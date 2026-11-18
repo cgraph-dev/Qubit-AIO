@@ -18,11 +18,10 @@ import type {
 } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, emitFx } from "@/sakuga/ui";
+import { Button, HoverTooltip, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import {
   SettingsEmpty,
-  SettingsLoadingSkeleton,
   SettingsPage,
   SettingsRow,
   SettingsSection,
@@ -539,16 +538,18 @@ export default function AnalyticsPage() {
               {p.label}
             </Button>
           ))}
-          <Button
-            type="button"
-            variant="secondary"
-            className="text-muted-foreground hover:text-foreground"
-            onClick={load}
-            disabled={loading}
-            aria-label={t.common.refresh}
-          >
-            {loading ? <Spinner /> : <RefreshCw />}
-          </Button>
+          <HoverTooltip content={t.common.refresh}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={load}
+              disabled={loading}
+              aria-label={t.common.refresh}
+            >
+              {loading ? <Spinner /> : <RefreshCw />}
+            </Button>
+          </HoverTooltip>
         </div>
       ),
     );
@@ -587,7 +588,9 @@ export default function AnalyticsPage() {
 
         {showTokens && loading && !data && (
           <SettingsSection title={t.analytics.period}>
-            <SettingsLoadingSkeleton rows={4} />
+            <div className="flex items-center justify-center py-8" aria-busy="true">
+              <SakugaLoading label="Loading analytics…" />
+            </div>
           </SettingsSection>
         )}
 

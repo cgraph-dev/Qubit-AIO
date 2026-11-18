@@ -183,8 +183,8 @@ describe("LogsPage detail view", () => {
     await renderLogs();
     await waitFor(() => apiMocks.fetchJSON.mock.calls.length > 0);
 
-    const row = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Log line 1 detail"]',
+    const row = container.querySelector<HTMLElement>(
+      '[aria-label="Log line 1 detail"]',
     );
     expect(row).not.toBeNull();
     await act(async () => {

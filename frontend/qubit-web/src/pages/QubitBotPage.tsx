@@ -23,7 +23,7 @@ import { ChevronDown, FileText, Plus, RotateCcw, Square, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, Textarea, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
@@ -946,14 +946,17 @@ export default function QubitBotPage() {
                 sends, Shift+Enter inserts a newline, and it collapses back to
                 44px after a send. A single-line <input> cannot grow, so it is
                 the wrong control for this pill. */}
-            <textarea
+            <Textarea
               id="bot-composer"
               ref={composerRef}
+              label="Message Qubit Bot"
               className="qb-composer-input"
               aria-label="Message Qubit Bot"
-              data-agent-context={JSON.stringify(BOT_AGENT_CONTEXT.value)}
+              {...({ "data-agent-context": JSON.stringify(BOT_AGENT_CONTEXT.value) } as Record<string, unknown>)}
               value={composer}
               rows={1}
+              autoResize
+              style={{ maxHeight: 140, overflowY: "auto" }}
               placeholder={
                 !loaded
                   ? historyError
@@ -961,9 +964,9 @@ export default function QubitBotPage() {
                     : "Loading conversation…"
                   : "Message…"
               }
-              onChange={(e) => {
-                setComposer(e.target.value);
-                setDrafts((d) => ({ ...d, [threadKey]: e.target.value }));
+              onChange={(value) => {
+                setComposer(value);
+                setDrafts((d) => ({ ...d, [threadKey]: value }));
               }}
               onFocus={() => setComposerFocused(true)}
               onBlur={() => setComposerFocused(false)}

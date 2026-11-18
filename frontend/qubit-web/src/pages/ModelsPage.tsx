@@ -44,7 +44,7 @@ import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
 import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
-import { Button, Input, Select, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, HoverTooltip, Input, Select, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 const PERIODS = [
   { label: "7d", days: 7 },
@@ -1607,16 +1607,18 @@ export default function ModelsPage() {
             {p.label}
           </Button>
         ))}
-        <Button
-          type="button"
-          variant="secondary"
-          className="text-muted-foreground hover:text-foreground"
-          onClick={load}
-          disabled={loading}
-          aria-label={t.common.refresh}
-        >
-          {loading ? <Spinner /> : <RefreshCw />}
-        </Button>
+        <HoverTooltip content={t.common.refresh}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={load}
+            disabled={loading}
+            aria-label={t.common.refresh}
+          >
+            {loading ? <Spinner /> : <RefreshCw />}
+          </Button>
+        </HoverTooltip>
       </div>,
     );
     setEnd(null);

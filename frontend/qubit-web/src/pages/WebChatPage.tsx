@@ -25,7 +25,7 @@ import {
   streamWebchatTurn,
 } from "@/lib/ocFamilyWebchatApi";
 import type { ChatStreamEvent } from "@/lib/api";
-import { Button, emitFx } from "@/sakuga/ui";
+import { Button, SakugaLoading, Textarea, emitFx } from "@/sakuga/ui";
 
 interface WebchatMessage {
   role: "user" | "assistant";
@@ -347,14 +347,17 @@ export function WebChatPage() {
         }}
         className="qb-composer"
       >
-        <textarea
+        <Textarea
+          label="Message"
           data-testid="webchat-input"
           aria-label="Message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(value) => setInput(value)}
           rows={1}
+          autoResize
           placeholder="Type a message…"
           className="qb-composer-input"
+          style={{ maxHeight: 180, overflowY: "auto" }}
         />
         <Button
           aria-label="Send"
@@ -367,6 +370,11 @@ export function WebChatPage() {
         </Button>
       </form>
 
+      {status === "loading" && (
+        <div className="qb-progress" aria-busy="true">
+          <SakugaLoading label="Opening session…" />
+        </div>
+      )}
       <p data-testid="webchat-status" className="qb-progress">
         {status === "loading" && "Opening session…"}
         {status === "idle" && "Ready"}

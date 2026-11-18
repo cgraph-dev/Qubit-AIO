@@ -35,7 +35,7 @@ import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
-import { Button, Checkbox, Input, Select, Textarea, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, HoverTooltip, Input, Select, Textarea, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Mirrors qubit_cli/profiles.py::_PROFILE_ID_RE so we can reject obviously
 // invalid names (uppercase, spaces, …) before round-tripping a doomed POST.
@@ -97,16 +97,18 @@ function ProfileActionsMenu({
 
   return (
     <div className="relative" data-profile-actions ref={containerRef}>
-      <Button
-        variant="secondary"
-        title={labels.actions}
-        aria-label={labels.actions}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <MoreVertical className="h-4 w-4" />
-      </Button>
+      <HoverTooltip content={labels.actions}>
+        <Button
+          variant="secondary"
+          title={labels.actions}
+          aria-label={labels.actions}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </HoverTooltip>
 
       {open && (
         <div

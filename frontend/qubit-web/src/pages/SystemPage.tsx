@@ -23,7 +23,7 @@ import {
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Button, Checkbox, Input, Select, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, FileField, Input, Select, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
@@ -798,15 +798,7 @@ export default function SystemPage() {
   return (
     <PageErrorBoundary label="System">
     <div className="flex flex-col gap-8">
-      <input
-        ref={importUploadInputRef}
-        type="file"
-        accept=".zip,application/zip,application/x-zip-compressed"
-        className="hidden"
-        onChange={(event) => {
-          setImportFile(event.currentTarget.files?.[0] ?? null);
-        }}
-      />
+
 
       <ConfirmDialog
         open={gatewayConfirm !== null}
@@ -1529,14 +1521,18 @@ export default function SystemPage() {
               <div className="grid min-w-0 flex-1 gap-2">
                 <Label>Restore from backup upload</Label>
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-                  <Button
-                    type="button"
+                  <FileField
+                    ref={importUploadInputRef}
+                    label=""
+                    buttonLabel="Choose restore zip"
+                    accept=".zip,application/zip,application/x-zip-compressed"
+                    showList={false}
                     disabled={importingBackup}
-                    
-                    onClick={() => importUploadInputRef.current?.click()}
+                    inputProps={{ "data-testid": "system-restore-input" } as Record<string, unknown>}
+                    onFiles={(files) => setImportFile(files[0] ?? null)}
                   >
                     Choose restore zip
-                  </Button>
+                  </FileField>
                   <span
                     className="min-w-0 truncate text-xs text-muted-foreground"
                     title={importFile?.name ?? "No backup archive selected"}

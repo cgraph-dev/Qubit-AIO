@@ -12,7 +12,7 @@
  * and the sessions switcher.
  */
 
-import { Button, Checkbox, HoverTooltip, Select, SakugaLoading, emitFx, emitFxAt } from "@/sakuga/ui";
+import { Button, Checkbox, FileField, HoverTooltip, ListItem, Select, SakugaLoading, Textarea, emitFx, emitFxAt } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
@@ -3001,18 +3001,20 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   className="absolute bottom-full left-0 right-0 z-10 mb-2 max-h-64 overflow-y-auto rounded-md border border-border bg-popover text-sm shadow-xl"
                 >
                   {slashMatches.map((match, i) => (
-                    <button
+                    <ListItem
                       key={match.name}
-                      type="button"
                       role="option"
+                      active={i === slashActive}
                       aria-selected={i === slashActive}
                       onMouseEnter={() => setSlashIndex(i)}
-                      onMouseDown={(e) => {
-                        // Apply before the textarea loses focus (click would
-                        // blur first); the composer is refocused in applySlash.
-                        e.preventDefault();
-                        applySlash(match);
-                      }}
+                      {...({
+                        onMouseDown: (e: React.MouseEvent<HTMLElement>) => {
+                          // Apply before the textarea loses focus (click would
+                          // blur first); the composer is refocused in applySlash.
+                          e.preventDefault();
+                          applySlash(match);
+                        },
+                      } as Record<string, unknown>)}
                       className={cn(
                         "flex w-full items-center gap-2 px-3 py-1.5 text-left",
                         i === slashActive && "bg-accent/10",
@@ -3024,7 +3026,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                       <span className="ml-auto truncate text-xs text-text-tertiary">
                         {match.description}
                       </span>
-                    </button>
+                    </ListItem>
                   ))}
                 </div>
               ) : null}
@@ -3034,13 +3036,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   resolve through the agent turn.
                 </div>
               ) : null}
-              <textarea
+              <Textarea
                 id="qubit-chat-input"
                 ref={composerRef}
+                label="Message Qubit"
                 value={input}
                 disabled={busy}
                 rows={2}
-                onChange={(event) => setInput(event.target.value)}
+                autoResize
+                onChange={(value) => setInput(value)}
                 onKeyDown={handleKeyDown}
                 onPaste={onPasteImage}
                 onDrop={onDropPath}
@@ -3048,35 +3052,30 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 placeholder="Message Qubit… (Enter to send, Shift+Enter for newline)"
                 aria-label="Message Qubit"
                 className={cn(
-                  "min-h-[2.5rem] w-full resize-none rounded-md border border-current/20",
-                  "bg-background-base/70 px-3 py-2 text-sm text-foreground",
-                  "focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60",
+                  "w-full rounded-md",
+                  "disabled:opacity-60",
                 )}
+                style={{ maxHeight: 260, overflowY: "auto" }}
               />
             </div>
-            <input
-              ref={attachInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,.pdf,.txt,.text,.md,.markdown,.mdown,.log,.transcript,.trans,.vtt,.srt"
-              className="hidden"
-              aria-hidden="true"
-              tabIndex={-1}
-              onChange={(event) => {
-                describeImage(event.target.files?.[0] ?? null);
-                event.target.value = "";
-              }}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => attachInputRef.current?.click()}
-              disabled={busy || attachState === "describing"}
-              aria-label="Attach image, PDF or file"
-              title="Attach or paste an image (routed to the agent), or a PDF/text file (extracted into the composer to review before sending)"
-            >
-              <ImagePlus className="h-4 w-4" />
-              {attachState === "describing" ? "Reading…" : "Attach"}
-            </Button>
+            <HoverTooltip content="Attach or paste an image (routed to the agent), or a PDF/text file (extracted into the composer to review before sending)">
+              <FileField
+                ref={attachInputRef}
+                label=""
+                buttonLabel="Attach image, PDF or file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,.pdf,.txt,.text,.md,.markdown,.mdown,.log,.transcript,.trans,.vtt,.srt"
+                showList={false}
+                disabled={busy || attachState === "describing"}
+                inputProps={{ "data-testid": "chat-attach-input" } as Record<string, unknown>}
+                onFiles={(files) => {
+                  describeImage(files[0] ?? null);
+                  if (attachInputRef.current) attachInputRef.current.value = "";
+                }}
+              >
+                <ImagePlus className="h-4 w-4" />
+                {attachState === "describing" ? "Reading…" : "Attach"}
+              </FileField>
+            </HoverTooltip>
             <Button
               type="button"
               variant="secondary"

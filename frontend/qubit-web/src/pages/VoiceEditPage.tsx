@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VoiceEditPreview } from "@/components/VoiceEditPreview";
 import { copyTextToClipboard } from "@/lib/clipboard";
-import { Button, Checkbox, Input, Select, Slider, Textarea, emitFx } from "@/sakuga/ui";
+import { Button, Checkbox, Input, NumberField, Select, Slider, Textarea, emitFx } from "@/sakuga/ui";
 import {
   voiceEdit,
   VOICE_EDIT_ACTIONS,
@@ -405,6 +405,10 @@ export default function VoiceEditPage() {
 
   // wake sub-editors: drafted locally, saved as one merged wake:{...} PUT
   const [wakePhrase, setWakePhrase] = useState("hey qubit");
+  // Bumped only when the server record is (re)applied. The string-backed
+  // number fields are uncontrolled so a typed "0." is not parsed and reset
+  // mid-keystroke; the epoch remounts them when fresh settings arrive.
+  const [numericEpoch, setNumericEpoch] = useState(0);
   const [wakeSilence, setWakeSilence] = useState("900");
   const [wakeRms, setWakeRms] = useState("0.0018");
   const [wakeEngine, setWakeEngine] = useState("auto");
@@ -511,6 +515,7 @@ export default function VoiceEditPage() {
     setWakeAsrFallbackMaxS(String(w.asr_fallback_max_s ?? 8));
     setWakeMaxS(String(w.max_s ?? 8));
     setWakeVad(w.vad ?? "auto");
+    setNumericEpoch((n) => n + 1);
   }, [settings?.wake]);
 
   useEffect(() => {
@@ -524,6 +529,7 @@ export default function VoiceEditPage() {
     setContinuousMode(settings.continuous_mode === true);
     setContinuousWindow(String(settings.continuous_window_s ?? 15));
     setContinuousMaxFollowups(String(settings.continuous_max_followups ?? 5));
+    setNumericEpoch((n) => n + 1);
   }, [
     settings?.voice_session_mode,
     settings?.voice_session_ttl_s,
@@ -936,57 +942,49 @@ export default function VoiceEditPage() {
                   Auto picks the spotter when its model bundle is present.
                 </span>
               </label>
-              <label className="text-sm">
-                End-of-speech silence (ms)
-                <input
-                  type="number"
-                  min={WAKE_LIMITS.silenceMs.min}
-                  max={WAKE_LIMITS.silenceMs.max}
-                  step="50"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-silence"
-                  value={wakeSilence}
-                  onChange={(e) => setWakeSilence(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Silence that ends the wake segment (300–5000).
-                </span>
-              </label>
-              <label className="text-sm">
-                Voice floor (RMS gate)
-                <input
-                  type="number"
-                  min={WAKE_LIMITS.rmsGate.min}
-                  max={WAKE_LIMITS.rmsGate.max}
-                  step="0.0001"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-rms"
-                  value={wakeRms}
-                  onChange={(e) => setWakeRms(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Frames quieter than this count as silence (0.0005–0.2).
-                </span>
-              </label>
-              <label className="text-sm">
-                Spotter threshold
-                <input
-                  type="number"
-                  min={WAKE_LIMITS.kwsThreshold.min}
-                  max={WAKE_LIMITS.kwsThreshold.max}
-                  step="0.01"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-kws"
-                  value={wakeKws}
-                  onChange={(e) => setWakeKws(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Lower hears more (0.05–0.9).
-                  {settings?.wake?.kws_available === false
-                    ? " No local spotter bundle — auto falls back to transcript match."
-                    : null}
-                </span>
-              </label>
+              <NumberField
+                key={`wake-silence-${numericEpoch}`}
+                label="End-of-speech silence (ms)"
+                defaultValue={wakeSilence}
+                min={WAKE_LIMITS.silenceMs.min}
+                max={WAKE_LIMITS.silenceMs.max}
+                step={50}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-wake-silence" }}
+                onChange={(value) => setWakeSilence(String(value))}
+                description="Silence that ends the wake segment (300–5000)."
+              />
+              <NumberField
+                key={`wake-rms-${numericEpoch}`}
+                label="Voice floor (RMS gate)"
+                defaultValue={wakeRms}
+                min={WAKE_LIMITS.rmsGate.min}
+                max={WAKE_LIMITS.rmsGate.max}
+                step={0.0001}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-wake-rms" }}
+                onChange={(value) => setWakeRms(String(value))}
+                description="Frames quieter than this count as silence (0.0005–0.2)."
+              />
+              <NumberField
+                key={`wake-kws-${numericEpoch}`}
+                label="Spotter threshold"
+                defaultValue={wakeKws}
+                min={WAKE_LIMITS.kwsThreshold.min}
+                max={WAKE_LIMITS.kwsThreshold.max}
+                step={0.01}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-wake-kws" }}
+                onChange={(value) => setWakeKws(String(value))}
+                description={
+                  <>
+                    Lower hears more (0.05–0.9).
+                    {settings?.wake?.kws_available === false
+                      ? " No local spotter bundle — auto falls back to transcript match."
+                      : null}
+                  </>
+                }
+              />
               <label className="text-sm">
                 ASR fallback for spotter misses
                 <Checkbox
@@ -1000,22 +998,18 @@ export default function VoiceEditPage() {
                   and match the wake phrase (local only).
                 </span>
               </label>
-              <label className="text-sm">
-                Fallback max length (s)
-                <input
-                  type="number"
-                  min={WAKE_LIMITS.asrFallbackMaxS.min}
-                  max={WAKE_LIMITS.asrFallbackMaxS.max}
-                  step="1"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-asr-fallback-max-s"
-                  value={wakeAsrFallbackMaxS}
-                  onChange={(e) => setWakeAsrFallbackMaxS(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Only utterances this long get a fallback probe (2–25).
-                </span>
-              </label>
+              <NumberField
+                key={`wake-asr-max-${numericEpoch}`}
+                label="Fallback max length (s)"
+                defaultValue={wakeAsrFallbackMaxS}
+                min={WAKE_LIMITS.asrFallbackMaxS.min}
+                max={WAKE_LIMITS.asrFallbackMaxS.max}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-wake-asr-fallback-max-s" }}
+                onChange={(value) => setWakeAsrFallbackMaxS(String(value))}
+                description="Only utterances this long get a fallback probe (2–25)."
+              />
               <label className="text-sm">
                 Segmentation (VAD)
                 <Select
@@ -1029,22 +1023,18 @@ export default function VoiceEditPage() {
                   Neural segmentation ignores fan/machine drone; energy hears it.
                 </span>
               </label>
-              <label className="text-sm">
-                Longest segment (s)
-                <input
-                  type="number"
-                  min={WAKE_LIMITS.maxS.min}
-                  max={WAKE_LIMITS.maxS.max}
-                  step="1"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-max-s"
-                  value={wakeMaxS}
-                  onChange={(e) => setWakeMaxS(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Continuously-voiced audio is cut here so every segment fits a probe (2–25).
-                </span>
-              </label>
+              <NumberField
+                key={`wake-max-s-${numericEpoch}`}
+                label="Longest segment (s)"
+                defaultValue={wakeMaxS}
+                min={WAKE_LIMITS.maxS.min}
+                max={WAKE_LIMITS.maxS.max}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-wake-max-s" }}
+                onChange={(value) => setWakeMaxS(String(value))}
+                description="Continuously-voiced audio is cut here so every segment fits a probe (2–25)."
+              />
             </div>
             <Button variant="secondary"
               data-testid="voice-edit-wake-save"
@@ -1374,55 +1364,47 @@ export default function VoiceEditPage() {
                     : "Follow-ups anchor to the same transcript (voice-chat)."}
                 </span>
               </label>
-              <label className="text-sm">
-                Keep sessions for (seconds)
-                <input
-                  type="number"
-                  min={VOICE_SESSION_LIMITS.ttlS.min}
-                  max={VOICE_SESSION_LIMITS.ttlS.max}
-                  step="60"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-session-ttl"
-                  value={sessionTtl}
-                  onChange={(e) => setSessionTtl(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Idle voice sessions are pruned after this (
-                  {formatTtlSeconds(Number(sessionTtl))}).
-                </span>
-              </label>
-              <label className="text-sm">
-                Max messages per session
-                <input
-                  type="number"
-                  min={VOICE_SESSION_LIMITS.maxMessages.min}
-                  max={VOICE_SESSION_LIMITS.maxMessages.max}
-                  step="10"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-session-max-messages"
-                  value={sessionMaxMessages}
-                  onChange={(e) => setSessionMaxMessages(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  An oversized session is reclaimed at the next voice turn.
-                </span>
-              </label>
-              <label className="text-sm">
-                Max kept sessions
-                <input
-                  type="number"
-                  min={VOICE_SESSION_LIMITS.maxSessions.min}
-                  max={VOICE_SESSION_LIMITS.maxSessions.max}
-                  step="1"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-session-max-sessions"
-                  value={sessionMaxSessions}
-                  onChange={(e) => setSessionMaxSessions(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Only the newest sessions beyond this are reclaimed.
-                </span>
-              </label>
+              <NumberField
+                key={`session-ttl-${numericEpoch}`}
+                label="Keep sessions for (seconds)"
+                defaultValue={sessionTtl}
+                min={VOICE_SESSION_LIMITS.ttlS.min}
+                max={VOICE_SESSION_LIMITS.ttlS.max}
+                step={60}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-session-ttl" }}
+                onChange={(value) => setSessionTtl(String(value))}
+                description={
+                  <>
+                    Idle voice sessions are pruned after this (
+                    {formatTtlSeconds(Number(sessionTtl))}).
+                  </>
+                }
+              />
+              <NumberField
+                key={`session-max-messages-${numericEpoch}`}
+                label="Max messages per session"
+                defaultValue={sessionMaxMessages}
+                min={VOICE_SESSION_LIMITS.maxMessages.min}
+                max={VOICE_SESSION_LIMITS.maxMessages.max}
+                step={10}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-session-max-messages" }}
+                onChange={(value) => setSessionMaxMessages(String(value))}
+                description="An oversized session is reclaimed at the next voice turn."
+              />
+              <NumberField
+                key={`session-max-sessions-${numericEpoch}`}
+                label="Max kept sessions"
+                defaultValue={sessionMaxSessions}
+                min={VOICE_SESSION_LIMITS.maxSessions.min}
+                max={VOICE_SESSION_LIMITS.maxSessions.max}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-session-max-sessions" }}
+                onChange={(value) => setSessionMaxSessions(String(value))}
+                description="Only the newest sessions beyond this are reclaimed."
+              />
             </div>
             <Button variant="secondary"
               data-testid="voice-session-save"
@@ -1452,38 +1434,30 @@ export default function VoiceEditPage() {
               Keep listening for a follow-up after each turn
             </label>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">
-                Follow-up window (seconds)
-                <input
-                  type="number"
-                  min={CONTINUOUS_LIMITS.windowS.min}
-                  max={CONTINUOUS_LIMITS.windowS.max}
-                  step="1"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="continuous-window"
-                  value={continuousWindow}
-                  onChange={(e) => setContinuousWindow(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  How long the mic stays armed after a turn (3–120).
-                </span>
-              </label>
-              <label className="text-sm">
-                Max follow-ups
-                <input
-                  type="number"
-                  min={CONTINUOUS_LIMITS.maxFollowups.min}
-                  max={CONTINUOUS_LIMITS.maxFollowups.max}
-                  step="1"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="continuous-max-followups"
-                  value={continuousMaxFollowups}
-                  onChange={(e) => setContinuousMaxFollowups(e.target.value)}
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Follow-up turns allowed before a fresh wake (1–20).
-                </span>
-              </label>
+              <NumberField
+                key={`continuous-window-${numericEpoch}`}
+                label="Follow-up window (seconds)"
+                defaultValue={continuousWindow}
+                min={CONTINUOUS_LIMITS.windowS.min}
+                max={CONTINUOUS_LIMITS.windowS.max}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "continuous-window" }}
+                onChange={(value) => setContinuousWindow(String(value))}
+                description="How long the mic stays armed after a turn (3–120)."
+              />
+              <NumberField
+                key={`continuous-max-followups-${numericEpoch}`}
+                label="Max follow-ups"
+                defaultValue={continuousMaxFollowups}
+                min={CONTINUOUS_LIMITS.maxFollowups.min}
+                max={CONTINUOUS_LIMITS.maxFollowups.max}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "continuous-max-followups" }}
+                onChange={(value) => setContinuousMaxFollowups(String(value))}
+                description="Follow-up turns allowed before a fresh wake (1–20)."
+              />
             </div>
             <Button variant="secondary"
               data-testid="continuous-save"
@@ -1666,24 +1640,21 @@ export default function VoiceEditPage() {
 />
                 Automatic gain control (level out quiet and loud speech)
               </label>
-              <label className="flex items-center gap-2">
-                Mic gain
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  max="32"
-                  data-testid="voice-edit-mic-gain"
-                  className="w-20 rounded border border-border bg-background p-1"
+              <div className="max-w-[16rem]">
+                <NumberField
+                  label="Mic gain"
                   value={settings.mic_gain ?? 6}
-                  onChange={(e) =>
-                    void update({ mic_gain: Number(e.target.value) })
+                  min={1}
+                  max={32}
+                  step={1}
+                  className="qsk-field"
+                  inputProps={{ "data-testid": "voice-edit-mic-gain" }}
+                  onChange={(value) =>
+                    void update({ mic_gain: Number(value) })
                   }
+                  description="Boosts a quiet interface (6–12 typical)."
                 />
-                <span className="text-xs text-muted-foreground">
-                  boosts a quiet interface (6–12 typical)
-                </span>
-              </label>
+              </div>
             </div>
           </Section>
 
@@ -1740,24 +1711,19 @@ export default function VoiceEditPage() {
                   Comma-separated phrases that ask for a longer, more detailed answer.
                 </span>
               </label>
-              <label className="text-sm">
-                Recent turns of context
-                <input
-                  type="number"
-                  min="2"
-                  max="40"
-                  step="1"
-                  data-testid="voice-edit-voice-recent-turns"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  value={settings.voice_recent_turns ?? 4}
-                  onChange={(e) =>
-                    void update({ voice_recent_turns: Number(e.target.value) })
-                  }
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  How many recent exchanges the voice brain sees (2–40).
-                </span>
-              </label>
+              <NumberField
+                label="Recent turns of context"
+                value={settings.voice_recent_turns ?? 4}
+                min={2}
+                max={40}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-voice-recent-turns" }}
+                onChange={(value) =>
+                  void update({ voice_recent_turns: Number(value) })
+                }
+                description="How many recent exchanges the voice brain sees (2–40)."
+              />
               <label className="text-sm">
                 Temperature
                 <div className="mt-1 flex items-center gap-2">
@@ -1874,26 +1840,19 @@ export default function VoiceEditPage() {
                 </span>
               </label>
               {ttsProvider === "kokoro" ? (
-                <label className="text-sm">
-                  Kokoro speaker
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="1"
-                    className="mt-1 w-full rounded border border-border bg-background p-1"
-                    data-testid="voice-edit-tts-kokoro-sid"
-                    value={settings.tts_kokoro_voice_sid ?? 1}
-                    onChange={(e) =>
-                      void update({
-                        tts_kokoro_voice_sid: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Kokoro speaker id (0–10).
-                  </span>
-                </label>
+                <NumberField
+                  label="Kokoro speaker"
+                  value={settings.tts_kokoro_voice_sid ?? 1}
+                  min={0}
+                  max={10}
+                  step={1}
+                  className="qsk-field"
+                  inputProps={{ "data-testid": "voice-edit-tts-kokoro-sid" }}
+                  onChange={(value) =>
+                    void update({ tts_kokoro_voice_sid: Number(value) })
+                  }
+                  description="Kokoro speaker id (0–10)."
+                />
               ) : null}
             </div>
           </Section>
@@ -1950,86 +1909,66 @@ export default function VoiceEditPage() {
               effect after the helper restarts.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">
-                Request lifetime (s)
-                <input
-                  type="number"
-                  min="30"
-                  max="3600"
-                  step="1"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-request_ttl_s"
-                  value={settings.request_ttl_s ?? 300}
-                  onChange={(e) =>
-                    void update({
-                      request_ttl_s: clampVoiceEditNumber(Number(e.target.value), 30, 3600),
-                    })
-                  }
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  How long a voice request stays valid (30–3600).
-                </span>
-              </label>
-              <label className="text-sm">
-                Brain timeout (s)
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  step="0.5"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-brain_timeout_s"
-                  value={settings.brain_timeout_s ?? 4}
-                  onChange={(e) =>
-                    void update({ brain_timeout_s: Number(e.target.value) })
-                  }
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  How long the brain router may take to disambiguate (default 4).
-                </span>
-              </label>
-              <label className="text-sm">
-                Release tail (ms)
-                <input
-                  type="number"
-                  min="0"
-                  max="2000"
-                  step="50"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-release_tail_ms"
-                  value={settings.release_tail_ms ?? 500}
-                  onChange={(e) =>
-                    void update({
-                      release_tail_ms: Math.round(
-                        clampVoiceEditNumber(Number(e.target.value), 0, 2000),
-                      ),
-                    })
-                  }
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Mic stream kept open after key release (0–2000).
-                </span>
-              </label>
-              <label className="text-sm">
-                Mic target peak
-                <input
-                  type="number"
-                  min="0.05"
-                  max="0.95"
-                  step="0.05"
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-mic_target_peak"
-                  value={settings.mic_target_peak ?? 0.5}
-                  onChange={(e) =>
-                    void update({
-                      mic_target_peak: clampVoiceEditNumber(Number(e.target.value), 0.05, 0.95),
-                    })
-                  }
-                />
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Capture level target (0.05–0.95).
-                </span>
-              </label>
+              <NumberField
+                label="Request lifetime (s)"
+                value={settings.request_ttl_s ?? 300}
+                min={30}
+                max={3600}
+                step={1}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-request_ttl_s" }}
+                onChange={(value) =>
+                  void update({
+                    request_ttl_s: clampVoiceEditNumber(Number(value), 30, 3600),
+                  })
+                }
+                description="How long a voice request stays valid (30–3600)."
+              />
+              <NumberField
+                label="Brain timeout (s)"
+                value={settings.brain_timeout_s ?? 4}
+                min={1}
+                max={60}
+                step={0.5}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-brain_timeout_s" }}
+                onChange={(value) =>
+                  void update({ brain_timeout_s: Number(value) })
+                }
+                description="How long the brain router may take to disambiguate (default 4)."
+              />
+              <NumberField
+                label="Release tail (ms)"
+                value={settings.release_tail_ms ?? 500}
+                min={0}
+                max={2000}
+                step={50}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-release_tail_ms" }}
+                onChange={(value) =>
+                  void update({
+                    release_tail_ms: Math.round(
+                      clampVoiceEditNumber(Number(value), 0, 2000),
+                    ),
+                  })
+                }
+                description="Mic stream kept open after key release (0–2000)."
+              />
+              <NumberField
+                label="Mic target peak"
+                value={settings.mic_target_peak ?? 0.5}
+                min={0.05}
+                max={0.95}
+                step={0.05}
+                className="qsk-field"
+                inputProps={{ "data-testid": "voice-edit-mic_target_peak" }}
+                onChange={(value) =>
+                  void update({
+                    mic_target_peak: clampVoiceEditNumber(Number(value), 0.05, 0.95),
+                  })
+                }
+                description="Capture level target (0.05–0.95)."
+              />
               <label className="text-sm">
                 STT engine override
                 <Input
