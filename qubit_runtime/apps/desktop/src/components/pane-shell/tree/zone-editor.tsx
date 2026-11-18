@@ -18,10 +18,11 @@
 
 import { useStore } from '@nanostores/react'
 import { atom } from 'nanostores'
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberField } from '@/sakuga/ui'
 import { registry } from '@/contrib/registry'
 import { useI18n } from '@/i18n'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
@@ -430,12 +431,13 @@ export function ZoneEditor() {
               {t.label}
             </Button>
           ))}
-          <Input
-            className="h-7 w-14 text-center text-xs"
+          <NumberField
+            inputProps={{ 'aria-label': 'Zone count' }}
+            label=""
             max={8}
             min={1}
-            onChange={e => setTemplateCount(Math.max(1, Math.min(8, Number(e.target.value) || 1)))}
-            type="number"
+            onChange={next => setTemplateCount(Math.max(1, Math.min(8, Number(next) || 1)))}
+            style={{ '--sk-number-width': '3.5rem' } as CSSProperties}
             value={templateCount}
           />
         </div>

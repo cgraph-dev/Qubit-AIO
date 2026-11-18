@@ -8,7 +8,7 @@
  * render differently, and a failed write shows the server's own reason rather
  * than a green tick. It never claims a save it did not make.
  */
-import { sakugaButton } from "./sakuga";
+import { sakugaButton, sakugaProgress } from "./sakuga";
 import { OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
@@ -90,7 +90,10 @@ export function createSeatModelPanel(
     if (!state) {
       children.push(R.createElement("div", {
         key: "loading", className: "seat-model__loading", role: "status",
-      }, "Loading model assignment\u2026"));
+      }, [
+        "Loading model assignment\u2026",
+        sakugaProgress(R, { label: "Loading model assignment", value: 0.08 }),
+      ]));
     } else if (!state.ok) {
       children.push(R.createElement("div", {
         key: "error", className: "seat-model__error", role: "alert",

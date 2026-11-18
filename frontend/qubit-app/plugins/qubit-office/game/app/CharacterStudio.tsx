@@ -251,21 +251,17 @@ export function createCharacterStudio(
       }, "Not saved yet.");
     };
 
-    const categoryButton = (category: PartCategory) => R.createElement(
-      "button",
-      {
-        key: `cat-${category}`,
-        type: "button",
-        className: "character-studio__category",
-        "data-testid": "character-category",
-        "data-category": category,
-        "aria-pressed": state.selectedCategory === category,
-        "aria-label": `${labelOf(category)} parts, ${counts[category] ?? 0}`,
-        onClick: () => update((current) =>
-          selectCategory(current, category)),
-      },
-      `${labelOf(category)} (${counts[category] ?? 0})`,
-    );
+    const categoryButton = (category: PartCategory) => sakugaButton(R, {
+      key: `cat-${category}`,
+      type: "button",
+      className: "character-studio__category",
+      "data-testid": "character-category",
+      "data-category": category,
+      "aria-pressed": state.selectedCategory === category,
+      "aria-label": `${labelOf(category)} parts, ${counts[category] ?? 0}`,
+      onClick: () => update((current) =>
+        selectCategory(current, category)),
+    }, `${labelOf(category)} (${counts[category] ?? 0})`);
 
     const partButton = (part: Part) => {
       const selected = part.category === "accessory"
@@ -286,21 +282,17 @@ export function createCharacterStudio(
       }, part.label);
     };
 
-    const lockButton = (category: PartCategory) => R.createElement(
-      "button",
-      {
-        key: `lock-${category}`,
-        type: "button",
-        "data-testid": "character-lock",
-        "data-category": category,
-        "aria-pressed": state.locks.includes(category),
-        "aria-label": `${state.locks.includes(category) ? "Unlock" : "Lock"}`
-          + ` ${category}`,
-        onClick: () => updateDraft((current) =>
-          toggleLock(current, category)),
-      },
-      state.locks.includes(category) ? "Locked" : "Lock",
-    );
+    const lockButton = (category: PartCategory) => sakugaButton(R, {
+      key: `lock-${category}`,
+      type: "button",
+      "data-testid": "character-lock",
+      "data-category": category,
+      "aria-pressed": state.locks.includes(category),
+      "aria-label": `${state.locks.includes(category) ? "Unlock" : "Lock"}`
+        + ` ${category}`,
+      onClick: () => updateDraft((current) =>
+        toggleLock(current, category)),
+    }, state.locks.includes(category) ? "Locked" : "Lock");
 
     const layerRow = (layer: LayerName, index: number) => [
       R.createElement("li", {
@@ -308,8 +300,10 @@ export function createCharacterStudio(
         "data-testid": "character-layer-row",
         "data-layer": layer,
       }, layer),
-      sakugaButton(R, {
-        key: `layer-up-${layer}`,
+      R.createElement(OfficeTooltip, {
+        key: `tip-layer-up-${layer}`,
+        content: `Draw the ${layer} layer earlier.`,
+      }, sakugaButton(R, {
         type: "button",
         "data-testid": "character-layer",
         "data-layer": layer,
@@ -318,9 +312,11 @@ export function createCharacterStudio(
         disabled: index === 0,
         onClick: () => updateDraft((current) =>
           moveLayer(current, layer, "up")),
-      }, "↑"),
-      sakugaButton(R, {
-        key: `layer-down-${layer}`,
+      }, "↑")),
+      R.createElement(OfficeTooltip, {
+        key: `tip-layer-down-${layer}`,
+        content: `Draw the ${layer} layer later.`,
+      }, sakugaButton(R, {
         type: "button",
         "data-testid": "character-layer",
         "data-layer": layer,
@@ -329,7 +325,7 @@ export function createCharacterStudio(
         disabled: index === state.draft.layer_order.length - 1,
         onClick: () => updateDraft((current) =>
           moveLayer(current, layer, "down")),
-      }, "↓"),
+      }, "↓")),
     ];
 
     const paletteInput = (colour: string, index: number) => R.createElement(

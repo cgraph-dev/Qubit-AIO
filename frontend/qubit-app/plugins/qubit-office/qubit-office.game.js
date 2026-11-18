@@ -191919,6 +191919,375 @@ create: function(game) {
 			"data-office-scale": String(values.textScale)
 		};
 	}
+	// ../qubit-shared/src/sakuga/loader.ts
+	var TAGS = {
+		button: "sakuga-button",
+		toggle: "sakuga-toggle",
+		slider: "sakuga-slider",
+		checkbox: "sakuga-checkbox",
+		radio: "sakuga-radio",
+		input: "sakuga-input",
+		tabs: "sakuga-tabs",
+		progress: "sakuga-progress",
+		rating: "sakuga-rating",
+		toast: "sakuga-toast",
+		tooltip: "sakuga-tooltip"
+	};
+	var base = "/sakuga-vfx";
+	var scripts = /* @__PURE__ */ new Map();
+	/** Point the loader at a different served copy (office frame, Electron file://). */
+	function configureSakuga(options = {}) {
+		if (options.base) base = options.base.replace(/\/+$/, "");
+	}
+	function canUseDom() {
+		return typeof window !== "undefined" && typeof document !== "undefined";
+	}
+	function inject(src) {
+		const existing = scripts.get(src);
+		if (existing) return existing;
+		const promise = new Promise((resolve, reject) => {
+			if (!canUseDom()) {
+				reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
+				return;
+			}
+			const script = document.createElement("script");
+			script.src = src;
+			script.async = false;
+			script.dataset.sakuga = "1";
+			script.onload = () => resolve();
+			script.onerror = () => {
+				scripts.delete(src);
+				reject(/* @__PURE__ */ new Error(`SAKUGA_LOAD_FAILED ${src}`));
+			};
+			document.head.append(script);
+		});
+		scripts.set(src, promise);
+		return promise;
+	}
+	/** Load and return the shared effects engine. Idempotent. */
+	function loadSakugaCore() {
+		if (!canUseDom()) return Promise.reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
+		if (window.SakugaFX) return Promise.resolve(window.SakugaFX);
+		return inject(`${base}/core.js`).then(() => {
+			if (!window.SakugaFX) throw new Error("SAKUGA_CORE_NOT_REGISTERED");
+			return window.SakugaFX;
+		});
+	}
+	/** Load one component file and resolve when its custom element exists. */
+	function loadSakugaComponent(name) {
+		if (!canUseDom()) return Promise.reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
+		return inject(`${base}/${name}/${name}.js`).then(() => {
+			if (!window.customElements.get(TAGS[name])) throw new Error(`SAKUGA_ELEMENT_NOT_REGISTERED ${TAGS[name]}`);
+		});
+	}
+	// ../qubit-shared/src/sakuga/fx.ts
+	var listeners = /* @__PURE__ */ new Set();
+	function viewportCentre() {
+		if (typeof window === "undefined") return {
+			x: 0,
+			y: 0
+		};
+		return {
+			x: window.scrollX + window.innerWidth / 2,
+			y: window.scrollY + window.innerHeight / 2
+		};
+	}
+	function anchor(detail) {
+		if (typeof detail.x === "number" && typeof detail.y === "number") return {
+			x: detail.x,
+			y: detail.y
+		};
+		const el = detail.target;
+		if (el && typeof el.getBoundingClientRect === "function") {
+			const rect = el.getBoundingClientRect();
+			return {
+				x: rect.left + window.scrollX + rect.width / 2,
+				y: rect.top + window.scrollY + rect.height / 2
+			};
+		}
+		return viewportCentre();
+	}
+	function draw$6(api, detail) {
+		const { x, y } = anchor(detail);
+		const s = Math.max(.35, Math.min(3, detail.scale ?? 1));
+		const word = detail.word;
+		const lettering = (fallback, opts = {}) => {
+			if (detail.silent) return;
+			api.sfx(word ?? fallback, x, y - 46 * s, {
+				size: opts.size ?? 56 * s,
+				...opts.dots ? api.dotted() : api.hollow()
+			});
+		};
+		switch (detail.cue) {
+			case "impact":
+				api.burst(x, y, {
+					r: 60 * s,
+					spikes: 14
+				});
+				api.puff(x - 34 * s, y + 18 * s, {
+					n: 5,
+					size: 12 * s
+				});
+				api.puff(x + 34 * s, y + 18 * s, {
+					n: 5,
+					size: 12 * s
+				});
+				api.shards(x, y, {
+					n: 9,
+					speed: 200 * s,
+					size: 5 * s
+				});
+				api.ticks(x, y, {
+					n: 3,
+					r: 26 * s
+				});
+				lettering("don", { size: 62 * s });
+				break;
+			case "success":
+				api.burst(x, y, {
+					r: 52 * s,
+					spikes: 12
+				});
+				api.ring(x, y + 34 * s, {
+					rx: 42 * s,
+					ry: 13 * s
+				});
+				api.kira(x + 30 * s, y - 24 * s, { r: 8 * s });
+				lettering("don", { size: 54 * s });
+				break;
+			case "error":
+				api.slash(x, y, {
+					len: 120 * s,
+					ang: -.6,
+					thick: 12 * s
+				});
+				api.lines(x, y, {
+					n: 7,
+					len: 46 * s
+				});
+				api.wob(x, y + 22 * s, { r: 18 * s });
+				lettering("zuza", {
+					dots: true,
+					size: 52 * s
+				});
+				break;
+			case "warning":
+				api.ring(x, y, {
+					rx: 44 * s,
+					ry: 13 * s,
+					life: .6
+				});
+				api.ticks(x, y, {
+					n: 4,
+					r: 22 * s
+				});
+				api.wob(x + 36 * s, y, { r: 14 * s });
+				lettering("pon", { size: 46 * s });
+				break;
+			case "celebrate":
+				api.burst(x, y, {
+					r: 70 * s,
+					spikes: 16
+				});
+				api.shards(x, y, {
+					n: 12,
+					speed: 240 * s,
+					size: 6 * s
+				});
+				api.puff(x - 52 * s, y + 20 * s, {
+					n: 6,
+					size: 13 * s
+				});
+				api.puff(x + 52 * s, y + 20 * s, {
+					n: 6,
+					size: 13 * s
+				});
+				lettering("don", { size: 68 * s });
+				break;
+			case "pop":
+				api.puff(x, y, {
+					n: 5,
+					size: 11 * s
+				});
+				lettering("pon", { size: 44 * s });
+				break;
+			case "slash":
+				api.slash(x, y, {
+					len: 140 * s,
+					ang: -.42,
+					thick: 15 * s
+				});
+				lettering("shu", { size: 46 * s });
+				break;
+			case "tick":
+				api.kira(x, y, { r: 10 * s });
+				api.ticks(x, y, {
+					n: 2,
+					r: 18 * s
+				});
+				lettering("kachi", { size: 42 * s });
+				break;
+			case "focus":
+				api.ticks(x, y, {
+					n: 3,
+					r: 20 * s
+				});
+				api.puff(x, y + 10 * s, {
+					n: 3,
+					size: 7 * s
+				});
+				break;
+			case "type":
+				api.puff(x, y, {
+					n: 3,
+					size: 5 * s,
+					life: .42,
+					vy: -10
+				});
+				break;
+			case "approval":
+				api.ring(x, y, {
+					rx: 50 * s,
+					ry: 15 * s,
+					life: .7
+				});
+				api.ticks(x, y, {
+					n: 5,
+					r: 24 * s
+				});
+				lettering("kachi", { size: 48 * s });
+				break;
+			case "agents":
+				api.burst(x, y, {
+					r: 40 * s,
+					spikes: 10
+				});
+				api.puff(x, y + 16 * s, {
+					n: 4,
+					size: 10 * s
+				});
+				lettering("gogo", { size: 48 * s });
+		}
+	}
+	/** Fire one cue. Resolves after the engine has loaded; failures are non-fatal. */
+	async function emitFx(cue, options = {}) {
+		const detail = {
+			cue,
+			...options
+		};
+		for (const listener of listeners) listener(detail);
+		try {
+			if (typeof window !== "undefined" && window.SakugaFX?.calm) return;
+			draw$6(await loadSakugaCore(), detail);
+		} catch {}
+	}
+	/** Fire a cue anchored to an element. */
+	function emitFxAt(cue, target, options = {}) {
+		return emitFx(cue, {
+			...options,
+			target
+		});
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/sakuga.ts
+	var configured = false;
+	/** Point the loader at the served `/sakuga-vfx` assets, once per document. */
+	function configureOfficeSakuga() {
+		if (configured) return;
+		configured = true;
+		const raw = (typeof window === "undefined" ? null : window)?.__QUBIT_SAKUGA_BASE__ || "/sakuga-vfx";
+		const base = String(raw).replace(/\/+$/, "") || "/sakuga-vfx";
+		try {
+			configureSakuga({ base });
+		} catch {}
+	}
+	/**
+	* A `sakuga-button` with the caller's attributes preserved.
+	*
+	* `props` are passed through unchanged (role, label, testid, className, type,
+	* disabled, aria-*, data-*), so every existing selector and assertion keeps
+	* working. The component script is loaded lazily; until it is defined the host
+	* element is inert but still carries the accessible role and label.
+	*/
+	function sakugaButton(R, props, ...children) {
+		configureOfficeSakuga();
+		try {
+			loadSakugaComponent("button").catch(() => {});
+		} catch {}
+		const next = { ...props ?? {} };
+		if (!next.role) next.role = "button";
+		return R.createElement("sakuga-button", next, ...children);
+	}
+	/** Clamp a value into the upstream progress bar's 0..1 range. */
+	function progressValue(value, fallback) {
+		return Math.max(0, Math.min(1, typeof value === "number" && Number.isFinite(value) ? value : fallback));
+	}
+	/**
+	* A `sakuga-progress` host with the caller's attributes preserved.
+	*
+	* The inner bar is the vendored shadow control. `value` is 0..1; callers that
+	* have no completion number pass a small, honest starting value (the bar is a
+	* status surface, not a fabricated percentage). `aria-valuenow` is only
+	* mirrored when the caller supplies a real value.
+	*/
+	function sakugaProgress(R, props) {
+		configureOfficeSakuga();
+		try {
+			loadSakugaComponent("progress").catch(() => {});
+		} catch {}
+		const next = { ...props ?? {} };
+		const explicitNow = typeof next["aria-valuenow"] === "number" && Number.isFinite(next["aria-valuenow"]);
+		const indeterminate = next.indeterminate === true;
+		delete next.indeterminate;
+		const controlled = !indeterminate && (typeof next.value === "number" && Number.isFinite(next.value) || explicitNow);
+		const value = progressValue(next.value, explicitNow ? Number(next["aria-valuenow"]) / 100 : 0);
+		delete next.value;
+		if (!next.role) next.role = "progressbar";
+		const label = typeof next.label === "string" && next.label.trim() ? next.label : "Loading";
+		const existingRef = next.ref;
+		delete next.ref;
+		const attrs = {
+			...next,
+			label,
+			"aria-valuemin": 0,
+			"aria-valuemax": 100,
+			ref: (el) => {
+				if (typeof existingRef === "function") existingRef(el);
+				else if (existingRef) existingRef.current = el;
+				if (el) el.setAttribute("value", String(value));
+			}
+		};
+		if (controlled) attrs["aria-valuenow"] = Math.round(value * 100);
+		else delete attrs["aria-valuenow"];
+		return R.createElement("sakuga-progress", attrs);
+	}
+	/**
+	* A label + progress pair, built from the same upstream bar. Used for long
+	* office loads; it never invents a number when the caller has none.
+	*/
+	function sakugaLoading(R, props, ...children) {
+		const { label = "Loading…", showLabel = true, className, style, id, "data-testid": testId, value, doneLabel, ...rest } = props ?? {};
+		const classes = ["qsk-loading", className].filter(Boolean).join(" ");
+		return R.createElement("div", {
+			id,
+			className: classes,
+			style,
+			role: "status",
+			"aria-live": "polite",
+			"aria-label": label,
+			"data-testid": testId
+		}, showLabel ? R.createElement("div", { className: "qsk-loading__label" }, label) : null, sakugaProgress(R, {
+			label,
+			value: progressValue(value, .08),
+			...typeof doneLabel === "string" ? { "done-label": doneLabel } : {},
+			...rest
+		}), ...children);
+	}
+	/** Fire one named cue in the dashboard document (the office shell). */
+	function officeFx(cue, options = {}) {
+		if (!cue) return;
+		configureOfficeSakuga();
+		emitFx(cue, options);
+	}
 	// ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
 	/**
 	* Build the component the plugin registry wants, bound to the host's React.
@@ -192188,7 +192557,7 @@ create: function(game) {
 				key: "spacer",
 				style: { flex: "1 1 auto" }
 			}),
-			R.createElement("button", {
+			sakugaButton(R, {
 				key: "text",
 				type: "button",
 				className: "office-game__btn",
@@ -192196,7 +192565,7 @@ create: function(game) {
 				"aria-label": "Larger text",
 				onClick: () => onSettingChange("textScale", nextScaleValue(settings.textScale))
 			}, "A+"),
-			R.createElement("button", {
+			sakugaButton(R, {
 				key: "motion",
 				type: "button",
 				className: "office-game__btn",
@@ -192204,7 +192573,7 @@ create: function(game) {
 				"data-testid": "office-game-reduce-motion",
 				onClick: () => onSettingChange("reducedMotion", !settings.reducedMotion)
 			}, "Motion"),
-			R.createElement("button", {
+			sakugaButton(R, {
 				key: "settings",
 				type: "button",
 				className: "office-game__btn",
@@ -192345,7 +192714,7 @@ create: function(game) {
 						gap: "var(--office-s1)",
 						flexWrap: "wrap"
 					}
-				}, (spec.options ?? []).map((o) => R.createElement("button", {
+				}, (spec.options ?? []).map((o) => sakugaButton(R, {
 					key: String(o.value),
 					type: "button",
 					className: "office-game__btn",
@@ -193614,375 +193983,6 @@ html body .ui-root .ui-deliv-card:active {
 			}
 		};
 	}
-	// ../qubit-shared/src/sakuga/loader.ts
-	var TAGS = {
-		button: "sakuga-button",
-		toggle: "sakuga-toggle",
-		slider: "sakuga-slider",
-		checkbox: "sakuga-checkbox",
-		radio: "sakuga-radio",
-		input: "sakuga-input",
-		tabs: "sakuga-tabs",
-		progress: "sakuga-progress",
-		rating: "sakuga-rating",
-		toast: "sakuga-toast",
-		tooltip: "sakuga-tooltip"
-	};
-	var base = "/sakuga-vfx";
-	var scripts = /* @__PURE__ */ new Map();
-	/** Point the loader at a different served copy (office frame, Electron file://). */
-	function configureSakuga(options = {}) {
-		if (options.base) base = options.base.replace(/\/+$/, "");
-	}
-	function canUseDom() {
-		return typeof window !== "undefined" && typeof document !== "undefined";
-	}
-	function inject(src) {
-		const existing = scripts.get(src);
-		if (existing) return existing;
-		const promise = new Promise((resolve, reject) => {
-			if (!canUseDom()) {
-				reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
-				return;
-			}
-			const script = document.createElement("script");
-			script.src = src;
-			script.async = false;
-			script.dataset.sakuga = "1";
-			script.onload = () => resolve();
-			script.onerror = () => {
-				scripts.delete(src);
-				reject(/* @__PURE__ */ new Error(`SAKUGA_LOAD_FAILED ${src}`));
-			};
-			document.head.append(script);
-		});
-		scripts.set(src, promise);
-		return promise;
-	}
-	/** Load and return the shared effects engine. Idempotent. */
-	function loadSakugaCore() {
-		if (!canUseDom()) return Promise.reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
-		if (window.SakugaFX) return Promise.resolve(window.SakugaFX);
-		return inject(`${base}/core.js`).then(() => {
-			if (!window.SakugaFX) throw new Error("SAKUGA_CORE_NOT_REGISTERED");
-			return window.SakugaFX;
-		});
-	}
-	/** Load one component file and resolve when its custom element exists. */
-	function loadSakugaComponent(name) {
-		if (!canUseDom()) return Promise.reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
-		return inject(`${base}/${name}/${name}.js`).then(() => {
-			if (!window.customElements.get(TAGS[name])) throw new Error(`SAKUGA_ELEMENT_NOT_REGISTERED ${TAGS[name]}`);
-		});
-	}
-	// ../qubit-shared/src/sakuga/fx.ts
-	var listeners = /* @__PURE__ */ new Set();
-	function viewportCentre() {
-		if (typeof window === "undefined") return {
-			x: 0,
-			y: 0
-		};
-		return {
-			x: window.scrollX + window.innerWidth / 2,
-			y: window.scrollY + window.innerHeight / 2
-		};
-	}
-	function anchor(detail) {
-		if (typeof detail.x === "number" && typeof detail.y === "number") return {
-			x: detail.x,
-			y: detail.y
-		};
-		const el = detail.target;
-		if (el && typeof el.getBoundingClientRect === "function") {
-			const rect = el.getBoundingClientRect();
-			return {
-				x: rect.left + window.scrollX + rect.width / 2,
-				y: rect.top + window.scrollY + rect.height / 2
-			};
-		}
-		return viewportCentre();
-	}
-	function draw$6(api, detail) {
-		const { x, y } = anchor(detail);
-		const s = Math.max(.35, Math.min(3, detail.scale ?? 1));
-		const word = detail.word;
-		const lettering = (fallback, opts = {}) => {
-			if (detail.silent) return;
-			api.sfx(word ?? fallback, x, y - 46 * s, {
-				size: opts.size ?? 56 * s,
-				...opts.dots ? api.dotted() : api.hollow()
-			});
-		};
-		switch (detail.cue) {
-			case "impact":
-				api.burst(x, y, {
-					r: 60 * s,
-					spikes: 14
-				});
-				api.puff(x - 34 * s, y + 18 * s, {
-					n: 5,
-					size: 12 * s
-				});
-				api.puff(x + 34 * s, y + 18 * s, {
-					n: 5,
-					size: 12 * s
-				});
-				api.shards(x, y, {
-					n: 9,
-					speed: 200 * s,
-					size: 5 * s
-				});
-				api.ticks(x, y, {
-					n: 3,
-					r: 26 * s
-				});
-				lettering("don", { size: 62 * s });
-				break;
-			case "success":
-				api.burst(x, y, {
-					r: 52 * s,
-					spikes: 12
-				});
-				api.ring(x, y + 34 * s, {
-					rx: 42 * s,
-					ry: 13 * s
-				});
-				api.kira(x + 30 * s, y - 24 * s, { r: 8 * s });
-				lettering("don", { size: 54 * s });
-				break;
-			case "error":
-				api.slash(x, y, {
-					len: 120 * s,
-					ang: -.6,
-					thick: 12 * s
-				});
-				api.lines(x, y, {
-					n: 7,
-					len: 46 * s
-				});
-				api.wob(x, y + 22 * s, { r: 18 * s });
-				lettering("zuza", {
-					dots: true,
-					size: 52 * s
-				});
-				break;
-			case "warning":
-				api.ring(x, y, {
-					rx: 44 * s,
-					ry: 13 * s,
-					life: .6
-				});
-				api.ticks(x, y, {
-					n: 4,
-					r: 22 * s
-				});
-				api.wob(x + 36 * s, y, { r: 14 * s });
-				lettering("pon", { size: 46 * s });
-				break;
-			case "celebrate":
-				api.burst(x, y, {
-					r: 70 * s,
-					spikes: 16
-				});
-				api.shards(x, y, {
-					n: 12,
-					speed: 240 * s,
-					size: 6 * s
-				});
-				api.puff(x - 52 * s, y + 20 * s, {
-					n: 6,
-					size: 13 * s
-				});
-				api.puff(x + 52 * s, y + 20 * s, {
-					n: 6,
-					size: 13 * s
-				});
-				lettering("don", { size: 68 * s });
-				break;
-			case "pop":
-				api.puff(x, y, {
-					n: 5,
-					size: 11 * s
-				});
-				lettering("pon", { size: 44 * s });
-				break;
-			case "slash":
-				api.slash(x, y, {
-					len: 140 * s,
-					ang: -.42,
-					thick: 15 * s
-				});
-				lettering("shu", { size: 46 * s });
-				break;
-			case "tick":
-				api.kira(x, y, { r: 10 * s });
-				api.ticks(x, y, {
-					n: 2,
-					r: 18 * s
-				});
-				lettering("kachi", { size: 42 * s });
-				break;
-			case "focus":
-				api.ticks(x, y, {
-					n: 3,
-					r: 20 * s
-				});
-				api.puff(x, y + 10 * s, {
-					n: 3,
-					size: 7 * s
-				});
-				break;
-			case "type":
-				api.puff(x, y, {
-					n: 3,
-					size: 5 * s,
-					life: .42,
-					vy: -10
-				});
-				break;
-			case "approval":
-				api.ring(x, y, {
-					rx: 50 * s,
-					ry: 15 * s,
-					life: .7
-				});
-				api.ticks(x, y, {
-					n: 5,
-					r: 24 * s
-				});
-				lettering("kachi", { size: 48 * s });
-				break;
-			case "agents":
-				api.burst(x, y, {
-					r: 40 * s,
-					spikes: 10
-				});
-				api.puff(x, y + 16 * s, {
-					n: 4,
-					size: 10 * s
-				});
-				lettering("gogo", { size: 48 * s });
-		}
-	}
-	/** Fire one cue. Resolves after the engine has loaded; failures are non-fatal. */
-	async function emitFx(cue, options = {}) {
-		const detail = {
-			cue,
-			...options
-		};
-		for (const listener of listeners) listener(detail);
-		try {
-			if (typeof window !== "undefined" && window.SakugaFX?.calm) return;
-			draw$6(await loadSakugaCore(), detail);
-		} catch {}
-	}
-	/** Fire a cue anchored to an element. */
-	function emitFxAt(cue, target, options = {}) {
-		return emitFx(cue, {
-			...options,
-			target
-		});
-	}
-	// ../qubit-app/plugins/qubit-office/game/app/sakuga.ts
-	var configured = false;
-	/** Point the loader at the served `/sakuga-vfx` assets, once per document. */
-	function configureOfficeSakuga() {
-		if (configured) return;
-		configured = true;
-		const raw = (typeof window === "undefined" ? null : window)?.__QUBIT_SAKUGA_BASE__ || "/sakuga-vfx";
-		const base = String(raw).replace(/\/+$/, "") || "/sakuga-vfx";
-		try {
-			configureSakuga({ base });
-		} catch {}
-	}
-	/**
-	* A `sakuga-button` with the caller's attributes preserved.
-	*
-	* `props` are passed through unchanged (role, label, testid, className, type,
-	* disabled, aria-*, data-*), so every existing selector and assertion keeps
-	* working. The component script is loaded lazily; until it is defined the host
-	* element is inert but still carries the accessible role and label.
-	*/
-	function sakugaButton(R, props, ...children) {
-		configureOfficeSakuga();
-		try {
-			loadSakugaComponent("button").catch(() => {});
-		} catch {}
-		const next = { ...props ?? {} };
-		if (!next.role) next.role = "button";
-		return R.createElement("sakuga-button", next, ...children);
-	}
-	/** Clamp a value into the upstream progress bar's 0..1 range. */
-	function progressValue(value, fallback) {
-		return Math.max(0, Math.min(1, typeof value === "number" && Number.isFinite(value) ? value : fallback));
-	}
-	/**
-	* A `sakuga-progress` host with the caller's attributes preserved.
-	*
-	* The inner bar is the vendored shadow control. `value` is 0..1; callers that
-	* have no completion number pass a small, honest starting value (the bar is a
-	* status surface, not a fabricated percentage). `aria-valuenow` is only
-	* mirrored when the caller supplies a real value.
-	*/
-	function sakugaProgress(R, props) {
-		configureOfficeSakuga();
-		try {
-			loadSakugaComponent("progress").catch(() => {});
-		} catch {}
-		const next = { ...props ?? {} };
-		const explicitNow = typeof next["aria-valuenow"] === "number" && Number.isFinite(next["aria-valuenow"]);
-		const indeterminate = next.indeterminate === true;
-		delete next.indeterminate;
-		const controlled = !indeterminate && (typeof next.value === "number" && Number.isFinite(next.value) || explicitNow);
-		const value = progressValue(next.value, explicitNow ? Number(next["aria-valuenow"]) / 100 : 0);
-		delete next.value;
-		if (!next.role) next.role = "progressbar";
-		const label = typeof next.label === "string" && next.label.trim() ? next.label : "Loading";
-		const existingRef = next.ref;
-		delete next.ref;
-		const attrs = {
-			...next,
-			label,
-			"aria-valuemin": 0,
-			"aria-valuemax": 100,
-			ref: (el) => {
-				if (typeof existingRef === "function") existingRef(el);
-				else if (existingRef) existingRef.current = el;
-				if (el) el.setAttribute("value", String(value));
-			}
-		};
-		if (controlled) attrs["aria-valuenow"] = Math.round(value * 100);
-		else delete attrs["aria-valuenow"];
-		return R.createElement("sakuga-progress", attrs);
-	}
-	/**
-	* A label + progress pair, built from the same upstream bar. Used for long
-	* office loads; it never invents a number when the caller has none.
-	*/
-	function sakugaLoading(R, props, ...children) {
-		const { label = "Loading…", showLabel = true, className, style, id, "data-testid": testId, value, doneLabel, ...rest } = props ?? {};
-		const classes = ["qsk-loading", className].filter(Boolean).join(" ");
-		return R.createElement("div", {
-			id,
-			className: classes,
-			style,
-			role: "status",
-			"aria-live": "polite",
-			"aria-label": label,
-			"data-testid": testId
-		}, showLabel ? R.createElement("div", { className: "qsk-loading__label" }, label) : null, sakugaProgress(R, {
-			label,
-			value: progressValue(value, .08),
-			...typeof doneLabel === "string" ? { "done-label": doneLabel } : {},
-			...rest
-		}), ...children);
-	}
-	/** Fire one named cue in the dashboard document (the office shell). */
-	function officeFx(cue, options = {}) {
-		if (!cue) return;
-		configureOfficeSakuga();
-		emitFx(cue, options);
-	}
 	// ../qubit-app/plugins/qubit-office/game/react-sdk.ts
 	var React = globalThis.__QUBIT_PLUGIN_SDK__?.React;
 	if (!React) throw new Error("QUBIT_PLUGIN_SDK_REACT_MISSING");
@@ -194765,46 +194765,69 @@ html body .ui-root .ui-deliv-card:active {
 	}
 	// ../qubit-shared/src/sakuga/extras/textarea.tsx
 	var SakugaTextarea = forwardRef(function SakugaTextarea(props, ref) {
-		const { label, value, defaultValue, placeholder, rows = 3, name, required, disabled, maxLength, autoFocus, readOnly, id, className, style, description, onChange } = props;
+		const { label, value, defaultValue, onChange, className, style, description, autoResize = false, rows = 3, onInput, ...rest } = props;
 		const autoId = useId();
-		const fieldId = id ?? `qsk-textarea-${autoId}`;
+		const fieldId = rest.id ?? `qsk-textarea-${autoId}`;
 		const typeFx = useTypeFx();
 		const focusFx = useFocusFx();
+		const innerRef = useRef(null);
+		const resize = () => {
+			if (!autoResize) return;
+			const element = innerRef.current;
+			if (!element) return;
+			element.style.height = "auto";
+			element.style.height = `${Math.max(rows * 20 + 16, element.scrollHeight)}px`;
+		};
+		useLayoutEffect(() => {
+			resize();
+		}, [
+			autoResize,
+			rows,
+			value,
+			defaultValue
+		]);
 		return createElement(ExtraField, {
 			label,
-			htmlFor: fieldId,
+			htmlFor: label ? fieldId : void 0,
 			description,
 			className,
 			style
 		}, createElement("textarea", {
+			...rest,
 			id: fieldId,
-			ref,
+			ref: (node) => {
+				innerRef.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
 			className: "qsk-extra__control qsk-textarea",
 			style: {
 				...FIELD_STYLE,
 				width: "100%",
 				minHeight: rows * 20 + 16,
-				resize: "vertical"
+				resize: autoResize ? "none" : "vertical",
+				...style
 			},
-			name,
-			placeholder,
 			rows,
-			required,
-			disabled,
-			maxLength,
-			autoFocus,
-			readOnly,
 			value,
 			defaultValue,
 			onChange: (event) => {
 				typeFx(event.currentTarget);
 				onChange?.(event.currentTarget.value);
+				resize();
 			},
-			onFocus: (event) => focusFx(event.currentTarget)
+			onInput: (event) => {
+				resize();
+				onInput?.(event);
+			},
+			onFocus: (event) => {
+				focusFx(event.currentTarget);
+				rest.onFocus?.(event);
+			}
 		}));
 	});
 	forwardRef(function SakugaNumber(props, ref) {
-		const { label, value, defaultValue, min, max, step = 1, name, disabled, id, className, style, description, onChange } = props;
+		const { label, value, defaultValue, min, max, step = 1, name, disabled, id, className, style, description, onChange, inputProps } = props;
 		const autoId = useId();
 		const fieldId = id ?? `qsk-number-${autoId}`;
 		const inputRef = useRef(null);
@@ -194852,6 +194875,7 @@ html body .ui-root .ui-deliv-card:active {
 			className: "qsk-stepper",
 			onClick: () => stepBy(-1)
 		}, "−"), createElement("input", {
+			...inputProps ?? {},
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -194899,7 +194923,7 @@ html body .ui-root .ui-deliv-card:active {
 	});
 	// ../qubit-shared/src/sakuga/extras/date-time.tsx
 	var DateTimeField = forwardRef(function DateTimeField(props, ref) {
-		const { label, value, defaultValue, min, max, name, disabled, id, className, style, description, onChange, type, openLabel } = props;
+		const { label, value, defaultValue, min, max, name, disabled, id, className, style, description, onChange, type, openLabel, inputProps } = props;
 		const autoId = useId();
 		const fieldId = id ?? `qsk-${type}-${autoId}`;
 		const inputRef = useRef(null);
@@ -194920,6 +194944,7 @@ html body .ui-root .ui-deliv-card:active {
 			className,
 			style
 		}, createElement("div", { style: ROW_STYLE }, createElement("input", {
+			...inputProps ?? {},
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -195002,7 +195027,7 @@ html body .ui-root .ui-deliv-card:active {
 		cursor: "pointer"
 	};
 	forwardRef(function SakugaFile(props, ref) {
-		const { label, accept, multiple, onFiles, name, disabled, id, className, style, description, buttonLabel } = props;
+		const { label, accept, multiple, onFiles, name, disabled, id, className, style, description, buttonLabel, children, showList = true, directory, inputProps } = props;
 		const autoId = useId();
 		const fieldId = id ?? `qsk-file-${autoId}`;
 		const [files, setFiles] = useState([]);
@@ -195036,7 +195061,8 @@ html body .ui-root .ui-deliv-card:active {
 			style
 		}, createElement("div", { style: {
 			...ROW_STYLE,
-			flexWrap: "wrap"
+			flexWrap: "wrap",
+			display: showList ? void 0 : "contents"
 		} }, createElement(SakugaButton, {
 			ref: (node) => {
 				triggerRef.current = node;
@@ -195047,8 +195073,10 @@ html body .ui-root .ui-deliv-card:active {
 			disabled,
 			"aria-label": `${buttonLabel ?? (multiple ? "Choose files" : "Choose file")}: ${label}`,
 			onClick: () => inputRef.current?.click()
-		}, buttonLabel ?? (multiple ? "Choose files" : "Choose file")), createElement("input", {
+		}, children ?? buttonLabel ?? (multiple ? "Choose files" : "Choose file")), createElement("input", {
+			...inputProps ?? {},
 			id: fieldId,
+			webkitdirectory: directory ? "" : void 0,
 			ref: (node) => {
 				inputRef.current = node;
 				if (typeof ref === "function") ref(node);
@@ -195369,7 +195397,10 @@ html body .ui-root .ui-deliv-card:active {
 				key: "loading",
 				className: "seat-model__loading",
 				role: "status"
-			}, "Loading model assignment…"));
+			}, ["Loading model assignment…", sakugaProgress(R, {
+				label: "Loading model assignment",
+				value: .08
+			})]));
 			else if (!state.ok) children.push(R.createElement("div", {
 				key: "error",
 				className: "seat-model__error",
@@ -196495,7 +196526,10 @@ html body .ui-root .ui-deliv-card:active {
 				"data-state": "loading",
 				role: "status",
 				"aria-live": "polite"
-			}, "Loading the roster…");
+			}, ["Loading the roster…", sakugaProgress(R, {
+				label: "Loading the roster",
+				value: .08
+			})]);
 			if (state.kind === "error") return R.createElement("div", {
 				className: "agents-panel agents-panel__error",
 				"data-testid": "agents-panel",
@@ -196665,7 +196699,10 @@ html body .ui-root .ui-deliv-card:active {
 				"data-state": "loading",
 				role: "status",
 				"aria-live": "polite"
-			}, "Loading effective state…");
+			}, ["Loading effective state…", sakugaProgress(R, {
+				label: "Loading effective state",
+				value: .08
+			})]);
 			if (read.kind === "error" || read.kind === "unavailable") {
 				const code = read.kind === "unavailable" ? read.code : "EFFECTIVE_READ_FAILED";
 				const detail = read.kind === "unavailable" ? read.detail : read.message;
@@ -197488,7 +197525,7 @@ html body .ui-root .ui-deliv-card:active {
 					"aria-live": "polite"
 				}, "Not saved yet.");
 			};
-			const categoryButton = (category) => R.createElement("button", {
+			const categoryButton = (category) => sakugaButton(R, {
 				key: `cat-${category}`,
 				type: "button",
 				className: "character-studio__category",
@@ -197512,7 +197549,7 @@ html body .ui-root .ui-deliv-card:active {
 					onClick: () => updateDraft((current) => pickPart(current, part.category, part.part_id))
 				}, part.label);
 			};
-			const lockButton = (category) => R.createElement("button", {
+			const lockButton = (category) => sakugaButton(R, {
 				key: `lock-${category}`,
 				type: "button",
 				"data-testid": "character-lock",
@@ -197527,8 +197564,10 @@ html body .ui-root .ui-deliv-card:active {
 					"data-testid": "character-layer-row",
 					"data-layer": layer
 				}, layer),
-				sakugaButton(R, {
-					key: `layer-up-${layer}`,
+				R.createElement(OfficeTooltip, {
+					key: `tip-layer-up-${layer}`,
+					content: `Draw the ${layer} layer earlier.`
+				}, sakugaButton(R, {
 					type: "button",
 					"data-testid": "character-layer",
 					"data-layer": layer,
@@ -197536,9 +197575,11 @@ html body .ui-root .ui-deliv-card:active {
 					"aria-label": `Move ${layer} layer up`,
 					disabled: index === 0,
 					onClick: () => updateDraft((current) => moveLayer(current, layer, "up"))
-				}, "↑"),
-				sakugaButton(R, {
-					key: `layer-down-${layer}`,
+				}, "↑")),
+				R.createElement(OfficeTooltip, {
+					key: `tip-layer-down-${layer}`,
+					content: `Draw the ${layer} layer later.`
+				}, sakugaButton(R, {
 					type: "button",
 					"data-testid": "character-layer",
 					"data-layer": layer,
@@ -197546,7 +197587,7 @@ html body .ui-root .ui-deliv-card:active {
 					"aria-label": `Move ${layer} layer down`,
 					disabled: index === state.draft.layer_order.length - 1,
 					onClick: () => updateDraft((current) => moveLayer(current, layer, "down"))
-				}, "↓")
+				}, "↓"))
 			];
 			const paletteInput = (colour, index) => R.createElement("input", {
 				key: `palette-${index}`,
@@ -198479,7 +198520,10 @@ html body .ui-root .ui-deliv-card:active {
 				className: "agent-control__state",
 				"data-testid": "agent-control-loading",
 				role: "status"
-			}, load.message ?? "Loading the agent control record…"));
+			}, [load.message ?? "Loading the agent control record…", sakugaProgress(R, {
+				label: "Loading the agent control record",
+				value: .08
+			})]));
 			else if (load.kind === "error" || load.kind === "empty") children.push(R.createElement("div", {
 				key: "state",
 				className: "agent-control__state agent-control__state--error",
@@ -200932,7 +200976,10 @@ html body .ui-root .ui-deliv-card:active {
 					"data-count": String(count),
 					"aria-label": `${count} pending approval${count === 1 ? "" : "s"}`
 				}, `${count} pending`),
-				sakugaButton(R, {
+				R.createElement(OfficeTooltip, {
+					key: "refresh-tip",
+					content: "Re-read the approval journal; settled ids disappear."
+				}, sakugaButton(R, {
 					key: "refresh",
 					type: "button",
 					className: "office-game__btn approvals-panel__refresh",
@@ -200940,7 +200987,7 @@ html body .ui-root .ui-deliv-card:active {
 					"aria-label": "Refresh pending approvals",
 					disabled: state.kind === "loading",
 					onClick: () => setRefresh((n) => n + 1)
-				}, "Refresh")
+				}, "Refresh"))
 			]);
 			const body = [];
 			if (state.kind === "loading") body.push(R.createElement("p", {
@@ -200949,7 +200996,10 @@ html body .ui-root .ui-deliv-card:active {
 				"data-testid": "approvals-loading",
 				role: "status",
 				"aria-live": "polite"
-			}, "Loading pending approvals…"));
+			}, ["Loading pending approvals…", sakugaProgress(R, {
+				label: "Loading pending approvals",
+				value: .08
+			})]));
 			else if (state.kind === "error") body.push(R.createElement("div", {
 				key: "error",
 				className: "approvals-panel__error",
@@ -201322,7 +201372,10 @@ html body .ui-root .ui-deliv-card:active {
 				"data-state": "loading",
 				role: "status",
 				"aria-live": "polite"
-			}, "Loading the command center…"));
+			}, ["Loading the command center…", sakugaProgress(R, {
+				label: "Loading the command center",
+				value: .08
+			})]));
 			else if (read.kind === "error" || read.kind === "unavailable") {
 				const code = read.kind === "unavailable" ? read.code : "COMMAND_CENTER_READ_FAILED";
 				const detail = read.kind === "unavailable" ? read.detail : read.message;
@@ -202002,7 +202055,10 @@ html body .ui-root .ui-deliv-card:active {
 				"data-testid": "timeline-loading",
 				role: "status",
 				"aria-live": "polite"
-			}, "Loading the operator timeline…"));
+			}, ["Loading the operator timeline…", sakugaProgress(R, {
+				label: "Loading the operator timeline",
+				value: .08
+			})]));
 			else if (read.kind === "error" || read.kind === "unavailable") {
 				const code = read.kind === "unavailable" ? read.code : "TIMELINE_READ_FAILED";
 				const detail = read.kind === "unavailable" ? read.detail : read.message;
@@ -205723,7 +205779,10 @@ html body .ui-root .ui-deliv-card:active {
 				role: "status",
 				"aria-live": "polite",
 				className: "panel-inventory panel-inventory--state"
-			}, "Loading panel inventory…");
+			}, ["Loading panel inventory…", sakugaProgress(R, {
+				label: "Loading panel inventory",
+				value: .08
+			})]);
 			if (read.kind === "error" || read.kind === "unavailable") {
 				const code = read.kind === "unavailable" ? read.code : "INVENTORY_ERROR";
 				const detail = read.kind === "unavailable" ? read.detail : read.message;
@@ -206972,7 +207031,10 @@ html body .ui-root .ui-deliv-card:active {
 					key: "t",
 					className: "office-theme-dock-title"
 				}, "Etsy connection"),
-				sakugaButton(R, {
+				R.createElement(OfficeTooltip, {
+					key: "refresh-tip",
+					content: "Re-read the token and scope state from the local integration store."
+				}, sakugaButton(R, {
 					key: "refresh",
 					type: "button",
 					className: "office-game__btn office-theme-dock-link",
@@ -206980,7 +207042,7 @@ html body .ui-root .ui-deliv-card:active {
 					"aria-label": "Refresh the Etsy connection status",
 					disabled: busy !== null || read.kind === "loading",
 					onClick: () => setRefresh((n) => n + 1)
-				}, "Refresh"),
+				}, "Refresh")),
 				sakugaButton(R, {
 					key: "x",
 					type: "button",
@@ -206995,7 +207057,10 @@ html body .ui-root .ui-deliv-card:active {
 				className: "etsy-connect__state",
 				"data-testid": "etsy-connect-loading",
 				role: "status"
-			}, "Reading the Etsy connection status…"));
+			}, ["Reading the Etsy connection status…", sakugaProgress(R, {
+				label: "Reading the Etsy connection status",
+				value: .08
+			})]));
 			else if (read.kind === "error") children.push(R.createElement("div", {
 				key: "read-error",
 				className: "etsy-connect__error",
