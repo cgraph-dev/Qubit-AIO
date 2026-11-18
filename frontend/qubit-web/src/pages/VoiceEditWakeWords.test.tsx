@@ -4,6 +4,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 import type { VoiceEditSettings, WakeRouting } from "@/lib/voiceEdit";
 
 const CATALOG = {
@@ -81,12 +83,16 @@ async function flush() {
   });
 }
 
-function setInput(el: HTMLInputElement, value: string) {
+function setInput(el: HTMLElement, value: string) {
+  if (el.tagName.toLowerCase() === "sakuga-input") {
+    typeIntoSakuga(el, value);
+    return;
+  }
   const setter = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
     "value",
   )?.set;
-  setter?.call(el, value);
+  setter?.call(el as HTMLInputElement, value);
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
@@ -170,7 +176,7 @@ describe("VoiceEditPage wake words & routing", () => {
     await flush();
     const input = container.querySelector(
       '[data-testid="wake-word-input"]',
-    ) as HTMLInputElement;
+    ) as HTMLElement;
     await act(async () => {
       setInput(input, "assistant");
       await Promise.resolve();

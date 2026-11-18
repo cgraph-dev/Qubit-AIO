@@ -3,6 +3,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { clickSakuga } from "@qubit/shared/sakuga";
 import type { VoiceEditSettings } from "@/lib/voiceEdit";
 
 const CATALOG = {
@@ -142,7 +144,7 @@ describe("VoiceEditPage in-game orb checkbox", () => {
       '[data-testid="voice-edit-waveform-ingame"]',
     ) as HTMLInputElement;
     await act(async () => {
-      box.click();
+      clickSakuga(box, "input");
       await Promise.resolve();
     });
     expect(mocks.saveSettings).toHaveBeenCalledWith({
@@ -171,7 +173,7 @@ describe("VoiceEditPage in-game orb checkbox", () => {
       '[data-testid="voice-edit-waveform-ingame"]',
     ) as HTMLInputElement;
     await act(async () => {
-      box.click();
+      clickSakuga(box, "input");
       await Promise.resolve();
     });
     await flush();
@@ -194,7 +196,7 @@ describe("VoiceEditPage in-game orb checkbox", () => {
       '[data-testid="voice-edit-waveform-ingame"]',
     ) as HTMLInputElement;
     await act(async () => {
-      box.click();
+      clickSakuga(box, "input");
       await Promise.resolve();
     });
     await flush();
@@ -224,7 +226,7 @@ describe("VoiceEditPage in-game orb checkbox", () => {
       '[data-testid="voice-edit-waveform-ingame"]',
     ) as HTMLInputElement;
     await act(async () => {
-      box.click();
+      clickSakuga(box, "input");
       await Promise.resolve();
     });
     expect(mocks.saveSettings).toHaveBeenCalledWith({

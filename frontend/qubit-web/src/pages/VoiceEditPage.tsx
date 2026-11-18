@@ -1196,7 +1196,7 @@ export default function VoiceEditPage() {
   data-testid="wake-route-target-mode"
   value={routeMode}
   onChange={(value) => setRouteMode(value)}
-  options={[{ value: "current", label: "current" }, { value: "agentId", label: "agent id" }, { value: "url", label: "URL" }]}
+  options={[{ value: "current", label: "current" }, { value: "agentId", label: "agent id" }, { value: "sessionKey", label: "session key" }]}
 />
                 </label>
                 {routeMode !== "current" ? (

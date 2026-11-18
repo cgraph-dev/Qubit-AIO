@@ -8,6 +8,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 import type { VoiceEditSettings, WakeRouting } from "@/lib/voiceEdit";
 
 const CATALOG = {
@@ -85,22 +87,34 @@ async function flush() {
   });
 }
 
-function setInput(el: HTMLInputElement, value: string) {
+function setInput(el: HTMLElement, value: string) {
+  if (el.tagName.toLowerCase() === "sakuga-input") {
+    typeIntoSakuga(el, value);
+    return;
+  }
   const setter = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
     "value",
   )?.set;
-  setter?.call(el, value);
+  setter?.call(el as HTMLInputElement, value);
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function setSelect(el: HTMLSelectElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLSelectElement.prototype,
-    "value",
-  )?.set;
-  setter?.call(el, value);
-  el.dispatchEvent(new Event("change", { bubbles: true }));
+async function setSelect(host: HTMLElement, value: string) {
+  const trigger = host.querySelector<HTMLButtonElement>('button[role="combobox"]');
+  if (!trigger) throw new Error("missing select trigger");
+  await act(async () => {
+    trigger.click();
+    await Promise.resolve();
+  });
+  const radio = document.querySelector("sakuga-radio");
+  await waitForSakuga(radio);
+  const option = sakugaInnerAll<HTMLInputElement>(radio, "input").find((i) => i.value === value);
+  if (!option) throw new Error(`missing option ${value}`);
+  await act(async () => {
+    option.click();
+    await Promise.resolve();
+  });
 }
 
 async function renderPage(over: Partial<VoiceEditSettings> = {}) {
@@ -113,18 +127,15 @@ async function renderPage(over: Partial<VoiceEditSettings> = {}) {
 async function addRoute(mode: string, trigger: string, value = "") {
   const triggerInput = container.querySelector(
     '[data-testid="wake-route-trigger"]',
-  ) as HTMLInputElement;
+  ) as HTMLElement;
   await act(async () => {
     setInput(triggerInput, trigger);
     await Promise.resolve();
   });
   const modeSelect = container.querySelector(
     '[data-testid="wake-route-target-mode"]',
-  ) as HTMLSelectElement;
-  await act(async () => {
-    setSelect(modeSelect, mode);
-    await Promise.resolve();
-  });
+  ) as HTMLElement;
+  await setSelect(modeSelect, mode);
   if (mode !== "current") {
     const valueInput = container.querySelector(
       '[data-testid="wake-route-target-value"]',
@@ -265,18 +276,15 @@ describe("VoiceEditPage wake routing", () => {
     await renderPage({ wake_routing: undefined });
     const triggerInput = container.querySelector(
       '[data-testid="wake-route-trigger"]',
-    ) as HTMLInputElement;
+    ) as HTMLElement;
     await act(async () => {
       setInput(triggerInput, "hey helper");
       await Promise.resolve();
     });
     const modeSelect = container.querySelector(
       '[data-testid="wake-route-target-mode"]',
-    ) as HTMLSelectElement;
-    await act(async () => {
-      setSelect(modeSelect, "agentId");
-      await Promise.resolve();
-    });
+    ) as HTMLElement;
+    await setSelect(modeSelect, "agentId");
     const add = container.querySelector(
       '[data-testid="wake-route-add"]',
     ) as HTMLButtonElement;

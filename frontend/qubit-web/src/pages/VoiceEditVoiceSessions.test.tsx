@@ -10,6 +10,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { clickSakuga, sakugaInner, sakugaInnerAll, waitForSakuga } from "@qubit/shared/sakuga";
 import type { VoiceEditSettings } from "@/lib/voiceEdit";
 
 const CATALOG = {
@@ -96,6 +98,18 @@ function setInput(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+async function chooseOption(host: Element | null, value: string) {
+  if (!host) throw new Error("missing select");
+  const trigger = host.querySelector<HTMLButtonElement>('button[role="combobox"]');
+  if (!trigger) throw new Error("missing select trigger");
+  await act(async () => { trigger.click(); await Promise.resolve(); });
+  const radio = document.querySelector("sakuga-radio");
+  await waitForSakuga(radio);
+  const option = sakugaInnerAll<HTMLInputElement>(radio, "input").find((i) => i.value === value);
+  if (!option) throw new Error(`missing option ${value}`);
+  await act(async () => { option.click(); await Promise.resolve(); });
+}
+
 async function renderPage() {
   const { default: VoiceEditPage } = await import("./VoiceEditPage");
   await act(async () => root.render(<VoiceEditPage />));
@@ -143,9 +157,7 @@ describe("VoiceEditPage voice sessions & continuous listening", () => {
       container.querySelector('[data-testid="voice-edit-continuous"]'),
     ).toBeTruthy();
 
-    const mode = container.querySelector(
-      '[data-testid="voice-session-mode"]',
-    ) as HTMLSelectElement;
+    const mode = container.querySelector('[data-testid="voice-session-mode"]');
     const ttl = container.querySelector(
       '[data-testid="voice-session-ttl"]',
     ) as HTMLInputElement;
@@ -155,21 +167,19 @@ describe("VoiceEditPage voice sessions & continuous listening", () => {
     const maxSessions = container.querySelector(
       '[data-testid="voice-session-max-sessions"]',
     ) as HTMLInputElement;
-    expect(mode.value).toBe("per_command");
+    expect(mode?.textContent).toContain("One session per command");
     expect(ttl.value).toBe("7200");
     expect(maxMessages.value).toBe("500");
     expect(maxSessions.value).toBe("25");
 
-    const continuous = container.querySelector(
-      '[data-testid="continuous-mode"]',
-    ) as HTMLInputElement;
+    const continuous = container.querySelector('[data-testid="continuous-mode"]');
     const windowS = container.querySelector(
       '[data-testid="continuous-window"]',
     ) as HTMLInputElement;
     const followups = container.querySelector(
       '[data-testid="continuous-max-followups"]',
     ) as HTMLInputElement;
-    expect(continuous.checked).toBe(true);
+    expect(sakugaInner<HTMLInputElement>(continuous, "input")?.checked).toBe(true);
     expect(windowS.value).toBe("30");
     expect(followups.value).toBe("8");
   });
@@ -179,9 +189,7 @@ describe("VoiceEditPage voice sessions & continuous listening", () => {
     mocks.saveSettings.mockResolvedValue({ settings: settings() });
     await renderPage();
 
-    const mode = container.querySelector(
-      '[data-testid="voice-session-mode"]',
-    ) as HTMLSelectElement;
+    const mode = container.querySelector('[data-testid="voice-session-mode"]');
     const ttl = container.querySelector(
       '[data-testid="voice-session-ttl"]',
     ) as HTMLInputElement;
@@ -192,9 +200,8 @@ describe("VoiceEditPage voice sessions & continuous listening", () => {
       '[data-testid="voice-session-max-sessions"]',
     ) as HTMLInputElement;
 
+    await chooseOption(mode, "per_command");
     await act(async () => {
-      mode.value = "per_command";
-      mode.dispatchEvent(new Event("change", { bubbles: true }));
       // Below the backend floors: these must clamp up on save.
       setInput(ttl, "30");
       setInput(maxMessages, "5");
@@ -230,11 +237,9 @@ describe("VoiceEditPage voice sessions & continuous listening", () => {
     );
     await renderPage();
 
-    const continuous = container.querySelector(
-      '[data-testid="continuous-mode"]',
-    ) as HTMLInputElement;
+    const continuous = container.querySelector('[data-testid="continuous-mode"]');
     await act(async () => {
-      continuous.click();
+      clickSakuga(continuous, "input");
       await Promise.resolve();
       await Promise.resolve();
     });
