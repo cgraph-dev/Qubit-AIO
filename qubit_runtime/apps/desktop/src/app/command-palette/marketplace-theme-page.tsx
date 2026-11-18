@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 /**
  * Cmd-K "Install theme…" page.
  *
@@ -101,7 +102,7 @@ export function MarketplaceThemePage({ search, onPickTheme }: MarketplaceThemePa
         const done = installs.has(item.extensionId)
 
         return (
-          <button
+          <Button variant="secondary"
             className={cn(
               'flex w-full items-start rounded-md text-left transition-colors hover:bg-(--chrome-action-hover) disabled:opacity-60 aria-disabled:opacity-60',
               HUD_ITEM,
@@ -140,7 +141,7 @@ export function MarketplaceThemePage({ search, onPickTheme }: MarketplaceThemePa
                 </>
               )}
             </span>
-          </button>
+          </Button>
         )
       })}
     </div>

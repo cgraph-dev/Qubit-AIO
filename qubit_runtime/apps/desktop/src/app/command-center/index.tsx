@@ -3,7 +3,7 @@ import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRe
 
 import { LogTail } from '@/components/chat/log-tail'
 import { PageLoader } from '@/components/page-loader'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -384,7 +384,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
 
                     return (
                       <li className="group flex items-center gap-2 py-2" key={session.id}>
-                        <button
+                        <Button variant="secondary"
                           className="min-w-0 flex-1 text-left"
                           onClick={() => onOpenSession(session.id)}
                           type="button"
@@ -395,7 +395,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
                           <div className="truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
                             {formatTimestamp(session.last_active || session.started_at)}
                           </div>
-                        </button>
+                        </Button>
                         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                           <RowIconButton
                             onClick={() => (pinned ? unpinSession(pinId) : pinSession(pinId))}

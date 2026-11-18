@@ -62,7 +62,7 @@ describe('Command Center session open carries the row', () => {
     )
 
     const title = await screen.findByText('Remote conversation')
-    fireEvent.click(title.closest('button') as HTMLButtonElement)
+    fireEvent.click(title.closest('[role="button"]') as HTMLButtonElement)
 
     expect(onOpenSession).toHaveBeenCalledWith(SESSION.id, SESSION)
   })

@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -182,14 +183,14 @@ export const Timeline = memo(function Timeline({
 
   return (
     <div className="pointer-events-auto flex w-[28rem] max-w-full items-center gap-3 [-webkit-app-region:no-drag]">
-      <button
+      <Button variant="secondary"
         aria-label={playing ? 'Pause' : 'Play timeline'}
         className="flex size-5 shrink-0 items-center justify-center text-foreground/75 transition-colors hover:text-foreground"
         onClick={onTogglePlay}
         type="button"
       >
         <Codicon name={playing ? 'debug-pause' : 'triangle-right'} size={playing ? '0.8rem' : '0.95rem'} />
-      </button>
+      </Button>
 
       <div
         aria-label="Timeline scrubber"

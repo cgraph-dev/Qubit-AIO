@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { SearchField } from '@/components/ui/search-field'
 import { Separator } from '@/components/ui/separator'
 import { useI18n } from '@/i18n'

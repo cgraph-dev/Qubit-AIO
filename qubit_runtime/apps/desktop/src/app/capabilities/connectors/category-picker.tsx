@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useRef, useState } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -40,7 +41,7 @@ export function CategoryPicker({ categories, onChange, value }: CategoryPickerPr
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
-        <button
+        <Button variant="secondary"
           aria-expanded={open}
           aria-haspopup="listbox"
           className={cn(controlVariants({ size: 'xs' }), 'flex w-auto items-center gap-1.5 whitespace-nowrap')}
@@ -51,7 +52,7 @@ export function CategoryPicker({ categories, onChange, value }: CategoryPickerPr
             {selected ? labelFor(selected.value) : copy.tools.categorySelect(categories.length)}
           </span>
           <Codicon className="shrink-0 opacity-60" name="chevron-down" size="0.875rem" />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="min-w-(--radix-popover-trigger-width)" variant="menu">
         <Command variant="menu">

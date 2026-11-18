@@ -1,7 +1,7 @@
+import { Button, Toggle } from '@/sakuga/ui'
 import type { ReactNode } from 'react'
 
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
-import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { Lock } from '@/lib/icons'
@@ -84,18 +84,18 @@ export function ToolRow({ expanded, on, onExpand, onToggle, preview = false, rea
           {preview ? null : locked ? (
             <Lock aria-hidden className="size-3 text-(--ui-text-quaternary)" />
           ) : (
-            <Switch
+            <Toggle
               aria-label={on ? copy.turnToolOff(tool.name) : copy.turnToolOn(tool.name)}
               checked={on}
               disabled={readOnly}
-              onCheckedChange={onToggle}
-              size="xs"
-            />
+              onChange={onToggle}
+          label={on ? copy.turnToolOff(tool.name) : copy.turnToolOn(tool.name)}
+        />
           )}
         </span>
 
         {expandable ? (
-          <button
+          <Button variant="secondary"
             aria-expanded={expanded}
             className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 text-left outline-none focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50"
             onClick={onExpand}
@@ -103,7 +103,7 @@ export function ToolRow({ expanded, on, onExpand, onToggle, preview = false, rea
           >
             {line}
             <span className="sr-only">{expanded ? copy.hideDetails(tool.name) : copy.showDetails(tool.name)}</span>
-          </button>
+          </Button>
         ) : (
           <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5">{line}</div>
         )}

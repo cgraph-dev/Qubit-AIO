@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import {
   type ActionResponse,
   type CuratorStatusResponse,

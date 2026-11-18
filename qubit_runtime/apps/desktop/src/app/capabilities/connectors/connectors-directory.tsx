@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 
 import { PanelEmpty } from '@/app/overlays/panel'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ErrorBanner } from '@/components/ui/error-state'
 import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'

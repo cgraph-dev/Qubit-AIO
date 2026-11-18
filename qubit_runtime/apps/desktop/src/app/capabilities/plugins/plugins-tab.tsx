@@ -12,9 +12,8 @@ import {
 import { setEnvVar } from '@/api/config'
 import { getToolsets, setToolsetEnabled } from '@/api/toolsets'
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
-import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { $pluginRecords, type PluginRecord, setPluginEnabled } from '@/contrib/plugins-store'
 import { discoverRuntimePlugins, uninstallDiskPlugin } from '@/contrib/runtime-loader'
@@ -451,15 +450,16 @@ function PackageRow({
           shows the install affordance. */}
         <HalfCell label={p.halfDesktop}>
           {desktop ? (
-            <Switch
+            <Toggle
               aria-label={`${p.halfDesktop}: ${pkg.name}`}
               checked={desktopOn}
               disabled={desktopBusy}
-              onCheckedChange={on => {
+              onChange={on => {
                 triggerHaptic('selection')
                 void toggleDesktop(desktop.id, on)
               }}
-            />
+          label={`${p.halfDesktop}: ${pkg.name}`}
+        />
           ) : pkg.desktopMissing ? (
             <Tip label={remoteBackend ? p.desktopHalfRemoteTip : p.desktopHalfPendingTip}>
               <span className="text-[0.65rem] text-(--ui-text-tertiary)">
@@ -487,16 +487,17 @@ function PackageRow({
               )}
               {busy && <Loader2 className="size-3.5 animate-spin text-(--ui-text-tertiary)" />}
               {agentToggleable ? (
-                <Switch
+                <Toggle
                   aria-label={`${p.halfAgent}: ${pkg.name}`}
                   checked={agentOn}
                   disabled={busy}
-                  onCheckedChange={on => onAgentToggle(agent, on)}
-                />
+                  onChange={on => onAgentToggle(agent, on)}
+          label={`${p.halfAgent}: ${pkg.name}`}
+        />
               ) : (
                 <Tip label={p.legacyBackend}>
                   <span>
-                    <Switch aria-label={`${p.halfAgent}: ${pkg.name}`} checked={agentOn} disabled />
+                    <Toggle aria-label={`${p.halfAgent}: ${pkg.name}`} checked={agentOn} disabled label={`${p.halfAgent}: ${pkg.name}`} />
                   </span>
                 </Tip>
               )}

@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
+import { Button, Toggle } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import type { Translations } from '@/i18n/types'
 
@@ -103,13 +102,13 @@ export function ToolsSummary({
                   <span className="w-24 shrink-0 text-right text-[0.7rem] text-(--ui-text-tertiary)">
                     {onLabel(copy, row)}
                   </span>
-                  <Switch
+                  <Toggle
                     aria-label={alone ? copy.allToolsSwitch : copy.facetSwitch(label)}
                     checked={row.switchState !== 'off'}
                     disabled={readOnly || row.locked}
-                    onCheckedChange={next => onToggleFacet(row.facet, next)}
-                    size="xs"
-                  />
+                    onChange={next => onToggleFacet(row.facet, next)}
+          label={alone ? copy.allToolsSwitch : copy.facetSwitch(label)}
+        />
                 </>
               )}
             </li>

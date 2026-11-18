@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useState } from 'react'
 
 import { ImageLightbox } from '@/components/chat/zoomable-image'
@@ -20,19 +21,19 @@ export function ReferenceChip({ name, onRemove, src }: ReferenceChipProps) {
 
   return (
     <div className="ml-auto flex h-6 items-center gap-2 self-start rounded-lg border border-border/60 bg-background/50 pl-1 pr-2">
-      <button aria-label={t.desktop.openImage} className="shrink-0" onClick={() => setViewing(true)} type="button">
+      <Button variant="secondary" aria-label={t.desktop.openImage} className="shrink-0" onClick={() => setViewing(true)} type="button">
         <img alt={name} className="size-4 rounded-md object-cover" src={src} />
-      </button>
+      </Button>
 
       <span className="max-w-40 truncate text-[0.64rem] font-medium text-foreground/50">{name || 'Reference'}</span>
-      <button
+      <Button variant="secondary"
         aria-label="Remove reference"
         className="text-(--ui-text-tertiary) transition not-hover:opacity-50"
         onClick={onRemove}
         type="button"
       >
         <X className="size-3" />
-      </button>
+      </Button>
 
       <ImageLightbox
         alt={name}
