@@ -32,10 +32,76 @@ sakuga-progress {
   gap: 0.5rem;
 }
 
-/* Qubit's shell already has a focus ring language; the component's own
- * :focus-visible is preserved, this only aligns its offset with dense rows. */
+/* ── compact chrome ─────────────────────────────────────────────────────
+ * The upstream controls are poster-sized for a component gallery (14px/30px
+ * button padding, 19px type, 16px type in a 54px-tall input). Qubit's
+ * dashboard is dense, so this layer narrows only the chrome. The drawing
+ * engine, the 108×54 toggle art and the 38px checkbox box are untouched:
+ * every value below is overridable chrome, not a scaled canvas.
+ *
+ * `::part()` is the supported upstream seam (see each component README); the
+ * shadow tree keeps ownership of the palette and the effects.
+ */
 sakuga-button::part(button) {
-  min-height: 24px;
+  min-height: 0;
+  padding: 5px 12px;
+  font-size: 13px;
+  line-height: 1.2;
+  border-width: 2.5px;
+  border-radius: 10px;
+  box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
+}
+
+sakuga-input::part(input) {
+  padding: 7px 12px;
+  font-size: 14px;
+  line-height: 1.35;
+  border-width: 2.5px;
+  box-shadow: 4px 5px 0 var(--sk-soft, #b8b3ff);
+}
+
+/* The raised tab keeps its landing animation; only the row metrics shrink. */
+sakuga-tabs::part(tabs) {
+  box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
+}
+
+sakuga-tabs::part(tab) {
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+/* Progress keeps the upstream bar height and the space its cloud/ground
+ * effects are anchored to; only the percentage chip is compacted. */
+sakuga-progress::part(label) {
+  padding: 2px 10px 3px;
+  font-size: 16px;
+}
+
+/* The toggle keeps its 108×54 art and the canvas metrics around it. The
+ * upstream 89px top margin reserved space for the splash in a gallery; in a
+ * settings row it is dead space. The canvas is absolutely positioned and
+ * pointer-events:none, so the effect still draws; it may spill over the row. */
+sakuga-toggle {
+  /* The splash draws upward; do not reserve the upstream 89px of gallery air.
+     A little side/bottom gap keeps rows readable. */
+  margin: 0 12px 8px;
+}
+
+/* Loading primitive: progress + visible caption. */
+.qsk-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  --sk-progress-width: 280px;
+}
+
+.qsk-loading__label {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sk-dim, #8580b0);
 }
 
 /* ListItem compatibility: the Sakuga button is flattened into the old dense

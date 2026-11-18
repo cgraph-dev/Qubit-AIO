@@ -3526,4 +3526,19 @@
 .room-builder [data-testid="room-builder-rooms"] button {
   font-size: 11px;
 }
+
+/* ── Sakuga control chrome (mirrors frontend/qubit-web/src/sakuga) ────────
+ * The host shell uses `sakuga-button` for its menu/dock actions. The
+ * dashboard's sakuga.css is normally present, but the office document can be
+ * served on its own, so the same compact chrome is stated here. Effects and
+ * palette stay in the vendored shadow tree. */
+.office-game sakuga-button::part(button) {
+  min-height: 0;
+  padding: 5px 12px;
+  font-size: 13px;
+  line-height: 1.2;
+  border-width: 2.5px;
+  border-radius: 10px;
+  box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
+}
 /*$vite$:1*/

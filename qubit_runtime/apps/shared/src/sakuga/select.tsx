@@ -53,18 +53,18 @@ const TRIGGER_STYLE: CSSProperties = {
   gap: 10,
   width: 'var(--sk-input-width, 230px)',
   maxWidth: '100%',
-  padding: '13px 16px',
-  border: 'var(--sk-bw, 3.2px) solid var(--sk-ink, #1d1a4a)',
+  padding: '7px 12px',
+  border: '2.5px solid var(--sk-ink, #1d1a4a)',
   borderRadius: 'var(--sk-r, 15px)',
   background: 'var(--sk-card, #fff)',
-  boxShadow: 'var(--sk-sh, 6px 7px 0 var(--sk-soft, #b8b3ff))',
+  boxShadow: '4px 5px 0 var(--sk-soft, #b8b3ff)',
   color: 'var(--sk-ink, #1d1a4a)',
   fontWeight: 600,
-  fontSize: 16,
-  lineHeight: 1.4,
+  fontSize: 14,
+  lineHeight: 1.35,
   textAlign: 'left',
   cursor: 'pointer',
-  font: 'inherit',
+  fontFamily: 'inherit',
 };
 
 const PANEL_STYLE: CSSProperties = {
@@ -73,12 +73,12 @@ const PANEL_STYLE: CSSProperties = {
   top: 'calc(100% + 10px)',
   left: 0,
   width: 'min(340px, 92vw)',
-  padding: 14,
-  border: 'var(--sk-bw, 3.2px) solid var(--sk-ink, #1d1a4a)',
+  padding: 12,
+  border: '2.5px solid var(--sk-ink, #1d1a4a)',
   borderRadius: 'var(--sk-r, 15px)',
   background: 'var(--sk-card, #fff)',
   color: 'var(--sk-ink, #1d1a4a)',
-  boxShadow: 'var(--sk-sh, 6px 7px 0 var(--sk-soft, #b8b3ff))',
+  boxShadow: '4px 5px 0 var(--sk-soft, #b8b3ff)',
 };
 
 export function SakugaSelect(props: SakugaSelectProps) {
