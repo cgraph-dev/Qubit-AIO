@@ -1,4 +1,5 @@
 import type { Unstable_TriggerAdapter, Unstable_TriggerItem } from '@assistant-ui/core'
+import { Button } from '@/components/ui/button'
 import { ComposerPrimitive, useAui, useAuiState } from '@assistant-ui/react'
 import {
   type ClipboardEvent,
@@ -934,7 +935,7 @@ export const UserEditComposer: FC<UserEditComposerProps> = ({ cwd, gateway, sess
                 {copy.attachingFile}
               </span>
             )}
-            <button
+            <Button
               aria-label={copy.sendEdited}
               className={cn('absolute right-2 bottom-2 size-5', USER_ACTION_ICON_BUTTON_CLASS)}
               disabled={!canSubmit || submitting || staging}
@@ -955,7 +956,7 @@ export const UserEditComposer: FC<UserEditComposerProps> = ({ cwd, gateway, sess
               type="button"
             >
               {submitting ? StopGlyph : <Codicon name="arrow-up" size={USER_ACTION_ICON_SIZE} />}
-            </button>
+            </Button>
           </div>
         </div>
       </StickyHumanMessageContainer>

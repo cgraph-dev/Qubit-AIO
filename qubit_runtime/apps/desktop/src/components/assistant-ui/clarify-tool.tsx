@@ -252,7 +252,7 @@ function ChoiceButton({
   title?: string
 }) {
   // `Tip` is the repo's themed replacement for native `title=` (a native
-  // tooltip on a <button> is banned by the no-native-title guard). It renders
+  // tooltip on a <Button> is banned by the no-native-title guard). It renders
   // the child untouched when `label` is falsy, so the live card (no tip) is
   // unaffected and only the settled skip card gets the hover hint.
   //
@@ -261,7 +261,7 @@ function ChoiceButton({
   // never passes it, so its rows stay plain.
   return (
     <Tip label={title}>
-      <button
+      <Button
         aria-current={active || undefined}
         aria-keyshortcuts={keyShortcuts}
         aria-pressed={selected}
@@ -281,7 +281,7 @@ function ChoiceButton({
         <span className="flex-1 wrap-anywhere">
           <ChoiceLabel choice={choice} />
         </span>
-      </button>
+      </Button>
     </Tip>
   )
 }
@@ -645,7 +645,7 @@ function ClarifyToolSinglePending({
             // That submits a staged single-select answer and toggles a
             // multi-select row. Skip, Continue, and the Other field stay
             // hands-off.
-            !active.matches('button[data-choice]')))
+            !active.matches('[data-choice]')))
       ) {
         return
       }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
 import { ImageLightbox } from '@/components/chat/zoomable-image'
@@ -233,7 +234,7 @@ function GalleryTile({
 }) {
   return (
     <Tip label={label}>
-      <button
+      <Button
         className={cn('relative block size-full cursor-zoom-in overflow-hidden bg-muted/55', className)}
         onClick={onOpen}
         type="button"
@@ -256,7 +257,7 @@ function GalleryTile({
             +{more}
           </span>
         )}
-      </button>
+      </Button>
     </Tip>
   )
 }

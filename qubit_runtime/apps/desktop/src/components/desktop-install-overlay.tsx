@@ -458,7 +458,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <button
+            <Button
               className="rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-4 text-left transition hover:bg-(--chrome-action-hover)"
               onClick={() => setRemoteOpen(true)}
               type="button"
@@ -468,9 +468,9 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                 <span>{copy.connectExistingTitle}</span>
               </div>
               <p className="mt-2 text-sm leading-5 text-muted-foreground">{copy.connectExistingDesc}</p>
-            </button>
+            </Button>
 
-            <button
+            <Button
               className="rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-4 text-left transition hover:bg-(--chrome-action-hover) disabled:cursor-not-allowed disabled:opacity-60"
               disabled={localStarting}
               onClick={async () => {
@@ -499,7 +499,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                 <span>{copy[localPres.title]}</span>
               </div>
               <p className="mt-2 text-sm leading-5 text-muted-foreground">{copy[localPres.desc]}</p>
-            </button>
+            </Button>
           </div>
 
           {localStartError ? (

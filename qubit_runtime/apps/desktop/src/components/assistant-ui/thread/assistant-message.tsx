@@ -8,6 +8,7 @@ import {
   useMessageRuntime,
   useThreadRuntime
 } from '@assistant-ui/react'
+import { Button } from '@/components/ui/button'
 import { useStore } from '@nanostores/react'
 import { type FC, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useInRouterContext, useNavigate } from 'react-router'
@@ -606,10 +607,10 @@ const SettingsLinkAction: FC<{ icon?: ReactNode; label: string; to: string }> = 
   const navigate = useNavigate()
 
   return (
-    <button className="aui-error-action" onClick={() => navigate(to)} type="button">
+    <Button className="aui-error-action" onClick={() => navigate(to)} type="button">
       {icon}
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -633,9 +634,9 @@ const SwitchProviderAction: FC<{ label: string }> = ({ label }) => {
   }, [navigate])
 
   return (
-    <button className="aui-error-action" onClick={switchProvider} type="button">
+    <Button className="aui-error-action" onClick={switchProvider} type="button">
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -688,9 +689,9 @@ const EditPreviousMessageAction: FC<{ label: string }> = ({ label }) => {
   }
 
   return (
-    <button className="aui-error-action" onClick={beginEdit} type="button">
+    <Button className="aui-error-action" onClick={beginEdit} type="button">
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -721,9 +722,9 @@ const CompressConversationAction: FC<{ label: string }> = ({ label }) => {
   }, [sessionId, t.assistant.thread.errorCompressFailed])
 
   return (
-    <button className="aui-error-action" onClick={compress} type="button">
+    <Button className="aui-error-action" onClick={compress} type="button">
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -781,9 +782,9 @@ const ScheduledRetryAction: FC<{ resetsAt: number }> = ({ resetsAt }) => {
         <span className="px-1 text-xs text-muted-foreground">
           {copy.errorRetryScheduled(formatResetClock(resetsAt), formatCountdown(fireAt - now))}
         </span>
-        <button className="aui-error-action" onClick={() => setFireAt(null)} type="button">
+        <Button className="aui-error-action" onClick={() => setFireAt(null)} type="button">
           {copy.errorRetryScheduledCancel}
-        </button>
+        </Button>
       </span>
     )
   }
@@ -793,7 +794,7 @@ const ScheduledRetryAction: FC<{ resetsAt: number }> = ({ resetsAt }) => {
   }
 
   return (
-    <button
+    <Button
       className="aui-error-action"
       onClick={() => {
         triggerHaptic('submit')
@@ -804,7 +805,7 @@ const ScheduledRetryAction: FC<{ resetsAt: number }> = ({ resetsAt }) => {
     >
       <RefreshCwIcon className="size-3" />
       {copy.errorRetryAtReset(formatResetClock(resetsAt))}
-    </button>
+    </Button>
   )
 }
 
@@ -924,26 +925,26 @@ const ErrorRecoveryActions: FC = () => {
       {plan.editMessage && <EditPreviousMessageAction label={copy.editMessage} />}
       {plan.compress && <CompressConversationAction label={copy.errorCompressConversation} />}
       {plan.chooseModel && (
-        <button className="aui-error-action" onClick={chooseModel} type="button">
+        <Button className="aui-error-action" onClick={chooseModel} type="button">
           {copy.errorChooseModel}
-        </button>
+        </Button>
       )}
       {plan.startNewSession && (
-        <button className="aui-error-action" onClick={startNewSession} type="button">
+        <Button className="aui-error-action" onClick={startNewSession} type="button">
           {copy.errorStartNewSession}
-        </button>
+        </Button>
       )}
       {plan.signInAgain && isOAuthReauthSurface(surface) && (
-        <button className="aui-error-action" onClick={signInAgain} type="button">
+        <Button className="aui-error-action" onClick={signInAgain} type="button">
           <KeyRound className="size-3" />
           {copy.errorSignInAgain(surface.providerLabel || surface.provider)}
-        </button>
+        </Button>
       )}
       {plan.signInFreeTier && (
-        <button className="aui-error-action" onClick={signInFreeTier} type="button">
+        <Button className="aui-error-action" onClick={signInFreeTier} type="button">
           <KeyRound className="size-3" />
           {copy.errorSignInFreeTier}
-        </button>
+        </Button>
       )}
       {plan.updateApiKey && inRouter && (
         <SettingsLinkAction
@@ -953,13 +954,13 @@ const ErrorRecoveryActions: FC = () => {
         />
       )}
       {plan.openHermesFolder && localFolders && (
-        <button className="aui-error-action" onClick={() => void openHermesFolder()} type="button">
+        <Button className="aui-error-action" onClick={() => void openHermesFolder()} type="button">
           {copy.errorOpenHermesFolder}
-        </button>
+        </Button>
       )}
       {plan.retry && (
         <ActionBarPrimitive.Reload asChild>
-          <button
+          <Button
             className="aui-error-action"
             onClick={() => {
               triggerHaptic('submit')
@@ -969,7 +970,7 @@ const ErrorRecoveryActions: FC = () => {
           >
             <RefreshCwIcon className="size-3" />
             {copy.errorRetry}
-          </button>
+          </Button>
         </ActionBarPrimitive.Reload>
       )}
       {plan.retry && limitReset && (
@@ -980,14 +981,14 @@ const ErrorRecoveryActions: FC = () => {
       {plan.retry && surface?.resetsAt !== undefined && <ScheduledRetryAction resetsAt={surface.resetsAt} />}
       {plan.switchProvider && inRouter && <SwitchProviderAction label={copy.errorSwitchProvider} />}
       {localFolders && (
-        <button className="aui-error-action" onClick={() => void openLogs()} type="button">
+        <Button className="aui-error-action" onClick={() => void openLogs()} type="button">
           {remoteConnection ? copy.errorOpenDesktopLogs : copy.errorOpenLogs}
-        </button>
+        </Button>
       )}
-      <button className="aui-error-action" onClick={() => requestSendDiagnostics(diagnosticsText())} type="button">
+      <Button className="aui-error-action" onClick={() => requestSendDiagnostics(diagnosticsText())} type="button">
         <Upload className="size-3" />
         {copy.errorSendDiagnostics}
-      </button>
+      </Button>
       <CopyButton
         appearance="inline"
         className="aui-error-action"

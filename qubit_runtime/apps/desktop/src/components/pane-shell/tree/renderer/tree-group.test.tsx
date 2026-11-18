@@ -44,7 +44,7 @@ function terminalGroup(minimized: boolean): GroupNode {
 
 const toggle = (label: string) =>
   globalThis.document.querySelector<HTMLButtonElement>(
-    `[data-tree-group="terminal-zone"] button[aria-label="${label}"]`
+    `[data-tree-group="terminal-zone"] button[aria-label="${label}"], [data-tree-group="terminal-zone"] sakuga-button[aria-label="${label}"]`
   )!
 
 afterEach(() => {

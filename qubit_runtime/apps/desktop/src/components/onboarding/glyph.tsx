@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
@@ -148,7 +149,7 @@ export function HackeryButton({
   onClick: () => void
 }) {
   return (
-    <button
+    <Button
       className={cn(
         'group inline-flex items-center gap-2 rounded-md border border-(--stroke-nous) px-6 py-2.5',
         'font-mono text-xs font-semibold uppercase text-primary',
@@ -163,6 +164,6 @@ export function HackeryButton({
       {loading ? <Loader2 className="size-3 animate-spin" /> : null}
       <span className="-mr-[0.25em] pl-[0.25em] tracking-[0.25em]">{label}</span>
       <span className="text-primary/40 transition-colors group-hover:text-primary">]</span>
-    </button>
+    </Button>
   )
 }

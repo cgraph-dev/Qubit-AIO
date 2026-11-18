@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 
@@ -329,7 +330,7 @@ export function FindBar() {
       )}
 
       <Tip label={t.findInPage.previous}>
-        <button
+        <Button
           aria-label={t.findInPage.previous}
           className="flex h-7 w-7 items-center justify-center rounded text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background)"
           onClick={findPrevious}
@@ -338,11 +339,11 @@ export function FindBar() {
           <svg height="14" viewBox="0 0 16 16" width="14">
             <path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
-        </button>
+        </Button>
       </Tip>
 
       <Tip label={t.findInPage.next}>
-        <button
+        <Button
           aria-label={t.findInPage.next}
           className="flex h-7 w-7 items-center justify-center rounded text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background)"
           onClick={findNext}
@@ -351,10 +352,10 @@ export function FindBar() {
           <svg height="14" viewBox="0 0 16 16" width="14">
             <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
-        </button>
+        </Button>
       </Tip>
 
-      <button
+      <Button
         aria-label={t.common.close}
         className="flex h-7 w-7 items-center justify-center rounded text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background)"
         onClick={closeFindBar}
@@ -363,7 +364,7 @@ export function FindBar() {
         <svg height="12" viewBox="0 0 12 12" width="12">
           <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" />
         </svg>
-      </button>
+      </Button>
     </div>
   )
 }

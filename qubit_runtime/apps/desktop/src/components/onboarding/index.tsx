@@ -873,7 +873,7 @@ export function ApiKeyForm({
 
       <div className="grid max-h-[42dvh] gap-2 overflow-y-auto p-1 sm:grid-cols-2">
         {options.map(o => (
-          <button
+          <Button
             className={cn(
               'rounded-2xl border bg-background/60 p-3 text-left transition hover:bg-accent/50',
               option.envKey === o.envKey ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
@@ -889,7 +889,7 @@ export function ApiKeyForm({
             {(t.onboarding.apiKeyOptions[o.id]?.short ?? o.short) ? (
               <p className="mt-1 text-xs text-muted-foreground">{t.onboarding.apiKeyOptions[o.id]?.short ?? o.short}</p>
             ) : null}
-          </button>
+          </Button>
         ))}
       </div>
 

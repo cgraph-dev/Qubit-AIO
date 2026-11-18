@@ -100,7 +100,7 @@ function PresetCard({ preset }: { preset: Contribution }) {
 
   return (
     <div className="group/preset relative">
-      <button
+      <Button
         className={cn(selectableCardClass({ active, prominent: true }), 'flex w-full flex-col gap-1.5 p-1.5 text-left')}
         onClick={() => applyLayoutPreset(preset.id, tree)}
         type="button"
@@ -113,9 +113,9 @@ function PresetCard({ preset }: { preset: Contribution }) {
         >
           {preset.title ?? preset.id}
         </span>
-      </button>
+      </Button>
       {isUserPreset(preset.id) && (
-        <button
+        <Button
           aria-label={t.zones.deletePreset(preset.title ?? preset.id)}
           // Hover-reveal (opacity, not display) — stays laid out + clickable,
           // appears on card hover or keyboard focus.
@@ -125,7 +125,7 @@ function PresetCard({ preset }: { preset: Contribution }) {
           type="button"
         >
           <Codicon name="close" size="0.7rem" />
-        </button>
+        </Button>
       )}
     </div>
   )
@@ -141,7 +141,7 @@ function ModeCard({ mode }: { mode: InterfaceMode }) {
   const copy = t.interfaceMode[mode]
 
   return (
-    <button
+    <Button
       aria-pressed={active}
       className={cn(
         selectableCardClass({ active, prominent: true }),
@@ -154,7 +154,7 @@ function ModeCard({ mode }: { mode: InterfaceMode }) {
         {copy.label}
       </span>
       <span className="text-[0.62rem] leading-snug text-(--ui-text-tertiary)">{copy.description}</span>
-    </button>
+    </Button>
   )
 }
 

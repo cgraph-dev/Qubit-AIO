@@ -83,7 +83,7 @@ function renderOneStrip() {
 const tabEl = (paneId: string) => document.querySelector<HTMLElement>(`[data-tree-tab="${paneId}"]`)
 
 /** Does this tab advertise a ✕? */
-const hasCloseButton = (paneId: string) => Boolean(tabEl(paneId)?.querySelector('button[aria-label]'))
+const hasCloseButton = (paneId: string) => Boolean(tabEl(paneId)?.querySelector('button[aria-label], sakuga-button[aria-label]'))
 
 /** Does the middle-click gesture actually close this tab? Observed through the
  *  tree, not through a spy — a pane that is gone stopped being a tab. */

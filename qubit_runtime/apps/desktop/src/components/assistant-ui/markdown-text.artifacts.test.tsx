@@ -48,7 +48,7 @@ describe('MarkdownTextContent artifacts', () => {
 
     const card = await screen.findByText('Pomodoro Timer')
 
-    expect(card.closest('button')?.dataset.slot).toBe('aui_artifact-card')
+    expect((card.closest('button, sakuga-button') as HTMLElement | null)?.dataset.slot).toBe('aui_artifact-card')
     expect(artifactsForSession('session-artifacts')).toHaveLength(1)
     expect(artifactsForSession('session-artifacts')[0]?.kind).toBe('html')
     // Registration alone must not open the rail (offer, don't hijack).

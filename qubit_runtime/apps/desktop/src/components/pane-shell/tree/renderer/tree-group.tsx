@@ -10,6 +10,7 @@
  */
 
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { type CSSProperties, Fragment, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 
 import { ShellMenuItems } from '@/app/context-menu/shell-menu-items'
@@ -599,7 +600,7 @@ export function TreeGroup({
                 trailing={
                   <>
                     {minimizable && (
-                      <button
+                      <Button
                         aria-label={node.minimized ? t.zones.restore : minimizeLabel}
                         className="mx-1 grid size-5 shrink-0 place-items-center self-center [-webkit-app-region:no-drag] rounded-md text-(--ui-text-tertiary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground focus-visible:opacity-100 group-hover/pane-header:opacity-100"
                         onClick={toggleCollapse}
@@ -607,7 +608,7 @@ export function TreeGroup({
                         type="button"
                       >
                         <Codicon name={node.minimized ? 'chevron-up' : 'chevron-down'} size="0.75rem" />
-                      </button>
+                      </Button>
                     )}
                     <StripDropCaret groupId={node.id} stripRef={stripRef} />
                   </>

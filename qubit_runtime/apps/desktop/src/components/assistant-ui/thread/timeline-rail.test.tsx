@@ -34,8 +34,8 @@ describe('TimelineRail', () => {
   it('bounds mounted buttons for thousands of prompts', () => {
     const view = render(<TimelineRail activeIndex={0} entries={entries} loadingId={null} onJump={vi.fn()} />)
 
-    expect(view.container.querySelectorAll('button').length).toBeGreaterThan(0)
-    expect(view.container.querySelectorAll('button').length).toBeLessThan(60)
+    expect(view.container.querySelectorAll('button, sakuga-button').length).toBeGreaterThan(0)
+    expect(view.container.querySelectorAll('button, sakuga-button').length).toBeLessThan(60)
   })
 
   it('keeps the active bar compact without hover and routes selection by stable ID', () => {

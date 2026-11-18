@@ -1,6 +1,7 @@
 'use client'
 
 import { type FC, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { DiffusionCanvas } from '@/components/chat/image-generation-placeholder'
 import { ImageActionButton, ImageLightbox } from '@/components/chat/zoomable-image'
@@ -84,7 +85,7 @@ export const GeneratedImage: FC<{ aspectRatio?: string; result?: unknown }> = ({
           </div>
         )}
         {src && (
-          <button
+          <Button
             aria-label={copy.openImage}
             className="absolute inset-0 block size-full cursor-zoom-in"
             onClick={() => setLightboxOpen(media.key)}
@@ -101,7 +102,7 @@ export const GeneratedImage: FC<{ aspectRatio?: string; result?: unknown }> = ({
               onLoad={event => media.onLoad(event.currentTarget)}
               src={src}
             />
-          </button>
+          </Button>
         )}
         {loaded && src && (
           <ImageActionButton className="group-hover/image:opacity-100" copy={copy} onClick={download} saving={saving} />

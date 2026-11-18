@@ -479,14 +479,14 @@ export function BootFailureOverlay() {
           <DialogCloseButton />
           {/* Subtle back affordance (projects/overlay idiom): muted → foreground
               on hover, no divider. */}
-          <button
+          <Button
             className="flex w-full items-center gap-1.5 px-4 pt-4 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
             onClick={() => setView('recovery')}
             type="button"
           >
             <ChevronLeft className="size-3.5" />
             {copy.back}
-          </button>
+          </Button>
           <div className="min-h-0 flex-1 pt-4">
             <Suspense fallback={<Loader className="mx-auto my-16 size-6 text-(--ui-text-tertiary)" />}>
               <GatewaySettings embedded />

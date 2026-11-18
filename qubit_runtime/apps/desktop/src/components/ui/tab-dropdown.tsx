@@ -1,4 +1,5 @@
 import { compactNumber } from '@qubit/shared'
+import { Button } from './button'
 import { Fragment } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -56,7 +57,7 @@ export function TabDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           className="flex h-7 cursor-pointer items-center gap-1.5 px-1 text-[length:var(--conversation-caption-font-size)] font-medium text-foreground [-webkit-app-region:no-drag]"
           type="button"
         >
@@ -64,7 +65,7 @@ export function TabDropdown({
           <span className="min-w-0 truncate">{active?.label}</span>
           {active?.meta !== undefined && <TextTabMeta>{tabMetaContent(active.meta)}</TextTabMeta>}
           <Codicon className="text-muted-foreground" name="chevron-down" size="0.75rem" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className={cn('w-44', className)} sideOffset={6}>
         {items.map((item, index) => (

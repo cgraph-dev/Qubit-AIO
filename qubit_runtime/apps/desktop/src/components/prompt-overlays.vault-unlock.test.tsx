@@ -44,7 +44,7 @@ it('answers the vault.unlock server request with the master password, never the 
   setVaultUnlockRequest({ backend: 'bitwarden', displayName: 'Bitwarden', requestId: 'req-a', sessionId: 'session-a' })
 
   render(<PromptOverlays sessionId="session-a" />)
-  const input = document.querySelector('input[type=password]')!
+  const input = document.querySelector('sakuga-input') as HTMLElement
   fireEvent.change(input, { target: { value: 'fixture-master' } })
   fireEvent.submit(input.closest('form')!)
 

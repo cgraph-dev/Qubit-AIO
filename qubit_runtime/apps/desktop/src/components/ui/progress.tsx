@@ -1,6 +1,7 @@
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
+import { Progress as SakugaProgress } from '@/sakuga/ui'
 
 const TRACK_HEIGHT = {
   sm: 'h-1',
@@ -36,7 +37,7 @@ export interface ProgressProps extends Omit<React.ComponentProps<'div'>, 'childr
  * `className` (track) and `fillClassName` while inheriting the structure,
  * sizing, and accessibility.
  */
-export function Progress({
+function NativeProgress({
   value = 0,
   indeterminate = false,
   animated = false,
@@ -78,5 +79,40 @@ export function Progress({
         />
       )}
     </div>
+  )
+}
+
+/**
+ * The app's progress bar.
+ *
+ * A plain determinate meter is the vendored Sakuga progress. The states the
+ * upstream component has no equivalent for — an unknown endpoint, the sliding
+ * pet animation, a destructive (error) fill, or a custom fill/marker — keep
+ * the native bar rather than silently dropping the state.
+ */
+export function Progress(props: ProgressProps) {
+  const { animated, children, destructive, fillClassName, fillStyle, indeterminate, ...rest } = props
+
+  if (indeterminate || animated || destructive || children || fillClassName || fillStyle) {
+    return (
+      <NativeProgress
+        {...rest}
+        animated={animated}
+        destructive={destructive}
+        fillClassName={fillClassName}
+        fillStyle={fillStyle}
+        indeterminate={indeterminate}
+      >
+        {children}
+      </NativeProgress>
+    )
+  }
+
+  return (
+    <SakugaProgress
+      className={rest.className}
+      label={(rest['aria-label'] as string | undefined) ?? 'Progress'}
+      value={rest.value ?? 0}
+    />
   )
 }

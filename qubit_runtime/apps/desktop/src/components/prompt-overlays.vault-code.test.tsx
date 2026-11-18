@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { stubResizeObserver } from '@/test/jsdom'
@@ -12,6 +12,7 @@ import { $profiles } from '@/store/profile'
 import { clearAllPrompts, sessionVaultCodeRequest, setVaultCodeRequest } from '@/store/prompts'
 import { hasOpenServerRequest, rememberServerRequest, resetServerRequestsForTests } from '@/store/server-requests'
 import { $activeSessionId, _resetSessionOwnerHintsForTests, setSessionOwnerHint } from '@/store/session'
+import { typeIntoSakuga } from '@/sakuga/ui'
 
 stubResizeObserver()
 
@@ -42,11 +43,11 @@ it('answers the vault.code server request with the trimmed code, never the ambie
   setVaultCodeRequest({ hint: '', requestId: 'req-c', sessionId: 'session-a', site: 'github.com' })
 
   render(<PromptOverlays sessionId="session-a" />)
-  const input = document.querySelector('input[autocomplete=one-time-code]') as HTMLInputElement
-  const submit = document.querySelector('button[type=submit]') as HTMLButtonElement
-  expect(submit.disabled).toBe(true)
-  fireEvent.change(input, { target: { value: '246 810' } })
-  expect(submit.disabled).toBe(false)
+  const input = document.querySelector('sakuga-input') as HTMLElement
+  const submit = document.querySelector('[data-sakuga-submit]') as HTMLElement
+  expect(submit.hasAttribute('disabled')).toBe(true)
+  act(() => typeIntoSakuga(input, '246 810'))
+  expect(submit.hasAttribute('disabled')).toBe(false)
   fireEvent.submit(input.closest('form')!)
 
   await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
@@ -65,7 +66,7 @@ it('Skip answers an empty code and clears the card', async () => {
   setVaultCodeRequest({ hint: '', requestId: 'req-d', sessionId: 'session-a', site: 'github.com' })
 
   render(<PromptOverlays sessionId="session-a" />)
-  fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Skip')!)
+  fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
   await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
   expect(respond).toHaveBeenCalledWith({ value: '' })

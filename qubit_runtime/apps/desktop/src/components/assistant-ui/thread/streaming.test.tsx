@@ -716,7 +716,7 @@ describe('assistant-ui streaming renderer', () => {
     const disclosures = container.querySelectorAll('[data-slot="aui_thinking-disclosure"]')
     expect(disclosures.length).toBe(1)
 
-    fireEvent.click(disclosures[0].querySelector('button')!)
+    fireEvent.click(disclosures[0].querySelector('button, sakuga-button')!)
 
     const reasoningParts = container.querySelectorAll('[data-slot="aui_reasoning-text"]')
     expect(reasoningParts.length).toBe(2)
@@ -730,8 +730,8 @@ describe('assistant-ui streaming renderer', () => {
     const disclosures = container.querySelectorAll('[data-slot="aui_thinking-disclosure"]')
     expect(disclosures.length).toBe(2)
 
-    expect(disclosures[0].querySelector('button')?.getAttribute('aria-expanded')).toBe('false')
-    expect(disclosures[1].querySelector('button')?.getAttribute('aria-expanded')).toBe('true')
+    expect(disclosures[0].querySelector('button, sakuga-button')?.getAttribute('aria-expanded')).toBe('false')
+    expect(disclosures[1].querySelector('button, sakuga-button')?.getAttribute('aria-expanded')).toBe('true')
     expect(container.textContent).not.toContain('Complete first thought.')
     expect(container.textContent).toContain('Interim answer.')
   })
@@ -755,7 +755,7 @@ describe('assistant-ui streaming renderer', () => {
       />
     )
 
-    fireEvent.click(container.querySelector('[data-tool-row] button')!)
+    fireEvent.click(container.querySelector('[data-tool-row] button, [data-tool-row] sakuga-button')!)
 
     await waitFor(() => {
       expect(container.textContent).toContain('FAL rejected the prompt')
@@ -767,7 +767,7 @@ describe('assistant-ui streaming renderer', () => {
   it('shows the command prompt and exit code for terminal calls', async () => {
     const { container } = render(<MessageHarness message={assistantTerminalMessage()} />)
 
-    fireEvent.click(container.querySelector('[data-tool-row] button')!)
+    fireEvent.click(container.querySelector('[data-tool-row] button, [data-tool-row] sakuga-button')!)
 
     await waitFor(() => {
       expect(container.textContent).toContain('$ npm run check --workspace=apps/desktop')
