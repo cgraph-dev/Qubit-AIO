@@ -11,6 +11,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./sakuga-test-dom";
+import { sakugaInnerAll, waitForSakuga } from "@qubit/shared/sakuga";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -127,13 +128,20 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+async function clickTab(label: string) {
+  const tabs = container.querySelector('[data-testid="computer-panels"]');
+  await waitForSakuga(tabs);
+  const item = sakugaInnerAll<HTMLButtonElement>(tabs, "button").find(
+    (b) => b.textContent?.includes(label),
+  );
+  if (!item) throw new Error(`tab not rendered: ${label}`);
+  await act(async () => item.click());
+}
+
 describe("ComputerWorkspacePage", () => {
   it("renders the live actuator status", async () => {
     await renderComputer();
-    const terminal = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
-      b.textContent?.includes("Terminal"),
-    ) as HTMLButtonElement;
-    await act(async () => terminal.click());
+    await clickTab("Terminal");
     await waitFor(() =>
       (container.textContent ?? "").includes("Actuator offline"),
     );
@@ -142,11 +150,7 @@ describe("ComputerWorkspacePage", () => {
 
   it("states the interactive shell gap instead of faking a command run", async () => {
     await renderComputer();
-    const terminal = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
-      b.textContent?.includes("Terminal"),
-    ) as HTMLButtonElement;
-    expect(terminal).toBeTruthy();
-    await act(async () => terminal.click());
+    await clickTab("Terminal");
     // Copy updated (om-computer-workspace.tsx:387): the shell gap is stated as
     // "deliberately out of scope" with the exact audited desktop-control
     // boundary, still never faking a command run.
@@ -179,10 +183,7 @@ describe("ComputerWorkspacePage", () => {
       if (url.includes("agent-workspace/list")) return jsonResponse(ROSTER);
       return jsonResponse({ state: "OK" });
     });
-    const terminal = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
-      b.textContent?.includes("Terminal"),
-    ) as HTMLButtonElement;
-    await act(async () => terminal.click());
+    await clickTab("Terminal");
     await waitFor(() =>
       (container.textContent ?? "").includes("Present desktop"),
     );
@@ -207,10 +208,7 @@ describe("ComputerWorkspacePage", () => {
 
   it("browses the real agent workspace roster on the Files tab", async () => {
     await renderComputer();
-    const files = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
-      b.textContent?.includes("Files"),
-    ) as HTMLButtonElement;
-    await act(async () => files.click());
+    await clickTab("Files");
     await waitFor(() => (container.textContent ?? "").includes("agent/main.py"));
     expect(container.textContent).toContain("Directories cannot be opened");
   });

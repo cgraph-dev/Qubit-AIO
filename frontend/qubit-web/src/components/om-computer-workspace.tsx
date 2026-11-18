@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button } from "@/sakuga/ui";
+import { Button, Tabs } from "@/sakuga/ui";
 
 import {
   getComputerStatus,
@@ -892,21 +892,17 @@ export function ComputerWorkspace() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Computer panels">
-        {(["Browser", "Terminal", "Files"] as const).map((item) => (
-          <OmButton
-            key={item}
-            small
-            primary={tab === item}
-            onClick={() => setTab(item)}
-            icon={
-              item === "Browser" ? Monitor : item === "Terminal" ? Terminal : FileText
-            }
-          >
-            {item}
-          </OmButton>
-        ))}
-      </div>
+      <Tabs
+        label="Computer panels"
+        options={[
+          { value: "Browser", label: "Browser" },
+          { value: "Terminal", label: "Terminal" },
+          { value: "Files", label: "Files" },
+        ]}
+        selected={tab === "Browser" ? 0 : tab === "Terminal" ? 1 : 2}
+        onChange={(detail) => setTab(detail.value as "Browser" | "Terminal" | "Files")}
+        data-testid="computer-panels"
+      />
 
       <OmErrorNotice error={statusError} />
 

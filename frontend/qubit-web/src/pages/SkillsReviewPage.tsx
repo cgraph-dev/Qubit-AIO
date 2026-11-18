@@ -225,7 +225,7 @@ export default function SkillsReviewPage() {
 
         <div className="settings-group">
           {/* Lifecycle tabs */}
-          <div className="settings-row settings-row--stacked" role="tablist" aria-label="Proposal status">
+          <div className="settings-row settings-row--stacked">
             <div className="settings-row__text">
               <div className="settings-row__title">Status</div>
             </div>
