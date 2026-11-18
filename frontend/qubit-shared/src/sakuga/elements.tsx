@@ -90,6 +90,65 @@ function hostShadowInput(host: HTMLElement | null): HTMLInputElement | null {
   return host?.shadowRoot?.querySelector<HTMLInputElement>('input') ?? null;
 }
 
+const INNER_INPUT_METHODS = [
+  'select',
+  'setSelectionRange',
+  'setRangeText',
+  'focus',
+  'blur',
+  'checkValidity',
+  'reportValidity',
+  'setCustomValidity',
+] as const;
+
+const INNER_INPUT_PROPS = [
+  'type',
+  'placeholder',
+  'required',
+  'pattern',
+  'minLength',
+  'maxLength',
+  'readOnly',
+  'selectionStart',
+  'selectionEnd',
+] as const;
+
+/** Let call sites treat the host like the native input it wraps. */
+function delegateInnerInput(host: HTMLElement): void {
+  const marked = host as HTMLElement & { __sakugaDelegated?: boolean };
+  if (marked.__sakugaDelegated) return;
+  marked.__sakugaDelegated = true;
+  const element = host as unknown as Record<string, unknown>;
+  for (const method of INNER_INPUT_METHODS) {
+    Object.defineProperty(host, method, {
+      configurable: true,
+      value: (...args: unknown[]) => {
+        const input = hostShadowInput(host) as unknown as Record<string, (...a: unknown[]) => unknown> | null;
+        return input?.[method]?.(...args);
+      },
+    });
+  }
+  for (const prop of INNER_INPUT_PROPS) {
+    if (Object.prototype.hasOwnProperty.call(host, prop)) continue;
+    Object.defineProperty(host, prop, {
+      configurable: true,
+      get: () => {
+        const input = hostShadowInput(host) as unknown as Record<string, unknown> | null;
+        if (input) return input[prop];
+        return host.getAttribute(prop.toLowerCase()) ?? undefined;
+      },
+    });
+  }
+  element['valueAsNumber'] = undefined;
+  Object.defineProperty(host, 'valueAsNumber', {
+    configurable: true,
+    get: () => {
+      const input = hostShadowInput(host) as unknown as { valueAsNumber?: number } | null;
+      return input?.valueAsNumber;
+    },
+  });
+}
+
 function isDefined(tag: string): boolean {
   return typeof window !== 'undefined' && Boolean(window.customElements?.get(tag));
 }
@@ -407,6 +466,8 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
       const input = host?.shadowRoot?.querySelector<HTMLInputElement>('input');
       if (!input) return false;
       innerRef.current = input;
+      const hostElement = inner.current;
+      if (hostElement) delegateInnerInput(hostElement);
       for (const [key, attr] of Object.entries(innerAttrs)) {
         if (attr === undefined || attr === null || attr === false) input.removeAttribute(key);
         else input.setAttribute(key, attr === true ? '' : String(attr));
