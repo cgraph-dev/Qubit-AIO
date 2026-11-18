@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BarChart3, X } from "lucide-react";
 import { api, type SharedMetricsConsent } from "@/lib/api";
 import { useProfileScope } from "@/contexts/useProfileScope";
+import { Button } from "@/sakuga/ui";
 
 const STORAGE_KEY = "sharedMetricsOfferDismissed";
 
@@ -79,25 +80,26 @@ export function SharedMetricsConsentBanner() {
       <span className="min-w-0 flex-1 opacity-80">
         {failed
           ? "Couldn't save your choice"
-          : ("Shared metrics are bounded counters, never prompts, files, paths or error text. Collection stays on this machine; sending them off this machine is a separate choice."){" "}
+          : "Shared metrics are bounded counters, never prompts, files, paths or error text. Collection stays on this machine; sending them off this machine is a separate choice."}
       </span>
-      <button type="button" disabled={saving} className={choice} onClick={() => answer(true, true)}>
-        {Share counters}
-      </button>
-      <button type="button" disabled={saving} className={choice} onClick={() => answer(true, false)}>
-        {Local only}
-      </button>
-      <button type="button" disabled={saving} className={choice} onClick={() => answer(false, false)}>
-        {No thanks}
-      </button>
-      <button
-        type="button"
+      <Button variant="secondary" disabled={saving} className={choice} onClick={() => answer(true, true)}>
+        Share counters
+      </Button>
+      <Button variant="secondary" disabled={saving} className={choice} onClick={() => answer(true, false)}>
+        Local only
+      </Button>
+      <Button variant="secondary" disabled={saving} className={choice} onClick={() => answer(false, false)}>
+        No thanks
+      </Button>
+      <Button
+        variant="secondary"
         aria-label="Dismiss"
         onClick={dismiss}
         className="shrink-0 opacity-70 hover:opacity-100"
+        fx={false}
       >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }

@@ -69,7 +69,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, SakugaToastHost } from "@/sakuga/ui";
 import { SelectionSwitcher } from "@nous-research/ui/ui/components/selection-switcher";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
@@ -933,6 +933,7 @@ export default function App() {
       data-layout-variant={layoutVariant}
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background-base text-text-primary antialiased"
     >
+      <SakugaToastHost />
       <a
         href="#qubit-main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[300] focus:border focus:border-midground focus:bg-background-base focus:px-3 focus:py-2 focus:text-sm focus:text-foreground"
@@ -971,12 +972,10 @@ export default function App() {
         }}
       >
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={() => setMobileOpen(true)}
           aria-label={t.app.openNavigation}
-          aria-expanded={mobileOpen}
-          aria-controls="app-sidebar"
+          {...{ "aria-expanded": mobileOpen, "aria-controls": "app-sidebar" }}
           className="text-text-secondary hover:text-midground"
         >
           <Menu />
@@ -990,9 +989,10 @@ export default function App() {
 
       {mobileOpen && (
         <Button
-          ghost
+          variant="secondary"
           aria-label={t.app.closeNavigation}
           onClick={closeMobile}
+          fx={false}
           className={cn(
             "lg:hidden fixed inset-0 z-40 p-0 block",
             "bg-black/70",
@@ -1082,8 +1082,7 @@ export default function App() {
               </div>
 
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={closeMobile}
                 aria-label={t.app.closeNavigation}
                 className="lg:hidden text-text-secondary hover:text-midground"
@@ -1092,8 +1091,7 @@ export default function App() {
               </Button>
 
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={toggleCollapsed}
                 aria-label={
                   collapsed ? t.common.expand : t.common.collapse
@@ -1853,10 +1851,11 @@ function SystemActionButton({
       onMouseEnter={collapsed ? showTooltip : undefined}
       onMouseLeave={collapsed ? hideTooltip : undefined}
     >
-      <button
+      <Button
+        variant="secondary"
         onClick={onClick}
         disabled={disabled}
-        aria-busy={busy}
+        {...{ "aria-busy": busy }}
         title={item.disabledReason || undefined}
         aria-label={displayLabel}
         onFocus={collapsed ? showTooltip : undefined}
@@ -1883,7 +1882,7 @@ function SystemActionButton({
         <span className={cn("truncate", collapsed && "lg:hidden")}>
           {displayLabel}
         </span>
-      </button>
+      </Button>
 
       {collapsed && tooltipAnchor && (
         <SidebarTooltip

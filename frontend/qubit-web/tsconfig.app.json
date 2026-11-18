@@ -19,7 +19,8 @@
     /* Path aliases */
     "paths": {
       "@/*": ["./src/*"],
-      "@qubit/shared": ["../qubit-shared/src/index.ts"]
+      "@qubit/shared": ["../qubit-shared/src/index.ts"],
+      "@qubit/shared/*": ["../qubit-shared/src/*"]
     },
 
     /* Linting */
