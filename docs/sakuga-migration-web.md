@@ -170,6 +170,7 @@ Swept by this lane and importing the controls from `@/sakuga/ui`:
 | `src/components/CommandPalette.tsx` search + option rows | Composite ARIA listbox: the input owns ↑/↓/Enter/Esc and rows are mouse-only `role="option"` elements; converting loses that contract. Kept native per the composite-widget exception. |
 | `src/components/LanguageSwitcher.tsx` `role="option"` rows | Composite listbox options, same reason. |
 | Hidden `<input type="file">` (`SystemPage`, `FilesPage`, `ConfigPage`) | Proxied by a Sakuga Button (owner exception). |
+| Segmented `role="radio"` filters (`SessionsPage`, `FilesPage`, and similar toolbar switches) | Composite segmented control: horizontal roving-arrow radio group. The upstream radio is a one-column list, so a literal swap changes layout and keys; the filter keeps its semantics and effects fire around it. |
 
 ### Shared-layer fixes this pass required
 
