@@ -2253,7 +2253,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <Button
                 variant="secondary"
                 onClick={() => setTerminalNoticeOpen((open) => !open)}
-                {...{ "aria-expanded": terminalNoticeOpen }}
+                {...{ "aria-expanded": String(terminalNoticeOpen) }}
                 aria-label="Terminal input"
                 title="Terminal input (Qubit policy)"
               >
@@ -2262,7 +2262,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <Button
                 variant="secondary"
                 onClick={() => setDebugOpen((open) => !open)}
-                {...{ "aria-expanded": debugOpen }}
+                {...{ "aria-expanded": String(debugOpen) }}
                 aria-label={debugOpen ? "Hide debug overlay" : "Show debug overlay"}
                 title="Debug overlay (runtime + logs)"
               >
@@ -2271,7 +2271,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <Button
                 variant="secondary"
                 onClick={() => setSidePanelOpen((open) => !open)}
-                {...{ "aria-expanded": sidePanelOpen, "aria-controls": "chat-side-panel" }}
+                {...{ "aria-expanded": String(sidePanelOpen), "aria-controls": "chat-side-panel" }}
                 aria-label={
                   sidePanelOpen
                     ? "Collapse chat side panel"

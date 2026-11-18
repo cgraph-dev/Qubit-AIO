@@ -975,7 +975,7 @@ export default function App() {
           variant="secondary"
           onClick={() => setMobileOpen(true)}
           aria-label={t.app.openNavigation}
-          {...{ "aria-expanded": mobileOpen, "aria-controls": "app-sidebar" }}
+          {...{ "aria-expanded": String(mobileOpen), "aria-controls": "app-sidebar" }}
           className="text-text-secondary hover:text-midground"
         >
           <Menu />

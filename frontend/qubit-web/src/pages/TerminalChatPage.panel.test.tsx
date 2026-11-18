@@ -325,7 +325,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     apiMocks.wsTicket.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
     apiMocks.wsTicket.mockImplementationOnce(async () => ({ ticket: "fresh-ticket" }));
     await renderTerminal();
-    const button = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("New chat"));
+    const button = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent?.includes("New chat"));
     expect(button).toBeTruthy();
     await act(async () => button!.click());
     await act(async () => resolveOld({ ticket: "obsolete-ticket" }));
@@ -339,7 +339,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     apiMocks.wsTicket.mockImplementationOnce(() => new Promise((_, reject) => { rejectOld = reject; }));
     apiMocks.wsTicket.mockImplementationOnce(async () => ({ ticket: "fresh-ticket" }));
     await renderTerminal();
-    const button = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("New chat"));
+    const button = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent?.includes("New chat"));
     await act(async () => button!.click());
     await act(async () => rejectOld(new Error("obsolete request failed")));
     expect(container.textContent).not.toContain("obsolete request failed");
@@ -526,7 +526,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await renderTerminal();
     await vi.waitFor(() => expect(panel()).not.toBeNull());
 
-    const collapse = Array.from(container.querySelectorAll("button")).find(
+    const collapse = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find(
       (b) => b.getAttribute("aria-label") === "Collapse chat side panel",
     )!;
     expect(collapse).toBeDefined();
@@ -539,18 +539,18 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(panel()).toBeNull();
     expect(
       container.querySelector(
-        'button[aria-label="Show chat side panel"]',
+        '[aria-label="Show chat side panel"]',
       ),
     ).not.toBeNull();
     expect(
       container
-        .querySelector('button[aria-label="Show chat side panel"]')!
+        .querySelector('[aria-label="Show chat side panel"]')!
         .getAttribute("aria-expanded"),
     ).toBe("false");
 
     await act(async () => {
       container
-        .querySelector('button[aria-label="Show chat side panel"]')!
+        .querySelector('[aria-label="Show chat side panel"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(panel()).not.toBeNull();
@@ -578,7 +578,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
       container.querySelector('[data-testid="terminal-active-model"]'),
     ).toBeNull();
     expect(
-      container.querySelector('button[aria-label="Reconnect terminal"]'),
+      container.querySelector('[aria-label="Reconnect terminal"]'),
     ).toBeNull();
   });
 
@@ -679,7 +679,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await renderTerminal();
     await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
 
-    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+    const newChat = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) =>
       b.textContent?.includes("New chat"),
     );
     expect(newChat).toBeDefined();
@@ -760,7 +760,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
     expect(FakeWebSocket.instances[0].url).not.toContain("resume=");
 
-    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+    const newChat = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) =>
       b.textContent?.includes("New chat"),
     );
     expect(newChat).toBeDefined();
@@ -804,7 +804,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     // Snapshot whatever token the mount used — New chat must replace it.
     const tokenBefore = window.sessionStorage.getItem("qubit.pty.token.chat");
 
-    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+    const newChat = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) =>
       b.textContent?.includes("New chat"),
     );
     await act(async () => {
@@ -846,7 +846,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
     expect(termClearSpy).not.toHaveBeenCalled();
 
-    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+    const newChat = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) =>
       b.textContent?.includes("New chat"),
     );
     await act(async () => {
@@ -1086,7 +1086,7 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
     apiMocks.wsTicket.mockImplementationOnce(() => new Promise((resolve) => { resolvePoll = resolve; }));
     try {
       await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
-      const newChat = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("New chat"))!;
+      const newChat = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent?.includes("New chat"))!;
       await act(async () => { newChat.click(); });
       await act(async () => { resolvePoll({ ticket: "stale", model: "previous-session-model" }); });
       const props = sidebarMount.mock.calls.at(-1)?.[0] as { terminalModel?: { model?: string } };
@@ -1159,7 +1159,7 @@ describe("Qubit TerminalChatPage copy last response", () => {
 
     const copy = await vi.waitFor(() => {
       const button = container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Copy last assistant response"]',
+        '[aria-label="Copy last assistant response"]',
       );
       expect(button).not.toBeNull();
       return button!;

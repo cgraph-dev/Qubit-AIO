@@ -18,7 +18,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal as XtermTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { Copy, Mic, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { api, withBackoff } from "@/lib/api";
 import type { WsTicketGrant } from "@/lib/api";
 import { WsTicketError } from "@/lib/api";
@@ -1486,11 +1486,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           {!sidePanelOpen ? (
             <div className="flex shrink-0 justify-end px-1">
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={() => setSidePanelOpen(true)}
-                aria-expanded={false}
-                aria-controls="chat-side-panel"
+                {...{ "aria-expanded": "false", "aria-controls": "chat-side-panel" }}
                 aria-label="Show chat side panel"
                 title="Show side panel"
               >
@@ -1537,7 +1535,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 {resumeMissingMessage(resumeParam)}
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" onClick={handleNewChat}>
+                <Button onClick={handleNewChat}>
                   New chat
                 </Button>
                 <a
@@ -1576,14 +1574,14 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             className="min-h-0 flex-1 overflow-hidden rounded-lg border border-current/15 bg-background-base/60 p-2 [&_.xterm]:h-full [&_.xterm-viewport]:!bg-transparent"
           />
           <Button
-            ghost
+            variant="secondary"
             onClick={() => void copyLastResponse()}
             disabled={copyBusy || resumeProbe === "missing"}
             title="Copy last assistant response as raw markdown"
             aria-label="Copy last assistant response"
             className="absolute bottom-3 right-3 z-10 rounded border border-current/30 bg-background-base/70 px-2 py-1 text-xs font-normal normal-case tracking-normal opacity-80 transition-opacity hover:border-current/60 hover:opacity-100 disabled:opacity-50"
-            prefix={<Copy className="h-3 w-3" />}
           >
+            <Copy className="h-3 w-3" />
             {copyState === "copied"
               ? "copied"
               : copyState === "empty"
@@ -1623,11 +1621,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             </div>
             <div className="flex shrink-0 items-center justify-end px-2 pt-1.5">
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={() => setSidePanelOpen(false)}
-                aria-expanded
-                aria-controls="chat-side-panel"
+                {...{ "aria-expanded": "true", "aria-controls": "chat-side-panel" }}
                 aria-label="Collapse chat side panel"
                 title="Collapse side panel"
               >
