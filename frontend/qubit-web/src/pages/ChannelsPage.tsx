@@ -8,31 +8,24 @@ import {
 } from "react";
 import {
   AlertTriangle,
-  Bot,
   Check,
   CheckCircle2,
   ExternalLink,
   Info,
   PlugZap,
-  QrCode,
   Radio,
-  RotateCw,
-  Save,
-  Settings2,
   WifiOff,
   X,
 } from "lucide-react";
 import * as QRCode from "qrcode";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
+import { Button, Input, Toggle } from "@/sakuga/ui";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import type {
   MessagingPlatform,
@@ -344,10 +337,8 @@ export default function ChannelsPage() {
     setEnd(
       <Button
         className="uppercase"
-        size="sm"
         onClick={handleRestart}
         disabled={restarting}
-        prefix={restarting ? <Spinner /> : <RotateCw className="h-4 w-4" />}
       >
         {restarting ? "Restarting…" : "Restart gateway"}
       </Button>,
@@ -384,11 +375,9 @@ export default function ChannelsPage() {
               </span>
             </div>
             <Button
-              size="sm"
               className="uppercase shrink-0"
               onClick={handleRestart}
               disabled={restarting}
-              prefix={restarting ? <Spinner /> : <RotateCw className="h-4 w-4" />}
             >
               {restarting ? "Restarting…" : "Restart now"}
             </Button>
@@ -436,8 +425,7 @@ export default function ChannelsPage() {
             )}
           >
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               onClick={() => setEditing(null)}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
@@ -561,18 +549,17 @@ export default function ChannelsPage() {
                     </span>
                   )}
                   <Input
+                    label={`${rebrand(field.prompt || field.key)}${field.required ? " *" : ""}`}
                     id={`field-${field.key}`}
                     type={field.is_password ? "password" : "text"}
-                    className="text-base leading-6 sm:text-xs sm:leading-4"
                     placeholder={
                       field.is_set
                         ? "reference stored — leave blank to keep"
                         : "env:NAME, vault:NAME, or file:/path"
                     }
                     value={draftEnv[field.key] ?? ""}
-                    aria-invalid={Boolean(fieldErrors[field.key])}
-                    onChange={(e) => {
-                      const nextValue = e.target.value;
+                    aria-invalid={fieldErrors[field.key] ? "true" : undefined}
+                    onChange={(nextValue) => {
                       setDraftEnv((prev) => ({ ...prev, [field.key]: nextValue }));
                       setFieldErrors((prev) => {
                         if (!prev[field.key]) return prev;
@@ -592,8 +579,7 @@ export default function ChannelsPage() {
 
               <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
                 <Button
-                  ghost
-                  size="sm"
+                  variant="secondary"
                   className="w-full sm:w-auto"
                   onClick={() => setEditing(null)}
                 >
@@ -601,10 +587,8 @@ export default function ChannelsPage() {
                 </Button>
                 <Button
                   className="w-full uppercase sm:w-auto"
-                  size="sm"
                   onClick={handleSave}
                   disabled={saving}
-                  prefix={saving ? <Spinner /> : undefined}
                 >
                   {saving ? "Saving…" : "Save & enable"}
                 </Button>
@@ -666,34 +650,24 @@ export default function ChannelsPage() {
                       {busy ? (
                         <Spinner className="text-sm" />
                       ) : (
-                        <Switch
+                        <Toggle
+                          label={`Enable ${platform.name}`}
                           checked={platform.enabled}
-                          onCheckedChange={() => void handleToggle(platform)}
-                          aria-label={`Enable ${platform.name}`}
+                          onChange={() => void handleToggle(platform)}
                         />
                       )}
                     </div>
                     <Button
-                      ghost
-                      size="sm"
+                      variant="secondary"
                       onClick={() => handleTest(platform)}
                       disabled={testingId === platform.id}
-                      prefix={
-                        testingId === platform.id ? (
-                          <Spinner />
-                        ) : (
-                          <PlugZap className="h-4 w-4" />
-                        )
-                      }
                     >
-                      Test
+                      {testingId === platform.id ? <Spinner /> : <PlugZap className="h-4 w-4" />} Test
                     </Button>
                     {platform.id !== "telegram" && (
                       <Button
-                        size="sm"
                         className="uppercase"
                         onClick={() => openConfig(platform)}
-                        prefix={<Settings2 className="h-4 w-4" />}
                       >
                         Configure
                       </Button>
@@ -995,11 +969,9 @@ function WhatsAppOnboardingPanel({
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            size="sm"
             className="uppercase"
             onClick={() => void start()}
             disabled={phase === "starting" || phase === "waiting" || phase === "applying"}
-            prefix={phase === "starting" ? <Spinner /> : <QrCode className="h-4 w-4" />}
           >
             {phase === "starting" ? "Starting…" : "Pair with QR"}
           </Button>
@@ -1024,16 +996,14 @@ function WhatsAppOnboardingPanel({
             </span>
             <div className="flex flex-wrap gap-2">
               <Button
-                size="sm"
-                outlined={mode !== "bot"}
+                variant={mode === "bot" ? "primary" : "secondary"}
                 onClick={() => setMode("bot")}
                 disabled={phase === "waiting" || phase === "applying"}
               >
                 Bot
               </Button>
               <Button
-                size="sm"
-                outlined={mode !== "self-chat"}
+                variant={mode === "self-chat" ? "primary" : "secondary"}
                 onClick={() => setMode("self-chat")}
                 disabled={phase === "waiting" || phase === "applying"}
               >
@@ -1042,11 +1012,11 @@ function WhatsAppOnboardingPanel({
             </div>
           </div>
           <div className="grid min-w-0 flex-1 gap-1.5">
-            <Label htmlFor="whatsapp-allowed-users">Allowed WhatsApp numbers</Label>
             <Input
+              label="Allowed WhatsApp numbers"
               id="whatsapp-allowed-users"
               value={allowedUsers}
-              onChange={(event) => setAllowedUsers(event.target.value)}
+              onChange={(value) => setAllowedUsers(value)}
               disabled={phase === "waiting" || phase === "applying"}
               placeholder="15551234567,15557654321"
             />
@@ -1110,15 +1080,13 @@ function WhatsAppOnboardingPanel({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      size="sm"
                       className="uppercase"
                       onClick={() => void apply()}
                       disabled={phase === "applying"}
-                      prefix={phase === "applying" ? <Spinner /> : <Save className="h-4 w-4" />}
                     >
                       {phase === "applying" ? "Saving…" : "Save and restart"}
                     </Button>
-                    <Button size="sm" ghost onClick={() => void cancel()}>
+                    <Button variant="secondary" onClick={() => void cancel()}>
                       Cancel
                     </Button>
                   </div>
@@ -1153,7 +1121,7 @@ function WhatsAppOnboardingPanel({
                   Scan with WhatsApp Linked Devices, not the camera app.
                 </span>
               )}
-              <Button size="sm" ghost onClick={() => void cancel()}>
+              <Button variant="secondary" onClick={() => void cancel()}>
                 Cancel
               </Button>
             </div>
@@ -1408,11 +1376,9 @@ function TelegramOnboardingPanel({
             reference to connect without any third party.
           </p>
           <Button
-            size="sm"
             className="w-fit uppercase"
             onClick={() => void start()}
             disabled={phase !== "idle"}
-            prefix={phase === "starting" ? <Spinner /> : <QrCode className="h-4 w-4" />}
           >
             {phase === "starting" ? "Starting…" : "Create with QR"}
           </Button>
@@ -1428,12 +1394,10 @@ function TelegramOnboardingPanel({
             reference and choosing who can use it.
           </p>
           <Button
-            size="sm"
-            outlined
+            variant="secondary"
             className="w-fit uppercase"
             onClick={onManualSetup}
             disabled={phase !== "idle"}
-            prefix={<Bot className="h-4 w-4" />}
           >
             Manual setup
           </Button>
@@ -1486,10 +1450,11 @@ function TelegramOnboardingPanel({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {allowedIds.map((id) => (
-                      <button
+                      <Button
                         key={id}
-                        type="button"
+                        variant="secondary"
                         className="inline-flex items-center gap-1 border border-border px-2 py-1 font-courier text-xs text-foreground hover:border-destructive/50"
+                        aria-label={`Remove allowed user ${id}`}
                         onClick={() =>
                           setAllowedIds((ids) =>
                             ids.filter((existing) => existing !== id),
@@ -1498,7 +1463,7 @@ function TelegramOnboardingPanel({
                       >
                         {id}
                         <X className="h-3 w-3" />
-                      </button>
+                      </Button>
                     ))}
                     {allowedIds.length === 0 && (
                       <span className="text-sm text-muted-foreground">
@@ -1510,27 +1475,26 @@ function TelegramOnboardingPanel({
 
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
+                    label="Telegram user ID"
                     value={newAllowedId}
-                    onChange={(event) => setNewAllowedId(event.target.value)}
+                    onChange={(value) => setNewAllowedId(value)}
                     placeholder="Telegram user ID"
-                    className="font-courier"
+                    onEnter={addAllowedId}
                   />
-                  <Button size="sm" outlined onClick={addAllowedId} prefix={<Check />}>
-                    Add
+                  <Button variant="secondary" onClick={addAllowedId}>
+                    <Check /> Add
                   </Button>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    size="sm"
                     className="uppercase"
                     onClick={() => void apply()}
                     disabled={phase === "applying"}
-                    prefix={phase === "applying" ? <Spinner /> : <Save className="h-4 w-4" />}
                   >
                     {phase === "applying" ? "Saving…" : "Save and restart"}
                   </Button>
-                  <Button size="sm" ghost onClick={() => void cancel()}>
+                  <Button variant="secondary" onClick={() => void cancel()}>
                     Cancel
                   </Button>
                 </div>
@@ -1560,7 +1524,7 @@ function TelegramOnboardingPanel({
                 <ExternalLink className="h-4 w-4" />
                 Open Telegram
               </a>
-              <Button size="sm" ghost onClick={() => void cancel()}>
+              <Button variant="secondary" onClick={() => void cancel()}>
                 Cancel
               </Button>
             </div>

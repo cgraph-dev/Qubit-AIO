@@ -8,34 +8,24 @@ import {
   Copy,
   Cpu,
   Database,
-  Download,
   Globe,
   HardDrive,
   KeyRound,
   Link2,
-  Play,
-  Plus,
   Power,
-  RotateCw,
   Server,
   Share2,
-  ShieldCheck,
   Sparkles,
-  Stethoscope,
   Terminal,
   Trash2,
-  Upload,
   X,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
-import { Input } from "@nous-research/ui/ui/components/input";
+import { Button, Checkbox, Input, Select } from "@/sakuga/ui";
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
@@ -157,7 +147,7 @@ function ActionLogViewer({
               </Badge>
             )}
           </div>
-          <Button ghost size="icon" onClick={onClose} aria-label="Close log">
+          <Button onClick={onClose} aria-label="Close log">
             <X />
           </Button>
         </div>
@@ -924,8 +914,6 @@ export default function SystemPage() {
         >
           <div className={cn(themedBody, "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col")}>
             <Button
-              ghost
-              size="icon"
               onClick={() => setHookModalOpen(false)}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
@@ -941,44 +929,41 @@ export default function SystemPage() {
               <div className="grid gap-2">
                 <Label htmlFor="hook-event">Event</Label>
                 <Select
-                  id="hook-event"
+                  label="Event"
+                  options={validEvents.map((ev) => ({ value: ev, label: ev }))}
                   value={hookEvent}
-                  onValueChange={(v) => setHookEvent(v)}
-                >
-                  {validEvents.map((ev) => (
-                    <SelectOption key={ev} value={ev}>
-                      {ev}
-                    </SelectOption>
-                  ))}
-                </Select>
+                  onChange={(v) => setHookEvent(v)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="hook-command">Command (absolute path)</Label>
                 <Input
+                  label="Command (absolute path)"
                   id="hook-command"
-                  autoFocus
                   placeholder="/usr/local/bin/my-hook.sh"
                   value={hookCommand}
-                  onChange={(e) => setHookCommand(e.target.value)}
+                  onChange={(value) => setHookCommand(value)}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="hook-matcher">Matcher (optional)</Label>
                   <Input
+                    label="Matcher (optional)"
                     id="hook-matcher"
                     placeholder="e.g. terminal"
                     value={hookMatcher}
-                    onChange={(e) => setHookMatcher(e.target.value)}
+                    onChange={(value) => setHookMatcher(value)}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="hook-timeout">Timeout (s)</Label>
                   <Input
+                    label="Timeout (s)"
                     id="hook-timeout"
                     placeholder="10"
                     value={hookTimeout}
-                    onChange={(e) => setHookTimeout(e.target.value)}
+                    onChange={(value) => setHookTimeout(value)}
                   />
                 </div>
               </div>
@@ -986,16 +971,11 @@ export default function SystemPage() {
                 <Checkbox
                   checked={hookApprove}
                   id="hook-approve"
-                  onCheckedChange={(checked) => setHookApprove(checked === true)}
-                />
-
-                <Label
-                  className="cursor-pointer text-sm font-normal normal-case tracking-normal text-muted-foreground"
-                  htmlFor="hook-approve"
+                  onChange={(checked) => setHookApprove(checked)}
                 >
                   Approve now (grant consent so it fires; otherwise it stays
                   configured but inactive)
-                </Label>
+                </Checkbox>
               </div>
               <p className="text-xs text-warning">
                 Shell hooks run arbitrary commands on this host. Only add scripts
@@ -1004,10 +984,9 @@ export default function SystemPage() {
               <div className="flex justify-end">
                 <Button
                   className="uppercase"
-                  size="sm"
                   onClick={createHook}
                   disabled={creatingHook}
-                  prefix={creatingHook ? <Spinner /> : undefined}
+                  
                 >
                   {creatingHook ? "Creating" : "Create hook"}
                 </Button>
@@ -1127,24 +1106,15 @@ export default function SystemPage() {
             {canUpdateQubit && !updateRefusal && (
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                 <Button
-                  size="sm"
-                  ghost
                   disabled={checkingUpdate}
-                  prefix={
-                    checkingUpdate ? (
-                      <Spinner className="h-3.5 w-3.5" />
-                    ) : (
-                      <RotateCw className="h-3.5 w-3.5" />
-                    )
-                  }
+                  
                   onClick={() => void checkForUpdate(true)}
                 >
                   Check for updates
                 </Button>
                 {updateInfo?.update_available && updateInfo.can_apply && (
                   <Button
-                    size="sm"
-                    prefix={<Download className="h-3.5 w-3.5" />}
+                    
                     onClick={() => setUpdateConfirmOpen(true)}
                   >
                     Update now
@@ -1233,13 +1203,11 @@ export default function SystemPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" ghost onClick={toggleCuratorPaused}>
+              <Button onClick={toggleCuratorPaused}>
                 {curator?.paused ? "Resume" : "Pause"}
               </Button>
               <Button
-                size="sm"
-                ghost
-                prefix={<Play className="h-3.5 w-3.5" />}
+                
                 onClick={() => runOp(api.runCurator, "Curator review")}
               >
                 Run now
@@ -1267,33 +1235,29 @@ export default function SystemPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
-                size="sm"
                 className="uppercase"
                 onClick={() => runGateway("start")}
                 disabled={gatewayRunning || !!gatewayRefusal}
                 title={gatewayRefusal ?? undefined}
-                prefix={<Play className="h-3.5 w-3.5" />}
+                
               >
                 Start
               </Button>
               <Button
-                size="sm"
                 className="uppercase"
                 onClick={() => runGateway("restart")}
                 disabled={!!gatewayRefusal}
                 title={gatewayRefusal ?? undefined}
-                prefix={<RotateCw className="h-3.5 w-3.5" />}
+                
               >
                 Restart
               </Button>
               <Button
-                size="sm"
                 className="uppercase text-warning"
-                ghost
                 onClick={() => runGateway("stop")}
                 disabled={!gatewayRunning || !!gatewayRefusal}
                 title={gatewayRefusal ?? undefined}
-                prefix={<Power className="h-3.5 w-3.5" />}
+                
               >
                 Stop
               </Button>
@@ -1341,20 +1305,18 @@ export default function SystemPage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
               {estopLatched ? (
                 <Button
-                  size="sm"
                   className="uppercase"
                   disabled={powerBusy}
-                  prefix={powerBusy ? <Spinner /> : <RotateCw className="h-3.5 w-3.5" />}
+                  
                   onClick={() => void runPowerAction("reset", "Emergency stop reset")}
                 >
                   Reset emergency stop
                 </Button>
               ) : (
                 <Button
-                  size="sm"
                   className="uppercase text-destructive"
                   disabled={powerBusy}
-                  prefix={powerBusy ? <Spinner /> : <Power className="h-3.5 w-3.5" />}
+                  
                   onClick={() => setConfirmEStop(true)}
                 >
                   Emergency stop
@@ -1362,8 +1324,6 @@ export default function SystemPage() {
               )}
               {globallyDisabled ? (
                 <Button
-                  size="sm"
-                  ghost
                   disabled={powerBusy || estopLatched}
                   onClick={() => void runPowerAction("enable", "Global enable")}
                 >
@@ -1371,8 +1331,6 @@ export default function SystemPage() {
                 </Button>
               ) : (
                   <Button
-                    size="sm"
-                    ghost
                     className="text-warning"
                     disabled={powerBusy || estopLatched}
                     onClick={() => setConfirmGlobalDisable(true)}
@@ -1428,13 +1386,13 @@ export default function SystemPage() {
                 {formatBytes(memory?.builtin_files?.user ?? 0)}
               </span>
               <div className="flex items-center gap-2 ml-auto">
-                <Button size="sm" ghost className="text-destructive" onClick={() => memoryReset.requestDelete("memory")}>
+                <Button className="text-destructive" onClick={() => memoryReset.requestDelete("memory")}>
                   Reset MEMORY.md
                 </Button>
-                <Button size="sm" ghost className="text-destructive" onClick={() => memoryReset.requestDelete("user")}>
+                <Button className="text-destructive" onClick={() => memoryReset.requestDelete("user")}>
                   Reset USER.md
                 </Button>
-                <Button size="sm" ghost className="text-destructive" onClick={() => memoryReset.requestDelete("all")}>
+                <Button className="text-destructive" onClick={() => memoryReset.requestDelete("all")}>
                   Reset all
                 </Button>
               </div>
@@ -1453,19 +1411,19 @@ export default function SystemPage() {
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
               <div className="grid gap-2">
                 <Label htmlFor="cred-provider">Provider</Label>
-                <Input id="cred-provider" value={credProvider} onChange={(e) => setCredProvider(e.target.value)} placeholder="openrouter" />
+                <Input label="Provider" id="cred-provider" value={credProvider} onChange={(value) => setCredProvider(value)} placeholder="openrouter" />
               </div>
               <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="cred-key">API key</Label>
-                <Input id="cred-key" type="text" value={credKey} onChange={(e) => setCredKey(e.target.value)} placeholder="env:OPENROUTER_API_KEY or file:/path/to/key" />
+                <Input label="API key" id="cred-key" type="text" value={credKey} onChange={(value) => setCredKey(value)} placeholder="env:OPENROUTER_API_KEY or file:/path/to/key" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="cred-label">Label</Label>
-                <Input id="cred-label" value={credLabel} onChange={(e) => setCredLabel(e.target.value)} placeholder="optional" />
+                <Input label="Label" id="cred-label" value={credLabel} onChange={(value) => setCredLabel(value)} placeholder="optional" />
               </div>
             </div>
             <div className="flex justify-end">
-              <Button size="sm" className="uppercase" onClick={addCredential} disabled={addingCred} prefix={addingCred ? <Spinner /> : undefined}>
+              <Button className="uppercase" onClick={addCredential} disabled={addingCred} >
                 Add key
               </Button>
             </div>
@@ -1489,7 +1447,7 @@ export default function SystemPage() {
                     <span className="font-mono text-xs text-muted-foreground">{entry.token_preview}</span>
                     <Badge tone="outline">{entry.auth_type}</Badge>
                     {entry.last_status && <Badge tone="secondary">{entry.last_status}</Badge>}
-                    <Button ghost size="icon" className="ml-auto text-destructive" aria-label="Remove credential" onClick={() => credDelete.requestDelete(`${prov.provider}|${entry.index}`)}>
+                    <Button className="ml-auto text-destructive" aria-label="Remove credential" onClick={() => credDelete.requestDelete(`${prov.provider}|${entry.index}`)}>
                       <Trash2 />
                     </Button>
                   </div>
@@ -1507,25 +1465,25 @@ export default function SystemPage() {
         </H2>
         <Card>
           <CardContent className="flex flex-wrap gap-2 py-4">
-            <Button size="sm" ghost prefix={<Terminal className="h-3.5 w-3.5" />} onClick={() => setConsoleOpen(true)}>
+            <Button  onClick={() => setConsoleOpen(true)}>
               Open console
             </Button>
-            <Button size="sm" ghost prefix={<Stethoscope className="h-3.5 w-3.5" />} onClick={() => runOp(api.runDoctor, "Doctor")}>
+            <Button  onClick={() => runOp(api.runDoctor, "Doctor")}>
               Run doctor
             </Button>
-            <Button size="sm" ghost prefix={<ShieldCheck className="h-3.5 w-3.5" />} onClick={() => runOp(api.runSecurityAudit, "Security audit")}>
+            <Button  onClick={() => runOp(api.runSecurityAudit, "Security audit")}>
               Security audit
             </Button>
-            <Button size="sm" ghost prefix={<RotateCw className="h-3.5 w-3.5" />} onClick={() => runOp(async () => ({ name: (await api.updateSkillsFromHub()).name ?? "skills-update" }), "Skills update")}>
+            <Button  onClick={() => runOp(async () => ({ name: (await api.updateSkillsFromHub()).name ?? "skills-update" }), "Skills update")}>
               Update skills
             </Button>
-            <Button size="sm" ghost prefix={<Activity className="h-3.5 w-3.5" />} onClick={() => runOp(api.runPromptSize, "Prompt size")}>
+            <Button  onClick={() => runOp(api.runPromptSize, "Prompt size")}>
               Prompt size
             </Button>
-            <Button size="sm" ghost prefix={<Database className="h-3.5 w-3.5" />} onClick={() => runOp(api.runDump, "Support dump")}>
+            <Button  onClick={() => runOp(api.runDump, "Support dump")}>
               Support dump
             </Button>
-            <Button size="sm" ghost prefix={<RotateCw className="h-3.5 w-3.5" />} onClick={() => runOp(api.runConfigMigrate, "Config migrate")}>
+            <Button  onClick={() => runOp(api.runConfigMigrate, "Config migrate")}>
               Migrate config
             </Button>
           </CardContent>
@@ -1537,32 +1495,23 @@ export default function SystemPage() {
               <div className="grid min-w-0 flex-1 gap-2">
                 <Label>Full backup</Label>
                 <Input
+                  label="Backup passphrase"
                   type="password"
                   value={backupPassphrase}
-                  onChange={(e) => setBackupPassphrase(e.target.value)}
+                  onChange={(value) => setBackupPassphrase(value)}
                   placeholder="Backup passphrase (encrypts the portable bundle)"
                   autoComplete="new-password"
                 />
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                   <Button
-                    size="sm"
-                    ghost
-                    prefix={<Database className="h-3.5 w-3.5" />}
+                    
                     onClick={() => void runDashboardBackup()}
                   >
                     Create backup
                   </Button>
                   <Button
-                    size="sm"
-                    ghost
                     disabled={!downloadableBackupArchive || downloadingBackup}
-                    prefix={
-                      downloadingBackup ? (
-                        <Spinner className="h-3.5 w-3.5" />
-                      ) : (
-                        <Download className="h-3.5 w-3.5" />
-                      )
-                    }
+                    
                     onClick={() => void downloadBackup()}
                   >
                     Download backup
@@ -1583,10 +1532,8 @@ export default function SystemPage() {
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                   <Button
                     type="button"
-                    size="sm"
-                    ghost
                     disabled={importingBackup}
-                    prefix={<Upload className="h-3.5 w-3.5" />}
+                    
                     onClick={() => importUploadInputRef.current?.click()}
                   >
                     Choose restore zip
@@ -1600,10 +1547,8 @@ export default function SystemPage() {
                 </div>
               </div>
               <Button
-                size="sm"
-                ghost
                 disabled={!importFile || importingBackup}
-                prefix={importingBackup ? <Spinner /> : undefined}
+                
                 onClick={() => {
                   if (!importFile) return;
                   setImportConfirmTarget({ kind: "upload", file: importFile });
@@ -1617,17 +1562,16 @@ export default function SystemPage() {
               <div className="grid min-w-0 flex-1 gap-2">
                 <Label htmlFor="import-path">Restore from backups path</Label>
                 <Input
+                  label="Restore from backups path"
                   id="import-path"
                   value={importPath}
-                  onChange={(e) => setImportPath(e.target.value)}
+                  onChange={(value) => setImportPath(value)}
                   placeholder="$QUBIT_HOME/backups/qubit-backup.zip"
                 />
               </div>
               <Button
-                size="sm"
-                ghost
                 disabled={!importPath.trim() || importingBackup}
-                prefix={importingBackup ? <Spinner /> : undefined}
+                
                 onClick={() => {
                   const path = importPath.trim();
                   if (!path) return;
@@ -1672,15 +1616,8 @@ export default function SystemPage() {
                 </div>
               </div>
               <Button
-                size="sm"
                 disabled={sharing}
-                prefix={
-                  sharing ? (
-                    <Spinner className="h-3.5 w-3.5" />
-                  ) : (
-                    <Share2 className="h-3.5 w-3.5" />
-                  )
-                }
+                
                 onClick={() => void runDebugShare()}
               >
                 {sharing ? "Uploading…" : "Generate share link"}
@@ -1692,15 +1629,10 @@ export default function SystemPage() {
                 checked={shareRedact}
                 disabled={sharing}
                 id="share-redact"
-                onCheckedChange={(checked) => setShareRedact(checked === true)}
-              />
-
-              <Label
-                className="cursor-pointer select-none text-xs font-normal normal-case tracking-normal text-muted-foreground"
-                htmlFor="share-redact"
+                onChange={(checked) => setShareRedact(checked)}
               >
                 Redact credential-shaped tokens before upload (recommended)
-              </Label>
+              </Checkbox>
             </div>
 
             {shareResult && (
@@ -1721,15 +1653,7 @@ export default function SystemPage() {
                   </div>
                   {Object.keys(shareResult.urls).length > 1 && (
                     <Button
-                      size="sm"
-                      ghost
-                      prefix={
-                        copiedLabel === "__all__" ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )
-                      }
+                      
                       onClick={() =>
                         void copyToClipboard(
                           Object.entries(shareResult.urls)
@@ -1762,8 +1686,6 @@ export default function SystemPage() {
                       {url}
                     </a>
                     <Button
-                      ghost
-                      size="icon"
                       aria-label={`Copy ${label} link`}
                       onClick={() => void copyToClipboard(url, label)}
                     >
@@ -1794,7 +1716,7 @@ export default function SystemPage() {
               {checkpoints?.sessions?.length ?? 0} session(s) ·{" "}
               {formatBytes(checkpoints?.total_bytes ?? 0)}
             </span>
-            <Button size="sm" ghost className="text-destructive" disabled={!checkpoints?.sessions?.length} prefix={<Trash2 className="h-3.5 w-3.5" />} onClick={() => checkpointsPrune.requestDelete("all")}>
+            <Button className="text-destructive" disabled={!checkpoints?.sessions?.length}  onClick={() => checkpointsPrune.requestDelete("all")}>
               Prune
             </Button>
           </CardContent>
@@ -1807,7 +1729,7 @@ export default function SystemPage() {
           <H2 variant="sm" className="flex items-center gap-2 text-muted-foreground">
             <Terminal className="h-4 w-4" /> Shell hooks
           </H2>
-          <Button size="sm" className="uppercase" prefix={<Plus className="h-3.5 w-3.5" />} onClick={() => setHookModalOpen(true)}>
+          <Button className="uppercase"  onClick={() => setHookModalOpen(true)}>
             New hook
           </Button>
         </div>
@@ -1833,8 +1755,6 @@ export default function SystemPage() {
                 {h.allowed ? "allowed" : "not approved"}
               </Badge>
               <Button
-                ghost
-                size="icon"
                 className="text-destructive"
                 aria-label="Remove hook"
                 onClick={() =>

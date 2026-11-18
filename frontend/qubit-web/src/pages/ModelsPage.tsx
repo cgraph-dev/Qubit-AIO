@@ -25,11 +25,11 @@ import type {
 } from "@/lib/api";
 import { timeAgo, cn, themedBody } from "@/lib/utils";
 import { formatTokenCount } from "@/lib/format";
-import { Button } from "@nous-research/ui/ui/components/button";
+
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Stats } from "@nous-research/ui/ui/components/stats";
-import { Input } from "@nous-research/ui/ui/components/input";
-import { Switch } from "@nous-research/ui/ui/components/switch";
+
+
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -44,6 +44,7 @@ import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
 import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
+import { Button, Input, Select, Toggle, emitFx } from "@/sakuga/ui";
 
 const PERIODS = [
   { label: "7d", days: 7 },
@@ -260,6 +261,7 @@ function UseAsMenu({
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      emitFx("error");
     } finally {
       setBusy(false);
     }
@@ -279,12 +281,10 @@ function UseAsMenu({
   return (
     <div className={cn("relative", open && "z-20")} data-use-as-menu>
       <Button
-        size="sm"
-        outlined
+        variant="secondary"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
         className="h-6 px-2 text-xs uppercase"
-        prefix={busy ? <Spinner /> : null}
       >
         Use as <ChevronDown className="h-3 w-3" />
       </Button>
@@ -588,8 +588,7 @@ function AuxiliaryTasksModal({
     >
       <div className={cn(themedBody, "relative w-full max-w-2xl max-h-[80vh] border border-border bg-card shadow-2xl flex flex-col")}>
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={onClose}
           className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
           aria-label="Close"
@@ -606,12 +605,10 @@ function AuxiliaryTasksModal({
               Auxiliary Tasks
             </h2>
             <Button
-              size="sm"
-              outlined
+              variant="secondary"
               onClick={() => setConfirmReset(true)}
               disabled={resetBusy}
               className="h-6 text-xs uppercase"
-              prefix={resetBusy ? <Spinner /> : null}
             >
               Reset all to auto
             </Button>
@@ -648,8 +645,7 @@ function AuxiliaryTasksModal({
                   </div>
                 </div>
                 <Button
-                  size="sm"
-                  outlined
+                  variant="secondary"
                   onClick={() => setPicker({ kind: "aux", task: t.key })}
                   className="h-6 text-xs uppercase"
                 >
@@ -863,20 +859,14 @@ function MoaModelsModal({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="border border-border bg-background px-2 py-1 text-xs"
+            <Select
+              label="Preset"
+              options={presetNames.map((name) => ({ value: name, label: name }))}
               value={selected}
-              onChange={(event) => setSelected(event.target.value)}
-            >
-              {presetNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setSelected(value)}
+            />
             <Button
-              size="sm"
-              outlined
+              variant="secondary"
               disabled={ro}
               onClick={() =>
                 setDraft((prev) => ({ ...prev, default_preset: selected }))
@@ -885,23 +875,23 @@ function MoaModelsModal({
               Set default
             </Button>
             <Button
-              size="sm"
-              ghost
+              variant="secondary"
               disabled={ro || presetNames.length <= 1}
               onClick={deletePreset}
             >
               Delete
             </Button>
-            <Input
-              className="h-8 max-w-40 text-xs"
-              placeholder="new preset name"
-              disabled={ro}
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-            />
+            <div className="qsk-field max-w-48">
+              <Input
+                label="New preset name"
+                placeholder="new preset name"
+                disabled={ro}
+                value={newName}
+                onChange={(value) => setNewName(value)}
+              />
+            </div>
             <Button
-              size="sm"
-              outlined
+              variant="secondary"
               disabled={ro || !newName.trim() || !!draft.presets[newName.trim()]}
               onClick={addPreset}
             >
@@ -927,10 +917,11 @@ function MoaModelsModal({
                       slot.enabled === false && "opacity-60",
                     )}
                   >
-                    <Switch
+                    <Toggle
+                      label="Enable reference model"
                       checked={slot.enabled !== false}
                       disabled={ro}
-                      onCheckedChange={(checked) =>
+                      onChange={(checked) =>
                         updateSelectedPreset((prev) => ({
                           ...prev,
                           reference_models: prev.reference_models.map((s, i) =>
@@ -945,16 +936,14 @@ function MoaModelsModal({
                       {slotLabel(slot)}
                     </div>
                     <Button
-                      size="sm"
-                      outlined
+                      variant="secondary"
                       disabled={ro}
                       onClick={() => setPicker({ kind: "reference", index })}
                     >
                       Change
                     </Button>
                     <Button
-                      size="sm"
-                      ghost
+                      variant="secondary"
                       disabled={ro || preset.reference_models.length <= 1}
                       onClick={() =>
                         updateSelectedPreset((prev) => ({
@@ -970,8 +959,7 @@ function MoaModelsModal({
                   </div>
                 ))}
                 <Button
-                  size="sm"
-                  outlined
+                  variant="secondary"
                   disabled={ro}
                   onClick={() =>
                     updateSelectedPreset((prev) => ({
@@ -996,8 +984,7 @@ function MoaModelsModal({
                     {slotLabel(preset.aggregator)}
                   </div>
                   <Button
-                    size="sm"
-                    outlined
+                    variant="secondary"
                     disabled={ro}
                     onClick={() => setPicker({ kind: "aggregator" })}
                   >
@@ -1015,7 +1002,7 @@ function MoaModelsModal({
 
           {error && <div className="text-xs text-destructive">{error}</div>}
           <div className="flex justify-end gap-2 pt-2">
-            <Button ghost onClick={onClose} disabled={busy}>
+            <Button variant="secondary" onClick={onClose} disabled={busy}>
               {ro ? "Close" : "Cancel"}
             </Button>
             {!ro && (
@@ -1168,7 +1155,6 @@ function ModelSettingsPanel({
             </div>
           </div>
           <Button
-            size="sm"
             onClick={() => setPicker({ kind: "main" })}
             className="shrink-0 self-start text-xs uppercase sm:self-center"
           >
@@ -1192,8 +1178,7 @@ function ModelSettingsPanel({
             </div>
           </div>
           <Button
-            size="sm"
-            outlined
+            variant="secondary"
             onClick={() => setAuxModalOpen(true)}
             className="shrink-0 self-start text-xs uppercase sm:self-center"
           >
@@ -1249,8 +1234,7 @@ function ModelSettingsPanel({
                 )}
               </div>
               <Button
-                size="sm"
-                outlined
+                variant="secondary"
                 onClick={() => setMoaModalOpen(true)}
                 disabled={!moa || !configurable}
                 title={
@@ -1430,10 +1414,8 @@ function ProfileUseAsPanel({ onAssigned }: { onAssigned(): void }) {
           >
             <span className="min-w-0 flex-1 break-words">{error}</span>
             <Button
-              size="sm"
-              outlined
+              variant="secondary"
               onClick={load}
-              prefix={<RefreshCw className="h-3.5 w-3.5" />}
               aria-label="Retry loading model profiles"
             >
               Retry
@@ -1481,14 +1463,12 @@ function ProfileUseAsPanel({ onAssigned }: { onAssigned(): void }) {
                     )}
                   </div>
                   <Button
-                    size="sm"
-                    outlined={!isActive}
+                    variant={isActive ? "primary" : "secondary"}
                     disabled={busy !== null}
-                    aria-pressed={isActive}
+                    aria-pressed={isActive ? "true" : "false"}
                     aria-label={`Use ${label} as the active model profile`}
                     onClick={() => void selectProfile(profile.id)}
                     className="shrink-0 text-xs uppercase"
-                    prefix={busy === profile.id ? <Spinner /> : null}
                   >
                     Use as
                   </Button>
@@ -1617,8 +1597,7 @@ export default function ModelsPage() {
           <Button
             key={p.label}
             type="button"
-            size="sm"
-            outlined={days !== p.days}
+            variant={days === p.days ? "primary" : "secondary"}
             onClick={() => setDays(p.days)}
             className="uppercase"
           >
@@ -1627,8 +1606,7 @@ export default function ModelsPage() {
         ))}
         <Button
           type="button"
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-foreground"
           onClick={load}
           disabled={loading}

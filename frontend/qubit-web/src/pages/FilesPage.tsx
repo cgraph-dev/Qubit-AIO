@@ -17,7 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import {
   Dialog,
@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@nous-research/ui/ui/components/dialog";
-import { Input } from "@nous-research/ui/ui/components/input";
+
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
@@ -43,6 +43,7 @@ import type { ManagedFileEntry, ManagedFilesResponse } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
 import { isAbortError } from "@/lib/api-error";
 import { PluginSlot } from "@/plugins";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -197,8 +198,7 @@ export default function FilesPage() {
     setEnd(
       <div className="flex items-center gap-2">
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           type="button"
           onClick={() => void load()}
           disabled={loading}
@@ -253,11 +253,13 @@ export default function FilesPage() {
       setFolderName("");
       setCreateDialogOpen(false);
       showToast("Folder created", "success");
+      emitFx("success");
       await load();
     } catch (e) {
       if (e instanceof ConfirmRequiredError) {
         showToast("Folder creation cancelled", "error");
       } else {
+        emitFx("error");
         showToast(
           `Create failed: ${refusalOrError(e, "Could not create the folder.")}`,
           "error",
@@ -284,11 +286,13 @@ export default function FilesPage() {
         );
       }
       showToast(`${files.length} file${files.length === 1 ? "" : "s"} uploaded`, "success");
+      emitFx("success");
       await load();
     } catch (e) {
       if (e instanceof ConfirmRequiredError) {
         showToast("Upload cancelled", "error");
       } else {
+        emitFx("error");
         showToast(
           `Upload failed: ${refusalOrError(e, "Could not upload the file.")}`,
           "error",
@@ -366,9 +370,11 @@ export default function FilesPage() {
         () => true,
       );
       showToast("Deleted", "success");
+      emitFx("warning");
       setPendingDelete(null);
       await load();
     } catch (e) {
+      emitFx("error");
       showToast(
         `Delete failed: ${refusalOrError(e, "Could not delete this entry.")}`,
         "error",
@@ -407,41 +413,44 @@ export default function FilesPage() {
               : "Only approved project folders can be listed; register another with `qubit project add-folder`."
           }
         >
-          <Input
-            value={pathInput}
-            onChange={(event) => setPathInput(event.target.value)}
-            aria-label="Path"
-            placeholder="Path"
-            className="h-9 min-w-0 flex-1 font-mono"
-          />
-          <Button type="submit" size="sm" outlined className="uppercase">
+          <div className="qsk-field min-w-0 flex-1">
+            <Input
+              label="Path"
+              value={pathInput}
+              onChange={(value) => setPathInput(value)}
+              onEnter={() => void goToPath()}
+              placeholder="Path"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="uppercase"
+            onClick={() => void goToPath()}
+          >
             Go
           </Button>
         </form>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button
             type="button"
+            variant="secondary"
             onClick={() => fileInputRef.current?.click()}
             disabled={!canUpload}
-            size="sm"
-            outlined
             className="uppercase"
             title={!activePath ? (emptyReason ?? "No project folder") : undefined}
-            prefix={uploading ? <Spinner /> : <Upload />}
           >
-            Upload
+            {uploading ? <Spinner /> : <Upload />} Upload
           </Button>
           <Button
             type="button"
+            variant="secondary"
             onClick={() => setCreateDialogOpen(true)}
             disabled={!activePath}
-            size="sm"
-            outlined
             className="uppercase"
             title={!activePath ? (emptyReason ?? "No project folder") : undefined}
-            prefix={<FolderPlus />}
           >
-            Create
+            <FolderPlus /> Create
           </Button>
         </div>
       </div>
@@ -499,8 +508,8 @@ export default function FilesPage() {
           </div>
 
           {listing?.parent && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setCurrentPath(listing.parent ?? undefined)}
               className="grid w-full min-w-[42rem] grid-cols-[minmax(12rem,1fr)_7rem_10rem_5.5rem] items-center gap-3 border-b border-border/60 px-4 py-2 text-left text-sm transition hover:bg-background/40"
             >
@@ -511,7 +520,7 @@ export default function FilesPage() {
               <span />
               <span />
               <span />
-            </button>
+            </Button>
           )}
 
           {loading && !listing ? (
@@ -534,8 +543,8 @@ export default function FilesPage() {
                 key={entry.path}
                 className="grid min-w-[42rem] grid-cols-[minmax(12rem,1fr)_7rem_10rem_5.5rem] items-center gap-3 border-b border-border/60 px-4 py-2 text-sm last:border-b-0 hover:bg-background/35"
               >
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => (entry.is_directory ? openDirectory(entry) : void downloadFile(entry))}
                   className="flex min-w-0 items-center gap-2 text-left font-mono text-foreground"
                 >
@@ -545,7 +554,7 @@ export default function FilesPage() {
                     <FileIcon className="h-4 w-4 shrink-0 text-text-tertiary" />
                   )}
                   <span className="truncate">{entry.name}</span>
-                </button>
+                </Button>
                 <span className="text-xs tabular-nums text-text-secondary">{formatBytes(entry.size)}</span>
                 <span className="truncate text-xs text-text-secondary">
                   {Number.isFinite(entry.mtime) ? DATE_FORMAT.format(entry.mtime * 1000) : "-"}
@@ -553,8 +562,7 @@ export default function FilesPage() {
                 <span className="flex justify-end gap-1">
                   {entry.is_directory ? (
                     <Button
-                      ghost
-                      size="icon"
+                      variant="secondary"
                       type="button"
                       onClick={() => openDirectory(entry)}
                       aria-label={`Open ${entry.name}`}
@@ -563,8 +571,7 @@ export default function FilesPage() {
                     </Button>
                   ) : (
                     <Button
-                      ghost
-                      size="icon"
+                      variant="secondary"
                       type="button"
                       onClick={() => void downloadFile(entry)}
                       aria-label={`Download ${entry.name}`}
@@ -573,8 +580,7 @@ export default function FilesPage() {
                     </Button>
                   )}
                   <Button
-                    ghost
-                    size="icon"
+                    variant="secondary"
                     type="button"
                     onClick={() => setPendingDelete(entry)}
                     aria-label={`Delete ${entry.name}`}
@@ -608,12 +614,10 @@ export default function FilesPage() {
           </DialogHeader>
           <div className="p-4">
             <Input
-              autoFocus
+              label="Folder name"
               value={folderName}
-              onChange={(event) => setFolderName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void createDirectory();
-              }}
+              onChange={(value) => setFolderName(value)}
+              onEnter={() => void createDirectory()}
               placeholder="Folder name"
               disabled={creating}
             />
@@ -621,7 +625,7 @@ export default function FilesPage() {
           <DialogFooter>
             <Button
               type="button"
-              outlined
+              variant="secondary"
               onClick={() => {
                 setCreateDialogOpen(false);
                 setFolderName("");
@@ -634,9 +638,8 @@ export default function FilesPage() {
               type="button"
               onClick={() => void createDirectory()}
               disabled={creating}
-              prefix={creating ? <Spinner /> : <FolderPlus />}
             >
-              Create
+              {creating ? <Spinner /> : <FolderPlus />} Create
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,6 +8,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   listFiles: vi.fn(),
@@ -117,8 +119,8 @@ describe("FilesPage root-level download path resolution", () => {
     await renderFiles();
     await waitFor(() => container.textContent?.includes("AGENTS.md") === true);
 
-    const download = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Download AGENTS.md"]',
+    const download = container.querySelector<HTMLElement>(
+      '[aria-label="Download AGENTS.md"]',
     );
     expect(download).not.toBeNull();
     await act(async () => {
@@ -143,20 +145,13 @@ describe("FilesPage path navigation", () => {
     });
 
     await renderFiles();
-    await waitFor(() => container.querySelector('input[aria-label="Path"]') !== null);
+    await waitFor(() => container.querySelector('sakuga-input[aria-label="Path"]') !== null);
 
-    const input = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Path"]',
+    const input = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="Path"]',
     )!;
     const form = input.closest("form")!;
-    await act(async () => {
-      const setValue = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setValue?.call(input, "/repo/docs");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    await act(async () => typeIntoSakuga(input, "/repo/docs"));
     await act(async () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
@@ -165,8 +160,8 @@ describe("FilesPage path navigation", () => {
       apiMocks.listFiles.mock.calls.some((call) => call[0] === "/repo/docs"),
     );
     expect(
-      Array.from(container.querySelectorAll("button")).some(
-        (button) => button.textContent?.trim() === "Go",
+      Array.from(container.querySelectorAll("button, sakuga-button")).some(
+        (button) => button.textContent?.trim().includes("Go"),
       ),
     ).toBe(true);
   });
@@ -214,19 +209,12 @@ describe("FilesPage request ordering", () => {
       .mockResolvedValue(secondPayload);
 
     await renderFiles();
-    const input = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Path"]',
+    const input = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="Path"]',
     )!;
     const form = input.closest("form")!;
     const setPath = async (path: string) => {
-      await act(async () => {
-        const setValue = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          "value",
-        )?.set;
-        setValue?.call(input, path);
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      });
+      await act(async () => typeIntoSakuga(input, path));
       await act(async () => {
         form.dispatchEvent(
           new Event("submit", { bubbles: true, cancelable: true }),

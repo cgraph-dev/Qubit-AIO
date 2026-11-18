@@ -11,6 +11,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
 
 const apiMocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
@@ -119,7 +120,7 @@ function buttonByText(text: string): HTMLButtonElement | null {
   // match so "Emergency stop" does not also match the dialog's
   // "Latch emergency stop" action.
   return (
-    [...document.querySelectorAll("button")].find(
+    [...document.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
@@ -203,7 +204,7 @@ describe("SystemPage gateway control confirmation", () => {
     await act(async () => buttonByText("Restart")!.click());
     await waitFor(() => Boolean(buttonByText("Cancel")));
     // Cancel is the dialog's dismiss action.
-    const cancel = [...document.querySelectorAll("button")].find(
+    const cancel = [...document.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === "Cancel",
     );
     await act(async () => cancel!.click());
@@ -353,7 +354,7 @@ describe("SystemPage global disable confirmation", () => {
 
     await act(async () => buttonByText("Global disable")!.click());
     await waitFor(() => Boolean(buttonByText("Globally disable")));
-    const cancel = [...document.querySelectorAll("button")].find(
+    const cancel = [...document.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === "Cancel",
     );
     await act(async () => cancel!.click());

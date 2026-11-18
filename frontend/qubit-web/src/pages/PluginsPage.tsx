@@ -16,15 +16,12 @@ import type {
   PluginsHubResponse,
 } from "@/lib/api";
 import { setupHasDetails, setupHasInstallableSteps } from "@/lib/memory-provider-setup";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
-import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { CommandBlock, CopyButton } from "@nous-research/ui/ui/components/command-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
+import { Button, Input, Select, Toggle } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
@@ -231,7 +228,6 @@ function MemoryProviderSetupHint({
           className="w-fit uppercase"
           disabled={installing}
           onClick={onInstall}
-          size="sm"
         >
           <span className="inline-flex items-center gap-2">
             {installing ? <Spinner /> : null}
@@ -589,8 +585,7 @@ export default function PluginsPage() {
   useEffect(() => {
     setAfterTitle(
       <Button
-        ghost
-        size="icon"
+        variant="secondary"
         className="shrink-0 text-muted-foreground hover:text-foreground"
         disabled={loading || rescanBusy}
         onClick={() => void onRescan()}
@@ -760,21 +755,20 @@ export default function PluginsPage() {
                     </div>
 
                     <Select
-                      id="mem-provider"
-                      className="w-full"
+                      label={t.pluginsPage.memoryProviderLabel}
+                      options={[
+                        {
+                          value: MEMORY_PROVIDER_BUILTIN,
+                          label: `(${t.pluginsPage.providerDefaults})`,
+                        },
+                        ...dedupeBy(providers.memory_options, (o) => o.name).map((o) => ({
+                          value: o.name,
+                          label: o.name,
+                        })),
+                      ]}
                       value={memorySel}
-                      onValueChange={setMemorySel}
-                    >
-                      <SelectOption value={MEMORY_PROVIDER_BUILTIN}>
-                        {`(${t.pluginsPage.providerDefaults})`}
-                      </SelectOption>
-
-                      {dedupeBy(providers.memory_options, (o) => o.name).map((o) => (
-                        <SelectOption key={o.name} value={o.name}>
-                          {o.name}
-                        </SelectOption>
-                      ))}
-                    </Select>
+                      onChange={(value) => setMemorySel(value)}
+                    />
                   </div>
 
                   {!selectedMemoryName && (
@@ -864,41 +858,32 @@ export default function PluginsPage() {
 
                             {field.kind === "select" ? (
                               <Select
-                                id={`memory-${field.key}`}
-                                className="w-full"
+                                label={field.label}
+                                options={field.options.map((option) => ({
+                                  value: option.value,
+                                  label: option.label,
+                                }))}
                                 value={String(value ?? "")}
-                                onValueChange={(next) =>
+                                onChange={(next) =>
                                   setMemoryValues((current) => ({ ...current, [field.key]: next }))
                                 }
-                              >
-                                {field.options.map((option) => (
-                                  <SelectOption key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectOption>
-                                ))}
-                              </Select>
+                              />
                             ) : field.kind === "boolean" ? (
-                              <Switch
+                              <Toggle
+                                label={field.label}
                                 checked={Boolean(value)}
-                                onCheckedChange={(next) =>
+                                onChange={(next) =>
                                   setMemoryValues((current) => ({ ...current, [field.key]: next }))
                                 }
                               />
                             ) : (
                               <div className="flex items-center gap-2">
                                 <Input
-                                  id={`memory-${field.key}`}
+                                  label={field.label}
                                   type={
                                     field.kind === "secret" && !secretIsVisible
                                       ? "password"
-                                      : field.kind === "integer" || field.kind === "number"
-                                        ? "number"
-                                        : "text"
-                                  }
-                                  min={field.minimum ?? undefined}
-                                  max={field.maximum ?? undefined}
-                                  step={
-                                    field.step ?? (field.kind === "integer" ? 1 : undefined)
+                                      : "text"
                                   }
                                   value={String(value ?? "")}
                                   placeholder={
@@ -906,17 +891,16 @@ export default function PluginsPage() {
                                       ? "Leave blank to keep existing value"
                                       : field.placeholder
                                   }
-                                  onChange={(event) =>
+                                  onChange={(next) =>
                                     setMemoryValues((current) => ({
                                       ...current,
-                                      [field.key]: event.target.value,
+                                      [field.key]: next,
                                     }))
                                   }
                                 />
                                 {field.kind === "secret" && (
                                   <Button
-                                    ghost
-                                    size="icon"
+                                    variant="secondary"
                                     aria-label={secretIsVisible ? "Hide secret" : "Show secret"}
                                     onClick={() =>
                                       setSecretVisible((current) => ({
@@ -946,44 +930,33 @@ export default function PluginsPage() {
 
                   <Button
                     className="w-fit uppercase"
-                    size="sm"
                     disabled={
                       memoryBusy || memoryConfigBusy || memorySetupBusy || !!memoryConfigRefusal
                     }
                     onClick={() => void onSaveMemoryProvider()}
-                    prefix={memoryBusy ? <Spinner /> : undefined}
                   >
                     Save memory provider
                   </Button>
                 </div>
 
                 <div className="grid content-start gap-3 min-w-0">
-                  <Label htmlFor="ctx-engine">{t.pluginsPage.contextEngineLabel}</Label>
-
                   <Select
-                    id="ctx-engine"
-                    className="w-full"
+                    label={t.pluginsPage.contextEngineLabel}
+                    options={[
+                      { value: "compressor", label: "compressor" },
+                      ...dedupeBy(
+                        providers.context_options.filter((o) => o.name !== "compressor"),
+                        (o) => o.name,
+                      ).map((o) => ({ value: o.name, label: o.name })),
+                    ]}
                     value={contextSel}
-                    onValueChange={setContextSel}
-                  >
-                    <SelectOption value="compressor">compressor</SelectOption>
-
-                    {dedupeBy(
-                      providers.context_options.filter((o) => o.name !== "compressor"),
-                      (o) => o.name,
-                    ).map((o) => (
-                        <SelectOption key={o.name} value={o.name}>
-                          {o.name}
-                        </SelectOption>
-                      ))}
-                  </Select>
+                    onChange={(value) => setContextSel(value)}
+                  />
 
                   <Button
                     className="w-fit uppercase"
-                    size="sm"
                     disabled={contextBusy}
                     onClick={() => void onSaveContextEngine()}
-                    prefix={contextBusy ? <Spinner /> : undefined}
                   >
                     Save context engine
                   </Button>
@@ -1019,18 +992,15 @@ export default function PluginsPage() {
 
             <div className="flex flex-col gap-2">
 
-              <Label htmlFor="install-url">{t.pluginsPage.identifierLabel}</Label>
-
               <Input
-                className="font-mono-ui lowercase"
+                label={t.pluginsPage.identifierLabel}
                 id="install-url"
                 placeholder="owner/repo, owner/repo/path/to/plugin, or https://github.com/owner/repo"
-                spellCheck={false}
-                aria-invalid={installError ? true : undefined}
+                aria-invalid={installError ? "true" : undefined}
                 aria-describedby={installError ? "plugin-install-error" : undefined}
                 value={installId}
-                onChange={(e) => {
-                  setInstallId(e.target.value);
+                onChange={(value) => {
+                  setInstallId(value);
                   if (installError) setInstallError(null);
                 }}
               />
@@ -1041,10 +1011,10 @@ export default function PluginsPage() {
 
               <div className="flex items-center gap-3">
 
-                <Switch
+                <Toggle
+                  label={t.pluginsPage.forceReinstall}
                   checked={installForce}
-                  onCheckedChange={setInstallForce}
-                  aria-label={t.pluginsPage.forceReinstall}
+                  onChange={setInstallForce}
                 />
 
                 <span className="text-xs tracking-[0.06em] text-text-secondary">
@@ -1054,10 +1024,10 @@ export default function PluginsPage() {
 
               <div className="flex items-center gap-3">
 
-                <Switch
+                <Toggle
+                  label={t.pluginsPage.enableAfterInstall}
                   checked={installEnable}
-                  onCheckedChange={setInstallEnable}
-                  aria-label={t.pluginsPage.enableAfterInstall}
+                  onChange={setInstallEnable}
                 />
 
                 <span className="text-xs tracking-[0.06em] text-text-secondary">
@@ -1068,10 +1038,8 @@ export default function PluginsPage() {
 
             <Button
               className="w-fit uppercase"
-              size="sm"
               disabled={installBusy}
               onClick={() => void onInstall()}
-              prefix={installBusy ? <Spinner /> : undefined}
             >
               {t.pluginsPage.installBtn}
             </Button>
@@ -1108,10 +1076,8 @@ export default function PluginsPage() {
               </div>
               <Button
                 className="w-fit uppercase"
-                size="sm"
                 disabled={reloadBusy}
                 onClick={() => void onCatalogReload()}
-                prefix={reloadBusy ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
               >
                 {t.pluginsPage.catalogReload ?? "Reload plugins"}
               </Button>
@@ -1120,26 +1086,26 @@ export default function PluginsPage() {
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <Input
-                className="max-w-sm"
-                aria-label="Search the plugin catalog"
+                label="Search the plugin catalog"
                 placeholder={
                   t.pluginsPage.catalogSearchPlaceholder ??
                   "Search the catalog by name, description, or tool…"
                 }
-                spellCheck={false}
                 value={catalogQuery}
-                onChange={(e) => setCatalogQuery(e.target.value)}
+                onChange={(value) => setCatalogQuery(value)}
               />
-              <Select value={catalogSource} onValueChange={setCatalogSource}>
-                <SelectOption value="">
-                  {t.pluginsPage.catalogAllSources ?? "All sources"}
-                </SelectOption>
-                {CATALOG_SOURCES.map((source) => (
-                  <SelectOption key={source} value={source}>
-                    {source}
-                  </SelectOption>
-                ))}
-              </Select>
+              <Select
+                label="Catalog source"
+                options={[
+                  {
+                    value: "",
+                    label: t.pluginsPage.catalogAllSources ?? "All sources",
+                  },
+                  ...CATALOG_SOURCES.map((source) => ({ value: source, label: source })),
+                ]}
+                value={catalogSource}
+                onChange={(value) => setCatalogSource(value)}
+              />
             </div>
 
             {catalogError ? (
@@ -1188,12 +1154,10 @@ export default function PluginsPage() {
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <Input
-                className="max-w-sm"
+                label="Search the pinned plugin index"
                 placeholder={"Search the pinned index by name, source, or capability…"}
-                aria-label="Search the pinned plugin index"
-                spellCheck={false}
                 value={indexQuery}
-                onChange={(e) => setIndexQuery(e.target.value)}
+                onChange={(value) => setIndexQuery(value)}
               />
               {pinnedIndex ? (
                 <span className="text-xs tracking-[0.06em] text-text-tertiary">
@@ -1389,8 +1353,7 @@ function PluginRowCard(props: PluginRowCardProps) {
             {row.runtime_status === "enabled" ? (
               <Button
                 disabled={busy}
-                ghost
-                size="sm"
+                variant="secondary"
                 onClick={() => {
                   void setRuntimeLoading(row.name, async () => {
                     await api.disableAgentPlugin(row.name);
@@ -1403,8 +1366,7 @@ function PluginRowCard(props: PluginRowCardProps) {
             ) : (
               <Button
                 disabled={busy}
-                ghost
-                size="sm"
+                variant="secondary"
                 onClick={() => {
                   void setRuntimeLoading(row.name, async () => {
                     await api.enableAgentPlugin(row.name);
@@ -1434,8 +1396,7 @@ function PluginRowCard(props: PluginRowCardProps) {
 
               <Button
                 disabled={busy}
-                ghost
-                size="sm"
+                variant="secondary"
                 onClick={() => {
                   void setRuntimeLoading(row.name, async () => {
                     await api.updateAgentPlugin(row.name);
@@ -1451,8 +1412,7 @@ function PluginRowCard(props: PluginRowCardProps) {
             {row.has_dashboard_manifest ? (
               <Button
                 disabled={busy}
-                ghost
-                size="sm"
+                variant="secondary"
                 title={row.user_hidden ? t.pluginsPage.showInSidebar : t.pluginsPage.hideFromSidebar}
                 onClick={() => {
                   void setRuntimeLoading(row.name, async () => {
@@ -1473,10 +1433,8 @@ function PluginRowCard(props: PluginRowCardProps) {
 
 
               <Button
-                destructive
                 disabled={busy}
-                ghost
-                size="sm"
+                variant="secondary"
                 title={t.pluginsPage.removeConfirm}
                 aria-label={t.pluginsPage.removeConfirm}
                 onClick={() => setConfirmRemove(true)}
@@ -1529,7 +1487,6 @@ function PluginRowCard(props: PluginRowCardProps) {
         }}
         title={t.pluginsPage.removeConfirm}
         description={`This will remove the "${row.name}" plugin from your agent.`}
-        destructive
         confirmLabel={t.common.delete}
       />
     </Card>
@@ -1572,12 +1529,12 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
           {entry.installed ? (
             <Badge tone="success">installed</Badge>
           ) : (
-            <Button size="sm" disabled={busy || entry.install_state === "BROKEN"} onClick={() => void onInstall(entry)} title={entry.install_state === "BROKEN" ? (entry.install_note || "known uninstallable at this pin") : undefined}>
+            <Button disabled={busy || entry.install_state === "BROKEN"} onClick={() => void onInstall(entry)} title={entry.install_state === "BROKEN" ? (entry.install_note || "known uninstallable at this pin") : undefined}>
               {busy ? <Spinner /> : null}
               {t.pluginsPage.catalogInstall ?? "Install"}
             </Button>
           )}
-          <Button ghost size="sm" onClick={() => setOpen((v) => !v)}>
+          <Button variant="secondary" onClick={() => setOpen((v) => !v)}>
             {open ? (
               <ChevronDown className="h-3.5 w-3.5" />
             ) : (
@@ -1687,24 +1644,22 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: Plug
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {row.can_install ? (
-            <Button size="sm" disabled={busy} onClick={() => void onInstall(row)}>
+            <Button disabled={busy} onClick={() => void onInstall(row)}>
               {busy ? <Spinner /> : null}
               {t.pluginsPage.catalogInstall ?? "Install"}
             </Button>
           ) : row.can_disable ? (
-            <Button ghost size="sm" disabled={busy} onClick={() => void onToggle(row, false)}>
+            <Button variant="secondary" disabled={busy} onClick={() => void onToggle(row, false)}>
               {t.pluginsPage.disableRuntime}
             </Button>
           ) : row.can_enable ? (
-            <Button ghost size="sm" disabled={busy} onClick={() => void onToggle(row, true)}>
+            <Button variant="secondary" disabled={busy} onClick={() => void onToggle(row, true)}>
               {t.pluginsPage.enableRuntime}
             </Button>
           ) : null}
           {row.can_remove ? (
             <Button
-              destructive
-              ghost
-              size="sm"
+              variant="secondary"
               title={t.pluginsPage.removeConfirm}
               disabled={busy}
               onClick={() => setConfirmRemove(true)}
@@ -1712,7 +1667,7 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: Plug
               {busy ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
             </Button>
           ) : null}
-          <Button ghost size="sm" onClick={toggleDetails}>
+          <Button variant="secondary" onClick={toggleDetails}>
             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             {open
               ? (t.pluginsPage.catalogHideDetails ?? "Hide details")
@@ -1826,7 +1781,6 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: Plug
         }}
         title={t.pluginsPage.removeConfirm}
         description={`This will remove the "${row.id}" plugin from your agent.`}
-        destructive
         confirmLabel={t.common.delete}
       />
     </div>

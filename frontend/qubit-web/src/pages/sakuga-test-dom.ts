@@ -182,7 +182,7 @@ function reflect(el: HTMLElement, name: string, apply: (value: Prop) => void): v
     configurable: true,
     get: () => {
       const raw = el.getAttribute(name);
-      if (raw === null) return undefined;
+      if (raw === null) return name === "disabled" ? false : undefined;
       if (raw === "") return true;
       if (raw === "true" || raw === "false") return raw === "true";
       return raw;

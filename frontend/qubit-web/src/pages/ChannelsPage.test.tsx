@@ -12,6 +12,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { clickSakuga, typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const ConfirmRequiredError = vi.hoisted(() => {
   return class ConfirmRequiredError extends Error {
@@ -112,7 +114,7 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 function buttonByText(text: string): HTMLButtonElement | null {
   // Confirm dialogs portal into document.body, outside `container`.
   return (
-    [...document.querySelectorAll("button")].find(
+    [...document.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
@@ -187,8 +189,8 @@ describe("ChannelsPage broker-confirm round-trip (audit AI10 item 1)", () => {
     );
 
     await renderChannels();
-    const toggle = container.querySelector('[role="switch"]') as HTMLButtonElement;
-    await act(async () => toggle.click());
+    const toggle = container.querySelector('[role="switch"]') as HTMLElement;
+    await act(async () => clickSakuga(toggle));
 
     // The page renders the confirmation dialog; nothing has been settled yet.
     await waitFor(() => Boolean(buttonByText("Confirm")));
@@ -216,8 +218,8 @@ describe("ChannelsPage broker-confirm round-trip (audit AI10 item 1)", () => {
     );
 
     await renderChannels();
-    const toggle = container.querySelector('[role="switch"]') as HTMLButtonElement;
-    await act(async () => toggle.click());
+    const toggle = container.querySelector('[role="switch"]') as HTMLElement;
+    await act(async () => clickSakuga(toggle));
     await waitFor(() => Boolean(buttonByText("Cancel")));
     await act(async () => buttonByText("Cancel")!.click());
 
@@ -253,17 +255,8 @@ describe("ChannelsPage reference-only credentials (audit AI10 item 2)", () => {
 
     await act(async () => buttonByText("Configure")!.click());
     await waitFor(() => Boolean(container.querySelector("#field-SLACK_BOT_TOKEN")));
-    const input = container.querySelector(
-      "#field-SLACK_BOT_TOKEN",
-    ) as HTMLInputElement;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )!.set!;
-      setter.call(input, "xoxb-raw-secret-value");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    const input = container.querySelector("#field-SLACK_BOT_TOKEN") as HTMLElement;
+    await act(async () => typeIntoSakuga(input, "xoxb-raw-secret-value"));
     await act(async () => buttonByText("Save & enable")!.click());
 
     await waitFor(() =>

@@ -39,12 +39,11 @@ import { getNestedValue, setNestedValue } from "@/lib/nested";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { AutoField } from "@/components/AutoField";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
+import { Button, Checkbox, Input, Select } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
@@ -169,20 +168,17 @@ export default function ConfigPage() {
       return;
     }
     setEnd(
-      <div className="relative w-full min-w-0 sm:max-w-xs">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <div className="w-full min-w-0 sm:max-w-xs">
         <Input
-          className="h-8 pl-8 pr-7 text-xs"
+          label={t.common.search}
           placeholder={t.common.search}
-          aria-label={t.common.search}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(value) => setSearchQuery(value)}
         />
         {searchQuery && (
           <Button
-            ghost
-            size="xs"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            variant="secondary"
+            className="mt-1 text-muted-foreground hover:text-foreground"
             onClick={() => setSearchQuery("")}
             aria-label={t.common.clear}
           >
@@ -581,7 +577,6 @@ export default function ConfigPage() {
               )}
             </div>
             <Button
-              size="sm"
               className="uppercase"
               disabled={restarting}
               onClick={() => {
@@ -599,7 +594,6 @@ export default function ConfigPage() {
               {restarting ? "Restarting…" : "Restart gateway"}
             </Button>
             <Button
-              size="sm"
               className="uppercase"
               disabled={verifying}
               onClick={() => {
@@ -646,8 +640,7 @@ export default function ConfigPage() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
           <Button
-            ghost
-            size="icon"
+            variant="secondary"
             onClick={handleExport}
             title={t.config.exportConfig}
             aria-label={t.config.exportConfig}
@@ -655,8 +648,7 @@ export default function ConfigPage() {
             <Download />
           </Button>
           <Button
-            ghost
-            size="icon"
+            variant="secondary"
             onClick={() => fileInputRef.current?.click()}
             title={t.config.importConfig}
             aria-label={t.config.importConfig}
@@ -680,8 +672,7 @@ export default function ConfigPage() {
             );
             return (
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={handleReset}
                 title={resetTitle}
                 aria-label={resetTitle}
@@ -694,7 +685,6 @@ export default function ConfigPage() {
           <div className="w-px h-5 bg-border mx-1" />
 
           <Button
-            size="sm"
             className="uppercase"
             onClick={handleSave}
             disabled={saving}
@@ -811,83 +801,72 @@ export default function ConfigPage() {
                     <div className="mb-3 border border-border bg-muted/10 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="text-sm font-medium">Use my installed browser</div>
-                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <input
-                            type="checkbox"
-                            checked={useMyBrowser}
-                            onChange={(e) => {
-                              const on = e.target.checked;
-                              setUseMyBrowser(on);
-                              if (!config) return;
-                              if (on) {
-                                const path = browserProfileChoice;
-                                let next = setNestedValue(config, "browser.cdp_url", path ? "http://127.0.0.1:9222" : "");
-                                next = setNestedValue(next, "browser.profile_dir", path);
-                                next = setNestedValue(next, "browser.use_real_profile", false);
-                                setConfig(next);
-                              } else {
-                                let next = setNestedValue(config, "browser.cdp_url", "");
-                                next = setNestedValue(next, "browser.profile_dir", "");
-                                next = setNestedValue(next, "browser.use_real_profile", false);
-                                setConfig(next);
-                              }
-                            }}
-                          />
-                          optional
-                        </label>
+                        <Checkbox
+                          checked={useMyBrowser}
+                          onChange={(on) => {
+                            setUseMyBrowser(on);
+                            if (!config) return;
+                            if (on) {
+                              const path = browserProfileChoice;
+                              let next = setNestedValue(config, "browser.cdp_url", path ? "http://127.0.0.1:9222" : "");
+                              next = setNestedValue(next, "browser.profile_dir", path);
+                              next = setNestedValue(next, "browser.use_real_profile", false);
+                              setConfig(next);
+                            } else {
+                              let next = setNestedValue(config, "browser.cdp_url", "");
+                              next = setNestedValue(next, "browser.profile_dir", "");
+                              next = setNestedValue(next, "browser.use_real_profile", false);
+                              setConfig(next);
+                            }
+                          }}
+                        >
+                          Use my installed browser (optional)
+                        </Checkbox>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Qubit attaches to one Chromium window over CDP; the profile stays yours and is never copied.
                       </p>
                       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        <label className="text-xs">
-                          <span className="mb-1 block text-muted-foreground">Installed browser</span>
-                          <select
-                            className="w-full border border-border bg-background px-2 py-1 text-xs"
-                            value={browserChoice}
-                            onChange={(e) => {
-                              const id = e.target.value;
-                              setBrowserChoice(id);
-                              const b = browserDetected?.browsers.find((x) => x.id === id);
-                              const prof = b?.profiles.find((x) => x.name === b.active_profile) || b?.profiles[0];
-                              setBrowserProfileChoice(prof?.path ?? "");
-                              if (useMyBrowser && config) {
-                                let next = setNestedValue(config, "browser.profile_dir", prof?.path ?? "");
-                                next = setNestedValue(next, "browser.cdp_url", prof ? "http://127.0.0.1:9222" : "");
-                                setConfig(next);
-                              }
-                            }}
-                          >
-                            {(browserDetected?.browsers ?? []).map((b) => (
-                              <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                            {!browserDetected?.browsers.length && <option value="">No Chromium detected</option>}
-                          </select>
-                        </label>
-                        <label className="text-xs">
-                          <span className="mb-1 block text-muted-foreground">Profile</span>
-                          <select
-                            className="w-full border border-border bg-background px-2 py-1 text-xs"
-                            value={browserProfileChoice}
-                            onChange={(e) => {
-                              const path = e.target.value;
-                              setBrowserProfileChoice(path);
-                              if (useMyBrowser && config) {
-                                let next = setNestedValue(config, "browser.profile_dir", path);
-                                next = setNestedValue(next, "browser.cdp_url", path ? "http://127.0.0.1:9222" : "");
-                                setConfig(next);
-                              }
-                            }}
-                          >
-                            {(browserDetected?.browsers.find((b) => b.id === browserChoice)?.profiles ?? []).map((p) => (
-                              <option key={p.path} value={p.path}>{p.name}</option>
-                            ))}
-                          </select>
-                        </label>
+                        <Select
+                          label="Installed browser"
+                          options={[
+                            ...(browserDetected?.browsers ?? []).map((b) => ({ value: b.id, label: b.name })),
+                            ...(!browserDetected?.browsers.length
+                              ? [{ value: "", label: "No Chromium detected" }]
+                              : []),
+                          ]}
+                          value={browserChoice}
+                          onChange={(id) => {
+                            setBrowserChoice(id);
+                            const b = browserDetected?.browsers.find((x) => x.id === id);
+                            const prof = b?.profiles.find((x) => x.name === b.active_profile) || b?.profiles[0];
+                            setBrowserProfileChoice(prof?.path ?? "");
+                            if (useMyBrowser && config) {
+                              let next = setNestedValue(config, "browser.profile_dir", prof?.path ?? "");
+                              next = setNestedValue(next, "browser.cdp_url", prof ? "http://127.0.0.1:9222" : "");
+                              setConfig(next);
+                            }
+                          }}
+                        />
+                        <Select
+                          label="Profile"
+                          options={(browserDetected?.browsers.find((b) => b.id === browserChoice)?.profiles ?? []).map((p) => ({
+                            value: p.path,
+                            label: p.name,
+                          }))}
+                          value={browserProfileChoice}
+                          onChange={(path) => {
+                            setBrowserProfileChoice(path);
+                            if (useMyBrowser && config) {
+                              let next = setNestedValue(config, "browser.profile_dir", path);
+                              next = setNestedValue(next, "browser.cdp_url", path ? "http://127.0.0.1:9222" : "");
+                              setConfig(next);
+                            }
+                          }}
+                        />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Button
-                          size="xs"
                           className="uppercase"
                           disabled={browserBusy || !browserChoice || !browserProfileChoice}
                           onClick={() => {
@@ -922,8 +901,7 @@ export default function ConfigPage() {
                           {browserBusy ? "Opening…" : "Open browser"}
                         </Button>
                         <Button
-                          size="xs"
-                          ghost
+                          variant="secondary"
                           onClick={() => {
                             api.getBrowserDetected().then(setBrowserDetected).catch(() => {});
                           }}

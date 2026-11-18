@@ -13,6 +13,10 @@ original palette, no recolouring. This file records only the controls that were
 | `src/pages/AgentCardsPage.tsx` (`AgentActivityScreen`, `DelegateSheet`) | controls rendered by `src/components/om-agent-ui.tsx` | component owned by another lane; not edited here |
 | `src/pages/VoiceEditPage.tsx` | audio device / xterm surfaces | third-party widget internals + editor/canvas exception |
 | `src/pages/CanvasPage.tsx` | canvas controls | canvas exception |
+| `src/pages/FilesPage.tsx` (`Drop files here` surface) | drag-and-drop upload button | the wrapper exposes no drag/drop props; a drop target is not a plain control. The hidden `<input type=file>` stays native and is proxied by the Sakuga Upload button (owner exception). |
+| `src/pages/FilesPage.tsx`, `src/pages/ConfigPage.tsx`, `src/pages/SystemPage.tsx` | hidden `<input type=file>` | hidden file inputs are proxied by a Sakuga Button (owner exception) |
+| `src/components/AutoField.tsx` (rendered by Config) | auto-generated config fields | component owned by another lane; documented rather than edited |
+| `src/components/DeleteConfirmDialog.tsx`, `ConfirmDialog.tsx` | confirm dialogs | component-owned; their buttons are outside this file scope |
 
 _(This table grows as pages are swept; every entry names file:line, control and reason.)_
 
@@ -31,6 +35,14 @@ vendored engine:
 - `frontend/qubit-web/vitest.config.ts` — adds `@qubit/shared` alias + React
   dedupe, matching `vite.config.ts`. Without it a page test loads the shared
   package's own React copy and every hook reads a null dispatcher.
+
+## Toast surface (deferred)
+
+Pages still render the `@nous-research/ui` `Toast` component; `showSakugaToast`
+is only used by `PairingPage` so far. Converting the remaining pages would
+replace the visible notification surface but every existing test asserts the
+toast text in `document.body`, so it needs a shared adapter first. Effects
+(`emitFx`) fire alongside the legacy toast on the swept pages.
 
 ## Effects wiring
 

@@ -12,6 +12,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { brandText } from "@/lib/catalog-brand";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   getPluginsHub: vi.fn(),
@@ -256,7 +258,7 @@ describe("PluginsPage curated pinned index", () => {
     );
     expect(section?.textContent).toContain("installed");
     const installButtons = Array.from(
-      section?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+      section?.querySelectorAll<HTMLButtonElement>("button, sakuga-button") ?? [],
     ).filter((b) => (b.textContent ?? "").trim() === "Install");
     expect(installButtons).toHaveLength(0);
   });
@@ -268,7 +270,7 @@ describe("PluginsPage curated pinned index", () => {
     const section = container.querySelector(
       '[data-testid="plugin-pinned-index-section"]',
     );
-    const button = section?.querySelector("button");
+    const button = section?.querySelector("button, sakuga-button");
     expect(button).not.toBeNull();
     await act(async () => {
       button?.click();
@@ -296,7 +298,7 @@ describe("PluginsPage curated pinned index", () => {
     const section = container.querySelector(
       '[data-testid="plugin-pinned-index-section"]',
     );
-    const button = section?.querySelector("button");
+    const button = section?.querySelector("button, sakuga-button");
     expect(button).not.toBeNull();
     await act(async () => {
       button?.click();
@@ -321,18 +323,11 @@ describe("PluginsPage install error surfacing", () => {
     await renderPage();
     await waitFor(() => container.querySelector("#install-url") !== null);
 
-    const input = container.querySelector<HTMLInputElement>("#install-url")!;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "/nonexistent/path");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    const input = container.querySelector<HTMLElement>("#install-url")!;
+    await act(async () => typeIntoSakuga(input, "/nonexistent/path"));
 
     const installBtn = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
+      container.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).find((b) => (b.textContent ?? "").trim() === "Install");
     expect(installBtn).not.toBeUndefined();
     await act(async () => installBtn?.click());
@@ -553,7 +548,7 @@ describe("PluginsPage memory provider refusal", () => {
       "This provider does not expose dashboard settings.",
     );
     const save = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
+      container.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).find((button) => (button.textContent ?? "").trim() === "Save memory provider");
     expect(save?.disabled).toBe(true);
   });
@@ -593,7 +588,7 @@ describe("PluginsPage plugin row controls", () => {
       () => container.textContent?.includes("demo-plugin") === true,
     );
 
-    const remove = [...container.querySelectorAll("button")].find((button) =>
+    const remove = [...container.querySelectorAll("button, sakuga-button")].find((button) =>
       (button.getAttribute("aria-label") ?? "").includes("Remove this plugin"),
     );
     expect(remove).toBeTruthy();

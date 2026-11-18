@@ -12,6 +12,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
 
 const apiMocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
@@ -145,19 +146,19 @@ describe("ModelsPage USE AS actions (drift A20)", () => {
     await vi.waitFor(() =>
       expect(
         container.querySelector(
-          'button[aria-label="Use qubit-brain4 as the active model profile"]',
+          '[aria-label="Use qubit-brain4 as the active model profile"]',
         ),
       ).not.toBeNull(),
     );
 
     const active = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Use qubit-brain4 as the active model profile"]',
+      '[aria-label="Use qubit-brain4 as the active model profile"]',
     );
     expect(active?.textContent).toContain("Use as");
     expect(active?.getAttribute("aria-pressed")).toBe("true");
 
     const other = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Use qubit-go as the active model profile"]',
+      '[aria-label="Use qubit-go as the active model profile"]',
     );
     expect(other).not.toBeNull();
     expect(other?.getAttribute("aria-pressed")).toBe("false");
@@ -168,7 +169,7 @@ describe("ModelsPage USE AS actions (drift A20)", () => {
     await vi.waitFor(() =>
       expect(
         container.querySelector(
-          'button[aria-label="Use qubit-go as the active model profile"]',
+          '[aria-label="Use qubit-go as the active model profile"]',
         ),
       ).not.toBeNull(),
     );
@@ -176,7 +177,7 @@ describe("ModelsPage USE AS actions (drift A20)", () => {
     await act(async () => {
       container
         .querySelector(
-          'button[aria-label="Use qubit-go as the active model profile"]',
+          '[aria-label="Use qubit-go as the active model profile"]',
         )!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -196,7 +197,7 @@ describe("ModelsPage Mixture of Agents card", () => {
     );
 
     const configureButtons = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
+      container.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).filter((button) => button.textContent?.trim() === "Configure");
     expect(configureButtons.some((button) => button.disabled)).toBe(true);
     expect(apiMocks.getMoaModels).toHaveBeenCalled();
@@ -242,10 +243,10 @@ describe("ModelsPage Mixture of Agents card", () => {
     expect(document.body.textContent).toContain("Read-only");
 
     const view = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>("button"),
+      document.body.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).find((button) => button.textContent?.trim() === "View");
     expect(view).toBeTruthy();
-    expect(view!.disabled).toBe(false);
+    expect((view as HTMLElement).hasAttribute("disabled")).toBe(false);
 
     await act(async () => {
       view!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -255,7 +256,7 @@ describe("ModelsPage Mixture of Agents card", () => {
     );
     expect(document.body.textContent).toContain("qubit moa configure");
     const save = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>("button"),
+      document.body.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).find((button) => button.textContent?.trim() === "Save");
     expect(save).toBeUndefined();
   });
@@ -294,7 +295,7 @@ describe("ModelsPage main-model picker authority", () => {
     );
 
     const change = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
+      container.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).find((button) => button.textContent?.trim() === "Change");
     expect(change).not.toBeUndefined();
     await act(async () => change!.click());
