@@ -192678,6 +192678,7 @@ create: function(game) {
 	function officeUiSkinRules(payload) {
 		if (!payload?.active) return [];
 		const slices = payload.ui?.slices ?? {};
+		const header = safeSrc(slices.header?.src);
 		return [
 			...sliceRule(slices.panel, [
 				".ui-panel",
@@ -192718,6 +192719,7 @@ create: function(game) {
 				".ui-chip"
 			]),
 			...sliceRule(slices.button, [".ui-btn"]),
+			...header ? [`.ui-feed__head, .ui-side__head, .ui-dialog__head, .ui-drawer__bar { background-image:url("${header}"); background-size:100% 100%; background-repeat:no-repeat; border-bottom:0; padding:6px 10px; }`, `.ui-feed__title, .ui-side__title h2, .ui-dialog__head h2 { background:transparent; color:#3d2a1a; text-shadow:none; }`] : [],
 			`.ui-root { image-rendering: pixelated; }`,
 			`.ui-feed, .ui-sidebar, .ui-panel, .ui-drawer, .ui-dialog, .ui-settings, .ui-spawn, .ui-perm, .ui-history, .ui-timelapse, .ui-daystats, .ui-deliveries { padding: 8px 10px; }`,
 			`.ui-feed .ui-feed__head, .ui-sidebar .ui-sidebar__head { margin-top: 2px; }`
@@ -192741,20 +192743,29 @@ create: function(game) {
 		timeline: ["[data-testid=\"office-menu-timeline\"]"],
 		studio: ["[data-testid=\"office-menu-studio\"]"],
 		campus: ["[data-testid=\"office-menu-campus\"]"],
-		etsy: ["button[title^=\"Etsy\"]", "button[aria-label^=\"Etsy\"]"]
+		etsy: ["button[title^=\"Etsy\"]", "button[aria-label^=\"Etsy\"]"],
+		close: [
+			"button[title^=\"Close\"]",
+			"button[aria-label^=\"Close\"]",
+			"button[title^=\"Fechar\"]",
+			"button[aria-label^=\"Fechar\"]"
+		]
 	};
 	function applyIcons(doc, payload, touched) {
 		const icons = payload.ui?.icons ?? {};
+		const diamond = safeSrc(payload.ui?.slices?.diamond?.src);
 		for (const [name, selectors] of Object.entries(ICON_SELECTORS)) {
 			const src = safeSrc(icons[name]?.src);
 			if (!src) continue;
 			for (const selector of selectors) for (const node of Array.from(doc.querySelectorAll(selector))) {
 				const el = node;
-				el.style.backgroundImage = `url("${src}")`;
+				const framed = !!el.closest(".ui-topbar") || (el.dataset.testid ?? "").startsWith("office-menu");
+				el.style.backgroundImage = diamond && framed ? `url("${src}"), url("${diamond}")` : `url("${src}")`;
 				el.style.backgroundPosition = "center";
 				el.style.backgroundRepeat = "no-repeat";
-				el.style.backgroundSize = "18px 18px";
+				el.style.backgroundSize = diamond && framed ? "16px 16px, 30px 30px" : "18px 18px";
 				el.style.imageRendering = "pixelated";
+				if (diamond && framed) el.style.backgroundColor = "transparent";
 				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "none";
 				touched.add(el);
 			}
@@ -192787,6 +192798,7 @@ create: function(game) {
 				el.style.backgroundRepeat = "";
 				el.style.backgroundSize = "";
 				el.style.imageRendering = "";
+				el.style.backgroundColor = "";
 				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "";
 			}
 		};
@@ -192867,7 +192879,7 @@ create: function(game) {
 		{
 			id: "campus",
 			label: "Campus",
-			title: "Campus: floor scenes and the 100-floor directory",
+			title: "Campus: floor scenes and the 5-floor directory",
 			testId: "office-menu-campus",
 			icon: {
 				cols: 16,
@@ -210225,7 +210237,7 @@ create: function(game) {
 					className: "office-game__campusState",
 					"data-testid": "office-campus-loading",
 					role: "status"
-				}, "Loading the 100-floor directory…") : campusState === "error" ? R.createElement("div", {
+				}, "Loading the 5-floor directory…") : campusState === "error" ? R.createElement("div", {
 					key: "error",
 					className: "office-game__campusState",
 					"data-testid": "office-campus-error",
@@ -210251,7 +210263,7 @@ create: function(game) {
 					R.createElement("p", {
 						key: "counts",
 						"data-testid": "office-campus-counts"
-					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "100-floor directory · floors, rooms, desks and occupancy"),
+					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "5-floor directory · floors, rooms, desks and occupancy"),
 					R.createElement("div", {
 						key: "tabs",
 						className: "office-game__campusTabs"
@@ -210269,7 +210281,7 @@ create: function(game) {
 						"data-testid": "office-campus-tab-directory",
 						"aria-pressed": campusTab === "directory",
 						onClick: () => setCampusTab("directory")
-					}, "100-floor directory")])
+					}, "5-floor directory")])
 				]), R.createElement("button", {
 					key: "close",
 					type: "button",

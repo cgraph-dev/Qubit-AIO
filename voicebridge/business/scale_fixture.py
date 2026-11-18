@@ -613,8 +613,8 @@ def build_scale_fixture(
             "SCALE_FIXTURE_BAD_TENANT", "tenant_id must be non-empty"
         )
 
-    plan = build_tower_plan()
     registry = RoleRegistry.default()
+    plan = build_tower_plan(registry)
     dept_by_floor = {
         floor.floor_id: floor.department_ids[0] for floor in registry.floors
     }

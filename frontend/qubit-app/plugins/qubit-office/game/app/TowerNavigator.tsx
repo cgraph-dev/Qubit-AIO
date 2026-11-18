@@ -1,9 +1,9 @@
-/* The 100-floor tower navigator for the War Room role/floor directory.
+/* The five-floor tower navigator for the War Room role/floor directory.
  *
  * WHAT THIS IS
  * ------------
  * A vertical, grouped index over the REAL `directory.floors` directory payload
- * (100 floor templates, 5 wings, 22 active / 78 dormant today). It is a
+ * (5 floor templates, 5 wings, 5 active today). It is a
  * navigation layer: selecting a floor shows the template's wing, department
  * ids, role-template ids, planned rooms/desks and expansion limits.
  *

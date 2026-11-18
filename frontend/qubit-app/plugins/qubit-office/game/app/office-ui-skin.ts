@@ -43,6 +43,7 @@ function sliceRule(slice: Slice | undefined, targets: readonly string[]): string
 export function officeUiSkinRules(payload: Payload | null | undefined): string[] {
   if (!payload?.active) return [];
   const slices = payload.ui?.slices ?? {};
+  const header = safeSrc(slices.header?.src);
   return [
     ...sliceRule(slices.panel, [
       ".ui-panel", ".ui-drawer", ".ui-dialog", ".ui-feed", ".ui-sidebar",
@@ -55,6 +56,10 @@ export function officeUiSkinRules(payload: Payload | null | undefined): string[]
     ...sliceRule(slices.dialog, [".ui-dialog", ".ui-popover", ".ui-modal"]),
     ...sliceRule(slices.bubble, [".ui-bubble", ".ui-toast", ".ui-chip"]),
     ...sliceRule(slices.button, [".ui-btn"]),
+    ...(header ? [
+      `.ui-feed__head, .ui-side__head, .ui-dialog__head, .ui-drawer__bar { background-image:url("${header}"); background-size:100% 100%; background-repeat:no-repeat; border-bottom:0; padding:6px 10px; }`,
+      `.ui-feed__title, .ui-side__title h2, .ui-dialog__head h2 { background:transparent; color:#3d2a1a; text-shadow:none; }`,
+    ] : []),
     `.ui-root { image-rendering: pixelated; }`,
     `.ui-feed, .ui-sidebar, .ui-panel, .ui-drawer, .ui-dialog, .ui-settings, .ui-spawn, .ui-perm, .ui-history, .ui-timelapse, .ui-daystats, .ui-deliveries { padding: 8px 10px; }`,
     `.ui-feed .ui-feed__head, .ui-sidebar .ui-sidebar__head { margin-top: 2px; }`,
@@ -80,21 +85,28 @@ const ICON_SELECTORS: Record<string, readonly string[]> = {
   studio: ['[data-testid="office-menu-studio"]'],
   campus: ['[data-testid="office-menu-campus"]'],
   etsy: ['button[title^="Etsy"]', 'button[aria-label^="Etsy"]'],
+  close: ['button[title^="Close"]', 'button[aria-label^="Close"]',
+          'button[title^="Fechar"]', 'button[aria-label^="Fechar"]'],
 };
 
 function applyIcons(doc: Document, payload: Payload, touched: Set<HTMLElement>): void {
   const icons = payload.ui?.icons ?? {};
+  const diamond = safeSrc(payload.ui?.slices?.diamond?.src);
   for (const [name, selectors] of Object.entries(ICON_SELECTORS)) {
     const src = safeSrc(icons[name]?.src);
     if (!src) continue;
     for (const selector of selectors) {
       for (const node of Array.from(doc.querySelectorAll<HTMLElement>(selector))) {
         const el = node as HTMLElement;
-        el.style.backgroundImage = `url("${src}")`;
+        const framed = !!el.closest(".ui-topbar")
+          || (el.dataset.testid ?? "").startsWith("office-menu");
+        el.style.backgroundImage = diamond && framed
+          ? `url("${src}"), url("${diamond}")` : `url("${src}")`;
         el.style.backgroundPosition = "center";
         el.style.backgroundRepeat = "no-repeat";
-        el.style.backgroundSize = "18px 18px";
+        el.style.backgroundSize = diamond && framed ? "16px 16px, 30px 30px" : "18px 18px";
         el.style.imageRendering = "pixelated";
+        if (diamond && framed) el.style.backgroundColor = "transparent";
         for (const svg of Array.from(el.querySelectorAll<SVGElement>("svg"))) {
           svg.style.display = "none";
         }
@@ -128,6 +140,7 @@ export function installOfficeUiSkin(win: Window): () => void {
       el.style.backgroundRepeat = "";
       el.style.backgroundSize = "";
       el.style.imageRendering = "";
+      el.style.backgroundColor = "";
       for (const svg of Array.from(el.querySelectorAll<SVGElement>("svg"))) {
         svg.style.display = "";
       }

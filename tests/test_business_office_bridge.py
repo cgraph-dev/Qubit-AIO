@@ -151,14 +151,14 @@ def test_directory_reports_the_real_template_catalog(env):
     expected_roles = len(RoleRegistry.default().roles)
     assert expected_roles >= 145
     assert counts["roles"] == expected_roles
-    assert counts["floors"] == 100
-    assert counts["active_floors"] + counts["dormant_floors"] == 100
+    assert counts["floors"] == 5
+    assert counts["active_floors"] + counts["dormant_floors"] == 5
     assert len(out["roles"]) == expected_roles
     assert all("autonomy" in role and "budget" in role for role in out["roles"])
     assert all("wing" in floor for floor in out["floors"])
 
 
-def test_world_tower_is_a_100_floor_unstaffed_room_scene(env):
+def test_world_tower_is_a_five_floor_unstaffed_room_scene(env):
     cfg, _store = env
     code, out = _call(cfg, "GET", "/api/office/world/tower")
     assert code == 200
@@ -167,11 +167,11 @@ def test_world_tower_is_a_100_floor_unstaffed_room_scene(env):
     assert out["source"] == "templates"
     assert out["staffed"] is False
     counts = out["counts"]
-    assert counts["floors"] == 100
+    assert counts["floors"] == 5
     assert counts["wings"] == 5
-    assert counts["active_floors"] + counts["dormant_floors"] == 100
+    assert counts["active_floors"] + counts["dormant_floors"] == 5
     assert len(out["wings"]) == 5
-    assert len(out["floors"]) == 100
+    assert len(out["floors"]) == 5
     # No fake agents: every rendered seat is empty and no agent is counted.
     assert counts["agents"] == 0
     assert counts["desks"] == sum(floor["capacity"]["desks"]

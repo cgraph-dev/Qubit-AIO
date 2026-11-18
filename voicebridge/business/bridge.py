@@ -242,7 +242,7 @@ def _asdict(value: Any) -> Any:
 
 @functools.lru_cache(maxsize=1)
 def _registry() -> RoleRegistry:
-    return RoleRegistry.default()
+    return RoleRegistry.product()
 
 
 def _ok(schema: str = SCHEMA, **fields: Any) -> Tuple[int, Dict[str, Any]]:
@@ -504,7 +504,7 @@ def _world_room(room: Any, *, active: bool,
 
 def h_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/office/world/tower -> the 100-floor tower as room scenes.
+    """GET /api/office/world/tower -> the five-floor tower as room scenes.
 
     A pure projection over the shipped floor/room templates. By default it is
     explicitly unstaffed: rooms are template scenes with empty desk slots, not
