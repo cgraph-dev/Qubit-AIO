@@ -38,11 +38,13 @@ the injected icons keep their native `title`/`aria-label` semantics.
 - **Numeric seed** (`RoomBuilder`) stays a native `type="number"`; the composed
   number control is a desktop-web extra and the office did not need the
   steppers for this one field.
-- **Office iframe internals** are covered by the in-iframe pass below. Buttons
-  whose own element is the row layout (agent rows, history items, tabs, feed
-  rows, delivery cards) stay native so their grid/flex contract, drag handlers
-  and terminal semantics are unchanged. The shell still never reaches into the
-  iframe; the vendored client upgrades itself.
+- **Office iframe internals** are covered by the in-iframe passes below. The
+  shell still never reaches into the iframe; the vendored client upgrades
+  itself. The second in-iframe pass converted the row/structural buttons too.
+- **Day selects** (timelapse and daily stats) stay native `<select>`s: the
+  native option list and keyboard contract are the reason, not an omission.
+- **Textareas and the hidden file input** stay native: Sakuga ships no
+  textarea, and the file picker is deliberately hidden behind a styled button.
 - **Composite widgets** in the shell keep their semantics where replacing them
   would lose keyboard/portal behaviour.
 
@@ -97,7 +99,7 @@ are untouched, and the control files are the byte-identical upstream copies.
 | Loader | `client/src/ui/sakuga.ts` loads `sakuga-vfx/core.js` + `button`/`input`/`progress` from the client's own `public/sakuga-vfx/` (served inside the iframe) before `createUI`. The 506 KB `toggle` and the `slider` load when the settings panel opens, and `checkbox` loads when a permission card is visible; ids are deduplicated. The component files are copied byte-identically from the Qubit `/sakuga-vfx/` vendor and never edited. |
 | Helpers | `client/src/ui/dom.ts` adds `sakugaButton`, `sakugaInput`, `sakugaSlider`, `sakugaToggle`, `sakugaCheckbox`, `sakugaProgress` and `sakugaTooltip`. They keep the `h()` contract (`class`/`text`/`attrs`/`hidden`/`on`/children) and mirror what the shadow control does not observe (`aria-label`, `maxlength`, `spellcheck`, inner `input` → host `input`, `.value`/`.focus()`/`.select()`). With the flag off they build the original native element. |
 | Converted | Standard action/modal/permission buttons, settings switches (108×54 toggle art preserved), the volume slider, the permission interrupt checkbox (38px box preserved), standalone text/search fields (character name, room rename, spawn path, permission “Outro”, sidebar/history/terminal search), and the splash loader (Sakuga progress). |
-| Native exceptions | Button-as-row-layout controls: agent rows, history rows, project tabs, feed header/rows, delivery cards/toast/attachments, toast body, account/room filters, room headers, terminal-tab close, terminal copy/new buttons, peak markers, counters, version pill, usage “how” link, room link, day legend keys, character swatches/chips, social name chips, spawn folder cards. Also native: the two day `<select>`s (native option list/keyboard), the timelapse scrubber (its `max` changes per recording and it needs `input`; the Sakuga slider does not observe `min`/`max` after mount), `<textarea>` (composer/spawn/reason), hidden file input, and the AskUserQuestion option radios/checkboxes (grouped named native inputs read by the form model). |
+| Native exceptions (this pass; superseded by the second pass below for the row controls) | No light-DOM `<button>` remains. Still native by contract: the two day `<select>`s (native option list/keyboard), `<textarea>` (composer/spawn/reason; Sakuga has no textarea), the hidden file input, and the AskUserQuestion option radios/checkboxes (grouped named native inputs read by the form model). The terminal-tab close stays a `role="button"` span inside the tab (a nested `<button>` is invalid). |
 
 **Rollback:** `QUBIT_OFFICE_SAKUGA=0` (env, read by `webui.py` for the office
 document) or `?sakuga=0` on the iframe URL. The client then builds the original
@@ -112,3 +114,76 @@ native elements; no rebuild is required.
 - `check_sakuga_vendor.py` OK (2 copies); `sync_sakuga_shared.py --check` OK (17 files).
 - Static same-origin probe of the vendored document (`?mock=1`): 86 Sakuga buttons, 22 native row buttons, 5 Sakuga inputs, 2 native inputs (file + timelapse range), 4 toggle hosts, 1 slider, 0 console errors, 0 failed requests, FX overlay present. Initial requests were exactly `core.js`, `button/button.js`, `input/input.js`, `progress/progress.js`; opening Settings added `toggle/toggle.js` and `slider/slider.js` and both shadow controls upgraded. `?sakuga=0` → 0 Sakuga elements, 109 native buttons, all native inputs, 0 console errors.
 - The live `:8890` bridge was not restarted in this worktree; deployment is a separate step.
+
+## Second in-iframe pass — row/structural buttons (2026-11-19)
+
+Owner: "do the same everywhere in qubit office". The first pass deliberately
+left the row-shaped controls native; this pass converts them without changing
+the rows' visual contract or their drag/keyboard behaviour.
+
+**Helper.** `client/src/ui/dom.ts` gains a `row: true` option on `sakugaButton`
+(class `sakuga-row` on the host). The **host** keeps the original class' box and
+state (background, hover, `is-selected`, `is-off`, opacity, drag, the room
+accent `::before`); the **Sakuga middle** loses the gallery chrome
+(`transparent`, `border:0`, `box-shadow:none`, `font/color: inherit`) and takes
+the row layout through `::part(button)` in `client/src/ui/styles.css`. The
+press/impact effects stay anchored on the part, which fills the host box.
+`aria-label/checked/pressed/expanded/current/selected/disabled/haspopup` and
+`tabIndex` are mirrored to the inner button (the element that actually receives
+focus), so roving radiogroups and Tab order keep working.
+
+**Converted (no light-DOM native `<button>` left):** agent rows, room headers,
+account filters, history items, feed header + feed rows, delivery toast/cards/
+attachments, toast body, terminal tabs, terminal copy/new, counters (waiting +
+shells), version pill, usage "how" link, room link, day legend keys, character
+swatches/chips, social name chips, spawn folder cards, timelapse peak markers,
+and the AskUserQuestion-style rows that had already been converted.
+
+**Inputs.** The timelapse scrubber is now a `sakuga-slider`. It stays an
+invisible drag surface over the chart (`opacity: 0`, inset 0) so the rendered
+timeline and its needle are unchanged; the lazy slider is pulled in when the
+timelapse mounts (`ensureSakuga('slider')`), so it works even if Settings was
+never opened. `value`/`disabled` are attribute-backed so a write before the
+component upgrade cannot shadow its accessor, and `min`/`max`/`step` are the
+component's observed attributes. The file input stays hidden. Text/search
+fields and the volume slider were already Sakuga from the first pass.
+
+**Exceptions (by contract, not omission):** the two day `<select>`s (native
+option list/keyboard), `<textarea>` (composer/spawn/reason; Sakuga ships no
+textarea), the hidden file input, the AskUserQuestion grouped native
+radios/checkboxes, and the terminal-tab close (`role="button"` span inside the
+tab; a nested `<button>` is invalid).
+
+**Rollback.** `QUBIT_OFFICE_SAKUGA=0` / `?sakuga=0` still builds the original
+native elements; the new `::part()` rules find no target.
+
+**Evidence:**
+
+- Habblaud `npm test` → 119 files / 1,353 passed, 2 skipped; `npm run typecheck`
+  clean; `npm run build:client` ok.
+- Re-vendor from `/home/trick/qubit-worktrees/habblaud-theme` →
+  `vendor_habblaud.py --check` ok (87 files, 3,042,531 bytes, commit
+  `4ccce2537472`; `local_commit` = the Habblaud lane commit).
+- Office-app Vitest → 52 files / 609 passed; `npx vite build --config
+  vite.office-game.config.ts` rebuilt the game bundle.
+- Office Python focused set (plugin app/auth, vendor, reproducibility, stream,
+  stream auth, stream FX) → 181 passed, 1 skipped. The rollback-global test
+  (`test_office_sakuga_rollback_global_is_opt_in`) passes.
+- `check_sakuga_vendor.py` OK (2 copies); `sync_sakuga_shared.py --check` OK
+  (17 files).
+- Standalone probe of the vendored document (`?mock=1`, Google Chrome via
+  `playwright-core`): **0 light-DOM `<button>`**, 107 `sakuga-button` hosts (21
+  with `sakuga-row`), 5 `sakuga-input`, 0 non-file native inputs, 2 native day
+  `<select>`s, 2 `sakuga-slider`, FX overlay present, **0 console errors / 0
+  failed requests** on the base load. Opening Settings upgrades the toggle and
+  slider; opening Timelapse adds the slider whose inner `input` carries
+  `min/max/step/value`. Clicking an account filter sets `is-off`, a room header
+  selects, an agent row opens the drawer with that agent, the version pill opens
+  Settings/About and the usage "how" opens Help; a room drag emits
+  `dragstart`/`dragover`/`drop`. Opening Timelapse against the static server
+  logs the expected `/api/timeline/days` 404 (no backend), identical in
+  rollback.
+- `?sakuga=0` on the same vendored document → 110 native `<button>`, 0 Sakuga
+  elements, 2 native ranges, 2 selects, no FX canvas; filter/room/agent
+  interactions still work.
+- No live `:8890` restart in this worktree.
