@@ -11,6 +11,7 @@
  *
  * React and hooks come from the HOST, exactly like the other office panels.
  */
+import { sakugaButton } from "./sakuga";
 import {
   type BuilderRoom,
   type BuilderState,
@@ -218,7 +219,7 @@ export function createRoomBuilder(
       }),
     ]);
 
-    const roomButton = (row: BuilderRoom) => R.createElement("button", {
+    const roomButton = (row: BuilderRoom) => sakugaButton(R, {
       key: row.room_id,
       type: "button",
       "data-testid": "room-builder-room",
@@ -236,7 +237,7 @@ export function createRoomBuilder(
       }, [
         R.createElement("span", { key: "label" },
           `${cell.cell_id} · ${cell.cols}x${cell.rows} · ${cell.desks.length} desks`),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "remove",
           type: "button",
           "data-testid": "room-builder-remove-cell",
@@ -257,7 +258,7 @@ export function createRoomBuilder(
       }, [
         R.createElement("span", { key: "label" },
           `${desk.desk_id} (${desk.x},${desk.y}) ${desk.w}x${desk.h}`),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "remove",
           type: "button",
           "data-testid": "room-builder-remove-desk",
@@ -331,37 +332,37 @@ export function createRoomBuilder(
 
       R.createElement("div", { key: "toolbar", role: "toolbar",
         "aria-label": "Draft controls" }, [
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "preview", type: "button", "data-testid": "room-builder-preview",
           "aria-label": "Preview the draft",
           "aria-pressed": previewOpen,
           onClick: () => setPreviewOpen((open) => !open),
         }, previewOpen ? "Hide preview" : "Preview"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "undo", type: "button", "data-testid": "room-builder-undo",
           "aria-label": "Undo the last edit",
           disabled: state.history.length === 0,
           onClick: () => edit(undo),
         }, "Undo"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "redo", type: "button", "data-testid": "room-builder-redo",
           "aria-label": "Redo the last undone edit",
           disabled: state.future.length === 0,
           onClick: () => edit(redo),
         }, "Redo"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "approve", type: "button", "data-testid": "room-builder-approve",
           "aria-label": "Approve the valid draft",
           onClick: () => edit(approveState),
         }, "Approve"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "rollback", type: "button",
           "data-testid": "room-builder-rollback",
           "aria-label": "Roll back to the last published version",
           disabled: state.published_version === null,
           onClick: onRollbackClick,
         }, "Rollback"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "publish", type: "button", "data-testid": "room-builder-publish",
           "aria-label": "Publish the approved draft",
           disabled: publish.kind === "publishing",
@@ -430,19 +431,19 @@ export function createRoomBuilder(
 
         R.createElement("div", { key: "cell-actions", role: "group",
           "aria-label": "Cell and desk actions" }, [
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "add-cell", type: "button",
             "data-testid": "room-builder-add-cell",
             "aria-label": "Add a fixed 16 by 12 cell",
             onClick: () => edit((current) => addCell(current, room.room_id, 2)),
           }, "Add cell"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "add-desk", type: "button",
             "data-testid": "room-builder-add-desk",
             "aria-label": "Add a desk",
             onClick: () => edit((current) => addDesk(current, room.room_id)),
           }, "Add desk"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "remove-room", type: "button",
             "data-testid": "room-builder-remove-room",
             "aria-label": `Remove room ${room.name}`,
@@ -538,7 +539,7 @@ export function createRoomBuilder(
             "room-builder-capability", setAssignCapability),
           field("Memory scope", assignMemory,
             "room-builder-memory", setAssignMemory),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "assign", type: "button",
             "data-testid": "room-builder-assign",
             "aria-label": "Apply the room assignment",
@@ -579,7 +580,7 @@ export function createRoomBuilder(
           "room-builder-new-room-kind", setNewRoomKind),
         field("Desks", newRoomDesks, "room-builder-new-room-desks",
           setNewRoomDesks),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "add", type: "button", "data-testid": "room-builder-add-room",
           "aria-label": "Create the room",
           onClick: () => edit((current) => addRoom(current, {
@@ -596,7 +597,7 @@ export function createRoomBuilder(
         key: "department-actions", role: "group",
         "aria-label": "Department actions",
       }, [
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "clone", type: "button",
           "data-testid": "room-builder-clone",
           "aria-label": "Clone the selected department",
@@ -606,7 +607,7 @@ export function createRoomBuilder(
             `floor-${current.floors.length + 1}`,
           )),
         }, "Clone department"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "merge", type: "button", "data-testid": "room-builder-merge",
           "aria-label": "Merge all departments into the first",
           disabled: state.floors.length < 2,
@@ -616,7 +617,7 @@ export function createRoomBuilder(
             current.floors[0].floor_id,
           )),
         }, "Merge departments"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "split", type: "button", "data-testid": "room-builder-split",
           "aria-label": "Split the selected room onto a new department floor",
           disabled: !room || state.rooms.filter(

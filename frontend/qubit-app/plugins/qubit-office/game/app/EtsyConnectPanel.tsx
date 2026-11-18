@@ -17,6 +17,7 @@
  *
  * React comes from the HOST: ``R.createElement``, never an import.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   EtsyApiError,
@@ -198,7 +199,7 @@ export function createEtsyConnectPanel(
         R.createElement("span", {
           key: "t", className: "office-theme-dock-title",
         }, "Etsy connection"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "refresh", type: "button",
           className: "office-game__btn office-theme-dock-link",
           "data-testid": "etsy-connect-refresh",
@@ -206,7 +207,7 @@ export function createEtsyConnectPanel(
           disabled: busy !== null || read.kind === "loading",
           onClick: () => setRefresh((n: number) => n + 1),
         }, "Refresh"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "x", type: "button",
           className: "office-game__btn office-theme-dock-close",
           "data-testid": "etsy-connect-close",
@@ -267,7 +268,7 @@ export function createEtsyConnectPanel(
           R.createElement("p", {
             key: "exp", className: "etsy-connect__meta",
           }, `Access expires ${expiry}.`),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "disconnect", type: "button",
             className: "office-game__btn etsy-connect__secondary",
             "data-testid": "etsy-connect-disconnect",
@@ -279,7 +280,7 @@ export function createEtsyConnectPanel(
         children.push(R.createElement("div", {
           key: "connect-row", className: "etsy-connect__actions",
         }, [
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "connect", type: "button",
             className: "office-game__btn etsy-connect__primary",
             "data-testid": "etsy-connect-start",
@@ -328,7 +329,7 @@ export function createEtsyConnectPanel(
               },
             }),
           ]),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "complete", type: "button",
             className: "office-game__btn etsy-connect__primary",
             "data-testid": "etsy-connect-complete",

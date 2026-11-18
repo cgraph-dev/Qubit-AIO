@@ -1,13 +1,14 @@
 /* The per-seat model/provider panel, mounted beside the Office iframe.
  *
  * React comes from the HOST (see OfficeAppShell.tsx): `R.createElement`, no
- * `import from "react"` — a second React copy would silently split the hook
+ * import from "react" — a second React copy would silently split the hook
  * runtime.
  *
  * The panel is honest about its states: loading, unavailable, and saved all
  * render differently, and a failed write shows the server's own reason rather
  * than a green tick. It never claims a save it did not make.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type SeatModelState,
@@ -137,7 +138,7 @@ export function createSeatModelPanel(
         }, state.providers_note));
       }
 
-      children.push(R.createElement("button", {
+      children.push(sakugaButton(R, {
         key: "save",
         type: "button",
         className: "seat-model__save",

@@ -28,6 +28,7 @@
 
 import { createOfficeComponent, type OfficeGameShellProps } from "./OfficeGameShell";
 import { createOfficeApp } from "./app/OfficeAppShell";
+import { officeFx } from "./app/sakuga";
 // F08's styles. Imported here so the bundler emits them with the entry; the
 // rules are all scoped to `.office-game`, so the dashboard is untouched.
 import "./styles/tokens.css";
@@ -104,6 +105,10 @@ function createOfficeWithSeatRouting(
       agents: number;
       error: string;
     }>({ state: "connecting", rooms: 0, agents: 0, error: "" });
+    // The tower's own animation vocabulary is the ONLY source for these cues:
+    // a seat that transitions to `done`/`settling` completed work, `stopped`
+    // failed, `blocked` was denied. No timers, no invented activity.
+    const previousAnimations = H.useRef<Map<number, string>>(new Map());
 
     H.useEffect(() => {
       const adapter = new OfficeAdapter({
@@ -130,6 +135,26 @@ function createOfficeWithSeatRouting(
             error: s.error ?? "",
           });
           if (characters.length === 0) return;
+          // Diff the tower's OWN animation values. The first sighting of a
+          // seat is not a completion; only a transition is.
+          const before = previousAnimations.current;
+          const after = new Map<number, string>();
+          let completed = false;
+          let failed = false;
+          let blocked = false;
+          for (const character of characters) {
+            const animation = String(character.animation || "");
+            after.set(character.agent_id, animation);
+            const previous = before.get(character.agent_id);
+            if (previous === undefined || previous === animation) continue;
+            if (animation === "done" || animation === "settling") completed = true;
+            else if (animation === "stopped") failed = true;
+            else if (animation === "blocked") blocked = true;
+          }
+          previousAnimations.current = after;
+          if (completed) officeFx("success");
+          if (failed) officeFx("error");
+          if (blocked) officeFx("warning");
           setSeats(characters.map((c) => ({ agent_id: c.agent_id, slug: c.slug })));
           // Select the first seat once, then keep the operator's choice.
           setSeatId((current) =>

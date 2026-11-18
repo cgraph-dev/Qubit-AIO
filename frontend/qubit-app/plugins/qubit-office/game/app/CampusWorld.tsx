@@ -24,6 +24,7 @@
  * floors first, then the template floors nearest them) and offers incremental
  * "load more" controls. Live floors are always in the window.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { OfficeAdapter } from "../adapter";
 import { fetchDirectory, type FloorTemplate } from "./business-api";
@@ -570,7 +571,7 @@ export function createCampusWorld(
 
     const controlButton = (key: string, label: string,
                            testId: string, onClick: () => void,
-                           disabled = false) => R.createElement("button", {
+                           disabled = false) => sakugaButton(R, {
       key, type: "button", className: "office-game__btn",
       "data-testid": testId,
       disabled,
@@ -631,7 +632,7 @@ export function createCampusWorld(
           width: `${CAMPUS_FLOOR_WIDTH}px`, height: `${CAMPUS_FLOOR_HEIGHT}px`,
         },
       }, [
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "label", type: "button",
           className: "office-game__campusFloorLabel",
           "data-testid": "campus-world-floor-label",

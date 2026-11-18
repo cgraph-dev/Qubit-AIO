@@ -8,6 +8,7 @@
  * React comes from the HOST: `R.createElement`, never an import. There is no
  * shell mount here; the Office lead mounts the factory.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type InventoryRead,
@@ -133,7 +134,7 @@ export function createPanelInventoryPanel(
           key: "detail",
           "data-testid": "panel-inventory-error-detail",
         }, `${code}: ${detail}`),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "retry",
           type: "button",
           "data-testid": "panel-inventory-retry",
