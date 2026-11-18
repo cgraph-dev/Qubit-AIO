@@ -12,6 +12,7 @@
  * React comes from the HOST: `R.createElement`, never an import.
  */
 import { sakugaButton } from "./sakuga";
+import { OfficeInput, OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
 import {
@@ -246,19 +247,22 @@ export function createTimeline(
     }, [
       R.createElement("label", { key: "q" }, [
         R.createElement("span", { key: "l" }, "Search "),
-        R.createElement("input", {
-          key: "i", type: "search",
+        R.createElement(OfficeTooltip, {
+          key: "search-tip",
+          content: "Filter the operator timeline by text.",
+        }, R.createElement(OfficeInput, {
+          key: "i", type: "search", label: "",
           "data-testid": "timeline-search",
           "aria-label": "Search the operator timeline",
           value: query,
           onChange: (event: { target?: { value?: string } }) =>
             setQuery(String(event?.target?.value ?? "")),
-        }),
+        })),
       ]),
       R.createElement("label", { key: "kind" }, [
         R.createElement("span", { key: "l" }, "Kind "),
-        R.createElement("select", {
-          key: "s",
+        R.createElement(OfficeSelect, {
+          key: "s", label: "",
           "data-testid": "timeline-kind",
           "aria-label": "Filter by record kind",
           value: kindFilter,
@@ -273,8 +277,8 @@ export function createTimeline(
       ]),
       R.createElement("label", { key: "status" }, [
         R.createElement("span", { key: "l" }, "Status "),
-        R.createElement("select", {
-          key: "s",
+        R.createElement(OfficeSelect, {
+          key: "s", label: "",
           "data-testid": "timeline-status",
           "aria-label": "Filter by status",
           value: statusFilter,

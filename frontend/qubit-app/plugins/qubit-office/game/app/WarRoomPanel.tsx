@@ -9,6 +9,7 @@
  * never dresses a template as a staffed agent.
  */
 import { officeFx, sakugaButton } from "./sakuga";
+import { OfficeInput, OfficeSelect } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type BusinessDirectory, type BusinessOverview,
@@ -72,7 +73,7 @@ function section(R: OfficeGameShellProps["React"], id: string, title: string,
 }
 
 function input(R: OfficeGameShellProps["React"], key: string, props: Record<string, unknown>) {
-  return R.createElement("input", {
+  return R.createElement(OfficeInput, {
     key, className: "warroom__input", autoComplete: "off", ...props,
   });
 }
@@ -363,8 +364,8 @@ export function createWarRoomPanel(
           children.push(R.createElement("label", {
             key: "picker", className: "warroom__picker",
           }, "Session",
-            R.createElement("select", {
-              key: "s",
+            R.createElement(OfficeSelect, {
+              key: "s", label: "",
               "data-testid": "warroom-session-picker",
               value: selectedId ?? "",
               onChange: (event: { target: { value: string } }) =>
@@ -451,8 +452,8 @@ export function createWarRoomPanel(
                 chip(R, source.status, "s"),
               ]))),
             R.createElement("div", { key: "row", className: "warroom__row" }, [
-              R.createElement("select", {
-                key: "kind", "data-testid": "warroom-source-kind",
+              R.createElement(OfficeSelect, {
+                key: "kind", label: "", "data-testid": "warroom-source-kind",
                 value: sourceKind,
                 onChange: (event: { target: { value: string } }) =>
                   setSourceKind(event.target.value),
@@ -533,8 +534,8 @@ export function createWarRoomPanel(
                   : null,
               ]))),
             R.createElement("div", { key: "row", className: "warroom__row" }, [
-              R.createElement("select", {
-                key: "label", "data-testid": "warroom-evidence-label",
+              R.createElement(OfficeSelect, {
+                key: "label", label: "", "data-testid": "warroom-evidence-label",
                 value: evidenceLabel,
                 onChange: (event: { target: { value: string } }) =>
                   setEvidenceLabel(event.target.value),
@@ -549,8 +550,8 @@ export function createWarRoomPanel(
                 onInput: (event: { target: { value: string } }) =>
                   setEvidenceClaim(event.target.value),
               }),
-              R.createElement("select", {
-                key: "source", "data-testid": "warroom-evidence-source",
+              R.createElement(OfficeSelect, {
+                key: "source", label: "", "data-testid": "warroom-evidence-source",
                 value: evidenceSource,
                 onChange: (event: { target: { value: string } }) =>
                   setEvidenceSource(event.target.value),

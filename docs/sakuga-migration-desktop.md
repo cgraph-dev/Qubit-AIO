@@ -76,3 +76,38 @@ indeterminate phase of the update overlay (`app/updates-overlay.tsx`).
 Real-outcome cues fire on gateway connect/failure and update done/error. The
 shared wrapper fix (idempotent attribute writes, read-only progress value) is
 synced into `qubit_runtime/apps/shared` by `scripts/sync_sakuga_shared.py`.
+
+## Composed extras pass (2026-11-18)
+
+The shared extras (`frontend/qubit-shared/src/sakuga/extras`) are re-exported
+from `@/sakuga/ui` as `Textarea`, `NumberField`, `DateField`, `TimeField`,
+`FileField`, `MultiSelect`, `FormRow`, `Pagination` and `HoverTooltip`.
+`qubit_runtime/apps/shared` is kept byte-identical by
+`scripts/sync_sakuga_shared.py --check`.
+
+| Control | Where | Notes |
+|---|---|---|
+| Textarea | `components/ui/textarea.tsx` (every consumer), starmap share code, goal criterion | The shared wrapper is now the composed `SakugaTextarea`: real native textarea, Sakuga frame, type/focus cues. Native `onChange` shape and `ref` are preserved, `onBlur`/`onKeyDown`/`onPaste` are attached to the inner element, and the frame label stays empty when the caller already provides one. |
+| NumberField | plugin settings `NumberControl` | Label comes from the surrounding field; the value is reported as a number and stringified for the draft store. |
+| TimeField | cron blueprint `time` slot | Replaces the native `type="time"` input. |
+| FileField | settings config import, pet reference photo, kanban attachment upload | Rendered with `className="hidden"` so the existing icon/action button still triggers the real input through the forwarded ref; the field owns the native `FileList`. |
+| Pagination | artifacts list | The numbered shadcn strip was replaced by the composed previous/next + page-field control; the item-count label stays. |
+| HoverTooltip | artifacts refresh icon, settings footer export/import/reset icons | Hover/focus/tap opens, Escape closes, and the effect fires from the real element. |
+
+### Remaining exceptions (unchanged)
+
+- **Assistant-ui binding textareas** (`app/chat/composer/index.tsx`,
+  `components/assistant-ui/thread/user-edit-composer.tsx`): these are the
+  invisible `ComposerPrimitive.Input asChild` controls that wire the composer
+  state. A composed control would replace the bound native element, so they stay
+  native (two `<textarea>` tags).
+- **Inline numeric settings rows** (`settings/billing`, `settings/pool-limits`,
+  `settings/sessions-settings`, `settings/memory`, `settings/config-field`,
+  `plugins/kanban/board`, `components/pane-shell/tree/zone-editor`): the row
+  owns the label and persists on blur; the native number input keeps the
+  commit-on-blur/Enter contract. `NumberField` is used where the field owns its
+  own label.
+- **Radix `Tabs` / `Tooltip`** keep composite ARIA/portal geometry; `HoverTooltip`
+  is used only where a light-DOM trigger is enough.
+- **Indeterminate checkbox, non-plain progress, composite search fields,
+  editors/canvas/xterm, nav links** remain as documented in the earlier passes.

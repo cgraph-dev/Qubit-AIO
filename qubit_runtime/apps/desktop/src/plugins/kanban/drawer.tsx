@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   ErrorState,
+  FileField,
   host,
   isSubmitEnter,
   Loader,
@@ -536,19 +537,16 @@ function AttachmentsSection({
     <Section
       action={
         <>
-          <input
-            hidden
-            onChange={event => {
-              const file = event.target.files?.[0]
-
+          <FileField
+            className="hidden"
+            label={k.uploadAttachment}
+            onFiles={files => {
+              const file = files[0]
               if (file) {
                 onUpload(file)
               }
-
-              event.target.value = ''
             }}
             ref={fileRef}
-            type="file"
           />
           <Button
             aria-label={k.uploadAttachment}

@@ -47,6 +47,7 @@ import type { OfficeLoadingConfigInput } from "../loading/config";
 import {
   officeFx, sakugaButton, sakugaLoading, sakugaProgress,
 } from "./sakuga";
+import { OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import {
   captureFocus,
   focusFirst,
@@ -894,8 +895,11 @@ export function createOfficeApp(
           children.push(R.createElement("label", {
             key: "seat-picker", className: "seat-model__label",
           }, "Seat",
-            R.createElement("select", {
-              key: "seat",
+            R.createElement(OfficeTooltip, {
+              key: "seat-tip",
+              content: "Pick the office seat whose model routing you are editing.",
+            }, R.createElement(OfficeSelect, {
+              key: "seat", label: "",
               "data-testid": "seat-model-seat",
               value: String(props.seatAgentId),
               onChange: (e: { target: { value: string } }) => {
@@ -905,7 +909,7 @@ export function createOfficeApp(
             }, seats.map((s) =>
               R.createElement("option", {
                 key: s.agent_id, value: String(s.agent_id),
-              }, s.slug || `seat ${s.agent_id}`))),
+              }, s.slug || `seat ${s.agent_id}`)))),
           ));
         }
         children.push(R.createElement(SeatModelPanel, {

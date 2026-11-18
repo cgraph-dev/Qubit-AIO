@@ -18,6 +18,7 @@
  * React comes from the HOST: ``R.createElement``, never an import.
  */
 import { officeFx, sakugaButton } from "./sakuga";
+import { OfficeInput } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   EtsyApiError,
@@ -306,8 +307,8 @@ export function createEtsyConnectPanel(
             key: "code-label", className: "etsy-connect__field",
           }, [
             R.createElement("span", { key: "l" }, "Redirect URL or code"),
-            R.createElement("input", {
-              key: "code", className: "warroom__input",
+            R.createElement(OfficeInput, {
+              key: "code", label: "", className: "warroom__input",
               "data-testid": "etsy-connect-code",
               autoComplete: "off",
               value: codeInput,
@@ -324,8 +325,8 @@ export function createEtsyConnectPanel(
             key: "state-label", className: "etsy-connect__field",
           }, [
             R.createElement("span", { key: "l" }, "OAuth state"),
-            R.createElement("input", {
-              key: "state", className: "warroom__input",
+            R.createElement(OfficeInput, {
+              key: "state", label: "", className: "warroom__input",
               "data-testid": "etsy-connect-state",
               autoComplete: "off",
               value: stateInput,

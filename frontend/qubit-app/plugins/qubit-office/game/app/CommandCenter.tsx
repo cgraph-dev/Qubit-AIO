@@ -10,6 +10,7 @@
  * React comes from the HOST: `R.createElement`, never an import.
  */
 import { sakugaButton } from "./sakuga";
+import { OfficeInput, OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
 import {
@@ -203,7 +204,11 @@ export function createCommandCenter(
           key: "label", htmlFor: "command-center-query",
           className: "command-center__label",
         }, "Search floors, rooms, desks, agents, tasks and approvals"),
-        R.createElement("input", {
+        R.createElement(OfficeTooltip, {
+          key: "input-tip",
+          content: "Ctrl or Command K focuses search. Arrow keys move, Enter opens, Escape closes.",
+        },
+        R.createElement(OfficeInput, {
           key: "input",
           id: "command-center-query",
           ref: searchRef,
@@ -212,13 +217,14 @@ export function createCommandCenter(
           autoComplete: "off",
           "aria-describedby": "command-center-help",
           "data-testid": "command-center-query",
+          "aria-label": "Search the office",
           placeholder: "Search by floor, room, desk, agent, task or approval",
           onChange: (event: { target: { value: string } }) => {
             setQuery(event.target.value);
             setActiveIndex(0);
           },
           onKeyDown,
-        }),
+        })),
         R.createElement("p", {
           key: "help",
           id: "command-center-help",
@@ -228,16 +234,12 @@ export function createCommandCenter(
         R.createElement("div", {
           key: "filters", className: "command-center__filters",
         }, [
-          R.createElement("label", {
-            key: "kind-label", htmlFor: "command-center-kind",
-            className: "command-center__filterLabel",
-          }, "Kind"),
-          R.createElement("select", {
+          R.createElement(OfficeSelect, {
             key: "kind",
             id: "command-center-kind",
             value: kindFilter,
             "data-testid": "command-center-kind",
-            "aria-label": "Filter by kind",
+            "aria-label": "Kind",
             onChange: (event: { target: { value: string } }) => {
               setKindFilter(event.target.value);
               setActiveIndex(0);
@@ -248,16 +250,12 @@ export function createCommandCenter(
               key: kind, value: kind,
             }, kindLabel(kind))),
           ]),
-          R.createElement("label", {
-            key: "status-label", htmlFor: "command-center-status",
-            className: "command-center__filterLabel",
-          }, "Status"),
-          R.createElement("select", {
+          R.createElement(OfficeSelect, {
             key: "status",
             id: "command-center-status",
             value: statusFilter,
             "data-testid": "command-center-status",
-            "aria-label": "Filter by status",
+            "aria-label": "Status",
             onChange: (event: { target: { value: string } }) => {
               setStatusFilter(event.target.value);
               setActiveIndex(0);

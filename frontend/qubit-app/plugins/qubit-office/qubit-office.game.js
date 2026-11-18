@@ -1,4 +1,4 @@
-(function() {
+(function(react) {
 	// \0rolldown/runtime.js
 	var __defProp = Object.defineProperty;
 	var __exportAll = (all, no_symbols) => {
@@ -193220,6 +193220,13 @@ create: function(game) {
 			draw$6(await loadSakugaCore(), detail);
 		} catch {}
 	}
+	/** Fire a cue anchored to an element. */
+	function emitFxAt(cue, target, options = {}) {
+		return emitFx(cue, {
+			...options,
+			target
+		});
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/sakuga.ts
 	var configured = false;
 	/** Point the loader at the served `/sakuga-vfx` assets, once per document. */
@@ -193319,6 +193326,1224 @@ create: function(game) {
 		if (!cue) return;
 		configureOfficeSakuga();
 		emitFx(cue, options);
+	}
+	// ../qubit-shared/src/sakuga/elements.tsx
+	var HOST_KEYS = /* @__PURE__ */ new Set([
+		"id",
+		"title",
+		"class",
+		"className",
+		"style",
+		"role",
+		"tabIndex",
+		"onClick",
+		"onKeyDown",
+		"onFocus",
+		"onBlur"
+	]);
+	function hostProps(props) {
+		const out = {};
+		for (const [key, value] of Object.entries(props)) {
+			if (value === void 0 || key === "children") continue;
+			if (HOST_KEYS.has(key) || key.startsWith("on") || key.startsWith("aria-") || key.startsWith("data-")) out[key === "className" ? "class" : key] = typeof value === "boolean" && (key.startsWith("aria-") || key.startsWith("data-")) ? String(value) : value;
+		}
+		return out;
+	}
+	function hostShadowInput(host) {
+		return host?.shadowRoot?.querySelector("input") ?? null;
+	}
+	var INNER_INPUT_METHODS = [
+		"select",
+		"setSelectionRange",
+		"setRangeText",
+		"focus",
+		"blur",
+		"checkValidity",
+		"reportValidity",
+		"setCustomValidity"
+	];
+	var INNER_INPUT_PROPS = [
+		"type",
+		"placeholder",
+		"required",
+		"pattern",
+		"minLength",
+		"maxLength",
+		"readOnly",
+		"selectionStart",
+		"selectionEnd"
+	];
+	/** Let call sites treat the host like the native input it wraps. */
+	function delegateInnerInput(host) {
+		const marked = host;
+		if (marked.__sakugaDelegated) return;
+		marked.__sakugaDelegated = true;
+		const element = host;
+		for (const method of INNER_INPUT_METHODS) Object.defineProperty(host, method, {
+			configurable: true,
+			value: (...args) => {
+				return hostShadowInput(host)?.[method]?.(...args);
+			}
+		});
+		for (const prop of INNER_INPUT_PROPS) {
+			if (Object.prototype.hasOwnProperty.call(host, prop)) continue;
+			Object.defineProperty(host, prop, {
+				configurable: true,
+				get: () => {
+					const input = hostShadowInput(host);
+					if (input) return input[prop];
+					return host.getAttribute(prop.toLowerCase()) ?? void 0;
+				}
+			});
+		}
+		element["valueAsNumber"] = void 0;
+		Object.defineProperty(host, "valueAsNumber", {
+			configurable: true,
+			get: () => {
+				return hostShadowInput(host)?.valueAsNumber;
+			}
+		});
+	}
+	function isDefined(tag) {
+		return typeof window !== "undefined" && Boolean(window.customElements?.get(tag));
+	}
+	/** A property can be assigned only when its descriptor has a setter (or is a data property). */
+	function writableProperty(el, key) {
+		let proto = el;
+		while (proto) {
+			const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+			if (descriptor) return "set" in descriptor ? typeof descriptor.set === "function" : descriptor.writable === true;
+			proto = Object.getPrototypeOf(proto);
+		}
+		return false;
+	}
+	/**
+	* Sync one value onto the host, mutating only what actually changes.
+	*
+	* `setAttribute` fires `attributeChangedCallback` even when the new value is
+	* identical. The vendored controls treat that callback as a real change: the
+	* toggle resets `seq` to a one-frame jump when `checked` is rewritten, so a
+	* redundant write on every React render killed its 43-frame ON animation.
+	* (Removing an absent attribute is a no-op, which is why OFF appeared to work.)
+	*
+	* The writable-property guard matters too: progress exposes a read-only
+	* `value` getter, and assigning it throws in strict mode. Its attribute is the
+	* documented input, so the attribute path still drives it.
+	*/
+	function writeValue(el, key, value) {
+		const booleanKey = key === "checked" || key === "disabled";
+		const clearing = value === void 0 || value === null || value === false;
+		const nextAttr = clearing ? null : value === true ? "" : String(value);
+		if (isDefined(el.tagName.toLowerCase())) {
+			const element = el;
+			const live = element[key];
+			if (typeof live !== "undefined" && writableProperty(el, key)) {
+				if (clearing) {
+					if (typeof live === "boolean" && live) element[key] = false;
+				} else {
+					const nextProp = booleanKey ? Boolean(value) : value;
+					if (live !== nextProp) element[key] = nextProp;
+				}
+			}
+		}
+		if (nextAttr === null) {
+			if (el.hasAttribute(key)) el.removeAttribute(key);
+		} else if (el.getAttribute(key) !== nextAttr) el.setAttribute(key, nextAttr);
+	}
+	function useSakuga(name, ref, attrs, initialAttrs = {}) {
+		(0, react.useEffect)(() => {
+			loadSakugaComponent(name).catch(() => {});
+		}, [name]);
+		const first = (0, react.useRef)(true);
+		(0, react.useLayoutEffect)(() => {
+			const el = ref && "current" in ref ? ref.current : null;
+			if (!el) return;
+			if (first.current) {
+				first.current = false;
+				for (const [key, value] of Object.entries(initialAttrs)) writeValue(el, key, value);
+			}
+			for (const [key, value] of Object.entries(attrs)) {
+				if (value === void 0) continue;
+				writeValue(el, key, value);
+			}
+		});
+	}
+	var SakugaButton = (0, react.forwardRef)(function SakugaButton(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { children, variant = "primary", type = "button", disabled = false, done = false, fx = "impact", className, onClick, name, value, ...rest } = props;
+		useSakuga("button", inner, {
+			variant: variant === "secondary" ? "secondary" : void 0,
+			type: type === "button" ? void 0 : type,
+			disabled,
+			name,
+			value
+		});
+		(0, react.useEffect)(() => {
+			if (!done) return;
+			inner.current?.done?.();
+		}, [done]);
+		const handleClick = (0, react.useCallback)((event) => {
+			if (fx) emitFxAt(fx, event.currentTarget);
+			onClick?.(event);
+		}, [fx, onClick]);
+		return (0, react.createElement)("sakuga-button", {
+			...hostProps(rest),
+			variant: variant === "secondary" ? "secondary" : void 0,
+			type: type === "button" ? void 0 : type,
+			disabled: disabled ? "" : void 0,
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			onClick: handleClick,
+			role: rest.role ?? "button"
+		}, children);
+	});
+	(0, react.forwardRef)(function SakugaToggle(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { label, checked, defaultChecked, name, value, disabled, onChange, className, ...rest } = props;
+		const current = checked ?? defaultChecked ?? false;
+		useSakuga("toggle", inner, {
+			label,
+			checked: checked !== void 0 ? checked : void 0,
+			name,
+			value,
+			disabled
+		}, { checked: current });
+		return (0, react.createElement)("sakuga-toggle", {
+			...hostProps(rest),
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "switch",
+			"aria-checked": current ? "true" : "false",
+			"aria-label": label,
+			onChange: () => onChange?.(inner.current?.checked ?? false)
+		});
+	});
+	(0, react.forwardRef)(function SakugaCheckbox(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { children, checked, defaultChecked, name, value, disabled, onChange, className, ...rest } = props;
+		const current = checked ?? defaultChecked ?? false;
+		useSakuga("checkbox", inner, {
+			checked: checked !== void 0 ? checked : void 0,
+			name,
+			value,
+			disabled
+		}, { checked: current });
+		return (0, react.createElement)("sakuga-checkbox", {
+			...hostProps(rest),
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "checkbox",
+			"aria-checked": current ? "true" : "false",
+			onChange: () => onChange?.(inner.current?.checked ?? false)
+		}, children);
+	});
+	var SakugaRadio = (0, react.forwardRef)(function SakugaRadio(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { label, options, value, name, disabled, onChange, className, ...rest } = props;
+		const signature = options.map((o) => `${o.value}:${o.label}`).join("|");
+		useSakuga("radio", inner, {
+			label,
+			value: value ?? options.find((o) => o.selected)?.value,
+			name,
+			disabled
+		});
+		return (0, react.createElement)("sakuga-radio", {
+			...hostProps(rest),
+			key: `${signature}|${label}`,
+			label,
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "radiogroup",
+			"aria-label": label,
+			onChange: () => onChange?.(inner.current?.value ?? "")
+		}, options.map((option) => (0, react.createElement)("option", {
+			key: option.value,
+			value: option.value,
+			selected: option.selected,
+			disabled: option.disabled
+		}, option.label)));
+	});
+	var SakugaInput = (0, react.forwardRef)(function SakugaInput(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { type = "text", label, placeholder, value, defaultValue, name, disabled, autoComplete, autoFocus, required, pattern, minLength, maxLength, inputMode, readOnly, spellCheck, onChange, onKeyDown, onEnter, className, ...rest } = props;
+		useSakuga("input", inner, {
+			type,
+			label,
+			placeholder,
+			value: value !== void 0 ? value : void 0,
+			name,
+			disabled,
+			autocomplete: autoComplete
+		}, { value: defaultValue ?? "" });
+		const innerAttrs = {
+			type,
+			required,
+			pattern,
+			minlength: minLength,
+			maxlength: maxLength,
+			inputmode: inputMode,
+			readonly: readOnly,
+			spellcheck: spellCheck,
+			autocomplete: autoComplete,
+			"aria-invalid": rest["aria-invalid"],
+			"aria-describedby": rest["aria-describedby"],
+			"aria-required": required ? "true" : void 0
+		};
+		const innerRef = (0, react.useRef)(null);
+		const wiredInput = (0, react.useRef)(null);
+		const wiredHandler = (0, react.useRef)(null);
+		(0, react.useEffect)(() => () => {
+			if (wiredInput.current && wiredHandler.current) wiredInput.current.removeEventListener("input", wiredHandler.current);
+			wiredInput.current = null;
+			wiredHandler.current = null;
+		}, []);
+		(0, react.useLayoutEffect)(() => {
+			let timer = null;
+			let stop = null;
+			const apply = () => {
+				const input = inner.current?.shadowRoot?.querySelector("input");
+				if (!input) return false;
+				innerRef.current = input;
+				const hostElement = inner.current;
+				if (hostElement) delegateInnerInput(hostElement);
+				if (wiredInput.current !== input) {
+					if (wiredInput.current && wiredHandler.current) wiredInput.current.removeEventListener("input", wiredHandler.current);
+					const wire = (event) => {
+						if (event.composed) return;
+						hostElement?.dispatchEvent(new Event("input", {
+							bubbles: true,
+							composed: true
+						}));
+					};
+					input.addEventListener("input", wire);
+					wiredInput.current = input;
+					wiredHandler.current = wire;
+				}
+				for (const [key, attr] of Object.entries(innerAttrs)) if (attr === void 0 || attr === null || attr === false) input.removeAttribute(key);
+				else input.setAttribute(key, attr === true ? "" : String(attr));
+				if (type) input.type = type;
+				return true;
+			};
+			if (!apply()) {
+				timer = setInterval(() => {
+					if (apply() && timer) {
+						clearInterval(timer);
+						timer = null;
+					}
+				}, 50);
+				stop = setTimeout(() => {
+					if (timer) clearInterval(timer);
+					timer = null;
+				}, 2e3);
+			}
+			if (autoFocus) {
+				const focus = () => {
+					const input = hostShadowInput(inner.current);
+					if (input) input.focus();
+					else return false;
+					return true;
+				};
+				if (!focus()) {
+					const focusTimer = setInterval(() => {
+						if (focus()) clearInterval(focusTimer);
+					}, 50);
+					setTimeout(() => clearInterval(focusTimer), 2e3);
+				}
+			}
+			return () => {
+				if (timer) clearInterval(timer);
+				if (stop) clearTimeout(stop);
+			};
+		});
+		return (0, react.createElement)("sakuga-input", {
+			...hostProps(rest),
+			type,
+			label,
+			placeholder,
+			autocomplete: autoComplete,
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? (type === "search" ? "searchbox" : "textbox"),
+			"aria-label": rest["aria-label"] ?? label,
+			"data-sakuga-input": "1",
+			onInput: (event) => {
+				const target = event.target;
+				const el = inner.current;
+				onChange?.(el?.value ?? target?.getAttribute("value") ?? "");
+			},
+			onKeyDown: (event) => {
+				onKeyDown?.(event);
+				if (event.key === "Enter") onEnter?.();
+			}
+		});
+	});
+	(0, react.forwardRef)(function SakugaSlider(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { label, value, defaultValue, min = 0, max = 100, step = 1, unit, name, disabled, onChange, className, ...rest } = props;
+		useSakuga("slider", inner, {
+			label,
+			value: value !== void 0 ? value : void 0,
+			min,
+			max,
+			step,
+			unit,
+			name,
+			disabled
+		}, { value: defaultValue ?? 50 });
+		return (0, react.createElement)("sakuga-slider", {
+			...hostProps(rest),
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "slider",
+			"aria-label": label,
+			onChange: () => onChange?.(inner.current?.valueAsNumber ?? 0)
+		});
+	});
+	(0, react.forwardRef)(function SakugaTabs(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { label, options, selected = 0, onChange, className, ...rest } = props;
+		const signature = options.map((o) => `${o.value}:${o.label}`).join("|");
+		useSakuga("tabs", inner, {
+			label,
+			selected
+		});
+		return (0, react.createElement)("sakuga-tabs", {
+			...hostProps(rest),
+			key: `${signature}|${label}`,
+			label,
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "tablist",
+			"aria-label": label,
+			onChange: (event) => {
+				const custom = event;
+				const detail = custom.detail ?? custom.nativeEvent?.detail;
+				if (detail) onChange?.(detail);
+			}
+		}, options.map((option) => (0, react.createElement)("option", {
+			key: option.value,
+			value: option.value
+		}, option.label)));
+	});
+	var SakugaProgress = (0, react.forwardRef)(function SakugaProgress(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { label, value = 0, doneLabel, onDone, className, ...rest } = props;
+		useSakuga("progress", inner, {
+			label,
+			value: Math.max(0, Math.min(1, value)),
+			"done-label": doneLabel
+		});
+		(0, react.useEffect)(() => {
+			const el = inner.current;
+			if (!el) return;
+			const listener = () => onDone?.();
+			el.addEventListener("sakuga:done", listener);
+			return () => el.removeEventListener("sakuga:done", listener);
+		}, [onDone]);
+		return (0, react.createElement)("sakuga-progress", {
+			...hostProps(rest),
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "progressbar",
+			"aria-label": label,
+			"aria-valuemin": 0,
+			"aria-valuemax": 100,
+			"aria-valuenow": Math.round(Math.max(0, Math.min(1, value)) * 100)
+		});
+	});
+	(0, react.forwardRef)(function SakugaLoading(props, ref) {
+		const { label = "Loading…", value, doneLabel, showLabel = true, className, style, id, onDone } = props;
+		const controlled = value !== void 0;
+		const clamped = controlled ? Math.max(0, Math.min(1, value)) : void 0;
+		const [crawl, setCrawl] = (0, react.useState)(clamped ?? .08);
+		(0, react.useEffect)(() => {
+			if (controlled) return;
+			setCrawl(.08);
+			const timer = setInterval(() => {
+				setCrawl((current) => current >= .9 ? current : Math.min(.9, current + (.9 - current) * .12));
+			}, 350);
+			return () => clearInterval(timer);
+		}, [controlled]);
+		const current = controlled ? clamped : crawl;
+		return (0, react.createElement)("div", {
+			id,
+			className: ["qsk-loading", className].filter(Boolean).join(" "),
+			style,
+			role: "status",
+			"aria-live": "polite",
+			"aria-label": label,
+			"data-testid": props["data-testid"]
+		}, showLabel ? (0, react.createElement)("div", { className: "qsk-loading__label" }, label) : null, (0, react.createElement)(SakugaProgress, {
+			ref,
+			label,
+			value: current,
+			doneLabel,
+			onDone
+		}));
+	});
+	(0, react.forwardRef)(function SakugaRating(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { label, value = 0, name, disabled, onChange, className, ...rest } = props;
+		useSakuga("rating", inner, {
+			label,
+			value,
+			name,
+			disabled
+		});
+		return (0, react.createElement)("sakuga-rating", {
+			...hostProps(rest),
+			label,
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "radiogroup",
+			"aria-label": label,
+			onChange: () => onChange?.(inner.current?.value ?? 0)
+		});
+	});
+	(0, react.forwardRef)(function SakugaTooltip(props, ref) {
+		const inner = (0, react.useRef)(null);
+		const { text, label = "Help", children, className, ...rest } = props;
+		useSakuga("tooltip", inner, {
+			text,
+			label
+		});
+		return (0, react.createElement)("sakuga-tooltip", {
+			...hostProps(rest),
+			ref: (node) => {
+				inner.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			class: className,
+			role: rest.role ?? "button",
+			"aria-label": label
+		}, children);
+	});
+	// ../qubit-shared/src/sakuga/select.tsx
+	var TRIGGER_STYLE = {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "space-between",
+		gap: 10,
+		width: "var(--sk-input-width, 230px)",
+		maxWidth: "100%",
+		padding: "7px 12px",
+		border: "2.5px solid var(--sk-ink, #1d1a4a)",
+		borderRadius: "var(--sk-r, 15px)",
+		background: "var(--sk-card, #fff)",
+		boxShadow: "4px 5px 0 var(--sk-soft, #b8b3ff)",
+		color: "var(--sk-ink, #1d1a4a)",
+		fontWeight: 600,
+		fontSize: 14,
+		lineHeight: 1.35,
+		textAlign: "left",
+		cursor: "pointer",
+		fontFamily: "inherit"
+	};
+	var PANEL_STYLE = {
+		position: "absolute",
+		zIndex: 2147482800,
+		top: "calc(100% + 10px)",
+		left: 0,
+		width: "min(340px, 92vw)",
+		padding: 12,
+		border: "2.5px solid var(--sk-ink, #1d1a4a)",
+		borderRadius: "var(--sk-r, 15px)",
+		background: "var(--sk-card, #fff)",
+		color: "var(--sk-ink, #1d1a4a)",
+		boxShadow: "4px 5px 0 var(--sk-soft, #b8b3ff)"
+	};
+	function SakugaSelect(props) {
+		const { label, options, value, defaultValue, name, disabled, placeholder = "Choose…", className, style, id, onChange } = props;
+		const controlled = value !== void 0;
+		const [internal, setInternal] = (0, react.useState)(defaultValue ?? "");
+		const current = controlled ? value : internal;
+		const [open, setOpen] = (0, react.useState)(false);
+		const [filter, setFilter] = (0, react.useState)("");
+		const wrapper = (0, react.useRef)(null);
+		const trigger = (0, react.useRef)(null);
+		const listId = (0, react.useId)();
+		const selected = options.find((option) => option.value === current);
+		const filtered = (0, react.useMemo)(() => {
+			const needle = filter.trim().toLowerCase();
+			if (!needle) return options;
+			return options.filter((option) => option.label.toLowerCase().includes(needle));
+		}, [filter, options]);
+		const close = (0, react.useCallback)((restoreFocus = true) => {
+			setOpen(false);
+			setFilter("");
+			if (restoreFocus) trigger.current?.focus();
+		}, []);
+		const choose = (0, react.useCallback)((next) => {
+			if (!controlled) setInternal(next);
+			onChange?.(next);
+			close();
+		}, [
+			close,
+			controlled,
+			onChange
+		]);
+		(0, react.useEffect)(() => {
+			if (!open) return;
+			const onPointer = (event) => {
+				if (!wrapper.current?.contains(event.target)) close(false);
+			};
+			const onKey = (event) => {
+				if (event.key === "Escape") {
+					event.preventDefault();
+					close();
+				}
+			};
+			document.addEventListener("pointerdown", onPointer);
+			document.addEventListener("keydown", onKey);
+			return () => {
+				document.removeEventListener("pointerdown", onPointer);
+				document.removeEventListener("keydown", onKey);
+			};
+		}, [close, open]);
+		const openPanel = () => {
+			if (disabled) return;
+			setOpen((wasOpen) => !wasOpen);
+			if (trigger.current) emitFxAt("impact", trigger.current, { scale: .6 });
+		};
+		return (0, react.createElement)("div", {
+			ref: wrapper,
+			className,
+			id,
+			style: {
+				position: "relative",
+				display: "inline-block",
+				...style
+			},
+			"data-testid": props["data-testid"]
+		}, name ? (0, react.createElement)("input", {
+			type: "hidden",
+			name,
+			value: current ?? ""
+		}) : null, (0, react.createElement)("button", {
+			ref: trigger,
+			type: "button",
+			role: "combobox",
+			"aria-haspopup": "listbox",
+			"aria-expanded": open ? "true" : "false",
+			"aria-controls": open ? listId : void 0,
+			"aria-label": label,
+			"aria-disabled": disabled ? "true" : void 0,
+			disabled,
+			style: TRIGGER_STYLE,
+			onClick: openPanel
+		}, (0, react.createElement)("span", { style: {
+			overflow: "hidden",
+			textOverflow: "ellipsis",
+			whiteSpace: "nowrap"
+		} }, selected?.label ?? placeholder), (0, react.createElement)("span", {
+			"aria-hidden": "true",
+			style: {
+				transform: open ? "rotate(180deg)" : void 0,
+				transition: "transform 120ms"
+			}
+		}, "▾")), open ? (0, react.createElement)("div", {
+			id: listId,
+			role: "dialog",
+			"aria-label": `${label} options`,
+			style: PANEL_STYLE,
+			onKeyDown: (event) => {
+				if (event.key === "Tab") close(false);
+			}
+		}, (0, react.createElement)(SakugaInput, {
+			label: `Filter ${label}`,
+			placeholder: "Filter…",
+			value: filter,
+			onChange: setFilter,
+			className: "qsk-select-filter"
+		}), filtered.length ? (0, react.createElement)(SakugaRadio, {
+			label,
+			name: `${listId}-options`,
+			options: filtered.map((option) => ({
+				value: option.value,
+				label: option.label,
+				selected: option.value === current,
+				disabled: option.disabled
+			})),
+			value: current,
+			onChange: choose
+		}) : (0, react.createElement)("p", { style: {
+			margin: "10px 0 0",
+			color: "var(--sk-dim, #8580b0)"
+		} }, "No matches")) : null);
+	}
+	// ../qubit-shared/src/sakuga/extras/common.tsx
+	var LABEL_STYLE = {
+		color: "var(--sk-ink, #1d1a4a)",
+		fontSize: 12.5,
+		fontWeight: 600,
+		lineHeight: 1.3
+	};
+	var DESCRIPTION_STYLE = {
+		color: "var(--sk-dim, #8580b0)",
+		fontSize: 12,
+		lineHeight: 1.4
+	};
+	/** The Sakuga input frame, as a plain CSS object so extras work without CSS. */
+	var FIELD_STYLE = {
+		width: "var(--sk-input-width, 230px)",
+		maxWidth: "100%",
+		boxSizing: "border-box",
+		padding: "7px 12px",
+		border: "2.5px solid var(--sk-ink, #1d1a4a)",
+		borderRadius: "var(--sk-r, 15px)",
+		background: "var(--sk-card, #fff)",
+		boxShadow: "4px 5px 0 var(--sk-soft, #b8b3ff)",
+		color: "var(--sk-ink, #1d1a4a)",
+		fontFamily: "inherit",
+		fontSize: 14,
+		fontWeight: 600,
+		lineHeight: 1.35,
+		outline: "none"
+	};
+	var ROW_STYLE = {
+		display: "flex",
+		alignItems: "center",
+		gap: 6,
+		minWidth: 0
+	};
+	var HIDDEN_INPUT_STYLE = {
+		position: "absolute",
+		width: 1,
+		height: 1,
+		opacity: 0,
+		pointerEvents: "none"
+	};
+	/** A label + control + optional description, the dense settings-row shape. */
+	function ExtraField(props) {
+		const { label, htmlFor, description, children, className, style } = props;
+		return (0, react.createElement)("div", {
+			className: ["qsk-extra", className].filter(Boolean).join(" "),
+			style: {
+				display: "flex",
+				flexDirection: "column",
+				gap: 4,
+				minWidth: 0,
+				...style
+			}
+		}, label ? (0, react.createElement)("label", {
+			htmlFor,
+			style: LABEL_STYLE
+		}, label) : null, children, description ? (0, react.createElement)("span", { style: DESCRIPTION_STYLE }, description) : null);
+	}
+	/** A keystroke cue, coalesced so a fast typist does not spawn a cue per key. */
+	function useTypeFx() {
+		const last = (0, react.useRef)(0);
+		return (0, react.useCallback)((el) => {
+			const now = Date.now();
+			if (now - last.current < 70) return;
+			last.current = now;
+			emitFxAt("type", el, { scale: .5 });
+		}, []);
+	}
+	/** A focus cue (three wedges and a puff, the upstream input reaction). */
+	function useFocusFx() {
+		return (0, react.useCallback)((el) => {
+			emitFxAt("focus", el, { scale: .6 });
+		}, []);
+	}
+	/** Clamp a value into the optional bounds. */
+	function clampNumber$1(value, min, max) {
+		let next = value;
+		if (typeof min === "number") next = Math.max(min, next);
+		if (typeof max === "number") next = Math.min(max, next);
+		return next;
+	}
+	// ../qubit-shared/src/sakuga/extras/textarea.tsx
+	var SakugaTextarea = (0, react.forwardRef)(function SakugaTextarea(props, ref) {
+		const { label, value, defaultValue, placeholder, rows = 3, name, required, disabled, maxLength, autoFocus, readOnly, id, className, style, description, onChange } = props;
+		const autoId = (0, react.useId)();
+		const fieldId = id ?? `qsk-textarea-${autoId}`;
+		const typeFx = useTypeFx();
+		const focusFx = useFocusFx();
+		return (0, react.createElement)(ExtraField, {
+			label,
+			htmlFor: fieldId,
+			description,
+			className,
+			style
+		}, (0, react.createElement)("textarea", {
+			id: fieldId,
+			ref,
+			className: "qsk-extra__control qsk-textarea",
+			style: {
+				...FIELD_STYLE,
+				width: "100%",
+				minHeight: rows * 20 + 16,
+				resize: "vertical"
+			},
+			name,
+			placeholder,
+			rows,
+			required,
+			disabled,
+			maxLength,
+			autoFocus,
+			readOnly,
+			value,
+			defaultValue,
+			onChange: (event) => {
+				typeFx(event.currentTarget);
+				onChange?.(event.currentTarget.value);
+			},
+			onFocus: (event) => focusFx(event.currentTarget)
+		}));
+	});
+	(0, react.forwardRef)(function SakugaNumber(props, ref) {
+		const { label, value, defaultValue, min, max, step = 1, name, disabled, id, className, style, description, onChange } = props;
+		const autoId = (0, react.useId)();
+		const fieldId = id ?? `qsk-number-${autoId}`;
+		const inputRef = (0, react.useRef)(null);
+		const controlled = value !== void 0;
+		const shown = controlled ? value === void 0 || value === null ? "" : String(value) : void 0;
+		const typeFx = useTypeFx();
+		const focusFx = useFocusFx();
+		const emit = (raw) => {
+			if (raw === "") {
+				onChange?.("");
+				return;
+			}
+			const parsed = Number(raw);
+			onChange?.(Number.isFinite(parsed) ? parsed : raw);
+		};
+		const setNative = (next) => {
+			const input = inputRef.current;
+			if (input && input.value !== next) input.value = next;
+		};
+		const stepBy = (direction) => {
+			const input = inputRef.current;
+			const base = Number(input?.value ?? shown ?? "");
+			const next = clampNumber$1(Number(((Number.isFinite(base) ? base : 0) + direction * step).toFixed(6)), min, max);
+			setNative(String(next));
+			onChange?.(next);
+			emitFxAt(direction > 0 ? "pop" : "tick", input, { scale: .5 });
+		};
+		const nativeValue = inputRef.current?.value ?? shown ?? (defaultValue === void 0 ? "" : String(defaultValue));
+		const nativeNumber = Number(nativeValue);
+		const hasNumber = nativeValue !== "" && Number.isFinite(nativeNumber);
+		const atMin = typeof min === "number" && hasNumber && nativeNumber <= min;
+		const atMax = typeof max === "number" && hasNumber && nativeNumber >= max;
+		return (0, react.createElement)(ExtraField, {
+			label,
+			htmlFor: fieldId,
+			description,
+			className,
+			style
+		}, (0, react.createElement)("div", { style: ROW_STYLE }, (0, react.createElement)(SakugaButton, {
+			variant: "secondary",
+			fx: false,
+			type: "button",
+			disabled: disabled || atMin,
+			"aria-label": "Decrease",
+			className: "qsk-stepper",
+			onClick: () => stepBy(-1)
+		}, "−"), (0, react.createElement)("input", {
+			id: fieldId,
+			ref: (node) => {
+				inputRef.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			className: "qsk-extra__control qsk-number__input",
+			style: {
+				...FIELD_STYLE,
+				width: "var(--sk-number-width, 92px)",
+				textAlign: "center"
+			},
+			type: "number",
+			name,
+			min,
+			max,
+			step,
+			disabled,
+			value: shown,
+			defaultValue: controlled ? void 0 : defaultValue,
+			onChange: (event) => {
+				typeFx(event.currentTarget);
+				emit(event.currentTarget.value);
+			},
+			onBlur: (event) => {
+				const raw = event.currentTarget.value;
+				const parsed = Number(raw);
+				if (raw === "" || !Number.isFinite(parsed)) return;
+				const next = clampNumber$1(parsed, min, max);
+				if (next !== parsed) {
+					event.currentTarget.value = String(next);
+					onChange?.(next);
+				}
+			},
+			onFocus: (event) => focusFx(event.currentTarget)
+		}), (0, react.createElement)(SakugaButton, {
+			variant: "secondary",
+			fx: false,
+			type: "button",
+			disabled: disabled || atMax,
+			"aria-label": "Increase",
+			className: "qsk-stepper",
+			onClick: () => stepBy(1)
+		}, "+")));
+	});
+	// ../qubit-shared/src/sakuga/extras/date-time.tsx
+	var DateTimeField = (0, react.forwardRef)(function DateTimeField(props, ref) {
+		const { label, value, defaultValue, min, max, name, disabled, id, className, style, description, onChange, type, openLabel } = props;
+		const autoId = (0, react.useId)();
+		const fieldId = id ?? `qsk-${type}-${autoId}`;
+		const inputRef = (0, react.useRef)(null);
+		const typeFx = useTypeFx();
+		const focusFx = useFocusFx();
+		const openPicker = () => {
+			const input = inputRef.current;
+			if (!input || disabled) return;
+			try {
+				input.showPicker?.();
+			} catch {}
+			emitFxAt("pop", input, { scale: .5 });
+		};
+		return (0, react.createElement)(ExtraField, {
+			label,
+			htmlFor: fieldId,
+			description,
+			className,
+			style
+		}, (0, react.createElement)("div", { style: ROW_STYLE }, (0, react.createElement)("input", {
+			id: fieldId,
+			ref: (node) => {
+				inputRef.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			className: "qsk-extra__control qsk-date__input",
+			style: {
+				...FIELD_STYLE,
+				width: "var(--sk-date-width, 168px)",
+				flex: "0 1 auto",
+				colorScheme: "light"
+			},
+			type,
+			name,
+			min,
+			max,
+			disabled,
+			value,
+			defaultValue,
+			onChange: (event) => {
+				typeFx(event.currentTarget);
+				onChange?.(event.currentTarget.value);
+			},
+			onFocus: (event) => focusFx(event.currentTarget)
+		}), (0, react.createElement)(SakugaButton, {
+			variant: "secondary",
+			fx: false,
+			type: "button",
+			disabled,
+			"aria-label": openLabel,
+			className: "qsk-stepper",
+			onClick: openPicker
+		}, "▾")));
+	});
+	(0, react.forwardRef)(function SakugaDate(props, ref) {
+		return (0, react.createElement)(DateTimeField, {
+			...props,
+			ref,
+			type: "date",
+			openLabel: "Open date picker"
+		});
+	});
+	(0, react.forwardRef)(function SakugaTime(props, ref) {
+		return (0, react.createElement)(DateTimeField, {
+			...props,
+			ref,
+			type: "time",
+			openLabel: "Open time picker"
+		});
+	});
+	// ../qubit-shared/src/sakuga/extras/file.tsx
+	var CHIP_STYLE = {
+		display: "inline-flex",
+		alignItems: "center",
+		gap: 6,
+		maxWidth: "100%",
+		padding: "2px 4px 2px 9px",
+		border: "1.5px solid var(--sk-ink, #1d1a4a)",
+		borderRadius: 999,
+		background: "var(--sk-card, #fff)",
+		color: "var(--sk-ink, #1d1a4a)",
+		fontSize: 12.5,
+		fontWeight: 600
+	};
+	var CHIP_NAME_STYLE = {
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+		maxWidth: 220
+	};
+	var CHIP_REMOVE_STYLE = {
+		padding: "1px 8px",
+		border: 0,
+		borderRadius: 999,
+		background: "var(--sk-chip, #f4f3fc)",
+		color: "var(--sk-ink, #1d1a4a)",
+		font: "inherit",
+		lineHeight: 1.2,
+		cursor: "pointer"
+	};
+	(0, react.forwardRef)(function SakugaFile(props, ref) {
+		const { label, accept, multiple, onFiles, name, disabled, id, className, style, description, buttonLabel } = props;
+		const autoId = (0, react.useId)();
+		const fieldId = id ?? `qsk-file-${autoId}`;
+		const [files, setFiles] = (0, react.useState)([]);
+		const inputRef = (0, react.useRef)(null);
+		const triggerRef = (0, react.useRef)(null);
+		const publish = (next) => {
+			setFiles(next);
+			onFiles?.(next);
+		};
+		const onPick = (event) => {
+			const picked = Array.from(event.currentTarget.files ?? []);
+			publish(picked);
+			emitFxAt("impact", triggerRef.current, { scale: .7 });
+		};
+		const remove = (index, target) => {
+			const next = files.filter((_, position) => position !== index);
+			const input = inputRef.current;
+			if (input) try {
+				const transfer = new DataTransfer();
+				next.forEach((file) => transfer.items.add(file));
+				input.files = transfer.files;
+			} catch {}
+			publish(next);
+			emitFxAt("pop", target, { scale: .6 });
+		};
+		return (0, react.createElement)(ExtraField, {
+			label,
+			htmlFor: fieldId,
+			description,
+			className,
+			style
+		}, (0, react.createElement)("div", { style: {
+			...ROW_STYLE,
+			flexWrap: "wrap"
+		} }, (0, react.createElement)(SakugaButton, {
+			ref: (node) => {
+				triggerRef.current = node;
+			},
+			variant: "secondary",
+			fx: false,
+			type: "button",
+			disabled,
+			"aria-label": `${buttonLabel ?? (multiple ? "Choose files" : "Choose file")}: ${label}`,
+			onClick: () => inputRef.current?.click()
+		}, buttonLabel ?? (multiple ? "Choose files" : "Choose file")), (0, react.createElement)("input", {
+			id: fieldId,
+			ref: (node) => {
+				inputRef.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
+			type: "file",
+			name,
+			accept,
+			multiple,
+			disabled,
+			tabIndex: -1,
+			"aria-hidden": "true",
+			style: HIDDEN_INPUT_STYLE,
+			onChange: onPick
+		}), files.map((file, index) => (0, react.createElement)("span", {
+			key: `${file.name}-${index}`,
+			style: CHIP_STYLE,
+			"data-qsk-file": file.name
+		}, (0, react.createElement)("span", {
+			style: CHIP_NAME_STYLE,
+			title: file.name
+		}, file.name), (0, react.createElement)("button", {
+			type: "button",
+			style: CHIP_REMOVE_STYLE,
+			"aria-label": `Remove ${file.name}`,
+			disabled,
+			onClick: (event) => remove(index, event.currentTarget)
+		}, "×")))), files.length ? (0, react.createElement)("span", {
+			style: DESCRIPTION_STYLE,
+			"aria-live": "polite"
+		}, multiple ? `${files.length} file${files.length === 1 ? "" : "s"} selected` : files[0].name) : null);
+	});
+	// ../qubit-shared/src/sakuga/extras/hover-tooltip.tsx
+	function SakugaHoverTooltip({ content, label, children, placement = "top", className, disabled = false, closeDelay = 90 }) {
+		const [open, setOpen] = (0, react.useState)(false);
+		const [bump, setBump] = (0, react.useState)(0);
+		const wrap = (0, react.useRef)(null);
+		const timer = (0, react.useRef)(null);
+		const clear = () => {
+			if (timer.current) {
+				clearTimeout(timer.current);
+				timer.current = null;
+			}
+		};
+		const show = (0, react.useCallback)(() => {
+			if (disabled) return;
+			clear();
+			setOpen(true);
+			if (wrap.current) emitFxAt("tick", wrap.current, { scale: .45 });
+		}, [disabled]);
+		const hide = (0, react.useCallback)(() => {
+			if (disabled) return;
+			clear();
+			timer.current = setTimeout(() => setOpen(false), closeDelay);
+		}, [closeDelay, disabled]);
+		(0, react.useEffect)(() => () => clear(), []);
+		(0, react.useEffect)(() => {
+			if (!open) return;
+			const onKey = (event) => {
+				if (event.key === "Escape") setOpen(false);
+			};
+			window.addEventListener("keydown", onKey);
+			return () => window.removeEventListener("keydown", onKey);
+		}, [open]);
+		const onClick = () => {
+			if (disabled) return;
+			setBump((value) => value + 1);
+			setOpen(true);
+			if (wrap.current) emitFxAt("pop", wrap.current, { scale: .5 });
+		};
+		return (0, react.createElement)("span", {
+			ref: wrap,
+			className: ["qsk-hover-tip", className].filter(Boolean).join(" "),
+			"data-open": open || void 0,
+			onMouseEnter: show,
+			onMouseLeave: hide,
+			onFocusCapture: show,
+			onBlurCapture: hide,
+			onClick
+		}, children, open ? (0, react.createElement)("span", {
+			key: bump,
+			role: "tooltip",
+			className: "qsk-hover-tip__bubble",
+			"data-placement": placement
+		}, label ? (0, react.createElement)("span", { className: "qsk-hover-tip__label" }, label) : null, (0, react.createElement)("span", { className: "qsk-hover-tip__text" }, content)) : null);
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/sakuga-form.ts
+	function textOf(node) {
+		if (node === null || node === void 0 || typeof node === "boolean") return "";
+		if (Array.isArray(node)) return node.map(textOf).join("");
+		if (typeof node === "object" && "props" in node) return textOf(node.props?.children);
+		return String(node);
+	}
+	/** Flatten the `<option>` children callers already build into select options. */
+	function optionsFrom(children) {
+		const out = [];
+		for (const child of react.Children.toArray(children)) {
+			if (!(0, react.isValidElement)(child)) continue;
+			const props = child.props;
+			const value = props.value === void 0 ? textOf(props.children) : String(props.value);
+			out.push({
+				value,
+				label: textOf(props.children) || value
+			});
+		}
+		return out;
+	}
+	/** A native-shaped text/search input rendered as a `SakugaInput`. */
+	function OfficeInput(props) {
+		const { value, placeholder, type, disabled, autoComplete, autoFocus, className, style, ref, onChange, onInput, onKeyDown, id } = props;
+		const label = props.label ?? props["aria-label"] ?? placeholder ?? "Search";
+		return (0, react.createElement)(SakugaInput, {
+			type: type === "search" ? "search" : "text",
+			label,
+			placeholder,
+			value: value === void 0 || value === null ? "" : String(value),
+			id,
+			disabled,
+			autoComplete,
+			autoFocus,
+			className,
+			style,
+			ref,
+			"aria-label": props["aria-label"],
+			"aria-describedby": props["aria-describedby"],
+			"data-testid": props["data-testid"],
+			onChange: (next) => {
+				const event = { target: { value: next } };
+				onChange?.(event);
+				onInput?.(event);
+			},
+			onKeyDown
+		});
+	}
+	/** A native-shaped `<select>` rendered as the composed `SakugaSelect`. */
+	function OfficeSelect(props) {
+		const { value, disabled, className, style, children, placeholder, onChange, id } = props;
+		return (0, react.createElement)(SakugaSelect, {
+			label: props.label ?? props["aria-label"] ?? id ?? "Select",
+			options: optionsFrom(children),
+			value: value === void 0 || value === null ? "" : String(value),
+			id,
+			disabled,
+			className,
+			style,
+			placeholder,
+			"data-testid": props["data-testid"],
+			onChange: (next) => onChange?.({ target: { value: next } })
+		});
+	}
+	/** A native-shaped textarea rendered as the composed `SakugaTextarea`. */
+	function OfficeTextarea(props) {
+		const { value, rows = 3, disabled, placeholder, className, onChange, id } = props;
+		return (0, react.createElement)(SakugaTextarea, {
+			label: props.label || props["aria-label"] || "Text",
+			value,
+			rows,
+			id,
+			disabled,
+			placeholder,
+			className,
+			onChange: (next) => onChange?.({ target: { value: next } }),
+			"data-testid": props["data-testid"]
+		});
+	}
+	/** The hover/focus/tap bubble around an arbitrary host-shell trigger. */
+	function OfficeTooltip(props) {
+		return (0, react.createElement)(SakugaHoverTooltip, props);
 	}
 	var SEAT_MODEL_ROUTE = `/agent/api/office/habblaud/agents`;
 	function seatModelUrl(agentId) {
@@ -193482,8 +194707,12 @@ create: function(game) {
 				children.push(R.createElement("label", {
 					key: "prov-label",
 					className: "seat-model__label"
-				}, "Provider", R.createElement("select", {
+				}, "Provider", R.createElement(OfficeTooltip, {
+					key: "prov-tip",
+					content: "Choose the provider this seat inherits or overrides."
+				}, R.createElement(OfficeSelect, {
 					key: "prov",
+					label: "",
 					"data-testid": "seat-model-provider",
 					value: provider,
 					disabled: saving,
@@ -193497,12 +194726,13 @@ create: function(game) {
 				}, "Inherit profile default"), ...providers.map((p) => R.createElement("option", {
 					key: p.slug,
 					value: p.slug
-				}, p.name || p.slug))])));
+				}, p.name || p.slug))]))));
 				children.push(R.createElement("label", {
 					key: "model-label",
 					className: "seat-model__label"
-				}, "Model", R.createElement("select", {
+				}, "Model", R.createElement(OfficeSelect, {
 					key: "model",
+					label: "",
 					"data-testid": "seat-model-model",
 					value: model,
 					disabled: saving || !provider,
@@ -195735,15 +196965,19 @@ create: function(game) {
 					key: "toolbar",
 					className: "character-studio__toolbar"
 				}, [
-					R.createElement("input", {
+					R.createElement(OfficeTooltip, {
+						key: "search-tip",
+						content: "Filter the character parts by name."
+					}, R.createElement(OfficeInput, {
 						key: "search",
 						type: "search",
+						label: "",
 						value: state.search,
 						placeholder: "Search parts",
 						"data-testid": "character-search",
 						"aria-label": "Search parts",
 						onChange: (event) => update((current) => setSearch(current, event.target.value))
-					}),
+					})),
 					sakugaButton(R, {
 						key: "randomize",
 						type: "button",
@@ -196596,8 +197830,9 @@ create: function(game) {
 				children.push(R.createElement("label", {
 					key: "picker",
 					className: "agent-control__picker"
-				}, "Managed agent", R.createElement("select", {
+				}, "Managed agent", R.createElement(OfficeSelect, {
 					key: "select",
+					label: "",
 					"data-testid": "agent-control-picker",
 					value: selectedId ?? "",
 					onChange: (event) => setSelectedId(event.target.value || null)
@@ -196626,9 +197861,10 @@ create: function(game) {
 						key: "l",
 						className: "agent-control__k"
 					}, label),
-					R.createElement("input", {
+					R.createElement(OfficeInput, {
 						key: "i",
 						type: "text",
+						label: "",
 						className: "agent-control__input",
 						"data-testid": `agent-control-input-${key}`,
 						value,
@@ -196646,8 +197882,9 @@ create: function(game) {
 						key: "l",
 						className: "agent-control__k"
 					}, label),
-					R.createElement("select", {
+					R.createElement(OfficeSelect, {
 						key: "s",
+						label: "",
 						className: "agent-control__input",
 						"data-testid": `agent-control-input-${key}`,
 						value,
@@ -196719,9 +197956,10 @@ create: function(game) {
 								key: "chips",
 								className: "agent-control__chips"
 							}, chips),
-							R.createElement("input", {
+							R.createElement(OfficeInput, {
 								key: "i",
 								type: "text",
+								label: "",
 								className: "agent-control__input",
 								"data-testid": "agent-control-perm-input",
 								"data-category": category,
@@ -196848,8 +198086,9 @@ create: function(game) {
 					}, [R.createElement("span", {
 						key: "l",
 						className: "agent-control__k"
-					}, "Prompt"), R.createElement("textarea", {
+					}, "Prompt"), R.createElement(OfficeTextarea, {
 						key: "i",
+						label: "Prompt",
 						className: "agent-control__input",
 						"data-testid": "agent-control-preview-prompt",
 						rows: 3,
@@ -196869,9 +198108,10 @@ create: function(game) {
 					}, [R.createElement("span", {
 						key: "l",
 						className: "agent-control__k"
-					}, "Requested tools (optional)"), R.createElement("input", {
+					}, "Requested tools (optional)"), R.createElement(OfficeInput, {
 						key: "i",
 						type: "text",
+						label: "",
 						className: "agent-control__input",
 						"data-testid": "agent-control-preview-tools",
 						value: previewTools,
@@ -196890,9 +198130,10 @@ create: function(game) {
 					}, [R.createElement("span", {
 						key: "l",
 						className: "agent-control__k"
-					}, "Estimated spend (USD, optional)"), R.createElement("input", {
+					}, "Estimated spend (USD, optional)"), R.createElement(OfficeInput, {
 						key: "i",
 						type: "text",
+						label: "",
 						className: "agent-control__input",
 						"data-testid": "agent-control-preview-spend",
 						value: previewSpend,
@@ -198065,7 +199306,7 @@ create: function(game) {
 		}, title), ...children]);
 	}
 	function input(R, key, props) {
-		return R.createElement("input", {
+		return R.createElement(OfficeInput, {
 			key,
 			className: "warroom__input",
 			autoComplete: "off",
@@ -198373,8 +199614,9 @@ create: function(game) {
 				else children.push(R.createElement("label", {
 					key: "picker",
 					className: "warroom__picker"
-				}, "Session", R.createElement("select", {
+				}, "Session", R.createElement(OfficeSelect, {
 					key: "s",
+					label: "",
 					"data-testid": "warroom-session-picker",
 					value: selectedId ?? "",
 					onChange: (event) => setSelectedId(event.target.value || null)
@@ -198458,8 +199700,9 @@ create: function(game) {
 						key: "row",
 						className: "warroom__row"
 					}, [
-						R.createElement("select", {
+						R.createElement(OfficeSelect, {
 							key: "kind",
+							label: "",
 							"data-testid": "warroom-source-kind",
 							value: sourceKind,
 							onChange: (event) => setSourceKind(event.target.value)
@@ -198541,8 +199784,9 @@ create: function(game) {
 						key: "row",
 						className: "warroom__row"
 					}, [
-						R.createElement("select", {
+						R.createElement(OfficeSelect, {
 							key: "label",
+							label: "",
 							"data-testid": "warroom-evidence-label",
 							value: evidenceLabel,
 							onChange: (event) => setEvidenceLabel(event.target.value)
@@ -198561,8 +199805,9 @@ create: function(game) {
 							value: evidenceClaim,
 							onInput: (event) => setEvidenceClaim(event.target.value)
 						}),
-						R.createElement("select", {
+						R.createElement(OfficeSelect, {
 							key: "source",
+							label: "",
 							"data-testid": "warroom-evidence-source",
 							value: evidenceSource,
 							onChange: (event) => setEvidenceSource(event.target.value)
@@ -199335,7 +200580,10 @@ create: function(game) {
 					htmlFor: "command-center-query",
 					className: "command-center__label"
 				}, "Search floors, rooms, desks, agents, tasks and approvals"),
-				R.createElement("input", {
+				R.createElement(OfficeTooltip, {
+					key: "input-tip",
+					content: "Ctrl or Command K focuses search. Arrow keys move, Enter opens, Escape closes."
+				}, R.createElement(OfficeInput, {
 					key: "input",
 					id: "command-center-query",
 					ref: searchRef,
@@ -199344,13 +200592,14 @@ create: function(game) {
 					autoComplete: "off",
 					"aria-describedby": "command-center-help",
 					"data-testid": "command-center-query",
+					"aria-label": "Search the office",
 					placeholder: "Search by floor, room, desk, agent, task or approval",
 					onChange: (event) => {
 						setQuery(event.target.value);
 						setActiveIndex(0);
 					},
 					onKeyDown
-				}),
+				})),
 				R.createElement("p", {
 					key: "help",
 					id: "command-center-help",
@@ -199359,52 +200608,39 @@ create: function(game) {
 				R.createElement("div", {
 					key: "filters",
 					className: "command-center__filters"
-				}, [
-					R.createElement("label", {
-						key: "kind-label",
-						htmlFor: "command-center-kind",
-						className: "command-center__filterLabel"
-					}, "Kind"),
-					R.createElement("select", {
-						key: "kind",
-						id: "command-center-kind",
-						value: kindFilter,
-						"data-testid": "command-center-kind",
-						"aria-label": "Filter by kind",
-						onChange: (event) => {
-							setKindFilter(event.target.value);
-							setActiveIndex(0);
-						}
-					}, [R.createElement("option", {
-						key: "all",
-						value: "all"
-					}, "All kinds"), ...COMMAND_CENTER_KINDS.map((kind) => R.createElement("option", {
-						key: kind,
-						value: kind
-					}, kindLabel$1(kind)))]),
-					R.createElement("label", {
-						key: "status-label",
-						htmlFor: "command-center-status",
-						className: "command-center__filterLabel"
-					}, "Status"),
-					R.createElement("select", {
-						key: "status",
-						id: "command-center-status",
-						value: statusFilter,
-						"data-testid": "command-center-status",
-						"aria-label": "Filter by status",
-						onChange: (event) => {
-							setStatusFilter(event.target.value);
-							setActiveIndex(0);
-						}
-					}, [R.createElement("option", {
-						key: "all",
-						value: "all"
-					}, "All statuses"), ...statusChoices.map((status) => R.createElement("option", {
-						key: status,
-						value: status
-					}, statusLabel$3(status)))])
-				])
+				}, [R.createElement(OfficeSelect, {
+					key: "kind",
+					id: "command-center-kind",
+					value: kindFilter,
+					"data-testid": "command-center-kind",
+					"aria-label": "Kind",
+					onChange: (event) => {
+						setKindFilter(event.target.value);
+						setActiveIndex(0);
+					}
+				}, [R.createElement("option", {
+					key: "all",
+					value: "all"
+				}, "All kinds"), ...COMMAND_CENTER_KINDS.map((kind) => R.createElement("option", {
+					key: kind,
+					value: kind
+				}, kindLabel$1(kind)))]), R.createElement(OfficeSelect, {
+					key: "status",
+					id: "command-center-status",
+					value: statusFilter,
+					"data-testid": "command-center-status",
+					"aria-label": "Status",
+					onChange: (event) => {
+						setStatusFilter(event.target.value);
+						setActiveIndex(0);
+					}
+				}, [R.createElement("option", {
+					key: "all",
+					value: "all"
+				}, "All statuses"), ...statusChoices.map((status) => R.createElement("option", {
+					key: status,
+					value: status
+				}, statusLabel$3(status)))])])
 			])];
 			if (read.kind === "loading") children.push(R.createElement("div", {
 				key: "state",
@@ -200039,16 +201275,21 @@ create: function(game) {
 				role: "group",
 				"aria-label": "Timeline filters"
 			}, [
-				R.createElement("label", { key: "q" }, [R.createElement("span", { key: "l" }, "Search "), R.createElement("input", {
+				R.createElement("label", { key: "q" }, [R.createElement("span", { key: "l" }, "Search "), R.createElement(OfficeTooltip, {
+					key: "search-tip",
+					content: "Filter the operator timeline by text."
+				}, R.createElement(OfficeInput, {
 					key: "i",
 					type: "search",
+					label: "",
 					"data-testid": "timeline-search",
 					"aria-label": "Search the operator timeline",
 					value: query,
 					onChange: (event) => setQuery(String(event?.target?.value ?? ""))
-				})]),
-				R.createElement("label", { key: "kind" }, [R.createElement("span", { key: "l" }, "Kind "), R.createElement("select", {
+				}))]),
+				R.createElement("label", { key: "kind" }, [R.createElement("span", { key: "l" }, "Kind "), R.createElement(OfficeSelect, {
 					key: "s",
+					label: "",
 					"data-testid": "timeline-kind",
 					"aria-label": "Filter by record kind",
 					value: kindFilter,
@@ -200060,8 +201301,9 @@ create: function(game) {
 					key: kind,
 					value: kind
 				}, kindLabel(kind)))])]),
-				R.createElement("label", { key: "status" }, [R.createElement("span", { key: "l" }, "Status "), R.createElement("select", {
+				R.createElement("label", { key: "status" }, [R.createElement("span", { key: "l" }, "Status "), R.createElement(OfficeSelect, {
 					key: "s",
+					label: "",
 					"data-testid": "timeline-status",
 					"aria-label": "Filter by status",
 					value: statusFilter,
@@ -201385,8 +202627,9 @@ create: function(game) {
 			const styleSelect = (label, value, options, testId, onPick) => R.createElement("label", {
 				key: `label-${testId}`,
 				className: "room-builder__field"
-			}, [R.createElement("span", { key: "text" }, label), R.createElement("select", {
+			}, [R.createElement("span", { key: "text" }, label), R.createElement(OfficeSelect, {
 				key: "select",
+				label: "",
 				"data-testid": testId,
 				"aria-label": label,
 				value,
@@ -201398,9 +202641,10 @@ create: function(game) {
 			const field = (label, value, testId, onChange) => R.createElement("label", {
 				key: `label-${testId}`,
 				className: "room-builder__field"
-			}, [R.createElement("span", { key: "text" }, label), R.createElement("input", {
+			}, [R.createElement("span", { key: "text" }, label), R.createElement(OfficeInput, {
 				key: "input",
 				type: "text",
+				label: "",
 				"data-testid": testId,
 				"aria-label": label,
 				value,
@@ -201627,9 +202871,10 @@ create: function(game) {
 						R.createElement("label", {
 							key: "signage-label",
 							className: "room-builder__field"
-						}, [R.createElement("span", { key: "text" }, "Signage"), R.createElement("input", {
+						}, [R.createElement("span", { key: "text" }, "Signage"), R.createElement(OfficeInput, {
 							key: "input",
 							type: "text",
+							label: "",
 							"data-testid": "room-builder-signage",
 							"aria-label": "Signage slug",
 							value: room.style.signage,
@@ -201653,9 +202898,10 @@ create: function(game) {
 						R.createElement("label", {
 							key: "dept-style-label",
 							className: "room-builder__field"
-						}, [R.createElement("span", { key: "text" }, "Department style"), R.createElement("input", {
+						}, [R.createElement("span", { key: "text" }, "Department style"), R.createElement(OfficeInput, {
 							key: "input",
 							type: "text",
+							label: "",
 							"data-testid": "room-builder-department-style",
 							"aria-label": "Department style signature",
 							value: departmentStyle,
@@ -205152,8 +206398,9 @@ create: function(game) {
 						R.createElement("label", {
 							key: "code-label",
 							className: "etsy-connect__field"
-						}, [R.createElement("span", { key: "l" }, "Redirect URL or code"), R.createElement("input", {
+						}, [R.createElement("span", { key: "l" }, "Redirect URL or code"), R.createElement(OfficeInput, {
 							key: "code",
+							label: "",
 							className: "warroom__input",
 							"data-testid": "etsy-connect-code",
 							autoComplete: "off",
@@ -205169,8 +206416,9 @@ create: function(game) {
 						R.createElement("label", {
 							key: "state-label",
 							className: "etsy-connect__field"
-						}, [R.createElement("span", { key: "l" }, "OAuth state"), R.createElement("input", {
+						}, [R.createElement("span", { key: "l" }, "OAuth state"), R.createElement(OfficeInput, {
 							key: "state",
+							label: "",
 							className: "warroom__input",
 							"data-testid": "etsy-connect-state",
 							autoComplete: "off",
@@ -210162,8 +211410,12 @@ create: function(game) {
 					if (seats.length > 0) children.push(R.createElement("label", {
 						key: "seat-picker",
 						className: "seat-model__label"
-					}, "Seat", R.createElement("select", {
+					}, "Seat", R.createElement(OfficeTooltip, {
+						key: "seat-tip",
+						content: "Pick the office seat whose model routing you are editing."
+					}, R.createElement(OfficeSelect, {
 						key: "seat",
+						label: "",
 						"data-testid": "seat-model-seat",
 						value: String(props.seatAgentId),
 						onChange: (e) => {
@@ -210173,7 +211425,7 @@ create: function(game) {
 					}, seats.map((s) => R.createElement("option", {
 						key: s.agent_id,
 						value: String(s.agent_id)
-					}, s.slug || `seat ${s.agent_id}`)))));
+					}, s.slug || `seat ${s.agent_id}`))))));
 					children.push(R.createElement(SeatModelPanel, {
 						key: "seat-model-panel",
 						agentId: props.seatAgentId,
@@ -210746,4 +211998,4 @@ create: function(game) {
 			})))
 		};
 	}
-})();
+})(React);

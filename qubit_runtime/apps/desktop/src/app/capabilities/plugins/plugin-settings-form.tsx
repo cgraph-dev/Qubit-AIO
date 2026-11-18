@@ -1,10 +1,9 @@
 import { type ReactNode, useMemo, useState } from 'react'
 
-import { Button, Toggle } from '@/sakuga/ui'
+import { Button, NumberField, Textarea, Toggle } from '@/sakuga/ui'
 import { Field, FieldHint } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { useI18n } from '@/i18n'
 import type { PluginSettingField, PluginSettingFieldType } from '@/store/agent-plugins'
 
@@ -87,13 +86,13 @@ function StringControl({ disabled, id, onChange, raw }: ControlProps) {
 
 function NumberControl({ disabled, id, onChange, raw }: ControlProps) {
   return (
-    <Input
-      className={TEXT_CLASS}
+    <NumberField
       disabled={disabled}
       id={id}
-      inputMode="decimal"
-      onChange={e => onChange(e.currentTarget.value)}
-      type="number"
+      label=""
+      onChange={value => onChange(String(value))}
+      step={1}
+      style={{ width: '100%' }}
       value={raw}
     />
   )
@@ -148,11 +147,12 @@ function SecretControl({ disabled, field, id, onChange, raw, secretSetHint }: Co
 function JsonControl({ disabled, id, onChange, raw }: ControlProps) {
   return (
     <Textarea
-      className="min-h-16 font-mono text-xs"
       disabled={disabled}
       id={id}
-      onChange={e => onChange(e.currentTarget.value)}
-      spellCheck={false}
+      label=""
+      onChange={value => onChange(value)}
+      rows={3}
+      style={{ width: '100%', fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }}
       value={raw}
     />
   )

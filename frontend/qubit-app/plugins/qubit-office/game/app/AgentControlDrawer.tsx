@@ -8,6 +8,7 @@
  * store's answer — never a local guess.
  */
 import { officeFx, sakugaButton } from "./sakuga";
+import { OfficeInput, OfficeSelect, OfficeTextarea } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createEffectiveStatePanel } from "./EffectiveStatePanel";
 import { createCharacterStudio } from "./CharacterStudio";
@@ -426,8 +427,8 @@ export function createAgentControlDrawer(
         children.push(R.createElement("label", {
           key: "picker", className: "agent-control__picker",
         }, "Managed agent",
-          R.createElement("select", {
-            key: "select",
+          R.createElement(OfficeSelect, {
+            key: "select", label: "",
             "data-testid": "agent-control-picker",
             value: selectedId ?? "",
             onChange: (event: { target: { value: string } }) =>
@@ -459,8 +460,8 @@ export function createAgentControlDrawer(
       }, [
         R.createElement("span", { key: "l", className: "agent-control__k" },
           label),
-        R.createElement("input", {
-          key: "i", type: "text", className: "agent-control__input",
+        R.createElement(OfficeInput, {
+          key: "i", type: "text", label: "", className: "agent-control__input",
           "data-testid": `agent-control-input-${key}`,
           value, disabled: lock || !editing,
           onChange: (event: { target: { value: string } }) =>
@@ -478,8 +479,8 @@ export function createAgentControlDrawer(
       }, [
         R.createElement("span", { key: "l", className: "agent-control__k" },
           label),
-        R.createElement("select", {
-          key: "s", className: "agent-control__input",
+        R.createElement(OfficeSelect, {
+          key: "s", label: "", className: "agent-control__input",
           "data-testid": `agent-control-input-${key}`,
           value, disabled: lock || !editing,
           onChange: (event: { target: { value: string } }) =>
@@ -561,8 +562,8 @@ export function createAgentControlDrawer(
               category),
             R.createElement("div", { key: "chips", className: "agent-control__chips" },
               chips),
-            R.createElement("input", {
-              key: "i", type: "text", className: "agent-control__input",
+            R.createElement(OfficeInput, {
+              key: "i", type: "text", label: "", className: "agent-control__input",
               "data-testid": "agent-control-perm-input",
               "data-category": category,
               value: permInput[category] ?? "",
@@ -732,8 +733,8 @@ export function createAgentControlDrawer(
         }, [
           R.createElement("span", { key: "l", className: "agent-control__k" },
             "Prompt"),
-          R.createElement("textarea", {
-            key: "i", className: "agent-control__input",
+          R.createElement(OfficeTextarea, {
+            key: "i", label: "Prompt", className: "agent-control__input",
             "data-testid": "agent-control-preview-prompt",
             rows: 3, value: previewPrompt,
             disabled: lock || previewBusy,
@@ -751,8 +752,8 @@ export function createAgentControlDrawer(
         }, [
           R.createElement("span", { key: "l", className: "agent-control__k" },
             "Requested tools (optional)"),
-          R.createElement("input", {
-            key: "i", type: "text", className: "agent-control__input",
+          R.createElement(OfficeInput, {
+            key: "i", type: "text", label: "", className: "agent-control__input",
             "data-testid": "agent-control-preview-tools",
             value: previewTools, disabled: lock || previewBusy,
             placeholder: "comma-separated granted tool names",
@@ -769,8 +770,8 @@ export function createAgentControlDrawer(
         }, [
           R.createElement("span", { key: "l", className: "agent-control__k" },
             "Estimated spend (USD, optional)"),
-          R.createElement("input", {
-            key: "i", type: "text", className: "agent-control__input",
+          R.createElement(OfficeInput, {
+            key: "i", type: "text", label: "", className: "agent-control__input",
             "data-testid": "agent-control-preview-spend",
             value: previewSpend, disabled: lock || previewBusy,
             placeholder: "0.00",
