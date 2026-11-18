@@ -192658,151 +192658,6 @@ create: function(game) {
 		win.fetch = bridge;
 		return restore;
 	}
-	// ../qubit-app/plugins/qubit-office/game/app/office-ui-skin.ts
-	var SAFE_URL = /^[A-Za-z0-9._~:/?=&%+,@!$'()*;-]+$/;
-	var STYLE_ID = "qubit-office-ui-skin";
-	function safeSrc(value) {
-		if (typeof value !== "string" || !value || value.includes("\\")) return null;
-		if (!SAFE_URL.test(value) || !/^(?:\/(?!\/)|https?:\/\/)/.test(value)) return null;
-		return value;
-	}
-	function sliceRule(slice, targets) {
-		const src = safeSrc(slice?.src);
-		const cell = Array.isArray(slice?.slice) && slice.slice.length === 4 ? slice.slice.filter((n) => Number.isInteger(n) && n > 0) : [];
-		if (!src || cell.length !== 4) return [];
-		const width = typeof slice?.width === "string" && /^[1-9][0-9]{0,3}px$/.test(slice.width) ? slice.width : "4px";
-		const repeat = slice?.repeat === "round" || slice?.repeat === "repeat" ? slice.repeat : "stretch";
-		return targets.map((target) => `.ui-root ${target} {border-style:solid;border-width:${width};border-image-source:url("${src}");border-image-slice:${cell.join(" ")};border-image-width:${width};border-image-repeat:${repeat};border-image-outset:0;image-rendering:pixelated; }`);
-	}
-	/** CSS for panels/dialogs/buttons/bubbles, scoped to the office document. */
-	function officeUiSkinRules(payload) {
-		if (!payload?.active) return [];
-		const slices = payload.ui?.slices ?? {};
-		const header = safeSrc(slices.header?.src);
-		return [
-			...sliceRule(slices.panel, [
-				".ui-panel",
-				".ui-drawer",
-				".ui-dialog",
-				".ui-feed",
-				".ui-sidebar",
-				".ui-settings",
-				".ui-spawn",
-				".ui-perm",
-				".ui-history",
-				".ui-timelapse",
-				".ui-daystats",
-				".ui-deliveries",
-				".ui-popover",
-				".ui-usage-card",
-				".ui-row",
-				".ui-tab"
-			]),
-			...sliceRule(slices.dock, [
-				".ui-drawer",
-				".ui-feed",
-				".ui-sidebar"
-			]),
-			...sliceRule(slices.card, [
-				".ui-row",
-				".ui-usage-card",
-				".ui-deliv-row"
-			]),
-			...sliceRule(slices.dialog, [
-				".ui-dialog",
-				".ui-popover",
-				".ui-modal"
-			]),
-			...sliceRule(slices.bubble, [
-				".ui-bubble",
-				".ui-toast",
-				".ui-chip"
-			]),
-			...sliceRule(slices.button, [".ui-btn"]),
-			...header ? [`.ui-feed__head, .ui-side__head, .ui-dialog__head, .ui-drawer__bar { background-image:url("${header}"); background-size:100% 100%; background-repeat:no-repeat; border-bottom:0; padding:6px 10px; }`, `.ui-feed__title, .ui-side__title h2, .ui-dialog__head h2 { background:transparent; color:#3d2a1a; text-shadow:none; }`] : [],
-			`.ui-root { image-rendering: pixelated; }`,
-			`.ui-feed, .ui-sidebar, .ui-panel, .ui-drawer, .ui-dialog, .ui-settings, .ui-spawn, .ui-perm, .ui-history, .ui-timelapse, .ui-daystats, .ui-deliveries { padding: 8px 10px; }`,
-			`.ui-feed .ui-feed__head, .ui-sidebar .ui-sidebar__head { margin-top: 2px; }`
-		];
-	}
-	var ICON_SELECTORS = {
-		overview: ["button[title^=\"Visão geral\"]", "button[aria-label^=\"Visão geral\"]"],
-		zoomOut: ["button[title^=\"Afastar\"]", "button[aria-label^=\"Afastar\"]"],
-		zoomIn: ["button[title^=\"Aproximar\"]", "button[aria-label^=\"Aproximar\"]"],
-		timelapse: [".ui-btn-timelapse", "button[title^=\"Timelapse\"]"],
-		history: ["button[title^=\"Histórico\"]", "button[aria-label^=\"Histórico\"]"],
-		spawn: ["button[title^=\"Novo agente\"]", "button[aria-label^=\"Novo agente\"]"],
-		feed: [".ui-btn-feed"],
-		sidebar: [".ui-btn-sidebar"],
-		settings: [".ui-btn-settings"],
-		help: ["button[title^=\"Ajuda\"]", "button[aria-label^=\"Ajuda\"]"],
-		agents: ["[data-testid=\"office-menu-agents\"]"],
-		hud: ["[data-testid=\"office-menu-hud\"]"],
-		approvals: ["[data-testid=\"office-menu-approvals\"]"],
-		command: ["[data-testid=\"office-menu-command-center\"]"],
-		timeline: ["[data-testid=\"office-menu-timeline\"]"],
-		studio: ["[data-testid=\"office-menu-studio\"]"],
-		campus: ["[data-testid=\"office-menu-campus\"]"],
-		etsy: ["button[title^=\"Etsy\"]", "button[aria-label^=\"Etsy\"]"],
-		close: [
-			"button[title^=\"Close\"]",
-			"button[aria-label^=\"Close\"]",
-			"button[title^=\"Fechar\"]",
-			"button[aria-label^=\"Fechar\"]"
-		]
-	};
-	function applyIcons(doc, payload, touched) {
-		const icons = payload.ui?.icons ?? {};
-		const diamond = safeSrc(payload.ui?.slices?.diamond?.src);
-		for (const [name, selectors] of Object.entries(ICON_SELECTORS)) {
-			const src = safeSrc(icons[name]?.src);
-			if (!src) continue;
-			for (const selector of selectors) for (const node of Array.from(doc.querySelectorAll(selector))) {
-				const el = node;
-				const framed = !!el.closest(".ui-topbar") || (el.dataset.testid ?? "").startsWith("office-menu");
-				el.style.backgroundImage = diamond && framed ? `url("${src}"), url("${diamond}")` : `url("${src}")`;
-				el.style.backgroundPosition = "center";
-				el.style.backgroundRepeat = "no-repeat";
-				el.style.backgroundSize = diamond && framed ? "16px 16px, 30px 30px" : "18px 18px";
-				el.style.imageRendering = "pixelated";
-				if (diamond && framed) el.style.backgroundColor = "transparent";
-				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "none";
-				touched.add(el);
-			}
-		}
-	}
-	/** Install the skin in a same-origin office iframe; returns an undo function. */
-	function installOfficeUiSkin(win) {
-		const doc = win.document;
-		const payload = win.__QUBIT_OFFICE_THEME__;
-		if (!payload?.active) return () => {};
-		const style = doc.createElement("style");
-		style.id = STYLE_ID;
-		style.setAttribute("data-office-ui-skin", "");
-		style.textContent = officeUiSkinRules(payload).join("\n");
-		doc.head.appendChild(style);
-		const touched = /* @__PURE__ */ new Set();
-		const reapply = () => applyIcons(doc, payload, touched);
-		reapply();
-		const obs = new win.MutationObserver(reapply);
-		obs.observe(doc.documentElement, {
-			childList: true,
-			subtree: true
-		});
-		return () => {
-			obs.disconnect();
-			style.remove();
-			for (const el of touched) {
-				el.style.backgroundImage = "";
-				el.style.backgroundPosition = "";
-				el.style.backgroundRepeat = "";
-				el.style.backgroundSize = "";
-				el.style.imageRendering = "";
-				el.style.backgroundColor = "";
-				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "";
-			}
-		};
-	}
 	var MENU_BUTTONS = [
 		{
 			id: "agents",
@@ -209648,13 +209503,10 @@ create: function(game) {
 					return;
 				}
 				let restoreEscape;
-				let restoreUiSkin;
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
 					installOfficeBrand(win);
-					restoreUiSkin?.();
-					restoreUiSkin = installOfficeUiSkin(win);
 					restoreEscape?.();
 					const loadedWindow = frame.contentWindow;
 					restoreEscape = installEscapeToShell(loadedWindow, () => {
@@ -209705,8 +209557,6 @@ create: function(game) {
 					frame.removeEventListener("error", onError);
 					menuRef.current?.dispose();
 					menuRef.current = null;
-					restoreUiSkin?.();
-					restoreUiSkin = void 0;
 					restoreEscape?.();
 					restoreBridge?.();
 				};

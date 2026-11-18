@@ -11,7 +11,6 @@ import { installOfficeBrand } from "./brand-patch";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
-import { installOfficeUiSkin } from "./office-ui-skin";
 import {
   installOfficeMenuButtons, menuIconGeometry, MENU_BUTTONS,
   type MenuButtonSpec, type OfficeMenuController,
@@ -591,13 +590,10 @@ export function createOfficeApp(
       // The vendored client owns its document and may swallow Tab. Give a
       // keyboard user a guaranteed escape back to the shell controls.
       let restoreEscape: (() => void) | undefined;
-      let restoreUiSkin: (() => void) | undefined;
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
         installOfficeBrand(win);
-        restoreUiSkin?.();
-        restoreUiSkin = installOfficeUiSkin(win);
         restoreEscape?.();
         // Resolve the frame window AT LOAD, not from the pre-navigation
         // closure: on a navigation the earlier window wrapper can still be
@@ -650,8 +646,6 @@ export function createOfficeApp(
         frame.removeEventListener("error", onError);
         menuRef.current?.dispose();
         menuRef.current = null;
-        restoreUiSkin?.();
-        restoreUiSkin = undefined;
         restoreEscape?.();
         restoreBridge?.();
       };
