@@ -10,6 +10,7 @@ import {
 } from "./i18n";
 import { en } from "./i18n/en";
 import { exposePluginSDK } from "./plugins";
+import { installFxBridge, loadSakugaCore } from "@qubit/shared/sakuga";
 import { ThemeProvider } from "./themes";
 import { QUBIT_BASE_PATH } from "./lib/api";
 import { installChunkReloadRecovery } from "./lib/preload-recovery";
@@ -29,6 +30,18 @@ installBuildWatch({ onNewBuild: (bundle) => showBuildNotice(bundle) });
 // Expose the plugin SDK before rendering so plugins loaded via <script>
 // can access React, components, etc. immediately.
 exposePluginSDK();
+
+// Sakuga VFX: install the window-level effect bridge and warm the shared
+// canvas engine after first paint. Components load lazily, so this is ~40 KB
+// and never the 506 KB toggle. Presentation failures are swallowed by the bus.
+installFxBridge();
+const warmSakuga = () => { void loadSakugaCore().catch(() => {}); };
+if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+  (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+    .requestIdleCallback(warmSakuga, { timeout: 2500 });
+} else {
+  setTimeout(warmSakuga, 1200);
+}
 
 async function mount(): Promise<void> {
   // Load the saved dictionary before the first paint. English (the default)

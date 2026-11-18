@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
+    "./sakuga": "./src/sakuga/index.ts",
     ".": "./src/index.ts",
     "./ansi": "./src/ansi.ts",
     "./billing": "./src/billing-types.ts",

@@ -1,0 +1,23 @@
+{
+  "name": "sakuga-vfx",
+  "source": "https://github.com/finktheartist/sakuga-vfx",
+  "commit": "c3dabb173928a3ad2372183103caf2e6f50953d0",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 Justin Finkelman",
+  "note": "Vendored byte-identical. Do not edit these files; edit the upstream checkout and re-vendor.",
+  "files": {
+    "LICENSE": "056e3d84530a1353df8ccad533823e2fd3a8cd94bec7dac2342b1d33eb60d624",
+    "button/button.js": "2d6f452b4d9c9489a4da9b6a1f0fb2ef52d88b5a28331eb3b1c5076742e0ddb8",
+    "checkbox/checkbox.js": "f8e89fd1915386a309c8e94425368a7a522529400505bdbbe227138f68704973",
+    "core.js": "f0518dd7d4dd1986eab2c9c76796421f4c827e91eac627f4c91a63c362c79419",
+    "input/input.js": "f925605c387c16dc6dad7b946789b0755d40b37ffe2f27860bd8211cd841e8bf",
+    "progress/progress.js": "42357bae8480cdcc32c771b340cf2a9886814bf9de706f24a85994ff6b122b31",
+    "radio/radio.js": "5f40e75d1439c021e322d9d4286f97037b6309a8965841d4c65d4fe6409b59f7",
+    "rating/rating.js": "b71a5886eec572125f666523864d634bc9f319aa66536ba083e60c33706bec55",
+    "slider/slider.js": "7924dec6ed71a86c8e8b611606bb4488dc4bd13f0353daa02fa755142420dbaf",
+    "tabs/tabs.js": "0467ac7bb687d8a6f8834b6e5ea7bd36133c2e126fb7231c916daac2a5d2fef5",
+    "toast/toast.js": "8b47d9e6bca4fad1bfae2aeefd4df45fdb81999dec1a02bbd941eb65ed93394c",
+    "toggle/toggle.js": "0f6115ea1705fda94e8c85f92ee081bf64f71ce6148a8d2e472f28b53f411516",
+    "tooltip/tooltip.js": "9929ca509ee0f5978182d71e909df90b6969f3a5dfbe416197f98a498fb25627"
+  }
+}

@@ -1145,3 +1145,41 @@ Upstream notices carried forward unchanged:
   MIT License.
 - The Patch Pixel font in upstream `gallery/fonts` is NOT covered by the MIT
   licence and is **not vendored** into Qubit.
+
+## Sakuga VFX — UI effect engine and controls (MIT)
+
+**Upstream:** https://github.com/finktheartist/sakuga-vfx
+**Pin:** `c3dabb173928a3ad2372183103caf2e6f50953d0` (2026-11-15)
+**Licence:** MIT — Copyright (c) 2026 Justin Finkelman
+**Live gallery:** https://sakuga-vfx.vercel.app/gallery/
+
+Qubit vendors the shared engine `core.js` and every component script
+(`button`, `toggle`, `slider`, `checkbox`, `radio`, `input`, `tabs`, `progress`,
+`rating`, `toast`, `tooltip`) **byte-identical**. Copies ship at
+`frontend/qubit-web/public/sakuga-vfx/`, `qubit_runtime/apps/desktop/public/sakuga-vfx/`
+and, for the in-canvas office overlay, inside the vendored Habblaud client.
+`VENDOR.json` records every file hash; `scripts/check_sakuga_vendor.py` is the
+drift gate. Do not edit a vendored file: change the upstream checkout and
+re-vendor, recording the local change.
+
+What Qubit added (not upstream):
+
+- `frontend/qubit-shared/src/sakuga/` (mirrored to
+  `qubit_runtime/apps/shared/src/sakuga/` by `scripts/sync_sakuga_shared.py`):
+  a typed loader, React wrappers that preserve the upstream look/motion and the
+  original `--sk-*` palette, the `emitFx`/`qubit:fx` effect bus, shadow-DOM test
+  helpers, and `SakugaSelect` — Qubit-owned UI composed from the upstream input
+  and radio because Sakuga ships no select.
+- Product event mappings, the office in-canvas overlay, and the Electron
+  integration are Qubit code, not upstream drawing changes.
+
+Upstream states that the manga sound-effect lettering and the toggle's 43
+frames were generated with GPT Image (through Higgsfield) for this project;
+that statement is carried forward here. The palette is deliberately the
+upstream one (white, lavender `#b8b3ff`, violet `#5a4fd8`, pink `#ff5fa8`, ink
+`#1d1a4a`); Qubit does not recolor it.
+
+Local divergence: the loader serves the files as plain scripts and lazy-loads
+each component; the wrappers set no drawing code. Upstream ships eleven control
+files although its README calls them twelve.
+

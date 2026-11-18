@@ -222,6 +222,7 @@ export default defineConfig(({ command }) => ({
       '@qubit/shared/billing': path.resolve(__dirname, '../shared/src/billing-types.ts'),
       '@qubit/shared/color': path.resolve(__dirname, '../shared/src/color.ts'),
       '@qubit/shared': path.resolve(__dirname, '../shared/src'),
+      '@qubit/shared/sakuga': path.resolve(__dirname, '../shared/src/sakuga/index.ts'),
       // The tour tool's preview surface injects driver.js's prebuilt IIFE into
       // the pane's guest page as raw source; the package's exports map doesn't
       // expose that dist file (nor ./package.json), so resolve the main entry
