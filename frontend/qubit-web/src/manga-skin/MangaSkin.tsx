@@ -1,77 +1,136 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
+import { emitFx } from "@/sakuga/ui";
+import {
+  applyMangaAttribute,
+  currentMangaEnabled,
+  mangaRouteEligible,
+  subscribeManga,
+  toggleManga,
+} from "./manga-store";
 import "./manga.css";
 
-export const MANGA_SKIN_KEY = "qubit-manga-skin-enabled";
-export const MANGA_EXCLUDED_PATHS = [
-  "/qubit-workbench", "/qubit-hud",
-  "/qubit-office", "/qubit-office2", "/qubit-office3",
-] as const;
-
-export function mangaRouteEligible(pathname: string): boolean {
-  return !MANGA_EXCLUDED_PATHS.some((path) => pathname === path || pathname.startsWith(path + "/"));
-}
-
-function readPreference(): boolean {
-  try { return localStorage.getItem(MANGA_SKIN_KEY) === "true"; }
-  catch { return false; }
+/** The skin only exists when the gate is mounted under the router. */
+function useMangaPreference(): boolean {
+  return useSyncExternalStore(
+    subscribeManga,
+    currentMangaEnabled,
+    () => false,
+  );
 }
 
 /**
- * Web-only skin: no navigation replacement, no backend changes.
- * The sidebar control mounts into the existing utility strip via a portal,
- * preserving the current App.tsx route tree and persistent chat host.
+ * Mount exactly once under the router. Paints nothing visible itself: it keeps
+ * the <html> marker in sync with (preference × eligible route) and portals the
+ * opt-in switch into the existing sidebar utility strip.
  */
-export function MangaSkinGate() {
+export function MangaSkinGate(): ReactElement | null {
   const { pathname } = useLocation();
-  const [enabled, setEnabled] = useState(readPreference);
-  const [utilityHost, setUtilityHost] = useState<HTMLElement | null>(null);
-  const eligible = mangaRouteEligible(pathname);
+  const enabled = useMangaPreference();
+
+  // Layout effect: the marker must be gone before the excluded surface paints.
+  useLayoutEffect(() => {
+    applyMangaAttribute(enabled && mangaRouteEligible(pathname));
+  }, [enabled, pathname]);
+
+  useEffect(() => () => applyMangaAttribute(false), []);
+
+  return <MangaSkinToggle />;
+}
+
+/** Find the sidebar utility strip without observing the whole document. */
+function useUtilityHost(active: boolean): HTMLElement | null {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const observer = useRef<MutationObserver | null>(null);
 
   useEffect(() => {
-    const sync = () => setEnabled(readPreference());
-    window.addEventListener("storage", sync);
-    return () => window.removeEventListener("storage", sync);
-  }, []);
+    if (!active) return;
+    let cancelled = false;
 
-  useEffect(() => {
-    const findHost = () => {
-      const host = document.querySelector<HTMLElement>("#app-sidebar .qagent-sidebar__utility");
-      setUtilityHost((previous) => previous === host ? previous : host);
+    const find = () => {
+      if (cancelled) return true;
+      const next = document.querySelector<HTMLElement>(
+        "#app-sidebar .qagent-sidebar__utility",
+      );
+      if (next) {
+        setHost(next);
+        observer.current?.disconnect();
+        observer.current = null;
+        return true;
+      }
+      return false;
     };
-    findHost();
-    const observer = new MutationObserver(findHost);
-    observer.observe(document.getElementById("root") ?? document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+
+    if (!find() && typeof MutationObserver !== "undefined") {
+      observer.current = new MutationObserver(() => {
+        find();
+      });
+      observer.current.observe(document.body, { childList: true, subtree: true });
+    }
+
+    return () => {
+      cancelled = true;
+      observer.current?.disconnect();
+      observer.current = null;
+    };
+  }, [active]);
+
+  return active ? host : null;
+}
+
+/**
+ * The opt-in switch, portalled into the existing sidebar utility strip so it
+ * sits beside the theme/language controls with no App.tsx changes.
+ */
+export function MangaSkinToggle(): ReactElement | null {
+  const { pathname } = useLocation();
+  const enabled = useMangaPreference();
+  const eligible = mangaRouteEligible(pathname);
+  const host = useUtilityHost(eligible);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const onClick = useCallback(() => {
+    const next = toggleManga();
+    // Presentation only; the engine swallows a missing WebGL context.
+    void emitFx(next ? "celebrate" : "pop", {
+      target: buttonRef.current,
+      scale: 0.8,
+      silent: true,
+    }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (enabled && eligible) document.documentElement.dataset.qubitManga = "on";
-    else delete document.documentElement.dataset.qubitManga;
-    return () => { delete document.documentElement.dataset.qubitManga; };
-  }, [enabled, eligible]);
+  if (!eligible || !host) return null;
 
-  const toggle = () => {
-    const next = !enabled;
-    try { localStorage.setItem(MANGA_SKIN_KEY, String(next)); } catch { /* private mode */ }
-    setEnabled(next);
-  };
-
-  if (!eligible || !utilityHost) return null;
   return createPortal(
     <button
+      ref={buttonRef}
       type="button"
       className="qm-skin-switch"
-      aria-label={enabled ? "Disable manga skin" : "Enable manga skin"}
-      title={enabled ? "Disable manga skin" : "Enable manga skin"}
+      data-state={enabled ? "on" : "off"}
       aria-pressed={enabled}
-      onClick={toggle}
+      aria-label={enabled ? "Disable manga skin" : "Enable manga skin"}
+      title={
+        enabled
+          ? "Manga skin is ON — click to restore the default theme"
+          : "Enable the optional manga skin"
+      }
+      onClick={onClick}
     >
-      <span aria-hidden="true" className="qm-skin-switch__spark">✦</span>
+      <span aria-hidden="true" className="qm-skin-switch__spark">
+        ✦
+      </span>
       <span className="qm-skin-switch__label">Manga</span>
-      <span aria-hidden="true" className="qm-skin-switch__lamp" data-active={enabled} />
+      <span aria-hidden="true" className="qm-skin-switch__lamp" />
     </button>,
-    utilityHost,
+    host,
   );
 }

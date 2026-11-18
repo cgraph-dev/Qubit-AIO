@@ -1,43 +1,211 @@
 # Optional Manga Skin — Web Dashboard
 
-This change is **opt-in** and affects only the React web dashboard under `frontend/qubit-web`.
+**Status:** implemented, typechecked, tested and built on this branch. Opt-in and reversible.
+**Scope:** the main React web dashboard under `frontend/qubit-web` only.
 
-## Turn it on
-1. Build and launch the web dashboard normally.
-2. In the **left sidebar's utility controls**, click **Manga**. It is OFF by default.
-3. Click again to return to your original theme. The selection is saved locally in your browser.
+The default dashboard is unchanged. The only visible addition when the skin is OFF is the
+**Manga** control used to turn it on.
 
-No command line or source-code edits are required to toggle the skin after this PR is merged.
+---
 
-## Design
-- Black/navy surfaces with hot magenta inked outlines, lavender layers, yellow highlights and halftone textures.
-- Applies to the existing navigation/sidebar, telemetry/footer, right chat panels, shared settings/cards, forms and Sakuga shadow parts.
-- Uses Qubit's existing route tree and components. Does **not** override event routing, app state, models or backends.
-- All label text remains normal DOM text; the SVG decorations contain no UI copy.
-- No external font or animation dependencies.
+## Turn it on (exact steps)
 
-## Intentionally not touched
-- Electron desktop `qubit_runtime/apps/desktop`.
-- `/qubit-workbench`, `/qubit-hud`, `/qubit-office`, `/qubit-office2`, `/qubit-office3` and descendants.
-- The off state preserves all prior styles; the only visible addition is the Manga toggle.
+1. Build/launch the web dashboard as usual (`cd frontend/qubit-web && npm run build`, or run the
+   packaged dashboard).
+2. Look at the **bottom of the left sidebar**, in the theme/language strip.
+3. Click **MANGA**.
+   - ON: the control turns yellow, the dashboard switches to the manga skin, and the setting is
+     saved in that browser (`localStorage["qubit-manga-skin-enabled"] = "true"`).
+   - OFF: click **MANGA** again. The previous theme (Q1–Q5 / Qubit Command / a user theme) is
+     restored exactly; the skin never writes theme variables inline.
+4. Keyboard: the control is a native `<button role=button>` with `aria-pressed`, `aria-label`,
+   and a visible focus ring; `Tab` then `Enter`/`Space` works.
+5. Mobile: open the sidebar with the menu button; **MANGA** is the full-width row under the
+   theme/language controls.
 
-## Integration points
-- `src/main.tsx` mounts `MangaSkinGate` inside the existing BrowserRouter and ThemeProvider.
-- `src/manga-skin/MangaSkin.tsx` adds the opt-in portal control in `#app-sidebar .qagent-sidebar__utility` and scopes the skin using `html[data-qubit-manga="on"]`.
-- `src/manga-skin/manga.css` adds styling with the real `.qagent-sidebar__link`, `.qplate`, `.qchat`, `.settings-*`, and `sakuga-*` CSS interfaces.
-- `public/manga-ui/` contains independent scalable vector ornaments.
+The preference survives reloads. In private mode where storage is unavailable, the in-memory
+toggle still works for the session.
 
-## Verification and remaining work
-Static repository inspection confirmed the component and selector names. This branch has **not been typechecked, built or exercised in a running web browser** in the current environment. Before merging, run:
+---
+
+## What the skin does
+
+A single scoped layer (`html[data-qubit-manga="on"]`) recolours and reframes the existing
+components; no component tree, route, API or state machine is replaced.
+
+| Layer | What is styled |
+|---|---|
+| Shell | page headers, status bar, left rail (expanded + collapsed + mobile), section strips, utility/system/telemetry blocks, colophon |
+| Chrome | cards, panels, plates, modals/dialogs, flyouts, popovers, tables, lists, tabs, segmented controls |
+| Forms | text/number/date/time/select/textarea, checkboxes/radios/toggles/sliders, focus/disabled states |
+| Chat | chat header, message bubbles, tool/progress messages, composer frame, right-hand model/tools/skills/sessions panel |
+| Data | analytics cards and series tokens, table headers/rows, file browser and drop zone, sessions/profiles/agents rosters |
+| Feedback | loading/progress, error alerts, success/status chips, toasts, tooltips |
+| Sakuga | palette through the public `--sk-*` variables and `::part()` seams; effects/animations untouched |
+
+Visual language: hot magenta frames, deep navy/black panel interiors, electric violet edges,
+yellow impact accents, angular/notched headers, halftone corners, and comic-spine labels.
+Ornaments are scalable SVG/CSS; every label, value and input remains live DOM text.
+
+### Design tokens (CSS)
+
+`manga.css` declares one palette and maps it onto the dashboard's existing seams:
+
+- theme tokens (`--background-base`, `--midground-base`, `--color-*`, `--text-*`)
+- Qubit plate ladder (`--qplate-*`)
+- Sakuga's public control variables (`--sk-card`, `--sk-ink`, `--sk-pri`, `--sk-acc`, …)
+- the Card primitive's documented variables (`--component-card-*`)
+
+There are no hardcoded per-page colours and no background images carrying UI copy.
+
+---
+
+## Exclusions (verified)
+
+The gate removes `data-qubit-manga` — and therefore every rule in `manga.css` — on:
+
+- `/qubit-workbench` (server-served document; untouched)
+- `/qubit-hud`
+- `/qubit-office`, `/qubit-office2`, `/qubit-office3` and every descendant path
+
+Verified with the skin preference ON: the marker is absent, the sidebar returns to the active
+theme, and no Manga control is rendered on those routes. The Electron desktop app, Workbench,
+HUD and the Office plugin bundles are not edited.
+
+Navigation to an excluded route removes the marker in a **layout effect**, so the excluded
+surface never paints one manga frame.
+
+---
+
+## Files
+
+| File | Role |
+|---|---|
+| `src/manga-skin/manga-store.ts` | preference, route eligibility, external store, pre-paint bootstrap |
+| `src/manga-skin/MangaSkin.tsx` | `MangaSkinGate` (document marker) + `MangaSkinToggle` (sidebar portal) |
+| `src/manga-skin/manga.css` | the entire visual layer (gated by `html[data-qubit-manga="on"]`) |
+| `src/main.tsx` | mounts the gate under the router; applies the persisted marker before first paint |
+| `public/manga-ui/*.svg` | text-free ornaments: halftone, impact star, section slashes, panel corner |
+| `src/manga-skin/manga-skin.test.tsx` | route gating, persistence, ON/OFF restore, toggle visibility |
+| `src/manga-skin/manga-css.test.ts` | stylesheet scope, palette, seams, assets, xterm exclusion |
+
+---
+
+## Verification
+
+Run from `frontend/qubit-web`:
 
 ```bash
-cd frontend/qubit-web
 npm ci
-npm run typecheck
-npm run test
-npm run build
+npm run typecheck        # exit 0
+npm run test             # 173 files / 1366 tests passed
+npm run build            # exit 0
 ```
 
-Manual checks: enable/disable skin on Sessions, Chat, Qubit Chat, Profiles, Models, Analytics, Skills, Plugins, Voice Editing and responsive navigation; confirm excluded routes retain original styling.
+Focused skin tests:
 
-This is a **first working skin implementation**, not a claim of 100% pixel-perfect coverage of all dashboard routes.
+```bash
+npx vitest run src/manga-skin   # 2 files / 14 tests passed
+npx eslint src/manga-skin src/main.tsx   # exit 0 (0 errors)
+```
+
+Browser verification was run against the real dashboard APIs (a Vite dev server on `:5199`
+proxying the live `:8890` backend, with the real session token). Checked at 1440×900,
+390×844 and with the sidebar collapsed:
+
+- skin marker present on every eligible route; absent on every excluded route
+- no document-level horizontal overflow at either width
+- no new console/page errors in the verified flows (the only expected message is the existing
+  typed `403 MEMORY_LOCAL_ONLY` on `/plugins`)
+- ON → reload → still ON; OFF → reload → default theme restored
+- dialogs, theme flyout, select panels, toasts, loading, error and disabled states exercised
+- excluded Office/HUD surfaces render with their original theme and no marker
+
+`npm run test` emits one benign jsdom/GSAP `cancelAnimationFrame` teardown warning when the whole
+suite runs together; the originating test passes alone and no assertion fails. It is not caused
+by this change.
+
+### Route coverage
+
+**Verified** = opened with the skin ON and OFF/eligible marker checks, screenshot captured.
+**Partial** = shared chrome themed; a deliberately unskinned subsystem is named.
+**Excluded** = untouched by design.
+
+| Route | Status | Notes |
+|---|---|---|
+| `/sessions` | Verified | stats, filters, connected platforms, session rows |
+| `/files` | Verified | path bar, drop zone, table, action buttons |
+| `/analytics` | Verified | cards, section spines, series tokens, table markup |
+| `/models` | Verified | period tabs, settings/profiles panels, “Use as”, model picker dialog |
+| `/config` | Verified | section rail, panels, inputs, numeric steppers, toggles |
+| `/plugins` | Verified | install form, toggles, catalog rows, chips; expected 403 memory-local-only |
+| `/skills` | Verified | list/detail chrome |
+| `/mcp` | Verified | server cards and controls |
+| `/channels` | Verified | channel rows and forms |
+| `/system` | Verified | host/labs/curator/gateway panels, loading → ready |
+| `/agents` | Verified | read-only roster rows (client-side navigation; see dev note) |
+| `/agent-workspace` | Verified | files/status panels |
+| `/profiles` | Verified | active banner, profile card, badges |
+| `/qubit-tasks` | Verified | list, filters, status chips |
+| `/qubit-scheduler` | Verified | schedule/TTS/power forms, checkboxes, disabled states |
+| `/qubit-taskflows` | Verified | flow panels |
+| `/qubit-board-admin` | Verified | admin panels/forms |
+| `/admin/users` | Verified | operator/credentials panels |
+| `/checkpoints` | Verified | checkpoint panels |
+| `/qubit-talk` | Verified | voice/TTS panels |
+| `/qubit-tv` | Verified | service cards |
+| `/guide` | Verified | guide sections |
+| `/qubit-chat` | Verified | full React chat: header, mission list, messages, composer, right model/tools/sessions rail |
+| `/chat` | Partial | page chrome and right rail themed; the embedded `qubit --tui` terminal is an xterm canvas and is intentionally not restyled (see `web/AGENTS.md`) |
+| `/qubit-workbench` | Excluded | server document; untouched |
+| `/qubit-hud` | Excluded | untouched |
+| `/qubit-office`, `2`, `3` | Excluded | untouched plugin surfaces |
+
+### Known limitations
+
+- **Terminal content:** `/chat` embeds the real Ink TUI in xterm; its canvas content keeps the
+  terminal's own colours. The surrounding panels/composer chrome is themed.
+- **Sakuga toggle art:** the 108×54 toggle is a pre-rendered sprite sheet; recolouring it would
+  mean editing the vendored asset, which this change deliberately does not do. It keeps the
+  upstream lavender look as the one non-palette control.
+- **Third-party embedded surfaces:** OpenViking's embedded studio and other iframe/embedded
+  tools keep their own styling; only the Qubit host chrome around them is themed.
+- **No calendar route:** this dashboard build has no dedicated calendar component; the scheduler
+  forms are themed instead.
+- **Dev-server quirk (not a product bug):** Vite's `/agent` proxy prefix also captures `/agents`
+  and `/agent-workspace` on direct URL loads in development. They were verified through
+  client-side navigation. A production dashboard build is unaffected.
+- **Email/Webhooks/etc.:** they use the same settings primitives and inherit the skin, but each
+  was not individually screenshotted in the final pass.
+
+---
+
+## Screenshot gallery
+
+Captured from the real dashboard at 1440×900 (mobile 390×844) with the real backend. Files live
+in [`docs/manga-skin/`](../../docs/manga-skin/).
+
+| Before (OFF) | After (ON) |
+|---|---|
+| ![Default sessions](../../docs/manga-skin/default_sessions.jpg) | ![Manga sessions](../../docs/manga-skin/manga_sessions.jpg) |
+| ![Default chat](../../docs/manga-skin/default_qubit_chat.jpg) | ![Manga chat](../../docs/manga-skin/manga_qubit_chat.jpg) |
+
+More: `manga_config.jpg`, `manga_models.jpg`, `manga_plugins.jpg`, `manga_tasks.jpg`,
+`manga_analytics.jpg`, `manga_system.jpg`, `manga_dialog_model_picker.jpg`,
+`manga_sidebar_collapsed.jpg`, `manga_mobile_sessions.jpg`, `manga_mobile_chat.jpg`,
+`excluded_hud_unchanged.jpg`, `excluded_office_unchanged.jpg`.
+
+---
+
+## Rollback
+
+No data or backend state is involved. Click **MANGA** to turn it off, or run in the browser
+console:
+
+```js
+localStorage.setItem("qubit-manga-skin-enabled", "false");
+location.reload();
+```
+
+Deleting the `src/manga-skin/`, `public/manga-ui/` folders and the two `main.tsx` lines removes
+the feature completely.
