@@ -7,7 +7,6 @@
  * `--sk-*` colours are used unchanged.
  */
 export {
-  SakugaButton as Button,
   SakugaCheckbox as Checkbox,
   SakugaInput as Input,
   SakugaProgress as Progress,
@@ -70,4 +69,28 @@ export function sakugaButtonVariant(variant: string | undefined | null): SakugaB
 export function cueAt(cue: FxCue | false | undefined, target: Element | null): void {
   if (!cue) return
   void emitFxAt(cue, target)
+}
+
+
+/* Backwards-compatible Button.
+ *
+ * The renderer's previous Button accepted `variant`, `size` and sometimes
+ * `asChild`. The sweep is therefore an import swap: unknown/quiet variants map
+ * to the secondary look, `size` is ignored (the upstream control has one size),
+ * and `asChild` renders the supplied child (links stay links). */
+import { cloneElement, createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { SakugaButton, type SakugaButtonProps } from '@qubit/shared/sakuga'
+
+export interface QubitButtonProps extends Omit<SakugaButtonProps, 'variant'> {
+  variant?: string | null
+  size?: string
+  asChild?: boolean
+  children?: ReactNode
+}
+
+export function Button({ variant, size: _size, asChild, children, ...rest }: QubitButtonProps) {
+  if (asChild && isValidElement(children)) {
+    return cloneElement(children as ReactElement<Record<string, unknown>>, rest as Record<string, unknown>)
+  }
+  return createElement(SakugaButton, { ...rest, variant: sakugaButtonVariant(variant) }, children)
 }
