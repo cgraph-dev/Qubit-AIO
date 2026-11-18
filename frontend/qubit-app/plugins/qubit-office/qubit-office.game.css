@@ -3619,5 +3619,10 @@
 .office-game__connectionProgress {
   --sk-progress-width: min(18rem, 60vw);
   width: min(18rem, 60vw);
+  position: absolute;
+  z-index: 2;
+  left: var(--office-s3);
+  bottom: calc(var(--office-s3) + 42px);
+  pointer-events: none;
 }
 /*$vite$:1*/
