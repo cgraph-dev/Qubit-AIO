@@ -38,8 +38,11 @@ the injected icons keep their native `title`/`aria-label` semantics.
 - **Numeric seed** (`RoomBuilder`) stays a native `type="number"`; the composed
   number control is a desktop-web extra and the office did not need the
   steppers for this one field.
-- **Office iframe internals** (Habblaud menu icons, canvas controls) stay
-  vendored/native; the shell must not reach into the iframe.
+- **Office iframe internals** are covered by the in-iframe pass below. Buttons
+  whose own element is the row layout (agent rows, history items, tabs, feed
+  rows, delivery cards) stay native so their grid/flex contract, drag handlers
+  and terminal semantics are unchanged. The shell still never reaches into the
+  iframe; the vendored client upgrades itself.
 - **Composite widgets** in the shell keep their semantics where replacing them
   would lose keyboard/portal behaviour.
 
@@ -80,3 +83,32 @@ icons stay iframe-native and keep their `title`/`aria-label`.
   `sync_sakuga_shared.py --check` OK.
 - No live browser run in this worktree (no bridge is started here); the served
   `:8890` process still carries the previous bundle.
+
+
+## In-iframe client pass (2026-11-18)
+
+**Scope:** the vendored Habblaud client (`frontend/qubit-app/plugins/qubit-office/habblaud/**`,
+source `/home/trick/qubit-worktrees/habblaud-theme`). This is still additive:
+the office stream, permission/terminal contracts, theme payload and FX overlay
+are untouched, and the control files are the byte-identical upstream copies.
+
+| Unit | Change |
+|---|---|
+| Loader | `client/src/ui/sakuga.ts` loads `sakuga-vfx/core.js` + the used control files from the client's own `public/sakuga-vfx/` (served inside the iframe), once, before `createUI`. The component files are copied byte-identically from the Qubit `/sakuga-vfx/` vendor and never edited. |
+| Helpers | `client/src/ui/dom.ts` adds `sakugaButton`, `sakugaInput`, `sakugaSlider`, `sakugaToggle`, `sakugaCheckbox`, `sakugaProgress` and `sakugaTooltip`. They keep the `h()` contract (`class`/`text`/`attrs`/`hidden`/`on`/children) and mirror what the shadow control does not observe (`aria-label`, `maxlength`, `spellcheck`, inner `input` → host `input`, `.value`/`.focus()`/`.select()`). With the flag off they build the original native element. |
+| Converted | Standard action/modal/permission buttons, settings switches (108×54 toggle art preserved), the volume slider, the permission interrupt checkbox (38px box preserved), standalone text/search fields (character name, room rename, spawn path, permission “Outro”, sidebar/history/terminal search), and the splash loader (Sakuga progress). |
+| Native exceptions | Button-as-row-layout controls: agent rows, history rows, project tabs, feed header/rows, delivery cards/toast/attachments, toast body, account/room filters, room headers, terminal-tab close, terminal copy/new buttons, peak markers, counters, version pill, usage “how” link, room link, day legend keys, character swatches/chips, social name chips, spawn folder cards. Also native: the two day `<select>`s (native option list/keyboard), the timelapse scrubber (its `max` changes per recording and it needs `input`; the Sakuga slider does not observe `min`/`max` after mount), `<textarea>` (composer/spawn/reason), hidden file input, and the AskUserQuestion option radios/checkboxes (grouped named native inputs read by the form model). |
+
+**Rollback:** `QUBIT_OFFICE_SAKUGA=0` (env, read by `webui.py` for the office
+document) or `?sakuga=0` on the iframe URL. The client then builds the original
+native elements; no rebuild is required.
+
+**Evidence (this pass):**
+
+- Habblaud `npm test` → 119 files / 1,353 passed, 2 skipped; `npm run typecheck` clean; `npm run build:client` ok.
+- Re-vendor `python3 scripts/vendor_habblaud.py --check` → ok (87 files, 3,038,538 bytes, commit `4ccce2537472`).
+- Office Python focused set (plugin app/auth, stream/auth/fx, theme/build, tower-plan, business bridge, vendor, static gzip) → 375 passed. The 4 `test_office_game_shell` CSS-scope assertions fail identically at the lane base.
+- `frontend/qubit-web`: `npx vitest run --config vitest.office-app.config.ts` → 52 files / 609 passed; `npx vite build --config vite.office-game.config.ts` → rebuilt the game bundle.
+- `check_sakuga_vendor.py` OK (2 copies); `sync_sakuga_shared.py --check` OK (17 files).
+- Static same-origin probe of the vendored document (`?mock=1`): 86 Sakuga buttons, 22 native row buttons, 5 Sakuga inputs, 2 native inputs (file + timelapse range), 4 toggles, 1 slider, 0 console errors, 0 failed requests, FX overlay present, switches/slider shadow controls upgraded. `?sakuga=0` → 0 Sakuga elements, 109 native buttons, all native inputs, 0 console errors.
+- The live `:8890` bridge was not restarted in this worktree; deployment is a separate step.
