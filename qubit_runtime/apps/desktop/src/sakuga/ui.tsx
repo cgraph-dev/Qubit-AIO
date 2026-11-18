@@ -245,10 +245,14 @@ export const Button = forwardRef<HTMLElement, QubitButtonProps>(function Button(
   )
 })
 
-/** Focus the host's real inner control (the custom elements use open shadow DOM). */
+/** Focus a custom element's host, the way a native control is focused.
+ *
+ * The upstream elements attach their shadow root with `delegatesFocus: true`,
+ * so focusing the host forwards real keyboard focus into the shadow control
+ * while `document.activeElement` still reports the host (the accessible
+ * element the rest of the tree can query). Drilling into the shadow and
+ * focusing the inner node directly bypasses that contract. */
 export function focusSakuga(host: Element | null | undefined): void {
   if (!host) return
-  const root = (host as HTMLElement).shadowRoot
-  const target = root?.querySelector<HTMLElement>('button, input, [tabindex]')
-  ;(target ?? (host as HTMLElement)).focus()
+  ;(host as HTMLElement).focus()
 }

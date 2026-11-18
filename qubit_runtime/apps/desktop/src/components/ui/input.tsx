@@ -24,7 +24,19 @@ type InputProps = Omit<React.ComponentProps<'input'>, 'size' | 'prefix' | 'suffi
 const SAKUGA_TYPES = new Set(['email', 'password', 'search', 'tel', 'text', 'url'])
 
 const Input = React.forwardRef<HTMLElement, InputProps>(function Input(
-  { className, containerClassName, prefix, suffix, size, type = 'text', onChange, placeholder, autoFocus, ...props },
+  {
+    className,
+    containerClassName,
+    prefix,
+    suffix,
+    size,
+    type = 'text',
+    onChange,
+    placeholder,
+    autoFocus,
+    tabIndex,
+    ...props
+  },
   ref
 ) {
   const grouped = prefix != null || suffix != null
@@ -49,6 +61,20 @@ const Input = React.forwardRef<HTMLElement, InputProps>(function Input(
     else el.removeAttribute('placeholder')
     if (type) el.setAttribute('type', type)
   }, [placeholder, type])
+
+  // A custom element is not a labelable control, so a wrapping
+  // `<label>Repository<Input/></label>` no longer gives the host an accessible
+  // name the way it did for the native input. When the caller supplied neither
+  // `aria-label` nor `aria-labelledby`, take the visible label text so
+  // `getByRole('textbox', { name })` and screen readers keep the same name.
+  React.useLayoutEffect(() => {
+    const el = hostRef.current
+    if (!el) return
+    if (props['aria-label'] || props['aria-labelledby']) return
+    const wrapping = el.closest('label')
+    const text = wrapping?.textContent?.replace(/\s+/g, ' ').trim()
+    if (text) el.setAttribute('aria-label', text)
+  })
 
   React.useEffect(() => {
     if (autoFocus) focusSakuga(hostRef.current)
@@ -118,6 +144,11 @@ const Input = React.forwardRef<HTMLElement, InputProps>(function Input(
       placeholder={placeholder}
       ref={setRefs}
       style={props.style}
+      // The host is the tab stop: its shadow root delegates focus to the real
+      // input. Without a tab index Radix's focus scope cannot see the field as
+      // a candidate and focuses the next button instead (a dialog's autofocus
+      // then lands on Cancel rather than the field).
+      tabIndex={props.disabled ? -1 : (tabIndex ?? 0)}
       title={props.title}
       type={type as 'email' | 'password' | 'search' | 'tel' | 'text' | 'url'}
       value={props.value === undefined ? undefined : String(props.value)}

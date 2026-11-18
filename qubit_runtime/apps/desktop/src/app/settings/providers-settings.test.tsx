@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConfirmHost } from '@/components/confirm-host'
+import { sakugaValue } from '@/sakuga/ui'
 import { $confirmRequest } from '@/store/confirm'
 import type { EnvVarInfo, OAuthProvider } from '@/types/hermes'
 
@@ -136,7 +137,7 @@ describe('ProvidersSettings', () => {
       await screen.findByText('Widget')
       expect(getEnvVars).toHaveBeenLastCalledWith('profile-b')
       expect(screen.getByText('Applies to')).toBeTruthy()
-      const input = container.querySelector('input[type="password"]')!
+      const input = container.querySelector('sakuga-input[type="password"]') as HTMLElement
       fireEvent.focus(input)
       fireEvent.change(input, { target: { value: 'fixture-key' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -280,8 +281,8 @@ describe('ProvidersSettings', () => {
     fireEvent.focus(inputs[0])
     fireEvent.change(inputs[0], { target: { value: 'shared-secret' } })
 
-    expect(screen.getAllByDisplayValue('shared-secret')).toHaveLength(1)
-    expect((inputs[1] as HTMLInputElement).value).toBe('')
+    expect(sakugaValue(inputs[0])).toBe('shared-secret')
+    expect(sakugaValue(inputs[1])).toBe('')
   })
 
   it('keeps a card on its own key when a shared credential arrives with primary: false', async () => {
@@ -330,7 +331,7 @@ describe('ProvidersSettings', () => {
 
     // Exactly one primary "Paste … key" input per card; the CN card's must edit
     // ALIBABA_CODING_PLAN_CN_API_KEY, never the shared DASHSCOPE_API_KEY.
-    const inputs = container.querySelectorAll('input[type="password"]')
+    const inputs = container.querySelectorAll('sakuga-input[type="password"]')
     const pasteInputs = await screen.findAllByPlaceholderText(/Paste .* key/)
     expect(pasteInputs).toHaveLength(2) // Qwen Cloud card + the CN Coding Plan card
 
@@ -339,7 +340,7 @@ describe('ProvidersSettings', () => {
       .map(el => el.closest('[role="button"]') ?? el.closest('div[class*="group/card"]'))
       .find(Boolean)!
 
-    const cnInput = cnCard.querySelector('input[type="password"]')!
+    const cnInput = cnCard.querySelector('sakuga-input[type="password"]') as HTMLElement
     expect(inputs.length).toBeGreaterThanOrEqual(1)
 
     fireEvent.focus(cnInput)
