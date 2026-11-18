@@ -24,7 +24,8 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
-import { officeFx, sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton, sakugaProgress } from "./sakuga";
+import { OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   ApprovalApiError,
@@ -249,14 +250,17 @@ export function createApprovalsPanel(
         "data-count": String(count),
         "aria-label": `${count} pending approval${count === 1 ? "" : "s"}`,
       }, `${count} pending`),
-      sakugaButton(R, {
+      R.createElement(OfficeTooltip, {
+        key: "refresh-tip",
+        content: "Re-read the approval journal; settled ids disappear.",
+      }, sakugaButton(R, {
         key: "refresh", type: "button",
         className: "office-game__btn approvals-panel__refresh",
         "data-testid": "approvals-refresh",
         "aria-label": "Refresh pending approvals",
         disabled: state.kind === "loading",
         onClick: () => setRefresh((n: number) => n + 1),
-      }, "Refresh"),
+      }, "Refresh")),
     ]);
 
     const body: unknown[] = [];
@@ -265,7 +269,10 @@ export function createApprovalsPanel(
         key: "loading", className: "approvals-panel__status",
         "data-testid": "approvals-loading",
         role: "status", "aria-live": "polite",
-      }, "Loading pending approvals\u2026"));
+      }, [
+        "Loading pending approvals\u2026",
+        sakugaProgress(R, { label: "Loading pending approvals", value: 0.08 }),
+      ]));
     } else if (state.kind === "error") {
       body.push(R.createElement("div", {
         key: "error", className: "approvals-panel__error",

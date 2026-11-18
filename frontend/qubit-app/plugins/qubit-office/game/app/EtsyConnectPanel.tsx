@@ -17,8 +17,8 @@
  *
  * React comes from the HOST: ``R.createElement``, never an import.
  */
-import { officeFx, sakugaButton } from "./sakuga";
-import { OfficeInput } from "./sakuga-form";
+import { officeFx, sakugaButton, sakugaProgress } from "./sakuga";
+import { OfficeInput, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   EtsyApiError,
@@ -206,14 +206,17 @@ export function createEtsyConnectPanel(
         R.createElement("span", {
           key: "t", className: "office-theme-dock-title",
         }, "Etsy connection"),
-        sakugaButton(R, {
+        R.createElement(OfficeTooltip, {
+          key: "refresh-tip",
+          content: "Re-read the token and scope state from the local integration store.",
+        }, sakugaButton(R, {
           key: "refresh", type: "button",
           className: "office-game__btn office-theme-dock-link",
           "data-testid": "etsy-connect-refresh",
           "aria-label": "Refresh the Etsy connection status",
           disabled: busy !== null || read.kind === "loading",
           onClick: () => setRefresh((n: number) => n + 1),
-        }, "Refresh"),
+        }, "Refresh")),
         sakugaButton(R, {
           key: "x", type: "button",
           className: "office-game__btn office-theme-dock-close",
@@ -228,7 +231,10 @@ export function createEtsyConnectPanel(
       children.push(R.createElement("p", {
         key: "loading", className: "etsy-connect__state",
         "data-testid": "etsy-connect-loading", role: "status",
-      }, "Reading the Etsy connection status…"));
+      }, [
+        "Reading the Etsy connection status…",
+        sakugaProgress(R, { label: "Reading the Etsy connection status", value: 0.08 }),
+      ]));
     } else if (read.kind === "error") {
       children.push(R.createElement("div", {
         key: "read-error", className: "etsy-connect__error",

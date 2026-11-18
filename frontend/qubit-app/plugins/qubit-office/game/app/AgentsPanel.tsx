@@ -41,6 +41,7 @@ import {
   preloadThemeAtlases,
   themeAtlasUrls,
 } from "./office-theme";
+import { sakugaProgress } from "./sakuga";
 
 export interface AgentsPanelProps {
   /** An explicit base path (a test); otherwise the host's injected global. */
@@ -395,7 +396,10 @@ export function createAgentsPanel(
         "data-testid": "agents-panel",
         "data-state": "loading",
         role: "status", "aria-live": "polite",
-      }, "Loading the roster\u2026");
+      }, [
+        "Loading the roster\u2026",
+        sakugaProgress(R, { label: "Loading the roster", value: 0.08 }),
+      ]);
     }
 
     if (state.kind === "error") {

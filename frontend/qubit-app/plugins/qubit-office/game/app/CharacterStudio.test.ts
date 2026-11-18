@@ -204,7 +204,8 @@ describe("CharacterStudio", () => {
   it("is keyboard/label accessible and exposes no paid asset path", () => {
     const h = mount();
     const interactive = h.tree.filter(
-      (el) => el.type === "button" || el.type === "input");
+      (el) => el.type === "button" || el.type === "input"
+        || el.props.role === "button");
     expect(interactive.length).toBeGreaterThan(20);
     for (const el of interactive) {
       expect(String(el.props["aria-label"] || "")).not.toBe("");
