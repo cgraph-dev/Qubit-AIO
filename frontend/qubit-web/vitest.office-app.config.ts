@@ -21,6 +21,8 @@ const LOADING_DIR = path.resolve(
   HERE, "../qubit-app/plugins/qubit-office/game/loading");
 const ART_DIR = path.resolve(
   HERE, "../qubit-app/plugins/qubit-office/game/art");
+const MOTION_DIR = path.resolve(
+  HERE, "../qubit-app/plugins/qubit-office/game/motion");
 
 export default defineConfig({
   // The tests live OUTSIDE this package (../qubit-app/...). Under the default
@@ -47,9 +49,9 @@ export default defineConfig({
     include: [
       path.join(APP_DIR, "**/*.test.ts"),
       path.join(LOADING_DIR, "**/*.test.ts"),
-      // The Stage 5/6 art modules are pure (no DOM), so their contract tests
-      // run in this same node environment.
+      // Stage 5/6 art contracts and Stage 8 motion contracts.
       path.join(ART_DIR, "**/*.test.ts"),
+      path.join(MOTION_DIR, "**/*.test.ts"),
     ],
     testTimeout: 20000,
   },
