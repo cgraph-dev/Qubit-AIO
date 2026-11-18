@@ -5,7 +5,6 @@
  * land. The wrappers are the shared layer; this file adds no behaviour.
  */
 export {
-  SakugaButton as Button,
   SakugaCheckbox as Checkbox,
   SakugaInput as Input,
   SakugaProgress as Progress,
