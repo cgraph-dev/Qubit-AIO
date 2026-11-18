@@ -9,6 +9,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { sakugaInnerAll, waitForSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   listProposals: vi.fn(),
@@ -161,15 +163,19 @@ describe("SkillsReviewPage", () => {
 
   it("lifecycle tabs filter the queue through the same list endpoint", async () => {
     await renderPage();
-    await waitFor(() => byTestId("sr-tab-pending") !== null);
-    expect(byTestId("sr-tab-all")).not.toBeNull();
-    expect(byTestId("sr-tab-quarantined")).not.toBeNull();
-    expect(byTestId("sr-tab-stale")).not.toBeNull();
+    const tabs = byTestId("sr-tabs");
+    await waitForSakuga(tabs);
+    const tabText = sakugaInnerAll<HTMLButtonElement>(tabs, "button").map((b) => b.textContent ?? "");
+    expect(tabText).toContain("All");
+    expect(tabText).toContain("Pending");
+    expect(tabText).toContain("Quarantined");
+    expect(tabText).toContain("Stale");
     const callsBefore = apiMocks.listProposals.mock.calls.length;
+    const pendingTab = sakugaInnerAll<HTMLButtonElement>(tabs, "button").find(
+      (b) => b.textContent === "Pending",
+    );
     await act(async () => {
-      byTestId("sr-tab-pending")?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true }),
-      );
+      pendingTab?.click();
     });
     await waitFor(() => apiMocks.listProposals.mock.calls.length > callsBefore);
     const last =
@@ -197,7 +203,7 @@ describe("SkillsReviewPage", () => {
     for (const d of DISABLED_SKILLS_ACTIONS) {
       const row = byTestId(`sr-disabled-${d.action}`);
       expect(row).not.toBeNull();
-      const btn = row?.querySelector("button");
+      const btn = row?.querySelector<HTMLElement>("button, sakuga-button");
       expect(btn?.disabled).toBe(true);
       expect(row?.textContent).toContain(d.reason);
     }

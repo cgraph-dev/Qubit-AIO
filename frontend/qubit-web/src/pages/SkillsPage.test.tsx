@@ -10,6 +10,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   getSkills: vi.fn(),
@@ -50,13 +52,10 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
   }
 }
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
+async function setInputValue(input: Element | null, value: string) {
+  if (!input) throw new Error("missing input");
+  await waitForSakuga(input);
+  typeIntoSakuga(input, value);
 }
 
 async function renderSkills() {
@@ -88,7 +87,7 @@ async function renderSkills() {
     ),
   );
   await waitFor(() =>
-    Boolean(container.querySelector('input[placeholder="Search..."]')),
+    Boolean(container.querySelector('sakuga-input[placeholder="Search..."]')),
   );
 }
 
@@ -138,17 +137,17 @@ describe("SkillsPage filter panel (drift A21)", () => {
     expect(container.textContent).toContain("Toolsets (1)");
     expect(container.textContent).toContain("Browse hub");
     expect(container.textContent).toContain("Automation");
-    expect(container.querySelector('input[placeholder="Search..."]')).not.toBeNull();
+    expect(container.querySelector('sakuga-input[placeholder="Search..."]')).not.toBeNull();
   });
 
   it("shows the typed empty state when the search matches nothing", async () => {
     await renderSkills();
-    const search = container.querySelector<HTMLInputElement>(
-      'input[placeholder="Search..."]',
+    const search = container.querySelector(
+      'sakuga-input[placeholder="Search..."]',
     );
     expect(search).not.toBeNull();
 
-    await act(async () => setInputValue(search!, "zzz-no-skill"));
+    await act(async () => setInputValue(search, "zzz-no-skill"));
     await waitFor(() =>
       container.textContent!.includes("No skills match your search or filter."),
     );

@@ -42,14 +42,10 @@ import type {
 import { useProfileScope } from "@/contexts/useProfileScope";
 import { ToolsetConfigDrawer } from "@/components/ToolsetConfigDrawer";
 import { SkillEditorDialog } from "@/components/SkillEditorDialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Switch } from "@nous-research/ui/ui/components/switch";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +55,7 @@ import {
 } from "@nous-research/ui/ui/components/dialog";
 import { cn } from "@/lib/utils";
 import { rebrand, rebrandOptional } from "@/lib/rebrand";
-import { Input } from "@nous-research/ui/ui/components/input";
+import { Button, Input, Toggle, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -151,7 +147,10 @@ export default function SkillsPage() {
   // Skill editor dialog: open + which skill is being edited (null = create).
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorSkill, setEditorSkill] = useState<string | null>(null);
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
   const { t } = useI18n();
   const { setAfterTitle, setEnd } = usePageHeader();
 
@@ -349,16 +348,15 @@ export default function SkillsPage() {
       <div className="relative w-full min-w-0 sm:max-w-xs">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
-          className="h-8 rounded-none pl-8 pr-7 text-xs"
+          label={t.common.search}
+          className="qsk-field pl-8 pr-7 text-xs"
           placeholder={t.common.search}
-          aria-label={t.common.search}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
         />
         {search && (
           <Button
-            ghost
-            size="xs"
+            variant="secondary"
             className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             onClick={() => setSearch("")}
             aria-label={t.common.clear}
@@ -404,7 +402,6 @@ export default function SkillsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PluginSlot name="skills:top" />
-      <Toast toast={toast} />
 
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
         <aside aria-label={t.skills.title} className="sm:w-56 sm:shrink-0">
@@ -554,20 +551,11 @@ export default function SkillsPage() {
                         .replace("{count}", String(activeSkills.length))
                         .replace("{s}", activeSkills.length !== 1 ? "s" : "")}
                     </Badge>
-                    <Button
-                      size="sm"
-                      outlined
-                      onClick={openLearn}
-                      prefix={<Sparkles />}
-                    >
-                      Learn a skill
+                    <Button variant="secondary" onClick={openLearn}>
+                      <Sparkles aria-hidden /> Learn a skill
                     </Button>
-                    <Button
-                      size="sm"
-                      outlined
-                      onClick={openCreateEditor}
-                      prefix={<Plus />}
-                    >
+                    <Button variant="secondary" onClick={openCreateEditor}>
+                      <Plus aria-hidden />
                       New skill
                     </Button>
                   </div>
@@ -662,13 +650,8 @@ export default function SkillsPage() {
                                 </span>
                               )}
                               <div className="mt-3">
-                                <Button
-                                  size="sm"
-                                  outlined
-                                  onClick={() => setConfigToolset(ts)}
-                                  prefix={<Wrench />}
-                                >
-                                  Configure
+                                <Button variant="secondary" onClick={() => setConfigToolset(ts)}>
+                                  <Wrench aria-hidden /> Configure
                                 </Button>
                               </div>
                             </div>
@@ -716,10 +699,11 @@ export default function SkillsPage() {
                 Local file or directory
               </label>
               <Input
-                aria-label="Local file or directory to learn from"
+                label="Local file or directory"
                 placeholder="~/projects/some-sdk  (read with read_file / search_files)"
                 value={learnDir}
-                onChange={(e) => setLearnDir(e.target.value)}
+                onChange={setLearnDir}
+                className="qsk-field"
               />
             </div>
             <div className="grid gap-1.5">
@@ -727,9 +711,11 @@ export default function SkillsPage() {
                 URL
               </label>
               <Input
+                label="URL"
                 placeholder="https://docs.example.com/api  (fetched with web_extract)"
                 value={learnUrl}
-                onChange={(e) => setLearnUrl(e.target.value)}
+                onChange={setLearnUrl}
+                className="qsk-field"
               />
             </div>
             <div className="grid gap-1.5">
@@ -746,15 +732,14 @@ export default function SkillsPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-1">
-            <Button ghost onClick={() => setLearnOpen(false)}>
+            <Button variant="secondary" onClick={() => setLearnOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={submitLearn}
-              prefix={<Sparkles />}
               disabled={!learnDir.trim() && !learnUrl.trim() && !learnText.trim()}
             >
-              Learn it
+              <Sparkles aria-hidden /> Learn it
             </Button>
           </div>
         </DialogContent>
@@ -774,9 +759,10 @@ function SkillRow({
   return (
     <div className="group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40">
       <div className="pt-0.5 shrink-0">
-        <Switch
+        <Toggle
+          label={`Enable ${skill.name}`}
           checked={skill.enabled}
-          onCheckedChange={onToggle}
+          onChange={() => onToggle()}
           disabled={toggling}
         />
       </div>
@@ -795,8 +781,7 @@ function SkillRow({
         </p>
       </div>
       <Button
-        ghost
-        size="icon"
+        variant="secondary"
         className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground"
         title="Edit SKILL.md"
         aria-label={`Edit ${skill.name}`}
@@ -1051,31 +1036,20 @@ function HubBrowser({
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
-                className="h-8 pl-8 text-sm"
+                label="Search the skill hub"
+                className="qsk-field pl-8 text-sm"
                 placeholder="Search the skill hub (GitHub, official, community)…"
-                aria-label="Search the skill hub"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void runSearch();
-                }}
+                onChange={setQuery}
+                onEnter={() => void runSearch()}
               />
             </div>
-            <Button
-              size="sm"
-              onClick={() => void runSearch()}
-              disabled={searching || !query.trim()}
-              prefix={searching ? <Spinner /> : <Search className="h-3.5 w-3.5" />}
-            >
+            <Button onClick={() => void runSearch()} disabled={searching || !query.trim()}>
+              {searching ? <Spinner /> : <Search className="h-3.5 w-3.5" aria-hidden />}
               Search
             </Button>
-            <Button
-              size="sm"
-              outlined
-              onClick={() => void updateAll()}
-              prefix={<RefreshCw className="h-3.5 w-3.5" />}
-            >
-              Update all
+            <Button variant="secondary" onClick={() => void updateAll()}>
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Update all
             </Button>
           </div>
 
@@ -1098,8 +1072,7 @@ function HubBrowser({
               )}
               {!actionRunning && (
                 <Button
-                  ghost
-                  size="xs"
+                  variant="secondary"
                   className="ml-auto text-muted-foreground"
                   onClick={() => setAction(null)}
                   aria-label="Dismiss"
@@ -1311,8 +1284,8 @@ function HubResultCard({
   return (
     <Card className="rounded-none transition-colors hover:bg-muted/30">
       <CardContent className="py-3 flex items-start gap-3">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           className="flex-1 min-w-0 text-left"
           onClick={onOpen}
           aria-label={`Open ${result.name}`}
@@ -1349,27 +1322,18 @@ function HubResultCard({
           <p className="text-xs font-mono text-text-tertiary truncate mt-1">
             {result.identifier}
           </p>
-        </button>
+        </Button>
         <div className="flex shrink-0 flex-col gap-1.5">
-          <Button
-            size="sm"
-            outlined
-            onClick={onOpen}
-            prefix={<FileText className="h-3.5 w-3.5" />}
-          >
-            Details
+          <Button variant="secondary" onClick={onOpen}>
+            <FileText className="h-3.5 w-3.5" aria-hidden /> Details
           </Button>
           {installed ? (
-            <Button size="sm" ghost disabled prefix={<CheckCircle2 className="h-3.5 w-3.5" />}>
-              Installed
+            <Button variant="secondary" disabled>
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Installed
             </Button>
           ) : (
-            <Button
-              size="sm"
-              onClick={onInstall}
-              prefix={<Download className="h-3.5 w-3.5" />}
-            >
-              Install
+            <Button onClick={onInstall}>
+              <Download className="h-3.5 w-3.5" aria-hidden /> Install
             </Button>
           )}
         </div>
@@ -1462,26 +1426,21 @@ function SkillDetailDialog({
         {/* Action row */}
         <div className="mt-3 flex flex-wrap items-center gap-2 border-y border-border py-2.5">
           <Button
-            size="sm"
-            outlined={tab !== "readme"}
+            variant={tab !== "readme" ? "secondary" : "primary"}
             onClick={() => setTab("readme")}
-            prefix={<FileText className="h-3.5 w-3.5" />}
           >
-            Read SKILL.md
+            <FileText className="h-3.5 w-3.5" aria-hidden /> Read SKILL.md
           </Button>
           <Button
-            size="sm"
-            outlined={tab !== "scan"}
+            variant={tab !== "scan" ? "secondary" : "primary"}
             onClick={() => void runScan()}
             disabled={scanning}
-            prefix={
-              scanning ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Shield className="h-3.5 w-3.5" />
-              )
-            }
           >
+            {scanning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Shield className="h-3.5 w-3.5" aria-hidden />
+            )}
             {scan ? "Re-scan" : "Security scan"}
           </Button>
           <div className="ml-auto flex items-center gap-3">
@@ -1497,16 +1456,12 @@ function SkillDetailDialog({
               </a>
             )}
             {installed ? (
-              <Button size="sm" ghost disabled prefix={<CheckCircle2 className="h-3.5 w-3.5" />}>
-                Installed
+              <Button variant="secondary" disabled>
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Installed
               </Button>
             ) : (
-              <Button
-                size="sm"
-                onClick={onInstall}
-                prefix={<Download className="h-3.5 w-3.5" />}
-              >
-                Install
+              <Button onClick={onInstall}>
+                <Download className="h-3.5 w-3.5" aria-hidden /> Install
               </Button>
             )}
           </div>

@@ -35,6 +35,7 @@ import {
   type SkillProposal,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Input, Tabs, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -65,9 +66,7 @@ function errText(e: unknown, fallback: string): string {
   return refusalOrError(e, `${fallback}: ${e instanceof Error ? e.message : String(e)}`);
 }
 
-const BTN_CLASS = "btn btn--sm";
-const BTN_GHOST_CLASS = "btn btn--sm btn--ghost";
-const INPUT_CLASS = "settings-input border border-border bg-background-base px-2 py-1 text-xs";
+
 
 export default function SkillsReviewPage() {
   const [statusFilter, setStatusFilter] = useState("");
@@ -147,10 +146,12 @@ export default function SkillsReviewPage() {
     try {
       await fn();
       setNotice(`${verb} settled ✓`);
+      emitFx("success");
       await refresh(statusFilter.trim());
       if (selectedId) await handleInspect(selectedId);
     } catch (e) {
       setError(errText(e, `${verb} failed`));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -212,15 +213,13 @@ export default function SkillsReviewPage() {
             </p>
           </div>
           <div className="settings-section__actions">
-            <button
-              type="button"
+            <Button
               data-testid="sr-refresh"
-              className={BTN_CLASS}
               disabled={loading}
               onClick={() => void refresh(statusFilter.trim())}
             >
               {loading ? "Loading…" : "Refresh"}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -231,21 +230,13 @@ export default function SkillsReviewPage() {
               <div className="settings-row__title">Status</div>
             </div>
             <div className="settings-row__control">
-              {STATUS_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab(tab.status)}
-                  data-testid={`sr-tab-${tab.id}`}
-                  className={`${
-                    activeTab(tab.status) ? BTN_CLASS : BTN_GHOST_CLASS
-                  } text-xs uppercase`}
-                  onClick={() => void handleTab(tab.status)}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              <Tabs
+                label="Proposal status"
+                options={STATUS_TABS.map((tab) => ({ value: tab.status, label: tab.label }))}
+                selected={Math.max(0, STATUS_TABS.findIndex((tab) => activeTab(tab.status)))}
+                onChange={(detail) => void handleTab(detail.value)}
+                data-testid="sr-tabs"
+              />
             </div>
           </div>
 
@@ -257,22 +248,18 @@ export default function SkillsReviewPage() {
               <p className="settings-row__desc">e.g. pending (empty = all)</p>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="sr-status"
                 data-testid="sr-status-filter"
-                className={INPUT_CLASS}
+                label="Status filter"
                 placeholder="e.g. pending (empty = all)"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={setStatusFilter}
+                className="qsk-field"
               />
-              <button
-                type="button"
-                data-testid="sr-filter-apply"
-                className={BTN_CLASS}
-                onClick={handleFilter}
-              >
+              <Button data-testid="sr-filter-apply" onClick={handleFilter}>
                 Filter
-              </button>
+              </Button>
               <span className="text-xs text-muted-foreground" data-testid="sr-count">
                 {loading ? "Loading…" : `${count} shown`}
               </span>
@@ -311,19 +298,16 @@ export default function SkillsReviewPage() {
                       )}
                     </div>
                     <div className="settings-row__control">
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
                         data-testid={`sr-inspect-${id}`}
-                        className={BTN_GHOST_CLASS}
                         disabled={inspecting || !id}
                         onClick={() => void handleInspect(id)}
                       >
                         Inspect
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
                         data-testid={`sr-apply-${id}`}
-                        className={BTN_CLASS}
                         disabled={busy !== null || !id}
                         onClick={() =>
                           void runVerdict(`apply ${id}`, () =>
@@ -332,11 +316,10 @@ export default function SkillsReviewPage() {
                         }
                       >
                         Apply
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
                         data-testid={`sr-reject-${id}`}
-                        className={BTN_GHOST_CLASS}
                         disabled={busy !== null || !id}
                         onClick={() =>
                           void runVerdict(`reject ${id}`, () =>
@@ -345,11 +328,10 @@ export default function SkillsReviewPage() {
                         }
                       >
                         Reject
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
                         data-testid={`sr-quarantine-${id}`}
-                        className={BTN_GHOST_CLASS}
                         disabled={busy !== null || !id}
                         onClick={() =>
                           void runVerdict(`quarantine ${id}`, () =>
@@ -358,7 +340,7 @@ export default function SkillsReviewPage() {
                         }
                       >
                         Quarantine
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 );
@@ -374,13 +356,14 @@ export default function SkillsReviewPage() {
               <p className="settings-row__desc">Optional; recorded on the verdict.</p>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="sr-reason"
                 data-testid="sr-reason"
-                className={INPUT_CLASS}
+                label="Verdict reason"
                 placeholder="recorded on the verdict"
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={setReason}
+                className="qsk-field"
               />
             </div>
           </div>
@@ -402,25 +385,23 @@ export default function SkillsReviewPage() {
               </h2>
             </div>
             <div className="settings-section__actions">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 data-testid="sr-events-open"
-                className={BTN_GHOST_CLASS}
                 onClick={() => void openEvents(selectedId)}
               >
                 Events
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
                 data-testid="sr-detail-close"
-                className={BTN_GHOST_CLASS}
                 onClick={() => {
                   setSelected(null);
                   setSelectedId(null);
                 }}
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -461,10 +442,8 @@ export default function SkillsReviewPage() {
                 <div className="settings-row__title">Revision writes</div>
               </div>
               <div className="settings-row__control">
-                <button
-                  type="button"
+                <Button
                   data-testid="sr-revise"
-                  className={BTN_CLASS}
                   disabled={busy !== null}
                   onClick={() => {
                     const payload = parsePayload(revisePayload);
@@ -478,11 +457,10 @@ export default function SkillsReviewPage() {
                   }}
                 >
                   Revise
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
                   data-testid="sr-update-staged"
-                  className={BTN_GHOST_CLASS}
                   disabled={busy !== null}
                   onClick={() => {
                     const payload = parsePayload(revisePayload);
@@ -496,7 +474,7 @@ export default function SkillsReviewPage() {
                   }}
                 >
                   Update-staged
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -508,25 +486,26 @@ export default function SkillsReviewPage() {
                 <p className="settings-row__desc">Instructions are required.</p>
               </div>
               <div className="settings-row__control">
-                <input
+                <Input
                   id="sr-rev-session"
                   data-testid="sr-revision-session"
-                  className={`${INPUT_CLASS} w-24 font-mono`}
+                  label="Revision session"
+                  className="qsk-field font-mono"
                   value={revisionSession}
-                  onChange={(e) => setRevisionSession(e.target.value)}
+                  onChange={setRevisionSession}
                 />
-                <input
+                <Input
                   id="sr-rev-text"
                   data-testid="sr-revision-text"
-                  className={INPUT_CLASS}
+                  label="Revision instructions"
+                  className="qsk-field"
                   placeholder="revision instructions (required)"
                   value={revisionText}
-                  onChange={(e) => setRevisionText(e.target.value)}
+                  onChange={setRevisionText}
                 />
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   data-testid="sr-request-revision"
-                  className={BTN_GHOST_CLASS}
                   disabled={busy !== null || !revisionText.trim()}
                   onClick={() =>
                     void runVerdict(`request-revision ${selectedId}`, () =>
@@ -540,7 +519,7 @@ export default function SkillsReviewPage() {
                   }
                 >
                   Request-revision
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -560,14 +539,13 @@ export default function SkillsReviewPage() {
               <h2 className="settings-section__heading">Events journal</h2>
             </div>
             <div className="settings-section__actions">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 data-testid="sr-events-close"
-                className={BTN_GHOST_CLASS}
                 onClick={() => setEventsOpen(false)}
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
           <div className="settings-group">
@@ -608,17 +586,16 @@ export default function SkillsReviewPage() {
               </label>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="sr-curator-skill"
                 data-testid="sr-curator-skill"
-                className={`${INPUT_CLASS} font-mono`}
+                label="Skill id"
+                className="qsk-field font-mono"
                 value={curatorSkill}
-                onChange={(e) => setCuratorSkill(e.target.value)}
+                onChange={setCuratorSkill}
               />
-              <button
-                type="button"
+              <Button
                 data-testid="sr-curator-pin"
-                className={BTN_CLASS}
                 disabled={busy !== null || !curatorSkill.trim()}
                 onClick={() =>
                   void runVerdict(`curator pin ${curatorSkill.trim()}`, () =>
@@ -627,11 +604,10 @@ export default function SkillsReviewPage() {
                 }
               >
                 Pin
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
                 data-testid="sr-curator-unpin"
-                className={BTN_GHOST_CLASS}
                 disabled={busy !== null || !curatorSkill.trim()}
                 onClick={() =>
                   void runVerdict(`curator unpin ${curatorSkill.trim()}`, () =>
@@ -640,11 +616,10 @@ export default function SkillsReviewPage() {
                 }
               >
                 Unpin
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
                 data-testid="sr-curator-restore"
-                className={BTN_GHOST_CLASS}
                 disabled={busy !== null || !curatorSkill.trim()}
                 onClick={() =>
                   void runVerdict(`curator restore ${curatorSkill.trim()}`, () =>
@@ -653,7 +628,7 @@ export default function SkillsReviewPage() {
                 }
               >
                 Restore
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -690,16 +665,9 @@ export default function SkillsReviewPage() {
                 </p>
               </div>
               <div className="settings-row__control">
-                <button
-                  type="button"
-                  disabled
-                  title={d.reason}
-                  aria-disabled="true"
-                  aria-label={`${d.action} unavailable: ${d.reason}`}
-                  className="btn btn--sm cursor-not-allowed"
-                >
+                <Button disabled title={d.reason} aria-label={`${d.action} unavailable: ${d.reason}`}>
                   Disabled
-                </button>
+                </Button>
               </div>
             </div>
           ))}
