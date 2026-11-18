@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 import { AlertTriangle } from '@/lib/icons'
+import { focusSakuga } from '@/sakuga/ui'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -59,7 +60,7 @@ export function ConfirmDialog({
   secondaryAction
 }: ConfirmDialogProps) {
   const { t } = useI18n()
-  const confirmRef = useRef<HTMLButtonElement>(null)
+  const confirmRef = useRef<HTMLElement>(null)
   const closeTimerRef = useRef<null | number>(null)
   const [status, setStatus] = useState<'done' | 'idle' | 'saving'>('idle')
   const [error, setError] = useState<null | string>(null)
@@ -145,7 +146,7 @@ export function ConfirmDialog({
           // sidebar row) and Enter re-triggers that instead. Radix's default
           // would take the X — confirm is the button Enter maps to.
           event.preventDefault()
-          confirmRef.current?.focus()
+          focusSakuga(confirmRef.current)
         }}
       >
         <DialogHeader>

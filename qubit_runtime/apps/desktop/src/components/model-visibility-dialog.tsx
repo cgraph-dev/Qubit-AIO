@@ -214,6 +214,7 @@ export function ModelVisibilityDialog({
                           )}
                           <Switch
                             checked={visible.has(key)}
+                            label={name}
                             onCheckedChange={() => toggle(provider, family.id)}
                             size="xs"
                           />

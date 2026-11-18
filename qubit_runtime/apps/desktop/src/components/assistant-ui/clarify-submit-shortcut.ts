@@ -17,9 +17,19 @@ export function handleClarifySubmitShortcut(event: KeyboardEvent<HTMLFormElement
   event.preventDefault()
   event.stopPropagation()
 
-  const submit = event.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]')
+  // Sakuga buttons render a host custom element, so the old `button[type=submit]`
+  // selector no longer finds them; the Button primitive marks them instead.
+  const submit = event.currentTarget.querySelector<HTMLElement>(
+    'button[type="submit"], [data-sakuga-submit]'
+  )
 
-  if (submit && !submit.disabled && !event.repeat) {
+  if (!submit || submit.hasAttribute('disabled') || event.repeat) {
+    return
+  }
+
+  if (submit instanceof HTMLButtonElement) {
     event.currentTarget.requestSubmit(submit)
+  } else {
+    event.currentTarget.requestSubmit()
   }
 }

@@ -9,6 +9,7 @@ import { type SessionView, SessionViewProvider } from '@/app/chat/session-view'
 import { hiddenPaneProps } from '@/components/pane-shell/pane-visibility'
 import { $activeTreeGroup, $hoveredTreeGroup } from '@/components/pane-shell/tree/store'
 import { I18nProvider } from '@/i18n'
+import { sakugaInner } from '@/sakuga/ui'
 import { clearClarifyRequest, setClarifyRequest } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
 import { $profiles } from '@/store/profile'
@@ -480,7 +481,10 @@ describe('ClarifyTool keyboard navigation', () => {
     const { respond } = renderLiveClarify()
     const skip = screen.getByRole('button', { name: 'Skip' })
 
-    skip.focus()
+    // The action is a Sakuga host; focus its real inner button and the host
+    // becomes `document.activeElement` (shadow retargeting), which the card
+    // already treats as a focused control.
+    sakugaInner(skip, 'button')?.focus()
 
     expect(fireEvent.keyDown(window, { key: 'Enter' })).toBe(true)
     expect(fireEvent.keyDown(window, { key: 'ArrowDown' })).toBe(true)

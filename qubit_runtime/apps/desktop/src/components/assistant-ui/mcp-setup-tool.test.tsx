@@ -129,7 +129,7 @@ describe('the MCP setup card', () => {
 
     expect(screen.getByText('Set up Linear')).toBeTruthy()
     expect(screen.getByText('Create a Linear API key.')).toBeTruthy()
-    expect(screen.getByLabelText('Team').getAttribute('value')).toBe('workspace')
+    expect(screen.getByRole('textbox', { name: 'Team' }).getAttribute('value')).toBe('workspace')
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(rpc).toHaveBeenCalledTimes(1))
     expect(rpc).toHaveBeenCalledWith('connection.respond', {

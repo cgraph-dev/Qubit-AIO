@@ -298,12 +298,17 @@ function InstallControls(props: InstallControlsProps) {
         {props.plugin ? (
           <label className="flex items-center justify-between gap-3">
             <span className={cn(CAPTION, 'text-foreground')}>{props.m.enableAgent}</span>
-            <Switch checked={props.enable} disabled={!props.agentHalf} onCheckedChange={props.onEnableChange} />
+            <Switch
+              checked={props.enable}
+              disabled={!props.agentHalf}
+              label={props.m.enableAgent}
+              onCheckedChange={props.onEnableChange}
+            />
           </label>
         ) : null}
         <label className="flex items-center justify-between gap-3">
           <span className={cn(CAPTION, 'text-foreground')}>{props.m.forceReinstall}</span>
-          <Switch checked={props.force} onCheckedChange={props.onForceChange} />
+          <Switch checked={props.force} label={props.m.forceReinstall} onCheckedChange={props.onForceChange} />
         </label>
         {props.plugin ? (
           <label className="grid gap-1">
