@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { emitFxAt } from "@/sakuga/ui";
 
 /**
  * The rail's flyout label.
@@ -34,6 +35,12 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
     };
   }, [warmRef]);
 
+  // The rail flyout is a Sakuga bubble now: the same white card, ink border,
+  // lavender shadow and a small pop from the anchor when it opens.
+  useEffect(() => {
+    void emitFxAt("pop", anchor, { scale: 0.45 });
+  }, [anchor]);
+
   const rect = anchor.getBoundingClientRect();
   const sidebar = document.getElementById("app-sidebar")?.getBoundingClientRect();
   const gap = 10;
@@ -62,18 +69,26 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
         "rounded-[var(--qrail-radius,0.4rem)] border",
       )}
       data-placement={placement}
+      data-sakuga-tip="1"
       role="tooltip"
       style={{
         top,
         transform: "translateY(-50%)",
+        background: "var(--sk-card, #fff)",
+        color: "var(--sk-ink, #1d1a4a)",
+        border: "2.5px solid var(--sk-ink, #1d1a4a)",
+        borderRadius: 12,
+        boxShadow: "5px 6px 0 var(--sk-soft, #b8b3ff)",
+        padding: "9px 13px",
+        font: "600 13px/1.35 -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif",
         ...(placement === "right"
           ? { left: railRight + gap }
           : { right: window.innerWidth - railLeft + gap }),
         animation: isWarm ? "none" : undefined,
       }}
     >
-      <span className="qagent-sidebar__tooltip-title">{title}</span>
-      {detail && <span className="qagent-sidebar__tooltip-detail">{detail}</span>}
+      <span className="qagent-sidebar__tooltip-title" style={{ color: "var(--sk-ink, #1d1a4a)" }}>{title}</span>
+      {detail && <span className="qagent-sidebar__tooltip-detail" style={{ color: "var(--sk-dim, #8580b0)", fontWeight: 500 }}>{detail}</span>}
     </div>,
     document.body,
   );

@@ -254,5 +254,8 @@ const api = window.SakugaFX = {
   advance, later, persist, blob, shape, get g() { return g; },
   puff, burst, shards, ring, splash, slash, lines, ticks, donut, wob, kira, sfx, hollow, dotted,
   at, esc, squashy, Base, define,
+  // The office client owns its overlay canvas; expose the same seam Base uses
+  // so an external FxLayer can join the core's frame list.
+  backLayer,
 };
 })();
