@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, HoverTooltip, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
@@ -60,14 +60,16 @@ export default function AgentsPage() {
             Worker lane and runtime adapters for this Qubit runtime.
           </p>
         </div>
-        <Button
-          variant="secondary"
-          onClick={load}
-          disabled={state === "loading"}
-          aria-label="Refresh agents"
-        >
-          {state === "loading" ? <Spinner /> : "refresh"}
-        </Button>
+        <HoverTooltip content="Reload the worker lane and runtime adapters">
+          <Button
+            variant="secondary"
+            onClick={load}
+            disabled={state === "loading"}
+            aria-label="Refresh agents"
+          >
+            {state === "loading" ? <Spinner /> : "refresh"}
+          </Button>
+        </HoverTooltip>
       </div>
 
       {state === "loading" ? (

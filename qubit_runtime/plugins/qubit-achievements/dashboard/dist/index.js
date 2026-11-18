@@ -60,6 +60,96 @@
     return SDK.fetchJSON(url, options);
   }
 
+  // ── Sakuga controls ────────────────────────────────────────────────────
+  // The dashboard loads the vendored Sakuga custom elements scripts, but this
+  // bundle is a plain IIFE with no React source tree, so it injects the
+  // component files once and renders the validated tags through the SDK's one
+  // React runtime. `sakuga-progress.value` is a read-only getter, so React must
+  // never assign the property; the attribute is written from a callback ref.
+  const SAKUGA_BASE = "/sakuga-vfx";
+  const sakugaPromises = {};
+  function ensureSakuga(name) {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return Promise.resolve(false);
+    }
+    if (window.customElements && window.customElements.get("sakuga-" + name)) {
+      return Promise.resolve(true);
+    }
+    if (sakugaPromises[name]) return sakugaPromises[name];
+    const src = SAKUGA_BASE + "/" + name + "/" + name + ".js";
+    // The dashboard loader may already be injecting the same file; reuse that
+    // tag instead of defining the custom element twice.
+    const existing = document.querySelector('script[src="' + src + '"]');
+    sakugaPromises[name] = new Promise(function (resolve) {
+      if (existing) {
+        existing.addEventListener("load", function () { resolve(true); });
+        existing.addEventListener("error", function () { resolve(false); });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = false;
+      script.dataset.sakuga = "1";
+      script.onload = function () { resolve(true); };
+      script.onerror = function () { resolve(false); };
+      document.head.appendChild(script);
+    });
+    return sakugaPromises[name];
+  }
+  // Each component file embeds the shared core, so these two cover the page.
+  ["button", "progress"].forEach(function (name) { void ensureSakuga(name); });
+
+  function SakugaButton(props) {
+    return React.createElement("sakuga-button", {
+      variant: props.variant === "secondary" ? "secondary" : undefined,
+      type: props.type,
+      disabled: props.disabled ? "" : undefined,
+      className: props.className,
+      title: props.title,
+      "aria-label": props["aria-label"],
+      "aria-pressed": props["aria-pressed"],
+      onClick: props.onClick,
+    }, props.children);
+  }
+
+  function SakugaProgress(props) {
+    const ref = React.useRef(null);
+    const value = Math.max(0, Math.min(1, Number(props.value) || 0));
+    React.useEffect(function () {
+      const el = ref.current;
+      if (el) el.setAttribute("value", String(value));
+    }, [value]);
+    return React.createElement("sakuga-progress", {
+      ref: ref,
+      label: props.label,
+      "done-label": props["done-label"],
+      className: props.className,
+    });
+  }
+
+  // Hover/focus/tap tooltip using the dashboard's shared Sakuga bubble classes
+  // (loaded from src/sakuga/sakuga.css on every route).
+  function HoverTip(props) {
+    const [open, setOpen] = React.useState(false);
+    React.useEffect(function () {
+      if (!open) return undefined;
+      function onKey(e) { if (e.key === "Escape") setOpen(false); }
+      window.addEventListener("keydown", onKey);
+      return function () { window.removeEventListener("keydown", onKey); };
+    }, [open]);
+    return React.createElement("span", {
+      className: "qsk-hover-tip",
+      onMouseEnter: function () { setOpen(true); },
+      onMouseLeave: function () { setOpen(false); },
+      onFocus: function () { setOpen(true); },
+      onBlur: function () { setOpen(false); },
+      onClick: function () { setOpen(true); },
+    }, props.children, open ? React.createElement("span", {
+      className: "qsk-hover-tip__bubble",
+      role: "tooltip",
+    }, React.createElement("span", { className: "qsk-hover-tip__text" }, props.content)) : null);
+  }
+
   function AchievementIcon({ icon }) {
     const svg = LUCIDE[icon] || LUCIDE.secret;
     const ref = React.useRef(null);
@@ -354,7 +444,7 @@
       React.createElement("div", { className: "ha-share-dialog", role: "dialog", "aria-label": tx(t, "share.dialog_label", "Share achievement") },
         React.createElement("div", { className: "ha-share-head" },
           React.createElement("strong", null, tx(t, "share.header", "Share: {name}", { name: achievement.name })),
-          React.createElement("button", { className: "ha-share-close", onClick: onClose, "aria-label": tx(t, "share.close", "Close") }, "×")
+          React.createElement(SakugaButton, { variant: "secondary", className: "ha-share-close", onClick: onClose, "aria-label": tx(t, "share.close", "Close") }, "×")
         ),
         React.createElement("div", { className: "ha-share-preview" },
           status === "rendering" && React.createElement("div", { className: "ha-share-placeholder" }, tx(t, "share.rendering", "Rendering…")),
@@ -362,18 +452,20 @@
         ),
         status === "error" && React.createElement("div", { className: "ha-share-error" }, errorMsg || tx(t, "share.error_generic", "Something went wrong.")),
         React.createElement("div", { className: "ha-share-actions" },
-          React.createElement("button", {
+          React.createElement(SakugaButton, {
             className: "ha-share-btn ha-share-btn-primary",
             onClick: shareOnX,
             title: tx(t, "share.x_title", "Opens X with a pre-filled post"),
           }, tx(t, "share.x_button", "Share on X")),
-          React.createElement("button", {
+          React.createElement(SakugaButton, {
+            variant: "secondary",
             className: "ha-share-btn",
             onClick: copyToClipboard,
             disabled: status !== "ready" && status !== "copied",
             title: tx(t, "share.copy_title", "Copy the image to paste into your post"),
           }, status === "copied" ? tx(t, "share.copied", "Copied ✓") : tx(t, "share.copy_button", "Copy image")),
-          React.createElement("button", {
+          React.createElement(SakugaButton, {
+            variant: "secondary",
             className: "ha-share-btn",
             onClick: download,
             disabled: status !== "ready" && status !== "copied",
@@ -525,8 +617,11 @@
           ),
           React.createElement("div", { className: "ha-badges" },
             React.createElement("span", { className: "ha-state-badge" }, stateLabel),
-            React.createElement("span", { className: "ha-tier-badge" }, tierLabel),
-            state === "unlocked" && React.createElement("button", {
+            React.createElement(HoverTip, {
+              content: tx(t, "card.tier_help", "Tiers go Copper → Silver → Gold → Diamond → Olympian. Higher tiers need more of the same behavior."),
+            }, React.createElement("span", { className: "ha-tier-badge" }, tierLabel)),
+            state === "unlocked" && React.createElement(SakugaButton, {
+              variant: "secondary",
               className: "ha-share-trigger",
               onClick: function () { setShareOpen(true); },
               title: tx(t, "card.share_title", "Share this achievement"),
@@ -642,9 +737,11 @@
             React.createElement("p", null, detail)
           )
         ),
-        total > 0 && React.createElement("div", { className: "ha-scan-progress-track", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct },
-          React.createElement("div", { className: "ha-scan-progress-fill", style: { width: pct + "%" } })
-        )
+        total > 0 && React.createElement(SakugaProgress, {
+          label: tx(t, "scan.progress_label", "Scanning session history"),
+          className: "ha-scan-progress",
+          value: pct / 100,
+        })
       );
     }
 
@@ -669,7 +766,7 @@
           React.createElement("h1", null, tx(t, "hero.title", "Qubit Achievements")),
           React.createElement("p", null, tx(t, "hero.subtitle", "Collectible Qubit badges earned from real session history. Known unfinished achievements are shown as Discovered; Secret achievements stay hidden until the first matching behavior appears."))
         ),
-        React.createElement(C.Button, { onClick: load, className: "ha-refresh" }, tx(t, "actions.rescan", "Rescan"))
+        React.createElement(SakugaButton, { onClick: load, className: "ha-refresh" }, tx(t, "actions.rescan", "Rescan"))
       ),
       scanBanner,
       error && React.createElement(C.Card, { className: "ha-error" }, React.createElement(C.CardContent, null, String(error))),
@@ -695,10 +792,22 @@
           // Render the localized "All" pill but keep the underlying value
           // unchanged so the filter logic still compares against "All".
           const pillLabel = cat === "All" ? allCategoryLabel : cat;
-          return React.createElement("button", { key: cat, onClick: function () { setCategory(cat); }, className: cat === category ? "active" : "" }, pillLabel);
+          return React.createElement(SakugaButton, {
+            key: cat,
+            variant: "secondary",
+            className: cn("ha-pill", cat === category && "active"),
+            "aria-pressed": cat === category ? "true" : "false",
+            onClick: function () { setCategory(cat); },
+          }, pillLabel);
         })),
         React.createElement("div", { className: "ha-pills" }, ["all", "unlocked", "discovered", "secret"].map(function (v) {
-          return React.createElement("button", { key: v, onClick: function () { setVisibility(v); }, className: v === visibility ? "active" : "" }, visibilityLabels[v] || v);
+          return React.createElement(SakugaButton, {
+            key: v,
+            variant: "secondary",
+            className: cn("ha-pill", v === visibility && "active"),
+            "aria-pressed": v === visibility ? "true" : "false",
+            onClick: function () { setVisibility(v); },
+          }, visibilityLabels[v] || v);
         }))
       ),
       latest.length > 0 && React.createElement("section", { className: "ha-latest" },

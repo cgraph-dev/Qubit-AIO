@@ -43,7 +43,7 @@ import type { ManagedFileEntry, ManagedFilesResponse } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
 import { isAbortError } from "@/lib/api-error";
 import { PluginSlot } from "@/plugins";
-import { Button, HoverTooltip, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, FileField, HoverTooltip, Input, ListItem, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -272,11 +272,12 @@ export default function FilesPage() {
     }
   };
 
-  const uploadFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
+  const uploadFiles = async (files: FileList | File[] | null) => {
+    const picked = Array.from(files ?? []);
+    if (!picked.length) return;
     setUploading(true);
     try {
-      for (const file of Array.from(files)) {
+      for (const file of picked) {
         const target = joinPath(activePath, file.name);
         await runMutationWithConfirm(
           () => api.uploadFile(target, file, true),
@@ -287,7 +288,7 @@ export default function FilesPage() {
             ),
         );
       }
-      showToast(`${files.length} file${files.length === 1 ? "" : "s"} uploaded`, "success");
+      showToast(`${picked.length} file${picked.length === 1 ? "" : "s"} uploaded`, "success");
       emitFx("success");
       await load();
     } catch (e) {
@@ -390,14 +391,6 @@ export default function FilesPage() {
     <div className="flex min-w-0 max-w-full flex-col gap-4">
       <Toast toast={toast} />
       <PluginSlot name="files:top" />
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(event) => void uploadFiles(event.currentTarget.files)}
-      />
-
       <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         {/* The reference dashboard always exposes an editable path + Go. Qubit
             keeps its approved-root policy in the backend (an outside path
@@ -434,16 +427,22 @@ export default function FilesPage() {
           </Button>
         </form>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!canUpload}
-            className="uppercase"
-            title={!activePath ? (emptyReason ?? "No project folder") : undefined}
+          <HoverTooltip
+            content={!activePath ? (emptyReason ?? "No project folder") : "Upload files into the current folder"}
           >
-            {uploading ? <Spinner /> : <Upload />} Upload
-          </Button>
+            <FileField
+              ref={fileInputRef}
+              label=""
+              buttonLabel="Upload"
+              multiple
+              showList={false}
+              disabled={!canUpload}
+              inputProps={{ "data-testid": "files-upload-input" } as Record<string, unknown>}
+              onFiles={(files) => void uploadFiles(files)}
+            >
+              {uploading ? <Spinner /> : <Upload />} Upload
+            </FileField>
+          </HoverTooltip>
           <Button
             type="button"
             variant="secondary"
@@ -457,38 +456,41 @@ export default function FilesPage() {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => canUpload && fileInputRef.current?.click()}
+      <div
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        disabled={!canUpload}
-        aria-label="Upload files"
-        className={`flex min-h-20 w-full min-w-0 items-center justify-between gap-4 border border-dashed px-4 py-3 text-left transition ${
-          draggingFiles
-            ? "border-primary bg-primary/10 text-foreground"
-            : "border-border bg-background/20 text-text-secondary hover:border-text-tertiary hover:bg-background/35"
-        } disabled:cursor-not-allowed disabled:opacity-60`}
       >
-        <span className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-background/45 text-text-tertiary">
-            {uploading ? <Spinner /> : <Upload className="h-4 w-4" />}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
-              {uploading ? "Uploading" : draggingFiles ? "Release to upload" : "Drop files here"}
+        <ListItem
+          onClick={() => canUpload && fileInputRef.current?.click()}
+          active={false}
+          disabled={!canUpload}
+          aria-label="Upload files"
+          className={`qsk-file-drop flex min-h-20 w-full min-w-0 items-center gap-4 border border-dashed px-4 py-3 text-left transition ${
+            draggingFiles
+              ? "border-primary bg-primary/10 text-foreground"
+              : "border-border bg-background/20 text-text-secondary hover:border-text-tertiary hover:bg-background/35"
+          } disabled:cursor-not-allowed disabled:opacity-60`}
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-background/45 text-text-tertiary">
+              {uploading ? <Spinner /> : <Upload className="h-4 w-4" />}
             </span>
-            <span className="block truncate font-mono text-xs text-text-secondary" title={activePath || emptyReason}>
-              {activePath || emptyReason}
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
+                {uploading ? "Uploading" : draggingFiles ? "Release to upload" : "Drop files here"}
+              </span>
+              <span className="block truncate font-mono text-xs text-text-secondary" title={activePath || emptyReason}>
+                {activePath || emptyReason}
+              </span>
             </span>
           </span>
-        </span>
-        <span className="hidden shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary sm:block">
-          Choose files
-        </span>
-      </button>
+          <span className="hidden shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary sm:block">
+            Choose files
+          </span>
+        </ListItem>
+      </div>
 
       <Card className="min-w-0 max-w-full overflow-hidden">
         <CardContent className="overflow-x-auto p-0">

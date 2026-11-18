@@ -53,14 +53,13 @@ import { Markdown } from "@/components/Markdown";
 import { StructuredReasoning } from "@/components/StructuredReasoning";
 import { shouldRenderStructuredReasoning } from "@/lib/reasoning-markup";
 import { PlatformsCard } from "@/components/PlatformsCard";
-import { ListItem, Button, Input as SakugaInput, Checkbox, HoverTooltip, Pagination, SakugaLoading, showSakugaToast, emitFx } from "@/sakuga/ui";
+import { ListItem, Button, FileField, Input as SakugaInput, NumberField, Checkbox, HoverTooltip, Pagination, SakugaLoading, showSakugaToast, emitFx } from "@/sakuga/ui";
 import { SakugaSegmented } from "@/components/sakuga-segmented";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
-import { Input } from "@nous-research/ui/ui/components/input";
 import {
   Dialog,
   DialogContent,
@@ -1276,7 +1275,7 @@ export default function SessionsPage() {
   }, []);
 
   const handleImportSessions = useCallback(
-    async (files: FileList | null) => {
+    async (files: FileList | File[] | null) => {
       const file = files?.[0];
       if (!file) return;
       setImportingSessions(true);
@@ -1859,13 +1858,7 @@ export default function SessionsPage() {
   return (
     <div className="flex min-w-0 w-full max-w-full flex-col gap-4">
       <PluginSlot name="sessions:top" />
-      <input
-        ref={importInputRef}
-        type="file"
-        accept=".json,.jsonl,application/json,application/x-ndjson"
-        className="hidden"
-        onChange={(event) => void handleImportSessions(event.currentTarget.files)}
-      />
+
 
       <DeleteConfirmDialog
         open={sessionDelete.isOpen}
@@ -1921,25 +1914,22 @@ export default function SessionsPage() {
               than the given number of days. Active sessions are never pruned.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="prune-days"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Older than (days)
-            </label>
-            <Input
-              id="prune-days"
-              type="number"
-              min={0}
-              value={pruneDays}
-              onChange={(e) => setPruneDays(e.target.value)}
-              onKeyDown={(e) => {
+          <NumberField
+            label="Older than (days)"
+            min={0}
+            step={1}
+            value={pruneDays}
+            onChange={(value) => setPruneDays(String(value))}
+            inputProps={{
+              id: "prune-days",
+              onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
                 if (e.key === "Enter") void handlePrune();
-              }}
-              disabled={pruning}
-            />
-          </div>
+              },
+            }}
+            disabled={pruning}
+            className="qsk-field"
+            description="Only archived sessions older than this are removed."
+          />
           <DialogFooter>
             <Button
               variant="secondary"
@@ -2234,19 +2224,21 @@ export default function SessionsPage() {
             )}
 
             {!isSearching && (
-              <Button
-                variant="secondary"
-                className="shrink-0"
+              <FileField
+                ref={importInputRef}
+                label=""
+                buttonLabel="Import exported sessions"
+                accept=".json,.jsonl,application/json,application/x-ndjson"
+                showList={false}
                 disabled={importingSessions}
-                onClick={() => importInputRef.current?.click()}
-                aria-label="Import exported sessions"
-                title="Import exported session JSON or JSONL"
+                inputProps={{ "data-testid": "sessions-import-input" } as Record<string, unknown>}
+                onFiles={(files) => void handleImportSessions(files)}
               >
                 {importingSessions ? <Spinner /> : <Upload />}
                 <span className="font-mondwest normal-case text-xs">
                   Import sessions
                 </span>
-              </Button>
+              </FileField>
             )}
           </div>
 

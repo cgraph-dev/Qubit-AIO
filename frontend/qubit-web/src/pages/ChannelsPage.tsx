@@ -25,7 +25,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { Button, Input, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, HoverTooltip, Input, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import type {
   MessagingPlatform,
@@ -659,20 +659,24 @@ export default function ChannelsPage() {
                         />
                       )}
                     </div>
-                    <Button
-                      variant="secondary"
-                      onClick={() => handleTest(platform)}
-                      disabled={testingId === platform.id}
-                    >
-                      {testingId === platform.id ? <Spinner /> : <PlugZap className="h-4 w-4" />} Test
-                    </Button>
-                    {platform.id !== "telegram" && (
+                    <HoverTooltip content="Probe this channel with its saved credentials; the result updates the card state.">
                       <Button
-                        className="uppercase"
-                        onClick={() => openConfig(platform)}
+                        variant="secondary"
+                        onClick={() => handleTest(platform)}
+                        disabled={testingId === platform.id}
                       >
-                        Configure
+                        {testingId === platform.id ? <Spinner /> : <PlugZap className="h-4 w-4" />} Test
                       </Button>
+                    </HoverTooltip>
+                    {platform.id !== "telegram" && (
+                      <HoverTooltip content="Open this channel's provider settings.">
+                        <Button
+                          className="uppercase"
+                          onClick={() => openConfig(platform)}
+                        >
+                          Configure
+                        </Button>
+                      </HoverTooltip>
                     )}
                   </div>
                 </div>

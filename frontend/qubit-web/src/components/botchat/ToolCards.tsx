@@ -27,6 +27,7 @@ import {
   Search,
 } from "lucide-react";
 
+import { Button } from "@/sakuga/ui";
 import type { BotToolCardKind } from "@/lib/botchat/runtime";
 import type { BotTask, RichCard, ThreadEvent } from "@/lib/ocFamilyBotApi";
 
@@ -310,9 +311,13 @@ export function ArtifactCard({ artifact }: { artifact: RichCard }) {
         </div>
       ) : null}
       {rows.length ? (
-        <button type="button" className="qb-tool-button" onClick={() => setExpanded((v) => !v)}>
+        <Button
+          variant="secondary"
+          className="qb-tool-button"
+          onClick={() => setExpanded((v) => !v)}
+        >
           {expanded ? "Show summary" : "Explore full result"}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

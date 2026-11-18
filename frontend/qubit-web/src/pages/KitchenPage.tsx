@@ -31,7 +31,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { Button, Input, emitFx } from "@/sakuga/ui";
+import { Button, FileField, Input, emitFx } from "@/sakuga/ui";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -342,24 +342,19 @@ export default function KitchenPage() {
               <p className="mt-2 text-sm text-text-secondary">
                 Drop a folder here, or pick one.
               </p>
-              <input
-                ref={dirInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                aria-label="Choose a folder"
-                {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-                onChange={(e) => setFolderFiles(Array.from(e.target.files ?? []))}
-              />
               <div className="mt-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="uppercase"
-                  onClick={() => dirInputRef.current?.click()}
+                <FileField
+                  ref={dirInputRef}
+                  label=""
+                  buttonLabel="Choose a folder"
+                  multiple
+                  directory
+                  showList={false}
+                  inputProps={{ "data-testid": "kitchen-folder-input" } as Record<string, unknown>}
+                  onFiles={setFolderFiles}
                 >
                   <FolderUp className="h-4 w-4" /> Choose folder
-                </Button>
+                </FileField>
               </div>
               {folderFiles.length > 0 && (
                 <p className="kitchen-drop__count" data-testid="kitchen-folder-count">

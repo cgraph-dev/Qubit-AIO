@@ -40,7 +40,7 @@ import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { AutoField } from "@/components/AutoField";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
-import { ListItem, Button, Checkbox, HoverTooltip, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { ListItem, Button, Checkbox, FileField, HoverTooltip, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { useI18n } from "@/i18n";
@@ -409,8 +409,8 @@ export default function ConfigPage() {
   // Import is not just a client-side preview: the parsed tree is staged to
   // the canonical config through the same confirm-gated write as Save, so an
   // "imported" toast always means the backend holds the values.
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImport = (files: File[]) => {
+    const file = files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
@@ -650,22 +650,18 @@ export default function ConfigPage() {
             </Button>
           </HoverTooltip>
           <HoverTooltip content={t.config.importConfig}>
-            <Button
-              variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
-              title={t.config.importConfig}
-              aria-label={t.config.importConfig}
+            <FileField
+              ref={fileInputRef}
+              label=""
+              buttonLabel={t.config.importConfig}
+              accept=".json"
+              showList={false}
+              inputProps={{ "data-testid": "config-import-input" } as Record<string, unknown>}
+              onFiles={handleImport}
             >
               <Upload />
-            </Button>
+            </FileField>
           </HoverTooltip>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={handleImport}
-          />
           {(() => {
             const resetScopeLabel = isSearching
               ? t.config.searchResults

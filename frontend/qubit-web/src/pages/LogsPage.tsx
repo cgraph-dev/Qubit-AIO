@@ -37,7 +37,7 @@ import { SakugaSegmented } from "@/components/sakuga-segmented";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Button, Input, Toggle } from "@/sakuga/ui";
+import { Button, Input, ListItem, Toggle } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -428,15 +428,14 @@ export default function LogsPage() {
               const expanded = detailIndex === i;
               return (
                 <div key={i}>
-                  <button
-                    type="button"
+                  <ListItem
                     onClick={() => setDetailIndex(expanded ? null : i)}
                     aria-expanded={expanded}
                     aria-label={`Log line ${offset + i + 1} detail`}
-                    className={`${LINE_COLORS[cls]} block w-full cursor-pointer text-left hover:bg-secondary/20 px-1 -mx-1`}
+                    className={`qsk-log-line ${LINE_COLORS[cls]} block w-full cursor-pointer text-left hover:bg-secondary/20`}
                   >
                     {rebrand(line)}
-                  </button>
+                  </ListItem>
                   {expanded && (
                     <div className="my-1 border-l-2 border-secondary bg-secondary/20 px-3 py-2">
                       <div className="mb-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] uppercase text-text-tertiary">

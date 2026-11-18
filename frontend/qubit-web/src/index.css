@@ -558,3 +558,26 @@ textarea:focus {
    pass" used to sit here with a hardcoded blue glow and a hover translate
    that fought the rail's own geometry — it is gone on purpose: two sheets
    styling the same row is how the rail ended up theme-blind and jittery. */
+
+/* Sakuga ListItem used as a dense log-line disclosure. The shared
+ * `.qsk-list-item` flat row keeps the list layout; log output needs the old
+ * zero-padding density, so only that is restated here. */
+.qsk-log-line::part(button) {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Files drop surface: a ListItem keeps the giant dashed target, so only the
+ * inner button layout is restored to the surface's space-between row. */
+.qsk-file-drop::part(button) {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
