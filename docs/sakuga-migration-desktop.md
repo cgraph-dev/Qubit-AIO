@@ -69,7 +69,10 @@ not drag events, so moving the handlers onto it would silently disable drops.
 Mirrored from the web layer. `src/sakuga/sakuga.css` carries the same compact
 `::part()` chrome (button 5px 12px / 13px; input 7px 12px / 14px; compact tabs
 and progress chip; toggle gallery top margin removed) so desktop rows match the
-dashboard. `@qubit/shared/sakuga` also gains `SakugaLoading` (progress + label);
-it is exported here but the desktop surfaces have not been swept onto it yet.
-The shared wrapper fix (idempotent attribute writes, read-only progress value)
-is synced into `qubit_runtime/apps/shared` by `scripts/sync_sakuga_shared.py`.
+dashboard. `SakugaLoading` is now used for the boot/connecting overlay
+(`components/gateway-connecting-overlay.tsx`, determinate from
+`boot.progress`), every page loader (`components/page-loader.tsx`), and the
+indeterminate phase of the update overlay (`app/updates-overlay.tsx`).
+Real-outcome cues fire on gateway connect/failure and update done/error. The
+shared wrapper fix (idempotent attribute writes, read-only progress value) is
+synced into `qubit_runtime/apps/shared` by `scripts/sync_sakuga_shared.py`.

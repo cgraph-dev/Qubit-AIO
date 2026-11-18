@@ -17,7 +17,7 @@
  * React and hooks arrive as arguments, exactly as the rest of the plugin does
  * it, so the host keeps one React runtime.
  */
-import { sakugaButton } from "./sakuga";
+import { sakugaButton, sakugaLoading } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type OutsideChunk, type OutsideEnvironmentEvent, type OutsideFloorLink,
@@ -199,6 +199,15 @@ export function createOutsideWorld(R: ReactArg, hooks: HooksArg) {
           key: "label", className: "outside-world__stateLabel",
         }, label),
         statusLine(),
+        view.status === "loading"
+          ? sakugaLoading(R, {
+              key: "progress",
+              className: "outside-world__loading",
+              label,
+              showLabel: false,
+              value: 0.12,
+            })
+          : null,
         view.code
           ? R.createElement("p", {
               key: "code", className: "outside-world__code",

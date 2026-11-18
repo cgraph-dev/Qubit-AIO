@@ -8,7 +8,7 @@
  * The directory tab renders the shipped TEMPLATES (145 roles, 5 floors) and
  * never dresses a template as a staffed agent.
  */
-import { sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type BusinessDirectory, type BusinessOverview,
@@ -237,8 +237,10 @@ export function createWarRoomPanel(
             tenant_id: tenantId,
           }, opts));
         }
+        officeFx(label === "Decision" ? "approval" : "success");
         setNotice(`${label} recorded.`);
       } catch (exc) {
+        officeFx("error");
         const { message, code } = errText(exc);
         setError(code ? `${code}: ${message}` : message);
       } finally {

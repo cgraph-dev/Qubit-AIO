@@ -1,9 +1,9 @@
 import { useStore } from '@nanostores/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { BrandMark } from '@/components/brand-mark'
 import { SyncStatusCard } from '@/components/sync-status-card'
-import { Button } from '@/sakuga/ui'
+import { Button, SakugaLoading, emitFx } from '@/sakuga/ui'
 import { CopyButton, writeClipboardText } from '@/components/ui/copy-button'
 import {
   Dialog,
@@ -73,6 +73,16 @@ export function UpdatesOverlay() {
   const apply = isBackend ? backendApply : clientApply
   const check = isBackend ? checkBackendUpdates : checkUpdates
   const install = isBackend ? applyBackendUpdate : applyUpdates
+
+  // A real update outcome gets one cue. `idle`/`prepare` never fire, so
+  // opening the overlay is silent.
+  const applyCueRef = useRef('')
+  useEffect(() => {
+    if (apply.stage === applyCueRef.current) return
+    applyCueRef.current = apply.stage
+    if (apply.stage === 'done') void emitFx('success')
+    else if (apply.stage === 'error') void emitFx('error')
+  }, [apply.stage])
 
   useEffect(() => {
     if (open && !status && !checking) {
@@ -509,12 +519,11 @@ function ApplyingView({
         ) : null}
       </div>
 
-      <Progress
-        aria-label={label}
-        indeterminate={percent === null}
-        size="lg"
-        value={percent === null ? 0 : percent / 100}
-      />
+      {percent === null ? (
+        <SakugaLoading className="qsk-update-loader" label={label} />
+      ) : (
+        <Progress aria-label={label} size="lg" value={percent / 100} />
+      )}
 
       {recentLog.length > 1 ? (
         <div className="max-h-24 overflow-hidden rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-left font-mono text-[11px] leading-4 text-muted-foreground">

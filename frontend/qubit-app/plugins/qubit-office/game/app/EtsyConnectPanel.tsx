@@ -17,7 +17,7 @@
  *
  * React comes from the HOST: ``R.createElement``, never an import.
  */
-import { sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   EtsyApiError,
@@ -116,6 +116,7 @@ export function createEtsyConnectPanel(
         base: props.base,
         fetchImpl: props.fetchImpl,
       }).then((next) => {
+        officeFx("impact");
         setStarted(next);
         setStateInput(next.state);
         openAuthorization(next.url);
@@ -124,6 +125,7 @@ export function createEtsyConnectPanel(
           + "redirect URL (or its code) below.",
         );
       }).catch((exc) => {
+        officeFx("error");
         setFailure(failureOf(exc));
       }).finally(() => {
         setBusy(null);
@@ -161,11 +163,13 @@ export function createEtsyConnectPanel(
       }).then((status) => {
         applyStatus(status);
         if (isConnected(status)) {
+          officeFx("success");
           setNotice("Etsy is connected.");
           setCodeInput("");
           setStarted(null);
         }
       }).catch((exc) => {
+        officeFx("error");
         setFailure(failureOf(exc));
       }).finally(() => {
         setBusy(null);
@@ -181,11 +185,13 @@ export function createEtsyConnectPanel(
         base: props.base,
         fetchImpl: props.fetchImpl,
       }).then((status) => {
+        officeFx("warning");
         applyStatus(status);
         setStarted(null);
         setCodeInput("");
         setStateInput("");
       }).catch((exc) => {
+        officeFx("error");
         setFailure(failureOf(exc));
       }).finally(() => {
         setBusy(null);

@@ -98,3 +98,88 @@ sakuga-toggle {
   text-transform: uppercase;
   color: var(--sk-dim, #8580b0);
 }
+
+/* Page-level loading: the same compact bar as the rest of the renderer. */
+.qsk-page-loader {
+  --sk-progress-width: min(20rem, 60vw);
+  width: min(20rem, 60vw);
+}
+
+.qsk-page-loader sakuga-progress::part(progress) {
+  padding-top: 0;
+}
+
+.qsk-page-loader sakuga-progress::part(bar) {
+  height: 16px;
+  border-width: 3px;
+  border-radius: 9px;
+}
+
+.qsk-page-loader sakuga-progress::part(label) {
+  margin: 4px auto 0;
+  padding: 1px 8px 2px;
+  font-size: 12px;
+}
+
+/* Boot/connecting overlay: a compact bar under the CONNECTING wordmark. */
+.qsk-connect-loader {
+  --sk-progress-width: min(18rem, 56vw);
+  width: min(18rem, 56vw);
+}
+
+.qsk-connect-loader sakuga-progress::part(progress) {
+  padding-top: 0;
+}
+
+.qsk-connect-loader sakuga-progress::part(bar) {
+  height: 14px;
+  border-width: 3px;
+  border-radius: 9px;
+}
+
+.qsk-connect-loader sakuga-progress::part(label) {
+  margin: 4px auto 0;
+  padding: 1px 8px 2px;
+  font-size: 11px;
+}
+
+/* Update overlay: the indeterminate phase uses the same compact bar. */
+.qsk-update-loader {
+  --sk-progress-width: 100%;
+  width: 100%;
+}
+
+.qsk-update-loader sakuga-progress::part(progress) {
+  padding-top: 0;
+}
+
+.qsk-update-loader sakuga-progress::part(bar) {
+  height: 16px;
+  border-width: 3px;
+  border-radius: 9px;
+}
+
+.qsk-update-loader sakuga-progress::part(label) {
+  margin: 4px auto 0;
+  padding: 1px 8px 2px;
+  font-size: 12px;
+}
+
+/* The upstream meter reserves 70px of gallery air above the bar and 64px
+ * below the label. The renderer's rows are dense, so narrow both (the cloud,
+ * ground and check are drawn on the effects layer and stay 1:1). */
+sakuga-progress::part(progress) {
+  padding-top: 0;
+}
+
+sakuga-progress::part(bar) {
+  height: 18px;
+  border-width: 3px;
+  border-radius: 9px;
+}
+
+sakuga-progress::part(label) {
+  margin: 6px auto 0;
+  padding: 1px 9px 2px;
+  font-size: 14px;
+}

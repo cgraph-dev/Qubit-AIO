@@ -11,7 +11,7 @@
  *
  * React and hooks come from the HOST, exactly like the other office panels.
  */
-import { sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton } from "./sakuga";
 import {
   type BuilderRoom,
   type BuilderState,
@@ -164,12 +164,15 @@ export function createRoomBuilder(
         .then(({ state: next, result }) => {
           setState(next);
           if (result.kind === "published") {
+            officeFx("success");
             setPublish({ kind: "published", version: result.version });
           } else {
+            officeFx("error");
             setPublish({ kind: "error", problems: result.problems });
           }
         })
         .catch((err: unknown) => {
+          officeFx("error");
           setPublish({ kind: "error", problems: [messageOf(err)] });
         });
     };
@@ -177,6 +180,7 @@ export function createRoomBuilder(
     const onRollbackClick = () => {
       if (state.published_version === null) return;
       const version = state.published_version;
+      officeFx("warning");
       edit((current) => rollbackState(current, version));
       props.onRollback?.(version);
     };

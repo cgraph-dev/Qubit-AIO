@@ -3100,3 +3100,75 @@
   border-radius: 10px;
   box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
 }
+
+/* The upstream elements are inline-block; keep them in the shell's rows. */
+.office-game sakuga-button,
+.office-game sakuga-input,
+.office-game sakuga-progress {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Compact native inputs/selects stay native only where the shadow control
+ * cannot preserve the widget semantics (composite filter/select and the
+ * controlled search fields). Size them to the same row height as the shell
+ * buttons so a panel never grows a 36px field beside a 24px action. */
+.office-game input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.office-game select,
+.office-game textarea {
+  font-size: 13px;
+  padding: 5px 8px;
+  line-height: 1.35;
+}
+
+/* Compact Sakuga progress. The bar/cloud drawing is upstream; only the box
+ * is narrowed so a dock can host it without a 134px meter. */
+.office-game sakuga-progress {
+  --sk-progress-width: min(22rem, 100%);
+  width: min(22rem, 100%);
+  max-width: 100%;
+}
+
+.office-game sakuga-progress::part(progress) {
+  padding-top: 0;
+}
+
+.office-game sakuga-progress::part(bar) {
+  height: 16px;
+  border-width: 3px;
+  border-radius: 9px;
+}
+
+.office-game sakuga-progress::part(label) {
+  margin: 4px auto 0;
+  padding: 1px 8px 2px;
+  font-size: 12px;
+}
+
+.office-game .qsk-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: min(22rem, 100%);
+}
+
+.office-game .qsk-loading__label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--office-muted, #8b97ad);
+}
+
+/* The connection banner is a single line; a full meter below it is enough. */
+.office-game__connection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.office-game__connectionProgress {
+  --sk-progress-width: min(18rem, 60vw);
+  width: min(18rem, 60vw);
+}

@@ -11,6 +11,7 @@ import json
 
 from voicebridge import office_stream as S
 from voicebridge.office import fx as FX
+from voicebridge.office.fx import EVENT_RULES
 
 
 def tower(activity=None):
@@ -113,3 +114,56 @@ def test_fx_carries_the_towers_real_room_for_the_room_centre_fallback():
     snap = S.to_snapshot(t, 1, 0.0)
     assert snap["fx"][0]["room"] == "f2r3"
     assert snap["fx"][0]["agent"] == "7"
+
+
+def test_business_os_events_are_projected_beside_the_office_feed():
+    # A committed BOS task event is presentation input, never new business truth.
+    snap = S.to_snapshot(
+        tower([]), 1, 1_700_000_000.0,
+        business_events=[{
+            "event_id": "evt_task_created",
+            "type": "task.created",
+            "payload": {"agent_id": "7", "room_id": "f2r3"},
+            "occurred_at": "2026-11-18T10:00:00Z",
+        }],
+    )
+    assert [e["event_type"] for e in snap["fx"]] == ["task.created"]
+    assert snap["fx"][0]["animation"] == "walk-to-desk"
+    assert snap["fx"][0]["agent"] == "7"
+    assert snap["fx"][0]["room"] == "f2r3"
+
+
+def test_business_events_are_ordered_with_the_office_feed_and_bounded():
+    office = [{"id": 2, "kind": "run_settled", "agent_id": 7, "ts": 100.0}]
+    business = [
+        {"event_id": "b3", "type": "artifact.created", "payload": {},
+         "occurred_at": "1970-01-01T00:02:00Z"},
+        {"event_id": "b2", "type": "task.claimed", "payload": {},
+         "occurred_at": "1970-01-01T00:01:00Z"},
+    ]
+    snap = S.to_snapshot(tower(office), 1, 0.0, business_events=business)
+    assert [e["event_type"] for e in snap["fx"]] == [
+        "task.claimed", "office.run_settled", "artifact.created"]
+
+
+def test_unknown_business_event_is_a_no_op():
+    snap = S.to_snapshot(
+        tower([]), 1, 0.0,
+        business_events=[{
+            "event_id": "evt_unknown", "type": "not.a.rule", "payload": {},
+        }],
+    )
+    assert snap["fx"] == []
+
+
+def test_office_fx_aliases_keep_one_rule_table():
+    assert FX.OFFICE_EVENT_RULES["task_created"] == EVENT_RULES["task.created"]
+    assert FX.OFFICE_EVENT_RULES["finance_posting"] == EVENT_RULES["finance.posting.posted"]
+
+
+def test_business_fx_events_reads_nothing_without_a_store(tmp_path):
+    class Cfg:
+        state_dir = lambda self: str(tmp_path)  # noqa: E731
+
+    assert S.business_fx_events(Cfg()) == []
+    assert not (tmp_path / "business" / "business.db").exists()

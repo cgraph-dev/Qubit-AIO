@@ -24,7 +24,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
-import { sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   ApprovalApiError,
@@ -199,6 +199,7 @@ export function createApprovalsPanel(
         if (!live) return;
         setState(next);
         if (next.kind === "ready") props.onCountChange?.(next.items.length);
+        if (next.kind === "error") officeFx("error");
       });
       return () => {
         live = false;
@@ -215,10 +216,12 @@ export function createApprovalsPanel(
         base: props.base,
         fetchImpl: props.fetchImpl,
       }).then(() => {
+        officeFx(decision === "approve" ? "success" : "warning");
         setNotice(decision === "approve"
           ? `Approved ${approvalTool(item)}.`
           : `Rejected ${approvalTool(item)}.`);
       }).catch((exc) => {
+        officeFx("error");
         setFailure(actionError(exc));
       }).finally(() => {
         setBusyId(null);

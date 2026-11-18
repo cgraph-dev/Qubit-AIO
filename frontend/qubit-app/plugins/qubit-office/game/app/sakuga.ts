@@ -78,6 +78,98 @@ export function sakugaButton(
   return R.createElement("sakuga-button", next, ...children);
 }
 
+/** Clamp a value into the upstream progress bar's 0..1 range. */
+function progressValue(value: unknown, fallback: number): number {
+  const numeric = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+/**
+ * A `sakuga-progress` host with the caller's attributes preserved.
+ *
+ * The inner bar is the vendored shadow control. `value` is 0..1; callers that
+ * have no completion number pass a small, honest starting value (the bar is a
+ * status surface, not a fabricated percentage). `aria-valuenow` is only
+ * mirrored when the caller supplies a real value.
+ */
+export function sakugaProgress(
+  R: OfficeReact,
+  props: Record<string, unknown> | null,
+): unknown {
+  configureOfficeSakuga();
+  try {
+    void loadSakugaComponent("progress").catch(() => {
+      // A failed component leaves the rest of the shell usable.
+    });
+  } catch {
+    // No DOM (unit harness): the recorded element still carries every prop.
+  }
+  const next: Record<string, unknown> = { ...(props ?? {}) };
+  const explicitNow = typeof next["aria-valuenow"] === "number"
+    && Number.isFinite(next["aria-valuenow"]);
+  const indeterminate = next.indeterminate === true;
+  delete next.indeterminate;
+  const controlled = !indeterminate
+    && ((typeof next.value === "number" && Number.isFinite(next.value))
+      || explicitNow);
+  const value = progressValue(next.value, explicitNow
+    ? Number(next["aria-valuenow"]) / 100 : 0);
+  delete next.value;
+  if (!next.role) next.role = "progressbar";
+  const label = typeof next.label === "string" && next.label.trim()
+    ? next.label : "Loading";
+  const attrs: Record<string, unknown> = {
+    ...next,
+    label,
+    value,
+    "aria-valuemin": 0,
+    "aria-valuemax": 100,
+  };
+  if (controlled) attrs["aria-valuenow"] = Math.round(value * 100);
+  else delete attrs["aria-valuenow"];
+  return R.createElement("sakuga-progress", attrs);
+}
+
+/**
+ * A label + progress pair, built from the same upstream bar. Used for long
+ * office loads; it never invents a number when the caller has none.
+ */
+export function sakugaLoading(
+  R: OfficeReact,
+  props: Record<string, unknown> | null,
+  ...children: unknown[]
+): unknown {
+  const {
+    label = "Loading\u2026",
+    showLabel = true,
+    className,
+    style,
+    id,
+    "data-testid": testId,
+    value,
+    doneLabel,
+    ...rest
+  } = (props ?? {}) as Record<string, unknown>;
+  const classes = ["qsk-loading", className].filter(Boolean).join(" ");
+  return R.createElement("div", {
+    id,
+    className: classes,
+    style,
+    role: "status",
+    "aria-live": "polite",
+    "aria-label": label,
+    "data-testid": testId,
+  },
+  showLabel ? R.createElement("div", { className: "qsk-loading__label" }, label) : null,
+  sakugaProgress(R, {
+    label,
+    value: progressValue(value, 0.08),
+    ...(typeof doneLabel === "string" ? { "done-label": doneLabel } : {}),
+    ...rest,
+  }),
+  ...children);
+}
+
 /** Fire one named cue in the dashboard document (the office shell). */
 export function officeFx(cue: FxCue | null, options: FxOptions = {}): void {
   if (!cue) return;

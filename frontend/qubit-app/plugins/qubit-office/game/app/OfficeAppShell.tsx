@@ -45,7 +45,7 @@ import {
 import { createOfficeLoadingScreen } from "../loading/OfficeLoadingScreen";
 import type { OfficeLoadingConfigInput } from "../loading/config";
 import {
-  officeFx, sakugaButton,
+  officeFx, sakugaButton, sakugaLoading, sakugaProgress,
 } from "./sakuga";
 import {
   captureFocus,
@@ -437,11 +437,13 @@ export function createOfficeApp(
           setCampusDirectory(directory);
           setCampusWorld(world);
           setCampusState("ready");
+          officeFx("success");
         })
         .catch((exc) => {
           if (!live) return;
           setCampusState("error");
           setCampusError(exc instanceof Error ? exc.message : String(exc));
+          officeFx("error");
         });
       return () => { live = false; ctl?.abort(); };
     }, [campusOpen, campusTab, props.base, props.fetchImpl]);
@@ -838,6 +840,16 @@ export function createOfficeApp(
         role: state === "error" ? "alert" : "status",
         "aria-live": state === "connecting" ? "polite" : "assertive",
       }, connectionText(props)));
+      if (state === "connecting") {
+        children.push(sakugaProgress(R, {
+          key: "connection-progress",
+          className: "office-game__connectionProgress",
+          "data-testid": "office-app-connection-progress",
+          label: "Connecting to the office backend",
+          value: 0.08,
+          indeterminate: true,
+        }));
+      }
     }
 
     // Keep binding diagnostics available to assistive technology, but do not
@@ -1242,7 +1254,10 @@ export function createOfficeApp(
           className: "office-game__btn office-game__studioTab",
           "data-testid": `office-studio-tab-${id}`,
           "aria-pressed": studioTab === id,
-          onClick: () => setStudioTab(id),
+          onClick: () => {
+            if (studioTab !== id) officeFx("tick");
+            setStudioTab(id);
+          },
         }, label);
       const body = studioTab === "rooms"
         ? R.createElement(RoomBuilder as never, { key: "rooms" })
@@ -1300,7 +1315,10 @@ export function createOfficeApp(
         sakugaButton(R, {
           key: "all", type: "button", className: "office-game__btn",
           "data-testid": "office-floor-scope-clear",
-          onClick: () => setFloorScope(""),
+          onClick: () => {
+            officeFx("pop");
+            setFloorScope("");
+          },
         }, "All floors"),
       ]));
     }
@@ -1309,8 +1327,17 @@ export function createOfficeApp(
       const directoryBody = campusState === "loading"
         ? R.createElement("div", {
             key: "loading", className: "office-game__campusState",
-            "data-testid": "office-campus-loading", role: "status",
-          }, "Loading the 5-floor directory…")
+            "data-testid": "office-campus-loading",
+          }, [
+            R.createElement("span", { key: "text" }, "Loading the 5-floor directory…"),
+            sakugaLoading(R, {
+              key: "progress",
+              className: "office-game__campusLoading",
+              label: "Loading the 5-floor directory",
+              showLabel: false,
+              value: 0.12,
+            }),
+          ])
         : campusState === "error"
         ? R.createElement("div", {
             key: "error", className: "office-game__campusState",
@@ -1377,6 +1404,7 @@ export function createOfficeApp(
               fetchImpl: props.fetchImpl,
               templates: campusDirectory?.floors,
               onOpenFloor: (floor: { scope: string }) => {
+                officeFx("pop");
                 setFloorScope(floor.scope);
                 setCampusOpen(false);
               },

@@ -206,27 +206,37 @@
   animation: office-loading-spin 0.9s linear infinite;
 }
 
+/* Sakuga progress: the vendored bar owns the drawing; this only sizes the
+ * compact chrome so the loading screen does not grow a 134px-tall meter. */
 .office-loading__progress {
-  position: relative;
   width: min(28rem, 82%);
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(232, 237, 246, 0.14);
+  --sk-progress-width: 100%;
 }
 
-.office-loading__bar {
-  display: block;
-  height: 100%;
-  min-width: 2px;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(125, 211, 200, 0.95), rgba(224, 143, 176, 0.95));
-  transition: width 220ms ease;
+.office-loading__progress::part(progress) {
+  padding-top: 0;
 }
 
-.office-loading__progress.is-indeterminate .office-loading__bar {
-  width: 38%;
-  animation: office-loading-slide 1.5s ease-in-out infinite;
+.office-loading__progress::part(bar) {
+  height: 14px;
+  border-width: 3px;
+  border-radius: 10px;
+}
+
+.office-loading__progress::part(label) {
+  margin: 4px auto 0;
+  padding: 1px 8px 2px;
+  font-size: 12px;
+}
+
+.office-loading__button::part(button) {
+  min-height: 0;
+  padding: 6px 16px;
+  font-size: 13px;
+  line-height: 1.2;
+  border-width: 2.5px;
+  border-radius: 10px;
+  box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
 }
 
 .office-loading__weather {
@@ -310,15 +320,13 @@
 /* Both the OS preference and the owner/setting override zero the motion. The
  * weather canvas still draws ONE still frame (see effect-surface.ts). */
 @media (prefers-reduced-motion: reduce) {
-  .office-loading,
-  .office-loading__progress .office-loading__bar {
+  .office-loading {
     transition: none;
   }
   .office-loading__mark,
   .office-loading__mark::before,
   .office-loading__mark::after,
-  .office-loading__spinner,
-  .office-loading__progress.is-indeterminate .office-loading__bar {
+  .office-loading__spinner {
     animation: none;
   }
 }
@@ -326,8 +334,7 @@
 .office-loading[data-reduced-motion="1"] .office-loading__mark,
 .office-loading[data-reduced-motion="1"] .office-loading__mark::before,
 .office-loading[data-reduced-motion="1"] .office-loading__mark::after,
-.office-loading[data-reduced-motion="1"] .office-loading__spinner,
-.office-loading[data-reduced-motion="1"] .office-loading__progress.is-indeterminate .office-loading__bar {
+.office-loading[data-reduced-motion="1"] .office-loading__spinner {
   animation: none;
 }
 

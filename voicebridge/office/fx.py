@@ -348,6 +348,21 @@ OFFICE_EVENT_RULES: Dict[str, FXRules] = {
     "ledger_write": EVENT_RULES["finance.posting.posted"],
     "escalation": EVENT_RULES["approval.requested"],
     "meeting": _r("talk", "talk-still", emote="meeting"),
+    # Task/artifact/receipt/campaign rows are written by the durable work,
+    # artifact and receipt paths. These aliases keep the presentation language
+    # one table: if the kind is absent from the log there is no effect, and if
+    # it is present the same deterministic rule applies.
+    "task_created": EVENT_RULES["task.created"],
+    "task_claimed": EVENT_RULES["task.claimed"],
+    "task_transitioned": EVENT_RULES["task.transitioned"],
+    "task_handoff": EVENT_RULES["task.handoff"],
+    "artifact_created": EVENT_RULES["artifact.created"],
+    "receipt_recorded": EVENT_RULES["receipt.recorded"],
+    "finance_posting": EVENT_RULES["finance.posting.posted"],
+    "marketing_published": EVENT_RULES["marketing.published"],
+    "crm_ticket": EVENT_RULES["crm.support.ticket_opened"],
+    "crm_message": EVENT_RULES["crm.support.message"],
+    "memory_forgotten": EVENT_RULES["memory.forgotten"],
 }
 
 

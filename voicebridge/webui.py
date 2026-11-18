@@ -2901,8 +2901,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     continue
 
                 revision += 1
-                for frame in OS.stream_frames(tower, revision, start,
-                                              fx_mode=fx_mode):
+                for frame in OS.stream_frames(
+                        tower, revision, start, fx_mode=fx_mode,
+                        business_events=OS.business_fx_events(cfg)):
                     write_frame(frame)
                 # Every frame comes from office_stream's explicit client schema.
                 # The raw tower report and its internal field names stay server-side.
@@ -2938,8 +2939,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                      if scope.startswith("floor-") else None)
             if tower is None:
                 tower = OS.scope_tower(TWR.state(cfg), scope)
-            snap = OS.to_snapshot(tower, 1, time.time(),
-                                  fx_mode=OS.fx_mode_for(cfg))
+            snap = OS.to_snapshot(
+                tower, 1, time.time(), fx_mode=OS.fx_mode_for(cfg),
+                business_events=OS.business_fx_events(cfg))
         except Exception as exc:  # noqa: BLE001 - a read must not 500
             self._json({"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
                         "detail": f"the office store could not be read: "
