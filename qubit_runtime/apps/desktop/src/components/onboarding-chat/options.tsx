@@ -1,4 +1,5 @@
 import { selectableClass } from '@/components/onboarding-chat/chip'
+import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { IS_MAC } from '@/lib/keybinds/combo'
@@ -101,7 +102,7 @@ export function AccentSwatch({
           />
         </label>
       ) : (
-        <button
+        <Button
           aria-label={name}
           aria-pressed={active}
           className={className}
@@ -207,7 +208,7 @@ export function LayoutPreviewCard({
   tree: MiniNode
 }) {
   return (
-    <button aria-pressed={active} className="group flex flex-col items-center gap-2" onClick={onSelect} type="button">
+    <Button aria-pressed={active} className="group flex flex-col items-center gap-2" onClick={onSelect} type="button">
       <span className={cn('flex aspect-[10/7] w-full flex-col gap-1.5 rounded-[8px] p-2', selectableClass(active))}>
         <MiniWindowButtons />
         <span className="flex min-h-0 flex-1">
@@ -218,6 +219,6 @@ export function LayoutPreviewCard({
         <span className={cn('text-xs', active ? 'text-foreground' : 'text-muted-foreground')}>{name}</span>
         {description && <span className="text-[0.68rem] text-muted-foreground/70">{description}</span>}
       </span>
-    </button>
+    </Button>
   )
 }

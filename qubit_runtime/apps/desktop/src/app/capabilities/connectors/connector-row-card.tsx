@@ -1,7 +1,6 @@
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { ConnectorLogo } from '@/components/ui/connector-logo'
-import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
 import type { Translations } from '@/i18n/types'
 import { connectorIconUrl } from '@/lib/connector-tools'
@@ -97,14 +96,14 @@ export function ConnectorRowCard({
 
       <div className="grid min-w-0 flex-1 gap-0.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <button
+          <Button variant="secondary"
             className="min-w-0 truncate text-[0.8125rem] font-semibold text-(--ui-text-primary) outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:ring-[0.1875rem] focus-visible:after:ring-ring/50"
             onClick={onOpen}
             type="button"
           >
             {card.name}
             <span className="sr-only">{` — ${copy.open(card.name)}`}</span>
-          </button>
+          </Button>
 
           <span className="shrink-0 text-[0.6875rem] text-(--ui-text-tertiary)">{connectorKindWord(card, copy)}</span>
 
@@ -162,11 +161,11 @@ function CardLane({
       </span>
 
       {server?.installed === true && onServerToggle ? (
-        <Switch
+        <Toggle
           aria-label={server.serverEnabled ? copy.turnServerOff(card.name) : copy.turnServerOn(card.name)}
           checked={server.serverEnabled ?? false}
-          onCheckedChange={onServerToggle}
-          size="xs"
+          onChange={onServerToggle}
+          label={server.serverEnabled ? copy.turnServerOff(card.name) : copy.turnServerOn(card.name)}
         />
       ) : null}
 

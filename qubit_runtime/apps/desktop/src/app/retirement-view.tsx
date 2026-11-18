@@ -1,6 +1,6 @@
 import { type ReactElement } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import type { DesktopUpdateStatus } from '@/global'
 import { useI18n } from '@/i18n'

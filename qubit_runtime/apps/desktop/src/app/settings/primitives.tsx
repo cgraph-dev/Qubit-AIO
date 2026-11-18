@@ -2,12 +2,12 @@ import type { ComponentProps, ReactNode } from 'react'
 import { createContext, useContext } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
 import { triggerHaptic } from '@/lib/haptics'
 import type { IconComponent } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { Toggle as SakugaToggle } from '@/sakuga/ui'
 
 import { PAGE_INSET_X } from '../layout-constants'
 
@@ -201,8 +201,8 @@ export function ListRow({
   )
 }
 
-// The one boolean row: every on/off setting is a Switch in a ListRow (haptic
-// baked in). Never a two-option SegmentedControl — that is for choices.
+// The one boolean row: every on/off setting is a Sakuga toggle in a ListRow
+// (haptic baked in). Never a two-option SegmentedControl — that is for choices.
 export function ToggleRow({
   checked,
   below,
@@ -229,11 +229,12 @@ export function ToggleRow({
   return (
     <ListRow
       action={
-        <Switch
+        <SakugaToggle
           aria-label={label}
           checked={checked}
           disabled={disabled}
-          onCheckedChange={on => {
+          label={label}
+          onChange={on => {
             triggerHaptic('selection')
             onChange(on)
           }}

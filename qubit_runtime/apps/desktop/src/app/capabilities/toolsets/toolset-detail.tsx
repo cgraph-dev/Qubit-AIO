@@ -1,7 +1,7 @@
 import { compactNumber } from '@qubit/shared'
 import { useNavigate } from 'react-router'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { type ProfileScope, profileScopeKey } from '@/hermes'
 import { useI18n } from '@/i18n'
 import type { ToolsetInfo } from '@/types/hermes'

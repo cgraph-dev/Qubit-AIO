@@ -1,10 +1,9 @@
 import { type ReactNode, useMemo, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { Field, FieldHint } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useI18n } from '@/i18n'
 import type { PluginSettingField, PluginSettingFieldType } from '@/store/agent-plugins'
@@ -102,13 +101,14 @@ function NumberControl({ disabled, id, onChange, raw }: ControlProps) {
 
 function BooleanControl({ disabled, field, id, onChange, raw }: ControlProps) {
   return (
-    <Switch
+    <Toggle
       aria-label={field.label}
       checked={raw === 'true'}
       disabled={disabled}
       id={id}
-      onCheckedChange={on => onChange(on ? 'true' : 'false')}
-    />
+      onChange={on => onChange(on ? 'true' : 'false')}
+          label={field.label}
+        />
   )
 }
 

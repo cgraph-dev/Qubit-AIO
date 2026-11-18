@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { sakugaValue } from '@/sakuga/ui'
 import { stubResizeObserver } from '@/test/jsdom'
 import type { ConfigFieldSchema } from '@/types/hermes'
 
@@ -120,7 +121,8 @@ describe('ConfigField searchable routing', () => {
     )
 
     expect(container.querySelector('[data-slot="searchable-select-trigger"]')).toBeNull()
-    expect(screen.getByDisplayValue('hello')).not.toBeNull()
+    const field = screen.getByRole('textbox')
+    expect(sakugaValue(field)).toBe('hello')
   })
 
   it('surfaces the clear item via schema.clearable and resets to blank', () => {

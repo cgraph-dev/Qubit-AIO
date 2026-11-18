@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 /**
  * Hover actions for directive chips in a composer.
  *
@@ -138,7 +139,7 @@ export function ComposerDirectiveActions({ editorRef }: { editorRef: RefObject<H
       onMouseLeave={hideSoon}
       style={{ left: anchor.left, top: anchor.top }}
     >
-      <button
+      <Button variant="secondary"
         className={cn(composerFloatingPill, 'shadow-nous')}
         // The pill is the composer's stand-in for clicking the link, so it
         // honours the same convention: ⌘/Ctrl-click escapes to the system
@@ -163,7 +164,7 @@ export function ComposerDirectiveActions({ editorRef }: { editorRef: RefObject<H
       >
         <Codicon className="shrink-0 opacity-70" name={anchor.action.icon} size="0.75rem" />
         {anchor.action.label(t)}
-      </button>
+      </Button>
     </div>,
     document.body
   )

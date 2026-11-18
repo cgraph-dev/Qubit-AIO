@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import { iconSize, Loader2, Mic, Volume2, VolumeX } from '@/lib/icons'
 import { cn } from '@/lib/utils'

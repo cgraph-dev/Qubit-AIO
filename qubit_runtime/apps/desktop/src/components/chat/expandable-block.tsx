@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useCallback, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { useResizeObserver } from '@/hooks/use-resize-observer'
 import { ChevronDown } from '@/lib/icons'
@@ -51,7 +52,7 @@ export function ExpandableBlock({ children, className }: ExpandableBlockProps) {
         // `pointer-events-none` and pin the only clickable target — a compact
         // toggle — to the right edge, clear of the draggable scrollbar track.
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-7 justify-end bg-linear-to-t from-[var(--expandable-fade-from,var(--ui-chat-surface-background))] to-transparent">
-          <button
+          <Button
             aria-expanded={expanded}
             aria-label={expanded ? 'Collapse' : 'Expand'}
             className="pointer-events-auto flex h-7 w-9 cursor-pointer items-end justify-center pb-1 text-muted-foreground/70 transition-colors hover:text-foreground"
@@ -59,7 +60,7 @@ export function ExpandableBlock({ children, className }: ExpandableBlockProps) {
             type="button"
           >
             <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { type ComponentProps, memo, type ReactNode, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -245,13 +246,13 @@ const StatusbarItemView = memo(function StatusbarItemView({
     // The `Tip` helper can't wrap a menu: its TooltipTrigger needs a DOM child,
     // but DropdownMenu's Root renders no element, so the hover listeners never
     // land on the button and the tooltip silently never shows. Compose the two
-    // trigger Slots directly onto the same <button> instead (both asChild), the
+    // trigger Slots directly onto the same <Button variant="secondary"> instead (both asChild), the
     // way profile-switcher.tsx stacks Popover/ContextMenu/Tooltip triggers.
     const trigger = (
       <DropdownMenuTrigger asChild>
-        <button className={cn(STATUSBAR_ACTION_CLASS, item.className)} disabled={item.disabled} type="button">
+        <Button variant="secondary" className={cn(STATUSBAR_ACTION_CLASS, item.className)} disabled={item.disabled} type="button">
           {content}
-        </button>
+        </Button>
       </DropdownMenuTrigger>
     )
 
@@ -342,7 +343,7 @@ const StatusbarItemView = memo(function StatusbarItemView({
 
   return (
     <Tip label={tooltipLabel}>
-      <button
+      <Button variant="secondary"
         className={cn(STATUSBAR_ACTION_CLASS, item.className)}
         disabled={item.disabled}
         onClick={event => {
@@ -355,7 +356,7 @@ const StatusbarItemView = memo(function StatusbarItemView({
         type="button"
       >
         {content}
-      </button>
+      </Button>
     </Tip>
   )
 })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { getActionStatus, getComputerUseStatus, grantComputerUsePermissions } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { AlertTriangle, Check, ExternalLink, Loader2, RefreshCw, X } from '@/lib/icons'

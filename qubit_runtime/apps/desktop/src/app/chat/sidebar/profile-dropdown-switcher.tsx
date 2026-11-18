@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import {
   DropdownMenu,

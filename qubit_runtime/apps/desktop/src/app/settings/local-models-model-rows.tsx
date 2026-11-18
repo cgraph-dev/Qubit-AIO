@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Tip } from '@/components/ui/tooltip'
 import { Check, CheckCircle2, Cpu, Download, Eject, Loader2, Trash2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'

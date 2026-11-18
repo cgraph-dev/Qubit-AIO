@@ -170,7 +170,7 @@ export function useClarifyKeys({
         focused &&
         (focused.isContentEditable ||
           (focused.matches('a[href], button, input, select, textarea, [role="button"]') &&
-            !focused.matches('button[data-choice]')))
+            !focused.matches('[data-choice]')))
       ) {
         return
       }

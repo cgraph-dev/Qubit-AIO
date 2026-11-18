@@ -45,7 +45,7 @@ it('measures detail elapsed from worker start rather than first inspection', () 
   fireEvent.click(screen.getByRole('button', { name: /Timed worker/ }))
   expect(
     container.querySelector(
-      '[data-slot="composer-subagent-detail"] [data-slot="tool-block"] > button > span:last-child'
+      '[data-slot="composer-subagent-detail"] [data-slot="tool-block"] > [role="button"] > span:last-child'
     )?.textContent
   ).toBe('17s')
 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { type FC, type ReactNode, useMemo } from 'react'
 
 import { useSessionView } from '@/app/chat/session-view'
@@ -96,7 +97,7 @@ function DelegateRowView({ row }: { row: DelegateRow }) {
     <div className="grid min-w-0 max-w-full gap-0.5 rounded-xl border border-(--ui-stroke-tertiary) px-3 py-2">
       <div className="flex min-w-0 max-w-full items-center gap-1.5" data-conversation-scaffold="">
         <span className={SCAFFOLD_GLYPH_CLASS}>{statusGlyph(row.status, statusLabel)}</span>
-        <button
+        <Button
           className={cn(
             SCAFFOLD_LABEL_CLASS,
             'min-w-0 truncate text-left transition-colors',
@@ -107,7 +108,7 @@ function DelegateRowView({ row }: { row: DelegateRow }) {
           type="button"
         >
           {row.goal}
-        </button>
+        </Button>
         {meta.length > 0 && <span className={SCAFFOLD_META_CLASS}>{meta.join(' · ')}</span>}
         {live && <ActivityTimerText className={cn(SCAFFOLD_META_CLASS, 'ml-auto')} seconds={elapsed} />}
         <Codicon className="ml-auto shrink-0 text-(--conversation-scaffold-text)" name="agent" size="0.625rem" />

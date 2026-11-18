@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
@@ -18,7 +18,6 @@ import {
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
   createWebhook,
@@ -507,7 +506,9 @@ export function WebhooksView({ onClose }: WebhooksViewProps) {
                 </Field>
                 <Field htmlFor="webhook-deliver-only" label={w.fieldDeliverOnly}>
                   <div className="flex h-9 items-center">
-                    <Switch checked={deliverOnly} id="webhook-deliver-only" onCheckedChange={setDeliverOnly} />
+                    <Toggle checked={deliverOnly} id="webhook-deliver-only" onChange={setDeliverOnly}
+          label={w.fieldDeliverOnly}
+        />
                   </div>
                 </Field>
               </div>

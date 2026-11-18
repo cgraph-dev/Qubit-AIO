@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -23,13 +24,13 @@ export function ProviderPicker() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {/* Plain text affordance (matches "Add a reference"), not a padded pill. */}
-        <button
+        <Button variant="secondary"
           className="flex h-6 items-center gap-1 text-[0.6875rem] text-(--ui-text-tertiary) transition hover:text-foreground"
           type="button"
         >
           {current?.label}
           <ChevronDown className="size-3" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       {/* The picker lives inside the pet-gen Dialog and portals to body, so its
           menu needs the rung above the modal or it opens behind the dialog. */}

@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
@@ -465,7 +466,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   const paletteOpen = useStore($commandPaletteOpen)
 
   const searchPill = (
-    <button
+    <Button variant="secondary"
       className={cn(
         'flex h-(--titlebar-control-height) items-center gap-1.5 rounded-full border border-(--ui-stroke-secondary) bg-(--ui-chat-surface-background) px-2.5 text-(--ui-text-tertiary) shadow-sm transition-all duration-200 ease-out hover:text-foreground motion-reduce:transition-none',
         paletteOpen && 'pointer-events-none scale-110 opacity-0'
@@ -481,7 +482,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       <Search className="size-3" />
       <span className="text-xs">{t.settings.search.pill}</span>
       {searchCombo && <KbdCombo combo={searchCombo} size="sm" variant="ghost" />}
-    </button>
+    </Button>
   )
 
   const navFooter = (

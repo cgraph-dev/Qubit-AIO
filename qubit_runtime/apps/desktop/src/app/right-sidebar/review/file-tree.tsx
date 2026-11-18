@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { AnimatePresence, motion } from 'motion/react'
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import {
   ContextMenu,

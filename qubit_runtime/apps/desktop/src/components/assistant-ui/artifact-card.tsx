@@ -1,6 +1,7 @@
 'use client'
 
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { useEffect, useMemo } from 'react'
 
 import { useSessionView } from '@/app/chat/session-view'
@@ -95,7 +96,7 @@ export function ArtifactCard({ code, detection, streaming = false }: ArtifactCar
   }
 
   return (
-    <button
+    <Button
       className={cn(
         WIDGET_SHELL_CLASS,
         'group/artifact my-1.5 flex w-full max-w-md items-center gap-2.5 overflow-hidden text-left',
@@ -131,6 +132,6 @@ export function ArtifactCard({ code, detection, streaming = false }: ArtifactCar
           {copy.open}
         </span>
       )}
-    </button>
+    </Button>
   )
 }

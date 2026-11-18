@@ -1,4 +1,5 @@
 import type { IconComponent } from '@/lib/icons'
+import { Button } from './button'
 import { cn } from '@/lib/utils'
 
 export interface SegmentedControlOption<T extends string> {
@@ -40,7 +41,7 @@ export function SegmentedControl<T extends string>({
         const active = value === id
 
         return (
-          <button
+          <Button
             aria-pressed={active}
             className={cn(
               'flex items-center justify-center gap-1 rounded-[3px] px-2.5 py-0.5 text-[0.6875rem] font-medium transition-colors disabled:cursor-default',
@@ -53,7 +54,7 @@ export function SegmentedControl<T extends string>({
           >
             {Icon && <Icon className="size-3" />}
             {label}
-          </button>
+          </Button>
         )
       })}
     </div>

@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useContext, useMemo, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { Kbd, KbdCombo } from '@/components/ui/kbd'
@@ -136,14 +136,14 @@ function ShortcutSettings({ includeScreenshot }: { includeScreenshot: boolean })
             {k.subtitle(openCombo ? formatCombo(openCombo) : '')}
           </p>
         </div>
-        <button
+        <Button variant="secondary"
           className="flex shrink-0 items-center gap-1 rounded-md text-[0.72rem] text-muted-foreground hover:text-foreground"
           onClick={resetAllBindings}
           type="button"
         >
           <Codicon name="discard" size="0.8125rem" />
           {k.resetAll}
-        </button>
+        </Button>
       </div>
 
       {includeScreenshot &&
@@ -211,7 +211,7 @@ function ShortcutSettings({ includeScreenshot }: { includeScreenshot: boolean })
 
 function CategoryHeader({ label, onToggle, open }: { label: string; onToggle: () => void; open: boolean }) {
   return (
-    <button
+    <Button variant="secondary"
       className="group/kbd-cat flex w-fit min-w-0 items-center gap-1 px-2.5 pb-1 pt-3 text-left leading-none"
       onClick={onToggle}
       type="button"
@@ -224,7 +224,7 @@ function CategoryHeader({ label, onToggle, open }: { label: string; onToggle: ()
         open={open}
         size="0.6875rem"
       />
-    </button>
+    </Button>
   )
 }
 
@@ -258,7 +258,7 @@ function KeybindRow({ action }: { action: KeybindActionMeta }) {
 
       {/* Click the caps to rebind — the on-screen editor does the same thing. */}
       <Tip label={k.rebind}>
-        <button
+        <Button variant="secondary"
           aria-label={k.rebind}
           className="flex shrink-0 items-center gap-1 rounded-lg outline-none"
           onClick={() => (capturing ? endCapture() : beginCapture(action.id))}
@@ -271,7 +271,7 @@ function KeybindRow({ action }: { action: KeybindActionMeta }) {
           ) : (
             <Kbd variant="ghost">{k.set}</Kbd>
           )}
-        </button>
+        </Button>
       </Tip>
 
       {/* Reset shows once a binding diverges from its default. A shipped chord

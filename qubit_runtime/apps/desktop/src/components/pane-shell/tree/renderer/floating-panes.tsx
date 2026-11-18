@@ -9,6 +9,7 @@
  */
 
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef } from 'react'
 
 import { HUD_SURFACE } from '@/app/floating-hud'
@@ -181,14 +182,14 @@ function FloatingPane({ pane }: { pane: Contribution }) {
         style={{ touchAction: 'none' }}
       >
         <span className="truncate font-medium">{pane.title ?? pane.id}</span>
-        <button
+        <Button
           className="rounded p-0.5 text-(--ui-text-quaternary) transition-colors hover:text-(--ui-text-primary)"
           data-floating-no-drag=""
           onClick={toggleCollapsed}
           type="button"
         >
           <Codicon name={collapsed ? 'chevron-up' : 'chevron-down'} size="0.75rem" />
-        </button>
+        </Button>
       </header>
 
       {(!collapsed || chrome.lifecycleKeepAlive) && (

@@ -117,7 +117,7 @@ export function SharedMetricsConsentDialog({ enabled, profile, requestGateway }:
         </DialogHeader>
 
         <div className="grid gap-2">
-          <button
+          <Button
             aria-controls={detailsId}
             aria-expanded={expanded}
             className="flex w-fit items-center gap-1 text-sm font-medium text-(--ui-text-secondary) hover:text-(--ui-text-primary)"
@@ -126,7 +126,7 @@ export function SharedMetricsConsentDialog({ enabled, profile, requestGateway }:
           >
             <ChevronDown className={cn('size-3.5 transition-transform', expanded ? 'rotate-0' : '-rotate-90')} />
             {copy.whatIsCollected}
-          </button>
+          </Button>
           {expanded ? (
             <div
               className="grid gap-2 rounded-lg bg-(--ui-bg-tertiary)/40 px-3 py-2.5 text-[0.8125rem] leading-5 text-(--ui-text-secondary)"

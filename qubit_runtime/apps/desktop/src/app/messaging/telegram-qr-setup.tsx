@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ErrorBanner } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import {
@@ -315,7 +315,7 @@ export function TelegramQrSetup({ onApplied, platform, scopeProfile }: TelegramQ
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {allowedIds.map(id => (
-                      <button
+                      <Button variant="secondary"
                         aria-label={`${t.common.remove} ${id}`}
                         className={cn(
                           'inline-flex items-center gap-1 rounded-md border border-(--ui-stroke-secondary) px-2 py-1 font-mono text-xs',
@@ -327,7 +327,7 @@ export function TelegramQrSetup({ onApplied, platform, scopeProfile }: TelegramQ
                       >
                         {id}
                         <X className="size-3" />
-                      </button>
+                      </Button>
                     ))}
                     {allowedIds.length === 0 && (
                       <span className="text-xs text-muted-foreground">{q.addAtLeastOne}</span>

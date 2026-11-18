@@ -156,7 +156,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
     desktop.continueBootstrapLocal = undefined as never
     render(<DesktopInstallOverlay />)
 
-    const install = (await screen.findByText('Install Qubit locally')).closest('button') as HTMLButtonElement
+    const install = (await screen.findByText('Install Qubit locally')).closest('button, sakuga-button') as HTMLButtonElement
     fireEvent.click(install)
 
     expect(
@@ -183,7 +183,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
     // Click the instant the choice paints, before React drains the passive
     // effect that reacts to the first snapshot. A loaded runner hits this
     // window by accident; observing the DOM directly hits it every time.
-    const install = (await whenPresent('Install Qubit locally')).closest('button') as HTMLButtonElement
+    const install = (await whenPresent('Install Qubit locally')).closest('button, sakuga-button') as HTMLButtonElement
     fireEvent.click(install)
 
     await act(async () => {
@@ -208,7 +208,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
     desktop.continueBootstrapLocal = undefined as never
     render(<DesktopInstallOverlay />)
 
-    fireEvent.click((await screen.findByText('Install Qubit locally')).closest('button') as HTMLButtonElement)
+    fireEvent.click((await screen.findByText('Install Qubit locally')).closest('button, sakuga-button') as HTMLButtonElement)
     expect(
       await screen.findByText('Local installation could not start. Restart Qubit Desktop and try again.')
     ).toBeTruthy()
@@ -268,14 +268,14 @@ describe('DesktopInstallOverlay first-run setup', () => {
 
     desktop.probeConnectionConfig.mockResolvedValue({
       authMode: 'token',
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       error: null,
       providers: [],
       reachable: true,
       version: '0.17.0'
     })
     desktop.testConnectionConfig.mockResolvedValue({
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       ok: true,
       version: '0.17.0'
     })
@@ -288,11 +288,11 @@ describe('DesktopInstallOverlay first-run setup', () => {
     render(<DesktopInstallOverlay />)
 
     fireEvent.click(await screen.findByText('Connect to existing Qubit'))
-    fireEvent.change(await screen.findByPlaceholderText('https://gateway.example.com/hermes'), {
-      target: { value: 'https://gateway.example.com/hermes' }
+    fireEvent.change(await screen.findByPlaceholderText('https://gateway.example.com/qubit'), {
+      target: { value: 'https://gateway.example.com/qubit' }
     })
 
-    const apply = screen.getByText('Apply and reconnect').closest('button') as HTMLButtonElement
+    const apply = screen.getByText('Apply and reconnect').closest('button, sakuga-button') as HTMLButtonElement
     expect(apply.disabled).toBe(true)
 
     await act(async () => {
@@ -309,11 +309,11 @@ describe('DesktopInstallOverlay first-run setup', () => {
         mode: 'remote',
         remoteAuthMode: 'token',
         remoteToken: 'session-secret',
-        remoteUrl: 'https://gateway.example.com/hermes'
+        remoteUrl: 'https://gateway.example.com/qubit'
       })
     })
 
-    await screen.findByText('Connected to https://gateway.example.com/hermes (0.17.0).')
+    await screen.findByText('Connected to https://gateway.example.com/qubit (0.17.0).')
     expect(apply.disabled).toBe(false)
 
     fireEvent.click(screen.getByText('Apply and reconnect'))
@@ -323,7 +323,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
         mode: 'remote',
         remoteAuthMode: 'token',
         remoteToken: 'session-secret',
-        remoteUrl: 'https://gateway.example.com/hermes'
+        remoteUrl: 'https://gateway.example.com/qubit'
       })
     })
     await waitFor(() => expect(screen.queryByText('Gateway URL')).toBeNull())
@@ -338,14 +338,14 @@ describe('DesktopInstallOverlay first-run setup', () => {
 
     desktop.probeConnectionConfig.mockResolvedValue({
       authMode: 'token',
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       error: null,
       providers: [],
       reachable: true,
       version: '0.17.0'
     })
     desktop.testConnectionConfig.mockResolvedValue({
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       ok: true,
       version: '0.17.0'
     })
@@ -354,8 +354,8 @@ describe('DesktopInstallOverlay first-run setup', () => {
     render(<DesktopInstallOverlay />)
 
     fireEvent.click(await screen.findByText('Connect to existing Qubit'))
-    fireEvent.change(await screen.findByPlaceholderText('https://gateway.example.com/hermes'), {
-      target: { value: 'https://gateway.example.com/hermes' }
+    fireEvent.change(await screen.findByPlaceholderText('https://gateway.example.com/qubit'), {
+      target: { value: 'https://gateway.example.com/qubit' }
     })
 
     await act(async () => {
@@ -366,9 +366,9 @@ describe('DesktopInstallOverlay first-run setup', () => {
       target: { value: 'session-secret' }
     })
     fireEvent.click(screen.getByText('Test connection'))
-    await screen.findByText('Connected to https://gateway.example.com/hermes (0.17.0).')
+    await screen.findByText('Connected to https://gateway.example.com/qubit (0.17.0).')
 
-    const apply = screen.getByText('Apply and reconnect').closest('button') as HTMLButtonElement
+    const apply = screen.getByText('Apply and reconnect').closest('button, sakuga-button') as HTMLButtonElement
     fireEvent.click(apply)
 
     expect(await screen.findByText('remote apply failed')).toBeTruthy()
@@ -385,19 +385,19 @@ describe('DesktopInstallOverlay first-run setup', () => {
 
     desktop.probeConnectionConfig.mockResolvedValue({
       authMode: 'oauth',
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       error: null,
       providers: [{ displayName: 'Username & Password', name: 'password', supportsPassword: true }],
       reachable: true,
       version: '0.17.0'
     })
     desktop.oauthLoginConnectionConfig.mockResolvedValue({
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       connected: true,
       ok: true
     })
     desktop.testConnectionConfig.mockResolvedValue({
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       ok: true,
       version: null
     })
@@ -406,8 +406,8 @@ describe('DesktopInstallOverlay first-run setup', () => {
     render(<DesktopInstallOverlay />)
 
     fireEvent.click(await screen.findByText('Connect to existing Qubit'))
-    fireEvent.change(await screen.findByPlaceholderText('https://gateway.example.com/hermes'), {
-      target: { value: 'https://gateway.example.com/hermes' }
+    fireEvent.change(await screen.findByPlaceholderText('https://gateway.example.com/qubit'), {
+      target: { value: 'https://gateway.example.com/qubit' }
     })
 
     await act(async () => {
@@ -418,7 +418,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
     fireEvent.click(await screen.findByText('Sign in'))
 
     await waitFor(() => {
-      expect(desktop.oauthLoginConnectionConfig).toHaveBeenCalledWith('https://gateway.example.com/hermes')
+      expect(desktop.oauthLoginConnectionConfig).toHaveBeenCalledWith('https://gateway.example.com/qubit')
     })
 
     fireEvent.click(screen.getByText('Test connection'))
@@ -428,12 +428,12 @@ describe('DesktopInstallOverlay first-run setup', () => {
         mode: 'remote',
         remoteAuthMode: 'oauth',
         remoteToken: undefined,
-        remoteUrl: 'https://gateway.example.com/hermes'
+        remoteUrl: 'https://gateway.example.com/qubit'
       })
     })
 
-    await screen.findByText('Connected to https://gateway.example.com/hermes.')
-    const apply = screen.getByText('Apply and reconnect').closest('button') as HTMLButtonElement
+    await screen.findByText('Connected to https://gateway.example.com/qubit.')
+    const apply = screen.getByText('Apply and reconnect').closest('button, sakuga-button') as HTMLButtonElement
     expect(apply.disabled).toBe(false)
     fireEvent.click(apply)
 
@@ -442,7 +442,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
         mode: 'remote',
         remoteAuthMode: 'oauth',
         remoteToken: undefined,
-        remoteUrl: 'https://gateway.example.com/hermes'
+        remoteUrl: 'https://gateway.example.com/qubit'
       })
     })
   })
@@ -472,7 +472,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
     )
     render(<DesktopInstallOverlay />)
     fireEvent.click(await screen.findByText('Connect to existing Qubit'))
-    const url = screen.getByPlaceholderText('https://gateway.example.com/hermes')
+    const url = screen.getByPlaceholderText('https://gateway.example.com/qubit')
     fireEvent.change(url, { target: { value: 'https://a.example' } })
     fireEvent.click(await screen.findByRole('button', { name: /Sign in with/ }))
     await waitFor(() => expect(desktop.oauthLoginConnectionConfig).toHaveBeenCalledWith('https://a.example'))
@@ -511,14 +511,14 @@ describe('DesktopInstallOverlay first-run setup', () => {
 
     desktop.probeConnectionConfig.mockResolvedValue({
       authMode: 'token',
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       error: null,
       providers: [],
       reachable: true,
       version: '0.17.0'
     })
     desktop.testConnectionConfig.mockResolvedValue({
-      baseUrl: 'https://gateway.example.com/hermes',
+      baseUrl: 'https://gateway.example.com/qubit',
       ok: true,
       version: '0.17.0'
     })
@@ -528,8 +528,8 @@ describe('DesktopInstallOverlay first-run setup', () => {
       return { mode: 'remote' }
     })
 
-    fireEvent.change(screen.getByPlaceholderText('https://gateway.example.com/hermes'), {
-      target: { value: 'https://gateway.example.com/hermes' }
+    fireEvent.change(screen.getByPlaceholderText('https://gateway.example.com/qubit'), {
+      target: { value: 'https://gateway.example.com/qubit' }
     })
 
     await act(async () => {
@@ -540,7 +540,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
       target: { value: 'session-secret' }
     })
     fireEvent.click(screen.getByText('Test connection'))
-    await screen.findByText('Connected to https://gateway.example.com/hermes (0.17.0).')
+    await screen.findByText('Connected to https://gateway.example.com/qubit (0.17.0).')
     fireEvent.click(screen.getByText('Apply and reconnect'))
 
     await waitFor(() => expect(screen.queryByText('Gateway URL')).toBeNull())

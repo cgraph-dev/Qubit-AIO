@@ -1,6 +1,6 @@
+import { Toggle } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tip } from '@/components/ui/tooltip'
 import { Check, Info } from '@/lib/icons'
@@ -49,7 +49,13 @@ export function FieldControl({
   const commitDraft = onCommit ? () => onCommit(value) : undefined
 
   if (field.kind === 'bool') {
-    return <Switch checked={value === 'true'} onCheckedChange={checked => set(checked ? 'true' : 'false')} />
+    return (
+      <Toggle
+        checked={value === 'true'}
+        label={field.label}
+        onChange={checked => set(checked ? 'true' : 'false')}
+      />
+    )
   }
 
   if (field.kind === 'number') {

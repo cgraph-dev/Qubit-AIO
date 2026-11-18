@@ -143,7 +143,7 @@ describe('MessagingView profile scope', () => {
 
 describe('MessagingView status filter', () => {
   const rowNames = (container: HTMLElement) =>
-    [...container.querySelectorAll('ul > li > button')].map(row => row.querySelector('.truncate')?.textContent)
+    [...container.querySelectorAll('ul > li > [role="button"]')].map(row => row.querySelector('.truncate')?.textContent)
 
   it('offers a tab only for tones some platform is in, and narrows the list to that tone', async () => {
     getMessagingPlatforms.mockResolvedValue({

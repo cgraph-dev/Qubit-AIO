@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useState } from 'react'
@@ -203,7 +204,7 @@ export function ProjectMenu({
   // of non-forwarding wrappers (#67500).
   const triggerButton = (
     <DropdownMenuTrigger asChild>
-      <button
+      <Button variant="secondary"
         aria-label={p.menu}
         className={cn(
           'grid size-4 shrink-0 place-items-center rounded-sm bg-transparent text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground data-[state=open]:opacity-100',
@@ -215,7 +216,7 @@ export function ProjectMenu({
         type="button"
       >
         <Codicon name="kebab-vertical" size="0.75rem" />
-      </button>
+      </Button>
     </DropdownMenuTrigger>
   )
 

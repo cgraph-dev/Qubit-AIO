@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import type { useSensors } from '@dnd-kit/core'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
@@ -82,7 +83,7 @@ function SidebarSectionHeader({
   return (
     <div className="group/section flex shrink-0 items-center justify-between gap-1 pb-1 pt-1.5">
       {collapsible ? (
-        <button
+        <Button variant="secondary"
           // min-w-0 lets the label truncate at narrow sidebar widths instead of
           // pushing the header's trailing action icons out of view.
           className="group/section-label flex w-fit min-w-0 items-center gap-1 bg-transparent text-left leading-none"
@@ -94,7 +95,7 @@ function SidebarSectionHeader({
             className="text-(--ui-text-tertiary) opacity-0 transition group-hover/section-label:opacity-100"
             open={open}
           />
-        </button>
+        </Button>
       ) : (
         <div className="flex w-fit min-w-0 items-center gap-1 leading-none">{labelBody}</div>
       )}

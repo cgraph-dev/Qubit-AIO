@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
@@ -1614,7 +1615,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
         <Command className="bg-transparent" loop shouldFilter={false}>
           <HighlightWatcher onValue={handleHighlight} />
           {activePage && (
-            <button
+            <Button variant="secondary"
               className="flex w-full items-center gap-1.5 border-b border-border px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
               onClick={goBack}
               type="button"
@@ -1623,7 +1624,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
               <span>{t.commandCenter.back}</span>
               <span className="text-muted-foreground/50">/</span>
               <span className="font-medium text-foreground">{activePage.title}</span>
-            </button>
+            </Button>
           )}
           <CommandInput
             className={HUD_TEXT}

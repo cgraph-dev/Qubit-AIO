@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DesktopConnectionsRegistry } from '@/global'
 import { _resetFleetRosterForTests, refreshFleetRoster } from '@/store/fleet-roster'
 import { $connection } from '@/store/session'
+import { sakugaValue } from '@/sakuga/ui'
 import { deferred } from '@/test/deferred'
 
 import {
@@ -89,7 +90,8 @@ describe('ConnectionsRegistrySection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
     const values = screen.getAllByPlaceholderText('Saved — leave blank to keep')
     fireEvent.change(values[1], { target: { value: 'new-header-secret' } })
-    fireEvent.click(within(screen.getByDisplayValue('Delete').parentElement!).getByRole('button', { name: 'Remove' }))
+    const deleteField = screen.getAllByRole('textbox').find(el => sakugaValue(el) === 'Delete')!
+    fireEvent.click(within(deleteField.parentElement!).getByRole('button', { name: 'Remove' }))
     fireEvent.change(screen.getByPlaceholderText('Existing token ...abc123'), { target: { value: 'new-token' } })
     fireEvent.click(screen.getByText('Save connection'))
     await screen.findByText('Store the gateway token in plain text?')
@@ -183,7 +185,7 @@ describe('ConnectionsRegistrySection', () => {
     fireEvent.click(screen.getByText('Add connection'))
 
     // Save is disabled until a label is present.
-    const saveButton = screen.getByText('Save connection').closest('button')!
+    const saveButton = screen.getByText('Save connection').closest('[role="button"]') as unknown as HTMLButtonElement
     expect(saveButton.disabled).toBe(true)
 
     fireEvent.change(screen.getByPlaceholderText('Homelab'), { target: { value: 'Spark box' } })
@@ -232,7 +234,7 @@ describe('ConnectionsRegistrySection', () => {
       })
     )
 
-    fireEvent.click(screen.getByText('Save connection').closest('button')!)
+    fireEvent.click(screen.getByText('Save connection').closest('[role="button"]') as unknown as HTMLButtonElement)
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(save.mock.calls[0][0]).toMatchObject({
@@ -255,7 +257,7 @@ describe('ConnectionsRegistrySection', () => {
     fireEvent.change(screen.getByPlaceholderText('auto-detect'), {
       target: { value: '/opt/hermes/bin/hermes' }
     })
-    fireEvent.click(screen.getByText('Save connection').closest('button')!)
+    fireEvent.click(screen.getByText('Save connection').closest('[role="button"]') as unknown as HTMLButtonElement)
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(save.mock.calls[0][0]).toMatchObject({
@@ -292,7 +294,7 @@ describe('ConnectionsRegistrySection', () => {
     const pathInput = screen.getByPlaceholderText('auto-detect') as HTMLInputElement
     expect(pathInput.value).toBe('/opt/hermes/bin/hermes')
     fireEvent.change(pathInput, { target: { value: '   ' } })
-    fireEvent.click(screen.getByText('Save connection').closest('button')!)
+    fireEvent.click(screen.getByText('Save connection').closest('[role="button"]') as unknown as HTMLButtonElement)
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(save.mock.calls[0][0]).toMatchObject({ id: 'build-host', remoteHermesPath: '' })
@@ -319,7 +321,7 @@ describe('ConnectionsRegistrySection', () => {
     fireEvent.change(screen.getByPlaceholderText('http://homelab.lan:9119'), {
       target: { value: 'HTTP://HOMELAB.LAN:9119/' }
     })
-    fireEvent.click(screen.getByText('Save connection').closest('button')!)
+    fireEvent.click(screen.getByText('Save connection').closest('[role="button"]') as unknown as HTMLButtonElement)
 
     await waitFor(() =>
       expect(screen.getByText('A connection to this gateway URL already exists (“Homelab”).')).toBeTruthy()
@@ -332,7 +334,7 @@ describe('ConnectionsRegistrySection', () => {
     render(<ConnectionsRegistrySection />)
 
     await waitFor(() => expect(screen.getByText('Homelab')).toBeTruthy())
-    const makePrimary = screen.getByText('Make primary').closest('button')!
+    const makePrimary = screen.getByText('Make primary').closest('[role="button"]') as unknown as HTMLButtonElement
 
     expect(makePrimary.disabled).toBe(false)
     fireEvent.click(makePrimary)

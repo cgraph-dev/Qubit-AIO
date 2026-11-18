@@ -1,6 +1,6 @@
 import { type ChangeEvent, type KeyboardEvent } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import { translateNow, useI18n } from '@/i18n'
 import { ChevronDown, ExternalLink, Loader2, Save, Trash2 } from '@/lib/icons'

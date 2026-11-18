@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { type ReactNode, useId, useRef, useState } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -116,7 +117,7 @@ export function ComboboxInput({
             role="combobox"
             value={value}
           />
-          <button
+          <Button variant="secondary"
             aria-label={t.settings.config.showOptions}
             className="absolute inset-y-0 right-1.5 flex items-center text-(--ui-text-tertiary) disabled:opacity-50"
             disabled={disabled}
@@ -128,7 +129,7 @@ export function ComboboxInput({
             type="button"
           >
             <Codicon name={expanded ? 'chevron-up' : 'chevron-down'} size="1rem" />
-          </button>
+          </Button>
         </div>
       </PopoverAnchor>
       <PopoverContent

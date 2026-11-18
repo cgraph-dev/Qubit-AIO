@@ -5,12 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageLoader } from '@/components/page-loader'
 import { StatusDot, type StatusTone } from '@/components/status-dot'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { ErrorBanner } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import { ResponsiveTabs } from '@/components/ui/tab-dropdown'
 import { Tip } from '@/components/ui/tooltip'
 import {
@@ -665,7 +664,7 @@ function PlatformRow({
   const { t } = useI18n()
 
   return (
-    <button
+    <Button variant="secondary"
       className={cn(
         'row-hover flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:text-foreground',
         active ? 'bg-(--ui-row-active-background) text-foreground' : 'text-(--ui-text-secondary)'
@@ -693,7 +692,7 @@ function PlatformRow({
           <StatusDot tone={platformStatusTone(platform)} />
         </span>
       </span>
-    </button>
+    </Button>
   )
 }
 
@@ -901,14 +900,14 @@ function PlatformDetail({
 
       {hiddenCount > 0 && (
         <section>
-          <button
+          <Button variant="secondary"
             className="flex w-full items-center justify-between gap-2 py-0.5 text-left text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
             onClick={() => setShowAdvanced(value => !value)}
             type="button"
           >
             <span>{m.advanced(hiddenCount)}</span>
             <DisclosureCaret open={showAdvanced} size="0.875rem" />
-          </button>
+          </Button>
           {showAdvanced && (
             <div className="mt-3 grid gap-1">
               {advancedFields.map(field => (
@@ -949,12 +948,12 @@ function PlatformActionBar({
   return (
     <>
       <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-        <Switch
+        <Toggle
           aria-label={platform.enabled ? m.disableAria(platform.name) : m.enableAria(platform.name)}
           checked={platform.enabled}
           disabled={saving === `enabled:${platform.id}`}
-          onCheckedChange={onToggle}
-          size="xs"
+          onChange={onToggle}
+          label={platform.enabled ? m.disableAria(platform.name) : m.enableAria(platform.name)}
         />
         {platform.enabled ? m.enabled : m.disabled}
       </label>

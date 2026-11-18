@@ -1,3 +1,4 @@
+import { Toggle } from '@/sakuga/ui'
 import { REASONING_EFFORTS } from '@qubit/shared'
 
 import {
@@ -10,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuSubContent
 } from '@/components/ui/dropdown-menu'
-import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
 import { isThinkingEnabled, reasoningEffortClamp, resolveReasoningEffort } from '@/lib/reasoning-effort'
 
@@ -157,18 +157,18 @@ export function ModelOptionsContent({
       {showThinkingToggle ? (
         <DropdownMenuItem className={dropdownMenuRow} onSelect={event => event.preventDefault()}>
           {copy.thinking}
-          <Switch
+          <Toggle
             checked={thinkingOn}
             className="ml-auto"
-            onCheckedChange={checked => onSetOptions({ effort: checked ? effortValue || defaultEffort : 'none' })}
-            size="xs"
+            label={copy.thinking}
+            onChange={checked => onSetOptions({ effort: checked ? effortValue || defaultEffort : 'none' })}
           />
         </DropdownMenuItem>
       ) : null}
       {hasFast ? (
         <DropdownMenuItem className={dropdownMenuRow} onSelect={event => event.preventDefault()}>
           {copy.fast}
-          <Switch checked={fastOn} className="ml-auto" onCheckedChange={setFast} size="xs" />
+          <Toggle checked={fastOn} className="ml-auto" label={copy.fast} onChange={setFast} />
         </DropdownMenuItem>
       ) : null}
       {reasoning ? (

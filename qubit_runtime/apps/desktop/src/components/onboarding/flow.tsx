@@ -169,7 +169,7 @@ export function DeviceCode({ code, copied, onCopy }: { code: string; copied: boo
   const { t } = useI18n()
 
   return (
-    <button
+    <Button
       aria-label={t.onboarding.copy}
       className="group flex w-full items-center justify-center gap-1.5"
       onClick={onCopy}
@@ -194,7 +194,7 @@ export function DeviceCode({ code, copied, onCopy }: { code: string; copied: boo
           </span>
         )
       )}
-    </button>
+    </Button>
   )
 }
 

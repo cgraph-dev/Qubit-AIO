@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { PetThumb } from '@/components/pet/pet-thumb'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -172,7 +172,7 @@ export function PetSettings() {
 
                       return (
                         <div className="group relative" key={pet.slug}>
-                          <button
+                          <Button variant="secondary"
                             className={cn(
                               'flex w-full items-center gap-2.5 px-2.5 py-2 text-left disabled:opacity-50',
                               selectableCardClass({ active: isActive, prominent: pet.installed })
@@ -204,7 +204,7 @@ export function PetSettings() {
                               </span>
                             </span>
                             {isBusy && <Loader2 className="size-4 shrink-0 animate-spin text-(--ui-text-tertiary)" />}
-                          </button>
+                          </Button>
                           {!isBusy && (pet.installed || pet.generated) && (
                             <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition focus-within:opacity-100 group-hover:opacity-100">
                               {pet.generated && (
@@ -360,7 +360,7 @@ function PetAction({
 }) {
   return (
     <Tip label={label}>
-      <button
+      <Button variant="secondary"
         aria-label={label}
         className={cn(
           'grid size-6 place-items-center rounded-md bg-(--ui-bg-elevated)/80 text-(--ui-text-tertiary) backdrop-blur-sm transition',
@@ -370,7 +370,7 @@ function PetAction({
         type="button"
       >
         {icon}
-      </button>
+      </Button>
     </Tip>
   )
 }

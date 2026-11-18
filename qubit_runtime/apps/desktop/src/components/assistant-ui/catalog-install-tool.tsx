@@ -246,14 +246,14 @@ function RowOutcome({
           {target.tools.length > 0 ? (
             <>
               {' · '}
-              <button
+              <Button
                 aria-expanded={namesOpen}
                 className="underline-offset-2 hover:underline"
                 onClick={() => setNamesOpen(open => !open)}
                 type="button"
               >
                 {namesOpen ? copy.hideNames : copy.showNames}
-              </button>
+              </Button>
             </>
           ) : null}
         </p>

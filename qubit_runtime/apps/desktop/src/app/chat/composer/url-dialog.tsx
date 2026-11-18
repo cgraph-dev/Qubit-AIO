@@ -1,6 +1,6 @@
 import type * as React from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import {
   Dialog,
   DialogContent,

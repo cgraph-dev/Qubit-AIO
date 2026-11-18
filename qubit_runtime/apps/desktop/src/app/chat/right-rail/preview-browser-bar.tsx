@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 /**
  * BROWSER BAR: back / forward / reload / address / pop-out (or pop-in) for a
  * URL preview.
@@ -237,14 +238,14 @@ export function PreviewBrowserBar({
         </span>
       ) : null}
       {commentCount > 0 && onFlushComments ? (
-        <button
+        <Button variant="secondary"
           className="shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold text-white"
           onClick={onFlushComments}
           style={{ background: ANNOTATE_BLUE }}
           type="button"
         >
           {copy.addComments(commentCount)}
-        </button>
+        </Button>
       ) : null}
       {onPopIn ? (
         <PaneStripGlyph

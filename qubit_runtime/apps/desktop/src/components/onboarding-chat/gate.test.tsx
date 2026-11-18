@@ -38,7 +38,7 @@ it('starts the skipped-film splash before the backend connects and removes it on
   )
 
   const { rerender } = render(view(false))
-  expect(screen.getByRole('status').textContent).toMatch(/Starting Hermes/)
+  expect(screen.getByRole('status').textContent).toMatch(/Starting Qubit Desktop/)
   expect(kickoff).not.toHaveBeenCalled()
   rerender(view(true))
   await waitFor(() => expect(kickoff).toHaveBeenCalledOnce())

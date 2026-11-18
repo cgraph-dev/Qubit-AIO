@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { CountSkeleton } from '@/components/ui/skeleton'
 import { previewSkillHub, type ProfileScope, profileScopeKey } from '@/hermes'
 import { useI18n } from '@/i18n'

@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { StatusRow } from '@/components/chat/status-row'
 import { StatusSection } from '@/components/chat/status-section'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { type Translations, useI18n } from '@/i18n'

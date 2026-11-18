@@ -365,7 +365,8 @@ describe('SidebarSessionRow drag and the rename dialog (portal press)', () => {
     const { container } = render(<Host session={makeSession({ title: 'Draggable' })} />)
     const row = rowShell(container)
     const doc = container.ownerDocument
-    const body = screen.getByText('Draggable').closest('button')!
+    // The row body is the Sakuga button host, not a native <button>.
+    const body = screen.getByText('Draggable').closest('[role="button"]') as HTMLElement
 
     fireEvent.pointerDown(body, {
       button: 0,

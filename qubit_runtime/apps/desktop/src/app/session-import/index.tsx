@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useEffect, useRef, useState } from 'react'
 
 import { MarkdownTextContent } from '@/components/assistant-ui/markdown-text'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
@@ -210,7 +210,7 @@ export function SessionImportView({ owner, onClose, onOpenSession }: SessionImpo
                 return (
                   <div key={row.id}>
                     {newDate && <p className="px-3 pb-2 pt-5 text-xs font-medium text-(--ui-text-secondary)">{date}</p>}
-                    <button
+                    <Button variant="secondary"
                       aria-pressed={selected === row.id}
                       className={cn(
                         'w-full cursor-pointer rounded-md px-3 py-4 text-start transition-colors hover:bg-(--chrome-action-hover) focus-visible:outline-2 focus-visible:outline-(--ui-accent)',
@@ -235,7 +235,7 @@ export function SessionImportView({ owner, onClose, onOpenSession }: SessionImpo
                       <span className="mt-1 block truncate text-xs leading-5 text-(--ui-text-secondary)">
                         {row.cwd || row.excerpt}
                       </span>
-                    </button>
+                    </Button>
                   </div>
                 )
               })}

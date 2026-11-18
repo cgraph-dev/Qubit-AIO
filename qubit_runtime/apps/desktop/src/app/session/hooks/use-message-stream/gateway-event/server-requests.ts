@@ -14,6 +14,7 @@ import {
 import { readActiveTerminal } from '@/app/right-sidebar/terminal/buffer'
 import { pendingClarifyToolPayload } from '@/app/session/hooks/use-session-actions/restore-pending-clarify'
 import { translateNow } from '@/i18n'
+import { emitFx } from '@/sakuga/ui'
 import { restorePendingClarifyToolCall } from '@/lib/chat-messages'
 import type { PreviewActAction } from '@/lib/preview-act/act-in-page'
 import type { TourAction, TourStep } from '@/lib/tour'
@@ -401,6 +402,7 @@ const approval: Handler = ctx => {
   markNeedsInput(ctx)
 
   if (!request.replayed) {
+    void emitFx('approval')
     dispatchNativeNotification({
       actions: [
         {

@@ -1,6 +1,7 @@
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
+import { Input as SakugaInput, focusSakuga } from '@/sakuga/ui'
 
 import { type ControlVariantProps, controlVariants } from './control'
 
@@ -16,30 +17,142 @@ type InputProps = Omit<React.ComponentProps<'input'>, 'size' | 'prefix' | 'suffi
     containerClassName?: string
   }
 
-function Input({ className, containerClassName, prefix, suffix, size, type, ...props }: InputProps) {
+// The upstream field renders a real text input inside a shadow root, so only
+// the text-like types are supported. Everything else (numbers, dates, files,
+// hidden fields, colour swatches) keeps the native element: the upstream has
+// no equivalent and silently demoting them would change their behaviour.
+const SAKUGA_TYPES = new Set(['email', 'password', 'search', 'tel', 'text', 'url'])
+
+const Input = React.forwardRef<HTMLElement, InputProps>(function Input(
+  {
+    className,
+    containerClassName,
+    prefix,
+    suffix,
+    size,
+    type = 'text',
+    onChange,
+    placeholder,
+    autoFocus,
+    tabIndex,
+    ...props
+  },
+  ref
+) {
   const grouped = prefix != null || suffix != null
+  const hostRef = React.useRef<HTMLElement | null>(null)
+
+  const setRefs = React.useCallback(
+    (node: HTMLElement | null) => {
+      hostRef.current = node
+      if (typeof ref === 'function') ref(node)
+      else if (ref) (ref as React.MutableRefObject<HTMLElement | null>).current = node
+    },
+    [ref]
+  )
+
+  // Mirror the host-level attributes the shared wrapper does not carry. The
+  // placeholder is on the inner native input; `getByPlaceholderText` and plain
+  // DOM lookups expect it on the element the rest of the tree can see.
+  React.useLayoutEffect(() => {
+    const el = hostRef.current
+    if (!el) return
+    if (placeholder != null) el.setAttribute('placeholder', placeholder)
+    else el.removeAttribute('placeholder')
+    if (type) el.setAttribute('type', type)
+  }, [placeholder, type])
+
+  // A custom element is not a labelable control, so a wrapping
+  // `<label>Repository<Input/></label>` no longer gives the host an accessible
+  // name the way it did for the native input. When the caller supplied neither
+  // `aria-label` nor `aria-labelledby`, take the visible label text so
+  // `getByRole('textbox', { name })` and screen readers keep the same name.
+  React.useLayoutEffect(() => {
+    const el = hostRef.current
+    if (!el) return
+    if (props['aria-label'] || props['aria-labelledby']) return
+    const wrapping = el.closest('label')
+    const text = wrapping?.textContent?.replace(/\s+/g, ' ').trim()
+    if (text) el.setAttribute('aria-label', text)
+  })
+
+  React.useEffect(() => {
+    if (autoFocus) focusSakuga(hostRef.current)
+  }, [autoFocus])
+
+  // `fireEvent.change(host, …)` and the upstream component's own `change`
+  // dispatch both land on the host, not the inner native input. Keep the
+  // event-shaped `onChange` contract every call site already uses.
+  const emitChange = React.useCallback(
+    (value: string) => {
+      onChange?.({
+        currentTarget: { value },
+        target: { value }
+      } as unknown as React.ChangeEvent<HTMLInputElement>)
+    },
+    [onChange]
+  )
+
+  React.useEffect(() => {
+    const el = hostRef.current
+    if (!el) return
+    const handler = () => {
+      const value = (el as unknown as { value?: string }).value ?? ''
+      emitChange(value)
+    }
+    el.addEventListener('change', handler)
+    return () => el.removeEventListener('change', handler)
+  }, [emitChange])
+
+  const label =
+    (props['aria-label'] as string | undefined) ?? placeholder ?? (props.id as string | undefined) ?? 'Text'
+
+  if (!SAKUGA_TYPES.has(type)) {
+    return (
+      <input
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        className={cn(controlVariants({ size }), className)}
+        data-slot="input"
+        placeholder={placeholder}
+        ref={ref as React.Ref<HTMLInputElement>}
+        spellCheck={false}
+        type={type}
+        onChange={onChange}
+        {...props}
+      />
+    )
+  }
 
   const field = (
-    <input
-      // Off by default for every consumer — these are code/config/search fields,
-      // not prose. Callers can re-enable per-instance by passing the prop.
-      autoCapitalize="off"
-      autoComplete="off"
-      autoCorrect="off"
-      className={cn(
-        // When adorned, the wrapper owns the chrome (border/background/focus
-        // glow) and the input goes transparent so the whole thing reads as one
-        // box; otherwise the input carries the chrome itself.
-        grouped
-          ? 'min-w-0 flex-1 border-0 bg-transparent p-0 text-xs leading-4 text-foreground outline-none placeholder:text-muted-foreground'
-          : controlVariants({ size }),
-        'selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-foreground',
-        className
-      )}
+    <SakugaInput
+      aria-label={label}
+      aria-labelledby={props.id ? `${props.id}-label` : undefined}
+      autoComplete={props.autoComplete}
       data-slot="input"
-      spellCheck={false}
-      type={type}
-      {...props}
+      className={cn(grouped ? 'min-w-0 flex-1' : undefined, className)}
+      defaultValue={props.defaultValue as string | undefined}
+      disabled={props.disabled}
+      label={label}
+      id={props.id}
+      name={props.name}
+      onBlur={props.onBlur}
+      onChange={emitChange}
+      onFocus={props.onFocus}
+      onKeyDown={props.onKeyDown}
+      placeholder={placeholder}
+      ref={setRefs}
+      style={props.style}
+      // The host is the tab stop: its shadow root delegates focus to the real
+      // input. Without a tab index Radix's focus scope cannot see the field as
+      // a candidate and focuses the next button instead (a dialog's autofocus
+      // then lands on Cancel rather than the field).
+      tabIndex={props.disabled ? -1 : (tabIndex ?? 0)}
+      title={props.title}
+      type={type as 'email' | 'password' | 'search' | 'tel' | 'text' | 'url'}
+      value={props.value === undefined ? undefined : String(props.value)}
+      {...(props as Record<string, unknown>)}
     />
   )
 
@@ -50,8 +163,6 @@ function Input({ className, containerClassName, prefix, suffix, size, type, ...p
   return (
     <div
       className={cn(
-        // Same control chrome/sizing as a bare input; `.desktop-input-chrome`
-        // lights on `:focus-within` (styles.css) since the div never focuses.
         controlVariants({ size }),
         'inline-flex items-center gap-1',
         props.disabled && 'cursor-not-allowed opacity-50',
@@ -68,6 +179,6 @@ function Input({ className, containerClassName, prefix, suffix, size, type, ...p
       )}
     </div>
   )
-}
+})
 
 export { Input }

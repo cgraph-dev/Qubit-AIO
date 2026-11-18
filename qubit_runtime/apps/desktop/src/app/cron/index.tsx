@@ -5,8 +5,7 @@ import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Button, Checkbox } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
@@ -985,7 +984,7 @@ function CronJobRuns({
             ) : (
               // One click to the run's transcript; a run the scheduler never
               // closed opens view-only (see `openCronRun`, #88443).
-              <button
+              <Button variant="secondary"
                 className="row-hover flex items-center justify-between gap-3 rounded-md px-2 py-1 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 key={run.id}
                 onClick={onOpenSession ? () => openCronRun(run, onOpenSession) : undefined}
@@ -997,7 +996,7 @@ function CronJobRuns({
                 <span className="shrink-0 text-[0.62rem] text-muted-foreground/55 tabular-nums">
                   {formatRunTime(run.last_active || run.started_at)}
                 </span>
-              </button>
+              </Button>
             )
           )}
         </div>
@@ -1056,9 +1055,10 @@ export function DeliverCheckboxes({
         return (
           <label className="flex items-center gap-2 text-sm" htmlFor={checkboxId} key={target.id}>
             <Checkbox
+              aria-label={deliverTargetLabel(target, c)}
               checked={checked}
               id={checkboxId}
-              onCheckedChange={next => onChange(toggleCronDeliveryTarget(value, target.id, next === true))}
+              onChange={next => onChange(toggleCronDeliveryTarget(value, target.id, next === true))}
             />
             <span>{deliverTargetLabel(target, c)}</span>
           </label>

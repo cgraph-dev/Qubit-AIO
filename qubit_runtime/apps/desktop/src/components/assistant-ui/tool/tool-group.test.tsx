@@ -418,14 +418,14 @@ describe('live tool run', () => {
   it('honors explicit disclosure across live updates and completion', async () => {
     const message = groupedPendingMessage()
     const { container, rerender } = render(<GroupHarness message={message} />)
-    const toggle = () => container.querySelector('[data-tool-summary] button[aria-expanded]') as HTMLButtonElement
+    const toggle = () => container.querySelector('[data-tool-summary] [role="button"][aria-expanded]') as HTMLButtonElement
 
     await waitFor(() => expect(toggle()).not.toBeNull())
     fireEvent.click(toggle())
     expect(toggle().getAttribute('aria-expanded')).toBe('true')
     expect(container.querySelector('[data-tool-ticker]')).toBeNull()
     fireEvent.click(toggle())
-    const row = container.querySelector('[data-tool-ticker] [data-tool-row] button[aria-expanded="false"]')
+    const row = container.querySelector('[data-tool-ticker] [data-tool-row] [role="button"][aria-expanded="false"]')
     expect(row).not.toBeNull()
     fireEvent.click(row as Element)
     await waitFor(() => expect(container.querySelector('[data-tool-ticker]')).toBeNull())
@@ -476,7 +476,7 @@ describe('live tool run', () => {
 
     expect(await screen.findByText('Running 2 commands')).toBeTruthy()
     expect(container.querySelector('[data-tool-ticker]')).not.toBeNull()
-    expect(container.querySelector('[data-tool-summary] button[aria-expanded]')).not.toBeNull()
+    expect(container.querySelector('[data-tool-summary] [role="button"][aria-expanded]')).not.toBeNull()
   })
 
   // The ticker is a one-line window, so a row opened inside it had its output
@@ -487,7 +487,7 @@ describe('live tool run', () => {
 
     await screen.findByText('Running 2 commands')
 
-    const row = container.querySelector('[data-tool-ticker] [data-tool-row] button[aria-expanded="false"]')
+    const row = container.querySelector('[data-tool-ticker] [data-tool-row] [role="button"][aria-expanded="false"]')
 
     expect(row).not.toBeNull()
 
@@ -511,14 +511,14 @@ describe('tool run left unresolved', () => {
 
     expect(await screen.findByText('Explored 2 files')).toBeTruthy()
     expect(container.querySelectorAll('[data-tool-row]')).toHaveLength(0)
-    expect(container.querySelector('[data-tool-summary] button[aria-expanded]')).not.toBeNull()
+    expect(container.querySelector('[data-tool-summary] [role="button"][aria-expanded]')).not.toBeNull()
   })
 
   it('settles once the agent moves on, even mid-turn', async () => {
     const { container } = render(<GroupHarness message={movedOnMessage()} />)
 
     expect(await screen.findByText('Explored 2 files')).toBeTruthy()
-    expect(container.querySelector('[data-tool-summary] button[aria-expanded]')).not.toBeNull()
+    expect(container.querySelector('[data-tool-summary] [role="button"][aria-expanded]')).not.toBeNull()
   })
 })
 

@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 
 interface EmptyHintProps {
   onExample: (prompt: string) => void

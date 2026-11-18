@@ -82,8 +82,8 @@ describe('credentials under a row', () => {
       />
     )
 
-    const plain = screen.getByLabelText('API URL')
-    const secret = screen.getByLabelText('API key')
+    const plain = screen.getByRole('textbox', { name: 'API URL' })
+    const secret = screen.getByRole('textbox', { name: 'API key' })
 
     expect(plain.getAttribute('type')).toBe('text')
     expect(plain.getAttribute('value')).toBe('https://api.linear.app')

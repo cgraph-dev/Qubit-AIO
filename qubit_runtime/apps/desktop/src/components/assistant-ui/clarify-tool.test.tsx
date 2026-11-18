@@ -9,6 +9,7 @@ import { type SessionView, SessionViewProvider } from '@/app/chat/session-view'
 import { hiddenPaneProps } from '@/components/pane-shell/pane-visibility'
 import { $activeTreeGroup, $hoveredTreeGroup } from '@/components/pane-shell/tree/store'
 import { I18nProvider } from '@/i18n'
+import { sakugaInner } from '@/sakuga/ui'
 import { clearClarifyRequest, setClarifyRequest } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
 import { $profiles } from '@/store/profile'
@@ -480,7 +481,10 @@ describe('ClarifyTool keyboard navigation', () => {
     const { respond } = renderLiveClarify()
     const skip = screen.getByRole('button', { name: 'Skip' })
 
-    skip.focus()
+    // The action is a Sakuga host; focus its real inner button and the host
+    // becomes `document.activeElement` (shadow retargeting), which the card
+    // already treats as a focused control.
+    sakugaInner(skip, 'button')?.focus()
 
     expect(fireEvent.keyDown(window, { key: 'Enter' })).toBe(true)
     expect(fireEvent.keyDown(window, { key: 'ArrowDown' })).toBe(true)
@@ -495,7 +499,7 @@ describe('ClarifyTool keyboard navigation', () => {
     // focus afterwards. jsdom's fireEvent.click does not move focus, so
     // focus it explicitly to reproduce the reported bug.
     fireEvent.click(production)
-    production.focus()
+    sakugaInner(production, 'button')?.focus()
     expect(production.getAttribute('aria-pressed')).toBe('true')
     expect(document.activeElement).toBe(production)
 
@@ -513,7 +517,7 @@ describe('ClarifyTool keyboard navigation', () => {
     // Tabbing onto a choice does not stage it. Enter still belongs to
     // activateActive, which confirms the highlighted row (staging by default)
     // rather than falling through as a hands-off keypress.
-    production.focus()
+    sakugaInner(production, 'button')?.focus()
     expect(production.getAttribute('aria-pressed')).toBe('false')
     expect(document.activeElement).toBe(production)
 
@@ -531,7 +535,7 @@ describe('ClarifyTool keyboard navigation', () => {
 
     fireEvent.click(staging)
     fireEvent.click(production)
-    production.focus()
+    sakugaInner(production, 'button')?.focus()
     expect(document.activeElement).toBe(production)
     expect(staging.getAttribute('aria-pressed')).toBe('true')
     expect(production.getAttribute('aria-pressed')).toBe('true')
@@ -703,7 +707,7 @@ describe('ClarifyTool submit shortcut', () => {
       const { respond } = renderLiveClarify({ multiSelect: true })
       const choice = screen.getByRole('button', { name: /staging/ })
       fireEvent.click(choice)
-      choice.focus()
+      sakugaInner(choice, 'button')?.focus()
       fireEvent.keyDown(choice, { key: 'Enter', ...modifier })
       await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
       expect(respond).toHaveBeenCalledWith({ answer: '["staging"]' })

@@ -6,7 +6,7 @@ import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { ArchiveSkillConfirmDialog } from '@/app/learning/archive-skill-confirm-dialog'
 import { CodeEditor } from '@/components/chat/code-editor'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import {
   editLearningNode,
   getLearningNode,

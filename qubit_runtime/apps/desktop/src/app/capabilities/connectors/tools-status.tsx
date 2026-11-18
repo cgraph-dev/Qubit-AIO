@@ -1,5 +1,5 @@
 import { PanelEmpty } from '@/app/overlays/panel'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import type { Translations } from '@/i18n/types'
 

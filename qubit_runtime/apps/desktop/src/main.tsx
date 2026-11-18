@@ -1,4 +1,5 @@
 import './styles.css'
+import './sakuga/sakuga.css'
 // Side-effect: reports in-flight turns to the main process for the quit guard.
 import './store/active-work'
 // Side-effect: mirrors the machine's AC/battery state for poll demotion.
@@ -27,6 +28,8 @@ import { RootErrorBoundary } from './components/error-boundary'
 import { HapticsProvider } from './components/haptics-provider'
 import { RootTooltipProvider } from './components/ui/tooltip'
 import { ProfileI18nProvider as I18nProvider } from './i18n/profile-provider'
+import { SakugaToastHost, configureSakuga, installFxBridge, loadSakugaCore } from './sakuga/ui'
+import { sakugaBaseUrl } from './sakuga/base'
 import { installClipboardShim } from './lib/clipboard'
 import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
@@ -38,6 +41,27 @@ installClipboardShim()
 // theme's computed colors inlined; without this guard a dark-theme selection
 // pastes as near-white text into light-background targets.
 installSelectionCopyColorGuard()
+
+// Sakuga VFX: the vendored engine and components live in `public/sakuga-vfx/`.
+// Resolving against `document.baseURI` works in both shapes this renderer runs
+// in: the Vite dev server (`http://127.0.0.1:5174/` → `/sakuga-vfx/`) and the
+// packaged app loaded with `loadFile` (`file:///…/index.html` → a sibling
+// `sakuga-vfx/` directory). `import.meta.env.BASE_URL` is `./`, which is not a
+// usable script prefix in either case, so it is deliberately not used.
+configureSakuga({ base: sakugaBaseUrl(document.baseURI) })
+// Install the window-level `qubit:fx` bridge and warm the shared canvas engine
+// AFTER first paint. Components load lazily per control, so this is ~40 KB and
+// never the 506 KB toggle. Presentation failures are swallowed by the bus.
+installFxBridge()
+const warmSakuga = () => {
+  void loadSakugaCore().catch(() => {})
+}
+if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+  ;(window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+    .requestIdleCallback(warmSakuga, { timeout: 2500 })
+} else {
+  setTimeout(warmSakuga, 1200)
+}
 
 // The perf probe ships in dev, and in a production build ONLY when explicitly
 // opted in (VITE_PERF_PROBE=1) — this lets the perf harness measure a real,
@@ -109,6 +133,9 @@ if (winParam === 'overlay') {
                     both freeze for seconds despite the main thread being free.
                     Disabling transitions makes navigate() commit at default priority. */}
                   <HashRouter useTransitions={false}>
+                    {/* Lazily loads the Sakuga toast element once; individual
+                        toasts are raised with `showSakugaToast`. */}
+                    <SakugaToastHost />
                     <App />
                   </HashRouter>
                 </RootTooltipProvider>

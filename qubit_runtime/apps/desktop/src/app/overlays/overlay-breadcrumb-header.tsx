@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ChevronRight } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 

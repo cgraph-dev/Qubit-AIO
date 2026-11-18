@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -71,28 +72,28 @@ export function TerminalRail() {
             label={<TipHintLabel hint={newHint && formatCombo(newHint)} text={t.rightSidebar.terminalNew} />}
             placement="right-rail"
           >
-            <button
+            <Button variant="secondary"
               aria-label={t.rightSidebar.terminalNew}
               className={cn(RAIL_ACTION, 'size-7 text-(--ui-text-quaternary)')}
               onClick={() => createTerminal()}
               type="button"
             >
               <Codicon name="add" size="0.8125rem" />
-            </button>
+            </Button>
           </Tip>
         </li>
       </ul>
 
       <div className="flex shrink-0 flex-col items-center pb-1.5">
         <Tip label={t.rightSidebar.terminalHide} placement="right-rail">
-          <button
+          <Button variant="secondary"
             aria-label={t.rightSidebar.terminalHide}
             className={cn(RAIL_ACTION, 'opacity-0 transition-opacity group-hover/rail:opacity-100')}
             onClick={() => setTerminalTakeover(false)}
             type="button"
           >
             <Codicon name="chevron-down" size="0.8125rem" />
-          </button>
+          </Button>
         </Tip>
       </div>
     </div>
@@ -125,7 +126,7 @@ function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: T
             label={<TipHintLabel hint={toggleHint && formatCombo(toggleHint)} text={label} />}
             placement="right-rail"
           >
-            <button
+            <Button variant="secondary"
               aria-label={label}
               aria-selected={active}
               className={cn(
@@ -145,7 +146,7 @@ function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: T
                 name={term.kind === 'agent' ? 'agent' : 'terminal'}
                 size="0.875rem"
               />
-            </button>
+            </Button>
           </Tip>
         </li>
       </ContextMenuTrigger>

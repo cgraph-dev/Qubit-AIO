@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/icons'
 import { cn } from '@/lib/utils'

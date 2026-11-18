@@ -198,7 +198,7 @@ describe('VaultSettings', () => {
 
     fireEvent.change(screen.getByPlaceholderText('Master password'), { target: { value: 'correct horse' } })
     fireEvent.click(
-      screen.getByRole('button', { name: 'Unlock' }).closest('form')!.querySelector('button[type=submit]')!
+      screen.getByRole('button', { name: 'Unlock' }).closest('form')!.querySelector('[role="button"][type=submit]')!
     )
 
     await waitFor(() =>

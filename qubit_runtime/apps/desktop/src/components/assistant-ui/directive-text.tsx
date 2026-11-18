@@ -1,6 +1,7 @@
 'use client'
 
 import type { Unstable_DirectiveFormatter, Unstable_DirectiveSegment, Unstable_TriggerItem } from '@assistant-ui/core'
+import { Button } from '@/components/ui/button'
 import type { TextMessagePartComponent, TextMessagePartProps } from '@assistant-ui/react'
 import type { FC } from 'react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
@@ -625,9 +626,9 @@ const DirectiveChip: FC<{
   }
 
   return activate ? (
-    <button {...props} onClick={activate} type="button">
+    <Button {...props} onClick={activate} type="button">
       {body}
-    </button>
+    </Button>
   ) : (
     <span {...props}>{body}</span>
   )

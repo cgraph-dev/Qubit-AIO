@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   Dialog,
@@ -17,7 +17,6 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { KeyRound, Lock, Plus, ShieldLock, Trash2 } from '@/lib/icons'
@@ -504,15 +503,16 @@ export function VaultSettings({ subpage }: VaultSettingsProps = {}) {
                       </Button>
                     ))}
                   {source.installed && (
-                    <Switch
+                    <Toggle
                       aria-label={source.display_name}
                       checked={source.enabled}
                       disabled={setSourceEnabled.isPending}
-                      onCheckedChange={enabled => {
+                      onChange={enabled => {
                         triggerHaptic('selection')
                         setSourceEnabled.mutate({ name: source.name, enabled })
                       }}
-                    />
+          label={source.display_name}
+        />
                   )}
                 </span>
               }

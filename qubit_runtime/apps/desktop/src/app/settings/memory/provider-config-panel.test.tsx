@@ -1,10 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { sakugaValue } from '@/sakuga/ui'
 import type { MemoryProviderConfig } from '@/types/hermes'
 
 const getMemoryProviderConfig = vi.fn()
 const saveMemoryProviderConfig = vi.fn()
+
+// The text field is a Sakuga host, which getByDisplayValue does not scan; find
+// it by the value it shows instead of changing what the test proves.
+function fieldShowing(value: string): HTMLElement | undefined {
+  return screen.queryAllByRole('textbox').find(element => sakugaValue(element) === value)
+}
 
 vi.mock('@/hermes', () => ({
   getMemoryProviderConfig: (provider: string) => getMemoryProviderConfig(provider),
@@ -123,19 +130,19 @@ describe('ProviderConfigPanel', () => {
   it('hides fields that are not marked inline', async () => {
     await renderPanel()
 
-    await screen.findByDisplayValue('myws')
-    expect(screen.queryByDisplayValue('async')).toBeNull()
+    await waitFor(() => expect(fieldShowing('myws')).toBeTruthy())
+    expect(fieldShowing('async')).toBeUndefined()
     expect(screen.queryByText('Write frequency')).toBeNull()
   })
 
   it('collapses and expands the fields', async () => {
     await renderPanel()
 
-    expect(await screen.findByDisplayValue('myws')).toBeTruthy()
+    await waitFor(() => expect(fieldShowing('myws')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: /Honcho settings/ }))
-    expect(screen.queryByDisplayValue('myws')).toBeNull()
+    expect(fieldShowing('myws')).toBeUndefined()
     fireEvent.click(screen.getByRole('button', { name: /Honcho settings/ }))
-    expect(await screen.findByDisplayValue('myws')).toBeTruthy()
+    await waitFor(() => expect(fieldShowing('myws')).toBeTruthy())
   })
 
   it('autosaves a text field on blur as a one-key partial save', async () => {
@@ -154,7 +161,11 @@ describe('ProviderConfigPanel', () => {
   it('does not save on blur when nothing changed', async () => {
     await renderPanel()
 
-    const workspace = await screen.findByDisplayValue('myws')
+    const workspace = await waitFor(() => {
+      const field = fieldShowing('myws')
+      if (!field) throw new Error('workspace field missing')
+      return field
+    })
     fireEvent.blur(workspace)
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Save' })).toBeNull())
@@ -184,7 +195,7 @@ describe('ProviderConfigPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
 
-    expect(await screen.findByDisplayValue('myws')).toBeTruthy()
+    await waitFor(() => expect(fieldShowing('myws')).toBeTruthy())
   })
 
   it('renders nothing for a provider with no declared config surface', async () => {

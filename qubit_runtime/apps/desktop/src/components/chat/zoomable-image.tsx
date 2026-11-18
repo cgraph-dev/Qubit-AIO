@@ -1,6 +1,7 @@
 'use client'
 
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { type ComponentProps, useEffect } from 'react'
 
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -60,7 +61,7 @@ export function ZoomableImage({
         className={cn('group/image relative inline-block max-w-full align-top', containerClassName)}
         data-slot={slot ?? 'aui_zoomable-image'}
       >
-        <button
+        <Button
           aria-label={canOpen ? copy.openImage : undefined}
           className="contents"
           disabled={!canOpen}
@@ -68,7 +69,7 @@ export function ZoomableImage({
           type="button"
         >
           <img alt={alt ?? ''} className={className} src={src} {...props} />
-        </button>
+        </Button>
         {src && (
           <ImageActionButton className="group-hover/image:opacity-100" copy={copy} onClick={download} saving={saving} />
         )}
@@ -140,7 +141,7 @@ export function ImageLightbox({
               onClick={event => event.stopPropagation()}
               onPointerDown={event => event.stopPropagation()}
             >
-              <button
+              <Button
                 aria-label={copy.zoomOut}
                 className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                 disabled={scale <= 0.25}
@@ -148,16 +149,16 @@ export function ImageLightbox({
                 type="button"
               >
                 <ZoomOut className="size-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 aria-label={copy.resetZoom}
                 className="min-w-14 rounded-full px-2 text-center text-xs font-medium tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 onClick={() => reset()}
                 type="button"
               >
                 {Math.round(scale * 100)}%
-              </button>
-              <button
+              </Button>
+              <Button
                 aria-label={copy.zoomIn}
                 className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                 disabled={scale >= 8}
@@ -165,7 +166,7 @@ export function ImageLightbox({
                 type="button"
               >
                 <ZoomIn className="size-4" />
-              </button>
+              </Button>
             </div>
           )
         }
@@ -220,7 +221,7 @@ export function ImageActionButton({
   saving: boolean
 }) {
   return (
-    <button
+    <Button
       aria-label={saving ? copy.savingImage : copy.downloadImage}
       className={cn(
         'absolute right-2 top-2 grid size-8 place-items-center rounded-full border border-border/70 bg-background/80 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 disabled:opacity-50',
@@ -234,6 +235,6 @@ export function ImageActionButton({
       type="button"
     >
       <Download className={cn('size-4', saving && 'animate-pulse')} />
-    </button>
+    </Button>
   )
 }

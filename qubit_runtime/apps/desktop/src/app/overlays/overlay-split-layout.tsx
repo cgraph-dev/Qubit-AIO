@@ -1,6 +1,6 @@
 import { Fragment, memo, type ReactNode, useEffect, useId, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { TabDropdown } from '@/components/ui/tab-dropdown'
 import { useI18n } from '@/i18n'
@@ -115,7 +115,7 @@ export const OverlayNavItem = memo(function OverlayNavItem({
   trailing
 }: OverlayNavItemProps) {
   return (
-    <button
+    <Button variant="secondary"
       aria-current={current ? 'page' : undefined}
       className={cn(
         'flex h-7 w-full items-center justify-start gap-2 rounded-md border px-2 text-left text-[length:var(--conversation-text-font-size)] font-normal transition-colors',
@@ -142,7 +142,7 @@ export const OverlayNavItem = memo(function OverlayNavItem({
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {trailing}
-    </button>
+    </Button>
   )
 })
 

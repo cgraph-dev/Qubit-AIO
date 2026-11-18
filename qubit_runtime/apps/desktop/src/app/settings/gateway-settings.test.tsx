@@ -3,9 +3,24 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { deferred } from '@/test/deferred'
+import { sakugaValue } from '@/sakuga/ui'
 
 // Collect the component graph before the behavioral test deadline starts.
 import { GatewaySettings } from './gateway-settings'
+
+// The visible field is the Sakuga host; its value lives on the inner control
+// and is mirrored by the host property. Testing Library's getByDisplayValue
+// only scans native input/textarea/select, so look the field up by the value it
+// shows instead of changing what the test proves.
+async function findFieldByValue(value: string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const field = screen.getAllByRole('textbox').find(element => sakugaValue(element) === value)
+
+    if (!field) throw new Error(`no text field displays ${value}`)
+
+    return field
+  })
+}
 
 const { registry, activeId, selectConnection } = vi.hoisted(() => ({
   registry: { value: null as any },
@@ -377,7 +392,7 @@ describe('GatewaySettings', () => {
       render(<GatewaySettings embedded />)
 
       // The env override still owns the URL: the editor stays read-only.
-      expect(((await screen.findByDisplayValue(envUrl)) as HTMLInputElement).disabled).toBe(true)
+      expect(((await findFieldByValue(envUrl)) as HTMLInputElement).disabled).toBe(true)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Nous Research' }))
 
@@ -395,7 +410,7 @@ describe('GatewaySettings', () => {
 
       render(<GatewaySettings embedded />)
 
-      expect(((await screen.findByDisplayValue(envUrl)) as HTMLInputElement).disabled).toBe(false)
+      expect(((await findFieldByValue(envUrl)) as HTMLInputElement).disabled).toBe(false)
       expect(await screen.findByRole('button', { name: 'Sign in with Nous Research' })).toBeTruthy()
       expect(oauthLoginConnectionConfig).not.toHaveBeenCalled()
     })

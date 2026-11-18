@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { Button } from './button'
 
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Tip } from '@/components/ui/tooltip'
@@ -34,14 +35,14 @@ export function Zoomable({ children, overlay, onCopy, label = 'Open full view', 
     <>
       <div className={cn('group/zoomable relative', className)}>
         {/* The whole content is the trigger — click anywhere to open, like an image. */}
-        <button
+        <Button
           aria-label={label}
           className="block w-full cursor-zoom-in text-left"
           onClick={() => setOpen(true)}
           type="button"
         >
           {children}
-        </button>
+        </Button>
         <span
           aria-hidden
           className="pointer-events-none absolute right-2 top-2 grid size-8 place-items-center rounded-full border border-border/70 bg-background/80 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity group-hover/zoomable:opacity-100"
@@ -192,14 +193,14 @@ function Divider() {
 function ToolbarButton({ children, label, onClick }: { children: ReactNode; label: string; onClick: () => void }) {
   return (
     <Tip label={label}>
-      <button
+      <Button
         aria-label={label}
         className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={onClick}
         type="button"
       >
         {children}
-      </button>
+      </Button>
     </Tip>
   )
 }

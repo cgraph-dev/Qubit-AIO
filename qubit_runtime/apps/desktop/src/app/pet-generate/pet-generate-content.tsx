@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -250,14 +251,14 @@ export function PetGenerateContent() {
               {refImage ? (
                 <ReferenceChip name={refName} onRemove={clearReference} src={refImage} />
               ) : (
-                <button
+                <Button variant="secondary"
                   className="ml-auto flex h-6 items-center gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary) transition hover:text-foreground"
                   onClick={() => fileRef.current?.click()}
                   type="button"
                 >
                   <ImageIcon className="size-3" />
                   Add a reference
-                </button>
+                </Button>
               )}
             </div>
 

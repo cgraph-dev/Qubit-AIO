@@ -40,7 +40,7 @@ describe('session refs open the session', () => {
 
     const chip = screen.getByTitle('work/20260101_abc123')
 
-    expect(chip.tagName).toBe('BUTTON')
+    expect(chip.tagName).toBe('SAKUGA-BUTTON')
     fireEvent.click(chip)
 
     await vi.waitFor(() => expect(openSession).toHaveBeenCalledWith('20260101_abc123', expect.any(Function), 'tab'))

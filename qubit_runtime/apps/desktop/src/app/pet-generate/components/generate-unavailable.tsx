@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ExternalLink } from '@/lib/external-link'
 import { PawPrint, Settings2 } from '@/lib/icons'
 

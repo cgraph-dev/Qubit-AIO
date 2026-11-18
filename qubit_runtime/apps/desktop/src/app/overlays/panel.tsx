@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { ActionsContextMenu, ActionsMenu, type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { RowButton } from '@/components/ui/row-button'
 import { SearchField } from '@/components/ui/search-field'
@@ -163,7 +163,7 @@ interface PanelListRowProps {
   title: ReactNode
 }
 
-// A row is a container (not a <button>) so it can host both the select target
+// A row is a container (not a <Button variant="secondary">) so it can host both the select target
 // and a kebab menu without nesting interactive elements. Hover/active bg lives
 // on the wrapper so the whole row highlights as one. When `menuItems` is passed,
 // the whole row also answers right-click with the same actions as its kebab.

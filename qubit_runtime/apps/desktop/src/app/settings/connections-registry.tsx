@@ -3,7 +3,7 @@ import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, u
 
 import { RemoteSetupFields } from '@/components/remote-setup/fields'
 import { useRemoteSetup } from '@/components/remote-setup/use-remote-setup'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Loader } from '@/components/ui/loader'

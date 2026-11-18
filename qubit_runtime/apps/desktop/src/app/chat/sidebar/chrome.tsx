@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 
 import { type NewSessionSplitHandler, startNewProjectDrag, startNewSessionDrag } from '@/app/chat/new-session-drag'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { RowButton } from '@/components/ui/row-button'
@@ -144,7 +144,7 @@ export function SidebarDateDivider({
     // so it borrows the header's hover-revealed "+" verbatim.
     <div className={cn('group/workspace flex select-none items-center gap-2 px-2 pb-0.5 pt-2', className)} {...props}>
       {toggle ? (
-        <button
+        <Button variant="secondary"
           aria-expanded={toggle.open}
           aria-label={toggle.ariaLabel}
           className="flex min-w-0 flex-1 items-center gap-2 bg-transparent text-left"
@@ -157,7 +157,7 @@ export function SidebarDateDivider({
             open={toggle.open}
           />
           {rule}
-        </button>
+        </Button>
       ) : (
         <>
           {caption}
@@ -299,7 +299,7 @@ export function SidebarGroupRow({
         {label}
         {toggle ? (
           <Tip label={toggle.ariaLabel}>
-            <button
+            <Button variant="secondary"
               aria-label={toggle.ariaLabel}
               className="flex flex-1 items-center self-stretch bg-transparent p-0"
               data-row-actions
@@ -310,7 +310,7 @@ export function SidebarGroupRow({
                 className="shrink-0 text-(--ui-text-tertiary) opacity-0 transition group-hover/workspace:opacity-100"
                 open={toggle.open}
               />
-            </button>
+            </Button>
           </Tip>
         ) : (
           <span className="flex-1" />

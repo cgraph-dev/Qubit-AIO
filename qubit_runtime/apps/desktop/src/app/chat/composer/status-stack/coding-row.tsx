@@ -10,7 +10,7 @@ import {
   type MenuKit,
   renderActionItem
 } from '@/components/ui/actions-menu'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import { DiffCount } from '@/components/ui/diff-count'
@@ -214,9 +214,9 @@ export const CodingStatusRow = memo(function CodingStatusRow({
           // It's a button (not the whole row) so the glyph opens the review pane
           // while the strip around it stays inert; size-3.5 fills the slot exactly.
           leading={
-            <button className="flex size-3.5 items-center justify-center" onClick={onOpen} type="button">
+            <Button variant="secondary" className="flex size-3.5 items-center justify-center" onClick={onOpen} type="button">
               <Codicon className="text-(--ui-green)" name="git-branch" size="0.8rem" />
-            </button>
+            </Button>
           }
         >
           <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -228,11 +228,11 @@ export const CodingStatusRow = memo(function CodingStatusRow({
             {/* Branch name — the other half of the review-pane target. `contents`
                 so the button lays out nothing of its own: the label stays the
                 same flex child it always was, and the hit area is the text. */}
-            <button className="contents" onClick={onOpen} type="button">
+            <Button variant="secondary" className="contents" onClick={onOpen} type="button">
               <span className="min-w-0 truncate text-xs font-normal text-muted-foreground/92" title={branchLabel}>
                 {branchLabel}
               </span>
-            </button>
+            </Button>
 
             {/* Worktree path + copy — plain muted text, not a chip. Always in the
                 flex so hover doesn't reflow the row; opacity alone reveals the
@@ -292,7 +292,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
               opens it. `contents` again: the two spans stay direct flex children
               of the row, keeping their gap and `ml-auto` behaviour untouched. */}
           {(status.ahead > 0 || status.behind > 0 || hasLineDelta || untrackedOnly) && (
-            <button className="contents" onClick={onOpen} type="button">
+            <Button variant="secondary" className="contents" onClick={onOpen} type="button">
               {(status.ahead > 0 || status.behind > 0) && (
                 <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[0.68rem] leading-4 text-muted-foreground/75 tabular-nums">
                   {status.ahead > 0 && (
@@ -323,7 +323,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
                   {s.changed(status.untracked)}
                 </span>
               ) : null}
-            </button>
+            </Button>
           )}
         </StatusRow>
       </ActionsContextMenu>

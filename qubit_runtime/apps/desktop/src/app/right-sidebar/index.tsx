@@ -3,7 +3,7 @@ import { type ComponentProps, useCallback, useEffect } from 'react'
 
 import { TreeSkeleton } from '@/components/chat/skeletons'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { useDelayedTrue } from '@/hooks/use-delayed-true'
@@ -299,13 +299,13 @@ function FileTreeBody({
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
         <EmptyState body={r.unreadableBody(error)} title={r.unreadableTitle} />
         {onRetry && (
-          <button
+          <Button variant="secondary"
             className="text-[0.68rem] font-medium text-muted-foreground transition hover:text-foreground"
             onClick={onRetry}
             type="button"
           >
             {r.tryAgain}
-          </button>
+          </Button>
         )}
       </div>
     )
@@ -324,13 +324,13 @@ function FileTreeBody({
       fallback={({ reset }) => (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
           <EmptyState body={r.treeErrorBody} title={r.treeErrorTitle} />
-          <button
+          <Button variant="secondary"
             className="text-[0.68rem] font-medium text-muted-foreground transition hover:text-foreground"
             onClick={reset}
             type="button"
           >
             {r.tryAgain}
-          </button>
+          </Button>
         </div>
       )}
       key={cwd}

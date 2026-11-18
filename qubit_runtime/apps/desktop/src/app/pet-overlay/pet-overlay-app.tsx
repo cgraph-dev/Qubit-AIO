@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -447,7 +448,7 @@ export function PetOverlayApp() {
               its box so the overlay's click-through hit-test still catches it);
               stopPropagation keeps a click from starting a window drag. */}
           {unread && (
-            <button
+            <Button variant="secondary"
               aria-label="Open in Qubit"
               onClick={openApp}
               onPointerDown={e => e.stopPropagation()}
@@ -472,7 +473,7 @@ export function PetOverlayApp() {
               type="button"
             >
               <Mail style={{ height: 13, width: 13 }} />
-            </button>
+            </Button>
           )}
         </div>
       </div>

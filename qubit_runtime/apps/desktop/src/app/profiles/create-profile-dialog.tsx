@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ActionStatus } from '@/components/ui/action-status'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import {
   Dialog,
   DialogContent,

@@ -64,12 +64,12 @@ const FullEmojiPicker: FC<{ onSelect: (emoji: string) => void }> = ({ onSelect }
             </div>
           ),
           Emoji: ({ emoji, ...props }) => (
-            <button
+            <Button
               className={cn('grid size-8 shrink-0 place-items-center rounded-md text-lg', cellTint(emoji.emoji))}
               {...props}
             >
               {emoji.emoji}
-            </button>
+            </Button>
           ),
           Row: ({ children, ...props }) => (
             <div className="flex px-1" {...props}>
@@ -175,7 +175,7 @@ export const ReactionBadge: FC<{
     >
       {reactions.map(reaction =>
         reaction.author === 'user' && onRetract ? (
-          <button
+          <Button
             aria-label={`Remove ${reaction.emoji} reaction`}
             className="reaction-pop cursor-pointer leading-none transition-transform hover:scale-110 active:scale-95"
             key={`${reaction.author}-${reaction.emoji}`}
@@ -192,7 +192,7 @@ export const ReactionBadge: FC<{
             type="button"
           >
             {reaction.emoji}
-          </button>
+          </Button>
         ) : (
           <span
             className="reaction-pop leading-none"

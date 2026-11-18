@@ -1,8 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Button, Checkbox } from '@/sakuga/ui'
 import {
   Dialog,
   DialogContent,
@@ -271,9 +270,10 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
               {loaded && loaded.secureTokenStorage === false && Boolean(token.trim()) && (
                 <label className="flex items-start gap-2 text-xs text-(--ui-text-secondary)">
                   <Checkbox
+                    aria-label={p.plainTextOptIn}
                     checked={allowPlainText}
                     className="mt-0.5"
-                    onCheckedChange={checked => setAllowPlainText(checked === true)}
+                    onChange={checked => setAllowPlainText(checked === true)}
                   />
                   <span>{p.plainTextOptIn}</span>
                 </label>

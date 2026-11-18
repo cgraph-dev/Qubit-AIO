@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
 import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import {
   Dialog,
@@ -299,7 +299,7 @@ export function ProjectDialog() {
             </div>
             <div className="flex flex-wrap items-center gap-1">
               {templates.map(template => (
-                <button
+                <Button variant="secondary"
                   className="flex items-center gap-1 rounded-full border border-(--ui-stroke-tertiary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-secondary) transition-colors hover:border-(--ui-stroke-secondary) hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:opacity-50"
                   disabled={submitting}
                   key={template.label}
@@ -308,7 +308,7 @@ export function ProjectDialog() {
                 >
                   <span aria-hidden>{template.emoji}</span>
                   {template.label}
-                </button>
+                </Button>
               ))}
               <Tip label={p.ideaShuffle}>
                 <Button

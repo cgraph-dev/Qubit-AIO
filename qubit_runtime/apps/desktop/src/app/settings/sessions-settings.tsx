@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { restoreListedSession } from '@/app/session/hooks/use-session-actions/utils'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
 import {

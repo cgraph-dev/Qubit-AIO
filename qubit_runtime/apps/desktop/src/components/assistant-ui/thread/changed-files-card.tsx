@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react'
+import { Button } from '@/components/ui/button'
 import { type FC, useMemo } from 'react'
 
 import { useComposerScope } from '@/app/chat/composer/scope'
@@ -48,18 +49,18 @@ export const ChangedFilesCard: FC<{ parts: readonly unknown[] }> = ({ parts }) =
     >
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-(--ui-text-primary)">{copy.filesChanged(files.length)}</span>
-        <button
+        <Button
           className="shrink-0 cursor-pointer text-(--ui-text-tertiary) transition-colors hover:text-(--ui-text-primary)"
           onClick={() => revealReview(scopeCwd, composerScope.target)}
           type="button"
         >
           {copy.reviewChanges}
-        </button>
+        </Button>
       </div>
       <FadeScroll className="-mx-1.5 mt-1.5 flex flex-col overscroll-y-auto px-1.5" maxHeight={MAX_ROWS_HEIGHT}>
         {files.map(file => (
           <Tip key={file.path} label={displayPath(file.path)}>
-            <button
+            <Button
               className="row-hover flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 text-left"
               onClick={() => void openReviewForPath(file.path, scopeCwd, composerScope.target)}
               type="button"
@@ -67,7 +68,7 @@ export const ChangedFilesCard: FC<{ parts: readonly unknown[] }> = ({ parts }) =
               <FileTypeIcon className="shrink-0 text-(--ui-text-tertiary)" path={file.path} size="0.875rem" />
               <span className="min-w-0 flex-1 truncate text-(--ui-text-secondary)">{file.name}</span>
               <DiffCount added={file.added} removed={file.removed} />
-            </button>
+            </Button>
           </Tip>
         ))}
       </FadeScroll>

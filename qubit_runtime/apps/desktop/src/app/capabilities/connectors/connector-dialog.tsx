@@ -1,11 +1,10 @@
 import { type ReactNode, type RefObject, useRef } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { ConnectorLogo } from '@/components/ui/connector-logo'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
 import { connectorIconUrl } from '@/lib/connector-tools'
 import { X } from '@/lib/icons'
@@ -177,21 +176,21 @@ function HeaderActions({
       ) : null}
 
       {local && !hosted && localWay?.installed === true && card.plugin === undefined && onServerToggle ? (
-        <Switch
+        <Toggle
           aria-label={localWay.serverEnabled === true ? copy.turnServerOff(card.name) : copy.turnServerOn(card.name)}
           checked={localWay.serverEnabled ?? false}
-          onCheckedChange={onServerToggle}
-          size="xs"
+          onChange={onServerToggle}
+          label={localWay.serverEnabled === true ? copy.turnServerOff(card.name) : copy.turnServerOn(card.name)}
         />
       ) : null}
 
       {appSwitch && hosted && onToggleForMe ? (
-        <Switch
+        <Toggle
           aria-label={t.connectorsPage.dialog.appSwitch(card.name)}
           checked={hosted.state !== 'off'}
           disabled={card.offBy === 'org' || togglePending || rulesReadOnly}
-          onCheckedChange={onToggleForMe}
-          size="xs"
+          onChange={onToggleForMe}
+          label={t.connectorsPage.dialog.appSwitch(card.name)}
         />
       ) : null}
 

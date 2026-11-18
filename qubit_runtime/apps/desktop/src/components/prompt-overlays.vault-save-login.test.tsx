@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { stubResizeObserver } from '@/test/jsdom'
@@ -10,6 +10,7 @@ import { PromptOverlays } from '@/components/prompt-overlays'
 import { $gateway } from '@/store/gateway'
 import { $profiles } from '@/store/profile'
 import { clearAllPrompts, sessionVaultSaveLoginRequest, setVaultSaveLoginRequest } from '@/store/prompts'
+import { typeIntoSakuga } from '@/sakuga/ui'
 import { hasOpenServerRequest, rememberServerRequest, resetServerRequestsForTests } from '@/store/server-requests'
 import { $activeSessionId, _resetSessionOwnerHintsForTests, setSessionOwnerHint } from '@/store/session'
 
@@ -48,14 +49,14 @@ it('answers the vault.save_login server request with identifier + password as on
   })
 
   render(<PromptOverlays sessionId="session-a" />)
-  const identifier = document.querySelector('input[autocomplete=username]') as HTMLInputElement
-  const password = document.querySelector('input[type=password]') as HTMLInputElement
-  const submit = document.querySelector('button[type=submit]') as HTMLButtonElement
-  expect(submit.disabled).toBe(true)
-  fireEvent.change(identifier, { target: { value: 'tek@acme.test' } })
-  expect(submit.disabled).toBe(true)
-  fireEvent.change(password, { target: { value: 'fixture-pw' } })
-  expect(submit.disabled).toBe(false)
+  const identifier = document.querySelectorAll('sakuga-input')[0] as HTMLElement
+  const password = document.querySelectorAll('sakuga-input')[1] as HTMLElement
+  const submit = document.querySelector('[data-sakuga-submit]') as HTMLElement
+  expect(submit.hasAttribute('disabled')).toBe(true)
+  act(() => typeIntoSakuga(identifier, 'tek@acme.test'))
+  expect(submit.hasAttribute('disabled')).toBe(true)
+  act(() => typeIntoSakuga(password, 'fixture-pw'))
+  expect(submit.hasAttribute('disabled')).toBe(false)
   fireEvent.submit(password.closest('form')!)
 
   await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
@@ -83,8 +84,7 @@ it("Don't save answers an empty login and clears the card", async () => {
   })
 
   render(<PromptOverlays sessionId="session-a" />)
-  const decline = Array.from(document.querySelectorAll('button')).find(b => b.textContent === "Don't save")!
-  fireEvent.click(decline)
+  fireEvent.click(screen.getByRole('button', { name: "Don't save" }))
 
   await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
   expect(respond).toHaveBeenCalledWith({ value: '' })

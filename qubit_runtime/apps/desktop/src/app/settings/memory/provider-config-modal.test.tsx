@@ -1,9 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { sakugaValue } from '@/sakuga/ui'
 import type { MemoryProviderConfig, MemoryProviderField } from '@/types/hermes'
 
 const saveMemoryProviderConfig = vi.fn()
+
+// Text fields are Sakuga hosts, which Testing Library's getByDisplayValue does
+// not scan; find the field by the value it shows. Native controls (number,
+// textarea) keep their display-value queries.
+function fieldShowing(value: string): HTMLElement | undefined {
+  return screen.queryAllByRole('textbox').find(element => sakugaValue(element) === value)
+}
 
 vi.mock('@/hermes', () => ({
   saveMemoryProviderConfig: (provider: string, values: unknown) => saveMemoryProviderConfig(provider, values)
@@ -95,7 +103,7 @@ describe('ProviderConfigModal', () => {
     // bool -> switch, number -> spinbutton, json/text -> textbox
     expect(screen.getByRole('switch')).toBeTruthy()
     expect(screen.getByDisplayValue('1200')).toBeTruthy()
-    expect(screen.getByDisplayValue('myws')).toBeTruthy()
+    expect(fieldShowing('myws')).toBeTruthy()
     expect(screen.getByDisplayValue('{"t":"eri"}')).toBeTruthy()
   })
 

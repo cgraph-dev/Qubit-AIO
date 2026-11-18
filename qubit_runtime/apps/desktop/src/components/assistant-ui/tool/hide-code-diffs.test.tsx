@@ -54,7 +54,7 @@ it('keeps edit counts without code in either display mode and restores disclosur
     await waitFor(() => expect(container.querySelector('[data-tool-row][data-file-edit]')).not.toBeNull())
     const row = container.querySelector('[data-tool-row]')!
     // An explicitly open historical row must not override the preference.
-    const toggle = row.querySelector('button[aria-expanded]')!
+    const toggle = row.querySelector('[role="button"][aria-expanded]')!
     fireEvent.click(toggle)
     fireEvent.click(toggle)
 
@@ -68,7 +68,7 @@ it('keeps edit counts without code in either display mode and restores disclosur
       expect(row.textContent).toContain('−1')
       expect(row.textContent).not.toContain('afterEdit')
       expect(row.textContent).not.toContain('beforeEdit')
-      expect(row.querySelector('pre, code, button[aria-expanded]')).toBeNull()
+      expect(row.querySelector('pre, code, [role="button"][aria-expanded]')).toBeNull()
       expect($hideCodeDiffs.get()).toBe(true)
       expect(localStorage.getItem('hermes.desktop.toolView.hideCodeDiffs')).toBe('true')
     }
@@ -89,7 +89,7 @@ it('still discloses failed edits when code diffs are hidden', async () => {
     </ThreadRuntime>
   )
 
-  const toggle = container.querySelector('[data-tool-row] button[aria-expanded]')!
+  const toggle = container.querySelector('[data-tool-row] [role="button"][aria-expanded]')!
   expect(toggle).not.toBeNull()
   fireEvent.click(toggle)
   expect(await screen.findByText('File is read-only')).toBeTruthy()

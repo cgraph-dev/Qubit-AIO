@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { TitlebarIcon } from '@/app/shell/titlebar-icon'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { PageLoader } from '@/components/page-loader'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
   Pagination,
@@ -551,7 +551,7 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: 
 }
 
 // Single click target for any row cell. External URLs render as <ExternalLink>;
-// local actions render as <button>. Padding lives here, NOT on the <td>, so
+// local actions render as <Button variant="secondary">. Padding lives here, NOT on the <td>, so
 // the entire cell area is hoverable and clickable in both branches.
 function ArtifactCellAction({
   children,

@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { compactNumber } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
@@ -369,7 +370,7 @@ export function SubagentRow({ node, depth = 0, nowMs }: { node: SubagentNode; de
 
   return (
     <div className={cn('grid min-w-0 max-w-full gap-2', depth > 0 && 'pl-4')} data-slot="tool-block" ref={enterRef}>
-      <button
+      <Button variant="secondary"
         aria-expanded={open}
         className="group flex w-full min-w-0 items-start gap-2.5 text-left"
         onClick={() => setOpen(v => !v)}
@@ -392,7 +393,7 @@ export function SubagentRow({ node, depth = 0, nowMs }: { node: SubagentNode; de
           ) : null}
         </span>
         {running ? <ActivityTimerText className="mt-1 shrink-0 text-[0.6rem]" seconds={durationSeconds} /> : null}
-      </button>
+      </Button>
 
       {visibleRows.length > 0 ? (
         <div className="grid min-w-0 gap-1 pl-6" data-selectable-text="true">

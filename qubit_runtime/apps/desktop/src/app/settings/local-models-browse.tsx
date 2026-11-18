@@ -1,7 +1,7 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { SearchField } from '@/components/ui/search-field'
 import {
   downloadBrowsedModel,

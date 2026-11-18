@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 /**
  * Cmd-K "Pets…" page — browse the petdex gallery, adopt/switch, toggle off.
  *
@@ -76,7 +77,7 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
   return (
     <div role="listbox">
       {onGenerate && (
-        <button
+        <Button variant="secondary"
           className={cn(
             'flex w-full items-center gap-2 rounded-md text-left text-foreground transition-colors hover:bg-(--chrome-action-hover)',
             HUD_ITEM,
@@ -90,7 +91,7 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
             <Egg className="size-4" />
           </span>
           <span className="font-medium">{t.commandCenter.generatePet.title}</span>
-        </button>
+        </Button>
       )}
 
       {error && <p className="px-2 pb-1 pt-1.5 text-[0.6875rem] text-(--ui-red)">{error}</p>}
@@ -103,7 +104,7 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
           const isBusy = busy === pet.slug
 
           return (
-            <button
+            <Button variant="secondary"
               className={cn(
                 'flex w-full items-center gap-2 rounded-md text-left transition-colors hover:bg-(--chrome-action-hover) disabled:opacity-60',
                 HUD_ITEM,
@@ -145,7 +146,7 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
                   <Check className="size-3.5 text-foreground" />
                 ) : null}
               </span>
-            </button>
+            </Button>
           )
         })
       )}
@@ -179,7 +180,7 @@ export function PetInlineToggle() {
   }
 
   return (
-    <button
+    <Button variant="secondary"
       aria-label={enabled ? copy.turnOff : copy.turnOn}
       aria-pressed={enabled}
       className={cn(
@@ -195,6 +196,6 @@ export function PetInlineToggle() {
       type="button"
     >
       {busy ? <Loader2 className="size-4 animate-spin" /> : <PawPrint className="size-4" />}
-    </button>
+    </Button>
   )
 }

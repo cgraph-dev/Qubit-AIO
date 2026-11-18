@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { ColorSwatches } from '@/components/ui/color-swatches'
 import { Tip } from '@/components/ui/tooltip'
@@ -63,7 +64,7 @@ export function ProjectAppearancePicker({ color, icon, noColorLabel, onColor, on
       <div className="mt-2 grid grid-cols-6 gap-1.5">
         {PROJECT_ICONS.map(name => (
           <Tip key={name} label={name}>
-            <button
+            <Button variant="secondary"
               aria-label={name}
               className={cn(
                 'grid aspect-square place-items-center rounded-md text-(--ui-text-tertiary) transition hover:bg-(--ui-control-hover-background)',
@@ -74,7 +75,7 @@ export function ProjectAppearancePicker({ color, icon, noColorLabel, onColor, on
               type="button"
             >
               <Codicon name={name} size="0.8125rem" />
-            </button>
+            </Button>
           </Tip>
         ))}
       </div>

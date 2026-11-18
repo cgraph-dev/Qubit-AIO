@@ -1,5 +1,5 @@
 import { PixelEggSprite } from '@/components/pet/pixel-egg-sprite'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
@@ -56,7 +56,7 @@ export function DraftGrid({
 
           return (
             <div className="group relative aspect-[192/208]" key={draft ? `draft-${draft.index}` : `slot-${i}`}>
-              <button
+              <Button variant="secondary"
                 className={cn(
                   'absolute inset-0 flex items-center justify-center overflow-hidden',
                   selectableCardClass({ active: isSelected, prominent: true })
@@ -80,7 +80,7 @@ export function DraftGrid({
                     <span className="pet-egg-shadow pet-egg-shadow--sm" style={{ marginTop: '-0.3rem' }} />
                   </div>
                 )}
-              </button>
+              </Button>
 
               {/* Remix: branch a new round off this look. Revealed on hover/focus. */}
               {draft != null && !generating && (

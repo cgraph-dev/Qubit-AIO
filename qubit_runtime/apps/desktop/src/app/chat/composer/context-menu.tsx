@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { composerPanelCard } from '@/components/chat/composer-dock'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -138,7 +138,7 @@ function PromptSnippetsDialog({ onInsertText, onOpenChange, open }: PromptSnippe
 
             return (
               <li key={key}>
-                <button
+                <Button variant="secondary"
                   className="group/snippet flex w-full cursor-pointer items-start gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-left transition-colors hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) focus-visible:border-(--ui-stroke-tertiary) focus-visible:bg-(--ui-control-hover-background) focus-visible:outline-none"
                   onClick={() => {
                     onInsertText(snippet.text)
@@ -153,7 +153,7 @@ function PromptSnippetsDialog({ onInsertText, onOpenChange, open }: PromptSnippe
                       {snippet.description}
                     </span>
                   </span>
-                </button>
+                </Button>
               </li>
             )
           })}

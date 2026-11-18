@@ -1,4 +1,5 @@
 import { useAuiState } from '@assistant-ui/react'
+import { Button } from '@/components/ui/button'
 import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 
@@ -55,7 +56,7 @@ export function AskDirective({ attrs, streaming }: { attrs: Record<string, strin
       {options.length > 0 && (
         <div className="flex min-w-0 max-w-full flex-wrap gap-2">
           {options.map(option => (
-            <button
+            <Button
               className={cn(
                 'max-w-full shrink-0 rounded-full border px-3 py-1.5 text-left text-[12px] whitespace-normal wrap-anywhere transition-colors',
                 picked === option
@@ -70,7 +71,7 @@ export function AskDirective({ attrs, streaming }: { attrs: Record<string, strin
               type="button"
             >
               {option}
-            </button>
+            </Button>
           ))}
         </div>
       )}
