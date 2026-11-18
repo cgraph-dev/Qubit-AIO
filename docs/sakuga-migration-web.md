@@ -434,3 +434,87 @@ Documented native exceptions after this sweep:
   buttons in Agent Workspace / Agent Cards / Kitchen stayed native because
   their tests address real `button[role=tab]` nodes and their strips carry
   counts/icons that the Sakuga tab options cannot express.
+
+## Pass E — remaining web controls + achievements plugin (2026-11-18)
+
+Owner ask: "find even more places". This pass closes the form/upload/disclosure gaps
+and converts the bundled Achievements plugin.
+
+### Achievements plugin (bundled IIFE, not a React source tree)
+
+Changed both copies (`qubit_runtime/plugins/qubit-achievements/dashboard/dist/` and the
+served `frontend/qubit-web/public/plugins/qubit-achievements/dist/`):
+
+- A small local loader injects `/sakuga-vfx/button/button.js` and
+  `/sakuga-vfx/progress/progress.js` once and renders `sakuga-button` /
+  `sakuga-progress` with the SDK's single React runtime.
+- `SakugaProgress` writes `value` as an **attribute** from a ref (the property is a
+  read-only getter, so React assigning it would throw); verified live with an
+  in-progress payload: `value="0.5"`, `el.value === 0.5`, no page error.
+- Converted: Rescan/Reset/Confirm reset/Cancel, the category and visibility filter
+  pill strips, share trigger, Share-on-X / Copy image / Download PNG, the share-close
+  button, and the in-flight scan banner bar.
+- Added a hover/focus/tap/Escape tooltip to the tier badge (reuses the dashboard's
+  shared `.qsk-hover-tip` classes). The plugin's API calls, i18n, share canvas,
+  badges, links and card grid are unchanged.
+- Kept native: the per-card progress **metric bar** (dense data visualisation inside
+  each card, not an action or a busy indicator; 60 cards would otherwise each carry
+  poster-sized progress chrome). The filter strips are wrapping pill lists, not a
+  tab strip, so they use Sakuga buttons with `aria-pressed` rather than
+  `sakuga-tabs` (which does not wrap).
+- `node --check` passes on both copies. Measured in the dev browser: 81 Sakuga
+  controls on the page, 0 native light-DOM buttons inside `.ha-page`, filter click
+  60 → 10 cards with `aria-pressed=true`, tier tooltip opens and Escape closes it,
+  share dialog opens with 3 Sakuga actions + Sakuga close, scan progress at 50%.
+
+### Web dashboard controls
+
+- **Voice Edit** — all 17 numeric tuning inputs are `NumberField` (Sakuga frame +
+  steppers). String-backed fields (wake/session/continuous) stay uncontrolled with
+  empty/raw-string passthrough and remount only when server settings are applied
+  (`numericEpoch`), so typing `0.0025` is not parsed/reset mid-keystroke; test ids
+  travel through `inputProps`. Settings-backed fields are controlled and clamp as
+  before. Live check: `0.0025` stayed in the field; 32 steppers rendered.
+- **Composers** — `ChatPage` (`#qubit-chat-input`), `WebChatPage`, `QubitBotPage`
+  now use `Textarea` with `autoResize`, `onKeyDown`, `onPaste`/`onDrop` preserved.
+  Live check: chat composer grew 56 → 108 px on five lines. `TerminalChatPage` has
+  no app textarea — its composer is xterm's hidden textarea (third-party exception).
+- **Hidden uploads** — Config import, Chat attach, System restore zip, Files upload,
+  Kitchen folder (`directory` + `multiple`) and Sessions import are `FileField` with
+  `showList={false}`, the existing icon/text trigger as children, and the old refs
+  retained (the Files drop surface still opens the same input). Upload/import
+  handlers now take `File[]`.
+- **Listbox / disclosures** — the ChatPage slash-command option rows use
+  `ListItem` (role/aria-selected/keyboard handled by the composer as before);
+  ThemeSwitcher and SlashPopover already used `ListItem`. Logs line disclosure and
+  the ToolCards "Explore full result" button are Sakuga controls; the Files drop
+  surface is a `ListItem` inside a drag/drop wrapper.
+- **Busy states** — Analytics' settings skeleton and WebChat's opening session are
+  `SakugaLoading`; Agents/Models/Sessions/Config/System already were.
+- **More tooltips** — icon/refresh/action hints added on Analytics, Models, Agents,
+  Profiles, Files upload, Chat attach/voice, plus the Config and Channels surfaces
+  that already had them. Hover/focus/tap/Escape verified on Models (`Refresh`).
+
+### Evidence
+
+- `npx tsc -b` clean; `npx vitest run` **171 files / 1352 tests passed**.
+- `python3 scripts/check_sakuga_vendor.py` OK (2 copies);
+  `python3 scripts/sync_sakuga_shared.py --check` OK (17 files).
+- Browser: temp Vite dev server `:8891` proxying live `:8890`; the plugin entry/CSS
+  were route-intercepted from this worktree because the live backend still serves
+  the installed copy. Routes `/achievements`, `/config`, `/sessions`, `/files`,
+  `/models`, `/plugins`, `/system`, `/chat`, `/qubit-chat`, `/skills/review`,
+  `/voice-edit`: no app console/page errors and no failed API requests. The only
+  console noise was the dev server's `@fs` font allowlist 403 for two DS fonts
+  (outside Vite's serving allow list; not a product error). Not deployed to the live
+  service — `:8890` still serves the previous bundle and installed plugin copy.
+
+### Exceptions after this pass
+
+| Control | Reason |
+|---|---|
+| Achievements card progress bar | dense per-card metric visualisation (see above) |
+| `TerminalChatPage` composer | xterm's hidden textarea (third-party widget internals) |
+| `SakugaGalleryPage` pill buttons | the Sakuga gallery's own raw demo controls |
+| Radix portal menus/dialog internals | third-party widget internals; their own triggers are Sakuga |
+| `type="number"` inside `SakugaNumber`, `Textarea` inside `SakugaTextarea`, `<input type=file>` inside `FileField` | these are the native controls the Sakuga extras intentionally compose |
