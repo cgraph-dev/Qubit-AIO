@@ -28,23 +28,15 @@ import { api } from "@/lib/api";
 import type { ActiveProfileInfo, ProfileInfo } from "@/lib/api";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
-import {
-  Select,
-  SelectOption,
-} from "@nous-research/ui/ui/components/select";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
+import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Mirrors qubit_cli/profiles.py::_PROFILE_ID_RE so we can reject obviously
 // invalid names (uppercase, spaces, …) before round-tripping a doomed POST.
@@ -131,8 +123,7 @@ function ProfileActionsMenu({
   return (
     <div className="relative" data-profile-actions ref={containerRef}>
       <Button
-        ghost
-        size="icon"
+        variant="secondary"
         title={labels.actions}
         aria-label={labels.actions}
         aria-haspopup="menu"
@@ -148,8 +139,8 @@ function ProfileActionsMenu({
           className="absolute right-0 top-full z-50 mt-1 min-w-[200px] border border-border bg-card shadow-lg"
         >
           {!isActive && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               role="menuitem"
               className={itemClass}
               disabled={settingActive}
@@ -157,11 +148,11 @@ function ProfileActionsMenu({
             >
               <Check className="h-4 w-4" />
               {labels.setActive}
-            </button>
+            </Button>
           )}
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             role="menuitem"
             className={itemClass}
             onClick={run(onEditModel)}
@@ -172,10 +163,10 @@ function ProfileActionsMenu({
               <Cpu className="h-4 w-4" />
             )}
             {labels.editModel}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             role="menuitem"
             className={itemClass}
             onClick={run(onEditDescription)}
@@ -186,10 +177,10 @@ function ProfileActionsMenu({
               <AlignLeft className="h-4 w-4" />
             )}
             {labels.editDescription}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             role="menuitem"
             className={itemClass}
             onClick={run(onEditSoul)}
@@ -202,50 +193,50 @@ function ProfileActionsMenu({
               </span>
             )}
             {labels.editSoul}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             role="menuitem"
             className={itemClass}
             onClick={run(onManageSkills)}
           >
             <Package className="h-4 w-4" />
             {labels.manageSkills}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             role="menuitem"
             className={itemClass}
             onClick={run(onCopyCommand)}
           >
             <Terminal className="h-4 w-4" />
             {labels.openInTerminal}
-          </button>
+          </Button>
 
           {!isDefault && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               role="menuitem"
               className={cn(itemClass, "border-t border-border/50")}
               onClick={run(onRename)}
             >
               <Pencil className="h-4 w-4" />
               {labels.rename}
-            </button>
+            </Button>
           )}
 
           {!isDefault && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               role="menuitem"
               className={cn(itemClass, "text-destructive hover:bg-destructive/10")}
               onClick={run(onDelete)}
             >
               <Trash2 className="h-4 w-4" />
               {labels.delete}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -258,7 +249,10 @@ export default function ProfilesPage() {
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
   const [activeInfo, setActiveInfo] = useState<ActiveProfileInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
   const { t } = useI18n();
   const { setEnd } = usePageHeader();
   const { setProfile } = useProfileScope();
@@ -781,19 +775,10 @@ export default function ProfilesPage() {
   useLayoutEffect(() => {
     setEnd(
       <div className="flex items-center gap-2">
-        <Button
-          className="uppercase"
-          size="sm"
-          outlined
-          onClick={() => navigate("/profiles/new")}
-        >
+        <Button variant="secondary" className="uppercase" onClick={() => navigate("/profiles/new")}>
           Build
         </Button>
-        <Button
-          className="uppercase"
-          size="sm"
-          onClick={() => setCreateModalOpen(true)}
-        >
+        <Button className="uppercase" onClick={() => setCreateModalOpen(true)}>
           {t.common.create}
         </Button>
       </div>,
@@ -821,7 +806,6 @@ export default function ProfilesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Toast toast={toast} />
 
       <DeleteConfirmDialog
         open={profileDelete.isOpen}
@@ -851,8 +835,7 @@ export default function ProfilesPage() {
             )}
           >
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               onClick={() => setCreateModalOpen(false)}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
@@ -875,17 +858,12 @@ export default function ProfilesPage() {
 
                 <Input
                   id="profile-name"
-                  autoFocus
+                  label={t.profiles.name}
                   placeholder={t.profiles.namePlaceholder}
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleCreate();
-                  }}
-                  aria-invalid={
-                    newName.trim() !== "" &&
-                    !PROFILE_NAME_RE.test(newName.trim())
-                  }
+                  onChange={setNewName}
+                  onEnter={() => handleCreate()}
+                  className="qsk-field"
                 />
 
                 <p className="text-xs text-muted-foreground">
@@ -897,20 +875,18 @@ export default function ProfilesPage() {
                 <Label htmlFor="clone-from">{t.profiles.cloneFrom}</Label>
                 <Select
                   id="clone-from"
+                  label={t.profiles.cloneFrom}
                   value={cloneFrom ?? ""}
-                  onValueChange={(v) => {
+                  onChange={(v) => {
                     const next = v || null;
                     setCloneFrom(next);
                     if (next === null) setCloneAll(false);
                   }}
-                >
-                  <SelectOption value="">{t.profiles.cloneFromNone}</SelectOption>
-                  {profiles.map((profile) => (
-                    <SelectOption key={profile.name} value={profile.name}>
-                      {profile.name}
-                    </SelectOption>
-                  ))}
-                </Select>
+                  options={[
+                    { value: "", label: t.profiles.cloneFromNone },
+                    ...profiles.map((profile) => ({ value: profile.name, label: profile.name })),
+                  ]}
+                />
               </div>
 
               <div className="grid gap-2">
@@ -932,23 +908,18 @@ export default function ProfilesPage() {
 
                 <Select
                   id="profile-model"
+                  label={L.modelOptional}
                   value={modelChoice}
                   disabled={modelChoices === null}
-                  onValueChange={setModelChoice}
-                >
-                  <SelectOption value="">
-                    {modelChoices === null ? L.modelLoading : L.modelInherit}
-                  </SelectOption>
-
-                  {(modelChoices ?? []).map((c) => (
-                    <SelectOption
-                      key={`${c.provider}\u0000${c.model}`}
-                      value={`${c.provider}\u0000${c.model}`}
-                    >
-                      {c.label}
-                    </SelectOption>
-                  ))}
-                </Select>
+                  onChange={setModelChoice}
+                  options={[
+                    { value: "", label: modelChoices === null ? L.modelLoading : L.modelInherit },
+                    ...(modelChoices ?? []).map((c) => ({
+                      value: `${c.provider}\u0000${c.model}`,
+                      label: c.label,
+                    })),
+                  ]}
+                />
 
                 {modelChoices !== null && modelChoices.length === 0 && (
                   <p className="text-xs text-muted-foreground">{L.modelNone}</p>
@@ -965,7 +936,8 @@ export default function ProfilesPage() {
                     checked={cloneAll}
                     disabled={!cloning}
                     id="clone-all"
-                    onCheckedChange={(checked) => setCloneAll(checked === true)}
+                    aria-label={L.cloneAll}
+                    onChange={(checked) => setCloneAll(checked === true)}
                   />
 
                   <Label
@@ -983,8 +955,9 @@ export default function ProfilesPage() {
                   <Checkbox
                     checked={noSkills}
                     id="no-skills"
+                    aria-label={L.noSkillsOption}
                     disabled={cloning}
-                    onCheckedChange={(checked) => setNoSkills(checked === true)}
+                    onChange={(checked) => setNoSkills(checked === true)}
                   />
 
                   <Label
@@ -1000,12 +973,7 @@ export default function ProfilesPage() {
               </fieldset>
 
               <div className="flex justify-end">
-                <Button
-                  className="uppercase"
-                  size="sm"
-                  onClick={handleCreate}
-                  disabled={creating}
-                >
+                <Button className="uppercase" onClick={handleCreate} disabled={creating}>
                   {creating ? t.common.creating : t.common.create}
                 </Button>
               </div>
@@ -1106,13 +1074,12 @@ export default function ProfilesPage() {
                       })()}
 
                       <div className="flex gap-1.5">
-                        <Button size="sm" onClick={handleRenameSubmit}>
+                        <Button onClick={handleRenameSubmit}>
                           {t.common.save}
                         </Button>
 
                         <Button
-                          size="sm"
-                          ghost
+                          variant="secondary"
                           onClick={() => setRenamingFrom(null)}
                         >
                           {t.common.cancel}
@@ -1276,8 +1243,7 @@ export default function ProfilesPage() {
             )}
           >
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               onClick={closeEditor}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
@@ -1311,26 +1277,19 @@ export default function ProfilesPage() {
                 ) : (
                   <>
                     <Select
+                      label={L.modelSelect}
                       value={modelEditChoice}
                       disabled={modelChoices === null}
-                      placeholder={
-                        modelChoices === null ? L.modelLoading : L.modelSelect
-                      }
-                      onValueChange={setModelEditChoice}
-                    >
-                      {(modelChoices ?? []).map((c) => (
-                        <SelectOption
-                          key={`${c.provider}\u0000${c.model}`}
-                          value={`${c.provider}\u0000${c.model}`}
-                        >
-                          {c.label}
-                        </SelectOption>
-                      ))}
-                    </Select>
+                      placeholder={modelChoices === null ? L.modelLoading : L.modelSelect}
+                      onChange={setModelEditChoice}
+                      options={(modelChoices ?? []).map((c) => ({
+                        value: `${c.provider}\u0000${c.model}`,
+                        label: c.label,
+                      }))}
+                    />
 
                     <div className="flex justify-end">
                       <Button
-                        size="sm"
                         className="uppercase"
                         onClick={() => handleSaveModel(editorName)}
                         disabled={
@@ -1359,8 +1318,7 @@ export default function ProfilesPage() {
                     </Label>
 
                     <Button
-                      size="sm"
-                      ghost
+                      variant="secondary"
                       className="gap-1.5"
                       disabled={describing}
                       onClick={() => handleAutoDescribe(editorName)}
@@ -1380,7 +1338,6 @@ export default function ProfilesPage() {
 
                   <div className="flex justify-end">
                     <Button
-                      size="sm"
                       className="uppercase"
                       onClick={() => handleSaveDesc(editorName)}
                       disabled={descSaving}
@@ -1410,7 +1367,6 @@ export default function ProfilesPage() {
 
                   <div className="flex justify-end">
                     <Button
-                      size="sm"
                       className="uppercase"
                       onClick={() => handleSaveSoul(editorName)}
                       disabled={soulSaving}

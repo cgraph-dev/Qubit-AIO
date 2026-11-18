@@ -3,12 +3,7 @@ import { useNavigate } from "react-router";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
-import { Toast } from "@nous-research/ui/ui/components/toast";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { api } from "@/lib/api";
 import type {
   McpHttpAuth,
@@ -23,6 +18,7 @@ import {
   type McpTransport,
 } from "@/lib/mcp-server-create";
 import { cn } from "@/lib/utils";
+import { Button, Checkbox, Input, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Profile name rule mirrors the backend (`^[a-z0-9][a-z0-9_-]{0,63}$`).
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -59,7 +55,10 @@ interface ModelChoice {
  */
 export default function ProfileBuilderPage() {
   const navigate = useNavigate();
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
 
   const [step, setStep] = useState<StepId>("identity");
 
@@ -283,7 +282,7 @@ export default function ProfileBuilderPage() {
     <div className="mx-auto w-full max-w-3xl space-y-6 p-4">
       <div className="flex items-center justify-between">
         <H2>New profile</H2>
-        <Button ghost onClick={() => navigate("/profiles")}>
+        <Button variant="secondary" onClick={() => navigate("/profiles")}>
           Cancel
         </Button>
       </div>
@@ -291,23 +290,15 @@ export default function ProfileBuilderPage() {
       {/* Stepper */}
       <div className="flex items-center gap-2 text-sm">
         {STEPS.map((s, i) => (
-          <button
+          <Button
             key={s.id}
+            variant={s.id === step ? "primary" : "secondary"}
             // Identity must be valid before jumping ahead.
             disabled={i > 0 && !nameValid}
             onClick={() => setStep(s.id)}
-            className={cn(
-              "rounded-full px-3 py-1 transition-colors",
-              s.id === step
-                ? "bg-primary text-primary-foreground"
-                : i <= stepIndex
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground",
-              i > 0 && !nameValid && "cursor-not-allowed opacity-50",
-            )}
           >
             {i + 1}. {s.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -319,11 +310,11 @@ export default function ProfileBuilderPage() {
                 <Label htmlFor="pb-name">Profile name</Label>
                 <Input
                   id="pb-name"
+                  label="Profile name"
                   placeholder="coder"
                   value={name}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setName(e.target.value)
-                  }
+                  onChange={setName}
+                  className="qsk-field"
                 />
                 {name && !nameValid && (
                   <p className="text-xs text-destructive">
@@ -336,11 +327,11 @@ export default function ProfileBuilderPage() {
                 <Label htmlFor="pb-desc">Description (optional)</Label>
                 <Input
                   id="pb-desc"
+                  label="Description (optional)"
                   placeholder="What this agent profile is for"
                   value={description}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setDescription(e.target.value)
-                  }
+                  onChange={setDescription}
+                  className="qsk-field"
                 />
               </div>
             </div>
@@ -353,41 +344,34 @@ export default function ProfileBuilderPage() {
                 default.
               </p>
               <Input
+                label="Filter models"
                 placeholder="Filter models…"
-                aria-label="Filter models"
                 value={modelFilter}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setModelFilter(e.target.value)
-                }
+                onChange={setModelFilter}
+                className="qsk-field"
               />
               {modelChoices === null ? (
                 <p className="text-sm text-muted-foreground">Loading models…</p>
               ) : (
                 <div className="max-h-72 space-y-1 overflow-y-auto">
-                  <button
+                  <Button
+                    variant={modelChoice === "" ? "primary" : "secondary"}
+                    className="w-full text-left"
                     onClick={() => setModelChoice("")}
-                    className={cn(
-                      "block w-full rounded px-3 py-2 text-left text-sm",
-                      modelChoice === "" ? "bg-primary/10" : "hover:bg-muted",
-                    )}
                   >
                     Use default (set later)
-                  </button>
+                  </Button>
                   {filteredModels.map((c) => {
                     const key = `${c.provider}\u0000${c.model}`;
                     return (
-                      <button
+                      <Button
                         key={key}
+                        variant={modelChoice === key ? "primary" : "secondary"}
+                        className="w-full text-left"
                         onClick={() => setModelChoice(key)}
-                        className={cn(
-                          "block w-full rounded px-3 py-2 text-left text-sm",
-                          modelChoice === key
-                            ? "bg-primary/10"
-                            : "hover:bg-muted",
-                        )}
                       >
                         {c.label}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -399,8 +383,9 @@ export default function ProfileBuilderPage() {
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
+                  label="Start from the full default skill bundle"
                   checked={keepAll}
-                  onCheckedChange={(v) => setKeepAll(Boolean(v))}
+                  onChange={(v) => setKeepAll(Boolean(v))}
                 />
                 Start from the full default skill bundle (recommended)
               </label>
@@ -411,12 +396,11 @@ export default function ProfileBuilderPage() {
                     Unchecked skills are disabled in the new profile.
                   </p>
                   <Input
+                    label="Filter skills"
                     placeholder="Filter skills…"
-                    aria-label="Filter skills"
                     value={skillFilter}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setSkillFilter(e.target.value)
-                    }
+                    onChange={setSkillFilter}
+                    className="qsk-field"
                   />
                   {skills === null ? (
                     <p className="text-sm text-muted-foreground">
@@ -430,8 +414,9 @@ export default function ProfileBuilderPage() {
                           className="flex items-start gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
                         >
                           <Checkbox
+                            label={s.name}
                             checked={keptSkills.has(s.name)}
-                            onCheckedChange={() => toggleKeep(s.name)}
+                            onChange={() => toggleKeep(s.name)}
                           />
                           <span className="flex-1">
                             <span className="font-medium">{s.name}</span>
@@ -458,21 +443,14 @@ export default function ProfileBuilderPage() {
                 <Label>Add from the skills hub</Label>
                 <div className="flex gap-2">
                   <Input
+                    label="Search the skills hub"
                     placeholder="Search the hub (e.g. linear, hyperliquid)…"
-                    aria-label="Search the skills hub"
                     value={hubQuery}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setHubQuery(e.target.value)
-                    }
-                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                      if (e.key === "Enter") runHubSearch();
-                    }}
+                    onChange={setHubQuery}
+                    onEnter={() => runHubSearch()}
+                    className="qsk-field"
                   />
-                  <Button
-                    outlined
-                    onClick={runHubSearch}
-                    disabled={hubSearching}
-                  >
+                  <Button variant="secondary" onClick={runHubSearch} disabled={hubSearching}>
                     {hubSearching ? "Searching…" : "Search"}
                   </Button>
                 </div>
@@ -494,7 +472,7 @@ export default function ProfileBuilderPage() {
                             </span>
                           )}
                         </span>
-                        <Button size="sm" ghost onClick={() => addHubSkill(r)}>
+                        <Button variant="secondary" onClick={() => addHubSkill(r)}>
                           Add
                         </Button>
                       </div>
@@ -506,13 +484,14 @@ export default function ProfileBuilderPage() {
                     {hubSkills.map((r) => (
                       <Badge key={r.identifier} className="gap-1">
                         {r.name}
-                        <button
-                          className="ml-1 text-xs"
+                        <Button
+                          variant="secondary"
+                          className="ml-1"
                           onClick={() => removeHubSkill(r.identifier)}
                           aria-label={`Remove ${r.name}`}
                         >
                           ×
-                        </button>
+                        </Button>
                       </Badge>
                     ))}
                   </div>
@@ -549,11 +528,11 @@ export default function ProfileBuilderPage() {
                     <Label htmlFor="pb-mcp-name">Server name</Label>
                     <Input
                       id="pb-mcp-name"
+                      label="Server name"
                       placeholder="Enter server name"
                       value={mcpDraft.name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setMcpDraft({ ...mcpDraft, name: e.target.value })
-                      }
+                      onChange={(value) => setMcpDraft({ ...mcpDraft, name: value })}
+                      className="qsk-field"
                     />
                   </div>
                   <div className="grid gap-1.5">
@@ -569,20 +548,14 @@ export default function ProfileBuilderPage() {
                           ["stdio", "stdio"],
                         ] as const
                       ).map(([value, label]) => (
-                        <button
+                        <Button
                           key={value}
-                          type="button"
+                          variant={mcpDraft.transport === value ? "primary" : "secondary"}
                           aria-pressed={mcpDraft.transport === value}
-                          className={cn(
-                            "px-3 py-2 text-sm font-medium transition-colors",
-                            mcpDraft.transport === value
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                          )}
                           onClick={() => setMcpTransport(value)}
                         >
                           {label}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
@@ -594,11 +567,11 @@ export default function ProfileBuilderPage() {
                       <Label htmlFor="pb-mcp-url">URL</Label>
                       <Input
                         id="pb-mcp-url"
+                        label="URL"
                         placeholder="https://example.com/mcp"
                         value={mcpDraft.url}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setMcpDraft({ ...mcpDraft, url: e.target.value })
-                        }
+                        onChange={(value) => setMcpDraft({ ...mcpDraft, url: value })}
+                        className="qsk-field"
                       />
                     </div>
                     <div className="grid gap-1.5">
@@ -615,20 +588,14 @@ export default function ProfileBuilderPage() {
                             ["oauth", "OAuth"],
                           ] as const
                         ).map(([value, label]) => (
-                          <button
+                          <Button
                             key={value}
-                            type="button"
+                            variant={mcpDraft.httpAuth === value ? "primary" : "secondary"}
                             aria-pressed={mcpDraft.httpAuth === value}
-                            className={cn(
-                              "px-2 py-2 text-sm font-medium transition-colors",
-                              mcpDraft.httpAuth === value
-                                ? "bg-primary text-primary-foreground"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                            )}
                             onClick={() => setMcpHttpAuth(value)}
                           >
                             {label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -639,16 +606,13 @@ export default function ProfileBuilderPage() {
                         </Label>
                         <Input
                           id="pb-mcp-bearer-token"
+                          label="Bearer token"
                           type="password"
                           autoComplete="new-password"
                           placeholder="Token or Bearer token"
                           value={mcpDraft.bearerToken}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setMcpDraft({
-                              ...mcpDraft,
-                              bearerToken: e.target.value,
-                            })
-                          }
+                          onChange={(value) => setMcpDraft({ ...mcpDraft, bearerToken: value })}
+                          className="qsk-field"
                         />
                         <p className="text-xs text-muted-foreground">
                           Stored in the new profile&apos;s .env; config.yaml
@@ -670,25 +634,22 @@ export default function ProfileBuilderPage() {
                         <Label htmlFor="pb-mcp-command">Command</Label>
                         <Input
                           id="pb-mcp-command"
+                          label="Command"
                           placeholder="npx"
                           value={mcpDraft.command}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setMcpDraft({
-                              ...mcpDraft,
-                              command: e.target.value,
-                            })
-                          }
+                          onChange={(value) => setMcpDraft({ ...mcpDraft, command: value })}
+                          className="qsk-field"
                         />
                       </div>
                       <div className="grid gap-1.5">
                         <Label htmlFor="pb-mcp-args">Arguments</Label>
                         <Input
                           id="pb-mcp-args"
+                          label="Arguments"
                           placeholder="-y @modelcontextprotocol/server"
                           value={mcpDraft.args}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setMcpDraft({ ...mcpDraft, args: e.target.value })
-                          }
+                          onChange={(value) => setMcpDraft({ ...mcpDraft, args: value })}
+                          className="qsk-field"
                         />
                       </div>
                     </div>
@@ -738,9 +699,7 @@ export default function ProfileBuilderPage() {
                         </span>
                       </span>
                       <Button
-                        size="sm"
-                        ghost
-                        destructive
+                        variant="secondary"
                         className="shrink-0"
                         onClick={() => removeMcp(s.name)}
                       >
@@ -799,7 +758,7 @@ export default function ProfileBuilderPage() {
       {/* Nav buttons */}
       <div className="flex items-center justify-between">
         <Button
-          ghost
+          variant="secondary"
           disabled={stepIndex === 0}
           onClick={() => setStep(STEPS[Math.max(0, stepIndex - 1)].id)}
         >
@@ -820,8 +779,6 @@ export default function ProfileBuilderPage() {
           </Button>
         )}
       </div>
-
-      <Toast toast={toast} />
     </div>
   );
 }
