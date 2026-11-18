@@ -5,10 +5,24 @@ import { MemoryRouter } from 'react-router'
 import type * as ReactRouterDom from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { sakugaValue } from '@/sakuga/ui'
 import type { ToolsetConfig } from '@/types/hermes'
 
 // Collect the component graph before the behavioral test deadline starts.
 import { ToolsetConfigPanel } from './toolset-config-panel'
+
+// Free-input voice/model fields are Sakuga hosts; Testing Library's
+// getByDisplayValue only scans native inputs, so find the combobox showing the
+// seeded value instead of changing what the test proves.
+async function findComboboxByValue(value: string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const field = screen.getAllByRole('combobox').find(element => sakugaValue(element) === value)
+
+    if (!field) throw new Error(`no combobox displays ${value}`)
+
+    return field
+  })
+}
 
 // EnvVarField navigates to Settings → Keys via useNavigate, so every render
 // needs a router context. The navigate spy asserts the deep-link target.
@@ -205,7 +219,7 @@ describe('ToolsetConfigPanel', () => {
     // Voice/model names are free-input comboboxes seeded with the current
     // config value — a custom voice ID must be typeable, not gated by a
     // closed Select.
-    const voiceInput = screen.getByDisplayValue('alloy')
+    const voiceInput = await findComboboxByValue('alloy')
     fireEvent.change(voiceInput, { target: { value: 'marin' } })
     await waitFor(() => expect(saveHermesConfigRecord).toHaveBeenCalled(), { timeout: 3000 })
 
@@ -244,7 +258,7 @@ describe('ToolsetConfigPanel', () => {
     const scope = { profile: 'scout', connectionId: 'gw-2' }
     render(<ToolsetConfigPanel onConfiguredChange={vi.fn()} profile={scope} toolset="tts" />)
 
-    fireEvent.change(await screen.findByDisplayValue('alloy'), { target: { value: 'marin' } })
+    fireEvent.change(await findComboboxByValue('alloy'), { target: { value: 'marin' } })
     await waitFor(() => expect(saveHermesConfigRecord).toHaveBeenCalled(), { timeout: 3000 })
 
     const [saved, forwarded] = saveHermesConfigRecord.mock.calls.at(-1) as [

@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+
+import { sakugaValue } from '@/sakuga/ui'
 import type * as Nanostores from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -102,7 +104,8 @@ describe('ProjectDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add folder' }))
 
-    await screen.findByDisplayValue('my-folder')
+    const nameField = screen.getByPlaceholderText('Project name')
+    await waitFor(() => expect(sakugaValue(nameField)).toBe('my-folder'))
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
 
     await waitFor(() => {

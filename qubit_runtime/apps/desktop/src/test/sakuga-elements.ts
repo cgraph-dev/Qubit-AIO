@@ -96,6 +96,12 @@ class SakugaToggleDouble extends SakugaBaseDouble {
 class SakugaCheckboxDouble extends SakugaToggleDouble {}
 
 class SakugaInputDouble extends SakugaBaseDouble {
+  // The real component forwards placeholder/type/disabled to its inner input
+  // through observed attributes. React writes those attributes *after* the
+  // element connects, so mirroring them once in `connectedCallback` would leave
+  // the inner control blank; observe them and keep the two in sync.
+  static observedAttributes = ['type', 'placeholder', 'value', 'disabled', 'readonly', 'required']
+
   get value(): string {
     return this.shadowRoot?.querySelector('input')?.value ?? this.getAttribute('value') ?? ''
   }
@@ -106,6 +112,21 @@ class SakugaInputDouble extends SakugaBaseDouble {
     this.setAttribute('value', next)
   }
 
+  private mirror(name: string): void {
+    const input = this.shadowRoot?.querySelector('input')
+    if (!input) return
+    if (name === 'type') input.type = this.getAttribute('type') || 'text'
+    else if (name === 'placeholder') input.placeholder = this.getAttribute('placeholder') ?? ''
+    else if (name === 'value') input.value = this.getAttribute('value') ?? ''
+    else if (name === 'disabled') input.disabled = this.hasAttribute('disabled')
+    else if (name === 'readonly') input.readOnly = this.hasAttribute('readonly')
+    else if (name === 'required') input.required = this.hasAttribute('required')
+  }
+
+  attributeChangedCallback(name: string): void {
+    this.mirror(name)
+  }
+
   connectedCallback() {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' })
     if (this.shadowRoot?.querySelector('input')) return
@@ -114,6 +135,8 @@ class SakugaInputDouble extends SakugaBaseDouble {
     input.placeholder = this.getAttribute('placeholder') ?? ''
     input.value = this.getAttribute('value') ?? ''
     input.disabled = boolAttr(this, 'disabled')
+    input.readOnly = boolAttr(this, 'readonly')
+    input.required = boolAttr(this, 'required')
     input.addEventListener('input', () => {
       this.setAttribute('value', input.value)
     })

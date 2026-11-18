@@ -54,6 +54,12 @@ vi.mock('@/store/settings-scope', () => ({
 }))
 
 vi.mock('@/store/projects', () => ({
+  // The session-actions graph reaches these through the same barrel even
+  // though this page never opens a session; without them the whole suite
+  // fails at import time demanding a missing mock export.
+  $projectTree: atom<unknown>(null),
+  projectProfile: () => null,
+  resolveNewSessionCwd: () => undefined,
   repoDiscoveryPolicyFromConfig: () => ({ enabled: true, roots: [], exclude_paths: [] }),
   repoDiscoveryPolicySignature: (policy: unknown) => JSON.stringify(policy),
   scanAndRecordRepos: vi.fn().mockResolvedValue(undefined)

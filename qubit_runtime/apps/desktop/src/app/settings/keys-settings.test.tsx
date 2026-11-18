@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { sakugaValue } from '@/sakuga/ui'
 import { stubResizeObserver } from '@/test/jsdom'
 
 import { envVar } from './test-utils'
@@ -151,13 +152,14 @@ describe('KeysSettings', () => {
       expect(await screen.findByText('WIDGET')).toBeTruthy()
       await waitFor(() => expect(getEnvVars).toHaveBeenCalledWith('profile-b'))
 
-      // Open the field and type a value without saving it.
-      fireEvent.focus(container.querySelector('input[readonly]') as HTMLInputElement)
-      fireEvent.change(container.querySelector('input[type="password"]') as HTMLInputElement, {
-        target: { value: 'typed-secret' }
-      })
+      // Open the field and type a value without saving it. The masked value is
+      // the read-only Sakuga field; focusing it swaps in the password editor.
+      const masked = container.querySelector('sakuga-input') as HTMLElement
+      fireEvent.focus(masked)
+      const editor = container.querySelector('sakuga-input[type="password"]') as HTMLElement
+      fireEvent.change(editor, { target: { value: 'typed-secret' } })
 
-      expect(screen.getByDisplayValue('typed-secret')).toBeTruthy()
+      expect(sakugaValue(editor)).toBe('typed-secret')
 
       // Re-target Settings at another profile. This is where the leak
       // manifested: the draft stayed live, so the (still-rendered) Save would
@@ -170,7 +172,7 @@ describe('KeysSettings', () => {
       // The draft belonged to the previous target: it is gone, and so is the
       // Save control that would have dispatched it — no path is left that can
       // write the stale value into the profile now being targeted.
-      expect(screen.queryByDisplayValue('typed-secret')).toBeNull()
+      expect(screen.getAllByRole('textbox').some(el => sakugaValue(el) === 'typed-secret')).toBe(false)
       expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     } finally {
       cleanup()

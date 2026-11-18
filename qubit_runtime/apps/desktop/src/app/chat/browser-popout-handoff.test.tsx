@@ -1,4 +1,6 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
+
+import { sakugaValue } from '@/sakuga/ui'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The consent dialog has its own test file and needs a QueryClientProvider;
@@ -68,8 +70,10 @@ async function expectGuestWithUrl(rendered: ReturnType<typeof render>, url: stri
   // an accessible name, so assert the aria-label, not text content).
   expect(rendered.container.querySelector('[aria-label="Pop in"]')).not.toBeNull()
 
-  // Address bar tracks the handed-off URL.
-  expect((rendered.container.querySelector('input') as HTMLInputElement | null)?.value).toContain('127.0.0.1')
+  // Address bar tracks the handed-off URL. The field is a Sakuga host; read
+  // the value from its delegated property (the inner control).
+  const address = rendered.container.querySelector('sakuga-input[aria-label="Address"]') as HTMLElement | null
+  expect(sakugaValue(address)).toContain('127.0.0.1')
 }
 
 describe('browser pop-out content handoff', () => {

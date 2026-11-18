@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DesktopConnectionsRegistry } from '@/global'
 import { _resetFleetRosterForTests, refreshFleetRoster } from '@/store/fleet-roster'
 import { $connection } from '@/store/session'
+import { sakugaValue } from '@/sakuga/ui'
 import { deferred } from '@/test/deferred'
 
 import {
@@ -89,7 +90,8 @@ describe('ConnectionsRegistrySection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
     const values = screen.getAllByPlaceholderText('Saved — leave blank to keep')
     fireEvent.change(values[1], { target: { value: 'new-header-secret' } })
-    fireEvent.click(within(screen.getByDisplayValue('Delete').parentElement!).getByRole('button', { name: 'Remove' }))
+    const deleteField = screen.getAllByRole('textbox').find(el => sakugaValue(el) === 'Delete')!
+    fireEvent.click(within(deleteField.parentElement!).getByRole('button', { name: 'Remove' }))
     fireEvent.change(screen.getByPlaceholderText('Existing token ...abc123'), { target: { value: 'new-token' } })
     fireEvent.click(screen.getByText('Save connection'))
     await screen.findByText('Store the gateway token in plain text?')
