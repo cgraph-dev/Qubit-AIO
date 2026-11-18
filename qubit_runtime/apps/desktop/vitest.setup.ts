@@ -2,6 +2,13 @@ import { configure } from '@testing-library/react'
 
 import { InertResizeObserver } from './src/test/jsdom'
 
+import { installSakugaTestElements } from './src/test/sakuga-elements'
+
+// The Sakuga components are upstream scripts loaded from `public/sakuga-vfx/`;
+// jsdom never evaluates them, so register the documented inner-control doubles
+// before any test mounts a wrapper. See src/test/sakuga-elements.ts.
+installSakugaTestElements()
+
 // Shared tooltips measure their arrow through Radix's useSize hook.
 // Geometry assertions still belong in a real browser, not this inert observer. Assigned,
 // not `vi.stubGlobal`, so a test's `vi.unstubAllGlobals()` cannot strip it.

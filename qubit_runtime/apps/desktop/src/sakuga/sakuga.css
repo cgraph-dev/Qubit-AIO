@@ -1,0 +1,42 @@
+/* Layout glue for the Sakuga custom elements in the Electron renderer.
+ *
+ * The components own their drawing and internal metrics; this file only fixes
+ * the host box so they fit the renderer's dense rows (the upstream elements are
+ * `display:inline-block` and default to their own fixed widths). It never
+ * pierces a shadow root and never changes the palette.
+ */
+
+sakuga-button {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Form fields are usually full-width in the settings rows; the upstream
+ * default is 230px. */
+.qsk-field,
+.qsk-field sakuga-input,
+.qsk-field sakuga-select,
+.qsk-field sakuga-toggle {
+  --sk-input-width: 100%;
+  width: 100%;
+}
+
+sakuga-input,
+sakuga-slider,
+sakuga-tabs,
+sakuga-progress {
+  max-width: 100%;
+}
+
+.qsk-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The settings row action column is right-aligned; keep the host from claiming
+ * the full row when the component is narrower than it. */
+.qsk-fit {
+  width: fit-content;
+  max-width: 100%;
+}
