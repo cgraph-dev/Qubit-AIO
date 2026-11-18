@@ -88,9 +88,19 @@ export default defineConfig({
   // actually are. Point them at this package's node_modules explicitly rather
   // than duplicating a dependency tree next to the plugin.
   resolve: {
-    alias: {
-      phaser: path.resolve(__dirname, "node_modules/phaser/dist/phaser.esm.js"),
-    },
+    alias: [
+      // The shared Sakuga wrappers import React. Resolve it to the host SDK
+      // shim so the plugin uses the dashboard's single React runtime, never a
+      // bundled second copy (which would split the hook dispatcher).
+      {
+        find: /^react$/,
+        replacement: path.resolve(PLUGIN_DIR, "game/react-sdk.ts"),
+      },
+      {
+        find: "phaser",
+        replacement: path.resolve(__dirname, "node_modules/phaser/dist/phaser.esm.js"),
+      },
+    ],
     dedupe: ["react", "react-dom"],
   },
 
@@ -111,10 +121,9 @@ export default defineConfig({
     // hook runtime: the engine would mount into its own tree and context,
     // session and theme would not reach it, and the failure is silent.
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+      external: ["react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
       output: {
         globals: {
-          react: "React",
           "react-dom": "ReactDOM",
           "react/jsx-runtime": "ReactJSXRuntime",
           "react/jsx-dev-runtime": "ReactJSXRuntime",

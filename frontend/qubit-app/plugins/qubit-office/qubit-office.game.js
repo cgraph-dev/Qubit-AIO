@@ -1,4 +1,4 @@
-(function(react) {
+(function() {
 	// \0rolldown/runtime.js
 	var __defProp = Object.defineProperty;
 	var __exportAll = (all, no_symbols) => {
@@ -193327,6 +193327,23 @@ create: function(game) {
 		configureOfficeSakuga();
 		emitFx(cue, options);
 	}
+	// ../qubit-app/plugins/qubit-office/game/react-sdk.ts
+	var React = globalThis.__QUBIT_PLUGIN_SDK__?.React;
+	if (!React) throw new Error("QUBIT_PLUGIN_SDK_REACT_MISSING");
+	var createElement = React.createElement;
+	var Children = React.Children;
+	var isValidElement = React.isValidElement;
+	var forwardRef = React.forwardRef;
+	var useCallback = React.useCallback;
+	var useEffect = React.useEffect;
+	var useId = React.useId;
+	var useLayoutEffect = React.useLayoutEffect;
+	var useMemo = React.useMemo;
+	var useRef = React.useRef;
+	var useState = React.useState;
+	React.useImperativeHandle;
+	React.useContext;
+	React.Fragment;
 	// ../qubit-shared/src/sakuga/elements.tsx
 	var HOST_KEYS = /* @__PURE__ */ new Set([
 		"id",
@@ -193451,11 +193468,11 @@ create: function(game) {
 		} else if (el.getAttribute(key) !== nextAttr) el.setAttribute(key, nextAttr);
 	}
 	function useSakuga(name, ref, attrs, initialAttrs = {}) {
-		(0, react.useEffect)(() => {
+		useEffect(() => {
 			loadSakugaComponent(name).catch(() => {});
 		}, [name]);
-		const first = (0, react.useRef)(true);
-		(0, react.useLayoutEffect)(() => {
+		const first = useRef(true);
+		useLayoutEffect(() => {
 			const el = ref && "current" in ref ? ref.current : null;
 			if (!el) return;
 			if (first.current) {
@@ -193468,8 +193485,8 @@ create: function(game) {
 			}
 		});
 	}
-	var SakugaButton = (0, react.forwardRef)(function SakugaButton(props, ref) {
-		const inner = (0, react.useRef)(null);
+	var SakugaButton = forwardRef(function SakugaButton(props, ref) {
+		const inner = useRef(null);
 		const { children, variant = "primary", type = "button", disabled = false, done = false, fx = "impact", className, onClick, name, value, ...rest } = props;
 		useSakuga("button", inner, {
 			variant: variant === "secondary" ? "secondary" : void 0,
@@ -193478,15 +193495,15 @@ create: function(game) {
 			name,
 			value
 		});
-		(0, react.useEffect)(() => {
+		useEffect(() => {
 			if (!done) return;
 			inner.current?.done?.();
 		}, [done]);
-		const handleClick = (0, react.useCallback)((event) => {
+		const handleClick = useCallback((event) => {
 			if (fx) emitFxAt(fx, event.currentTarget);
 			onClick?.(event);
 		}, [fx, onClick]);
-		return (0, react.createElement)("sakuga-button", {
+		return createElement("sakuga-button", {
 			...hostProps(rest),
 			variant: variant === "secondary" ? "secondary" : void 0,
 			type: type === "button" ? void 0 : type,
@@ -193501,8 +193518,8 @@ create: function(game) {
 			role: rest.role ?? "button"
 		}, children);
 	});
-	(0, react.forwardRef)(function SakugaToggle(props, ref) {
-		const inner = (0, react.useRef)(null);
+	forwardRef(function SakugaToggle(props, ref) {
+		const inner = useRef(null);
 		const { label, checked, defaultChecked, name, value, disabled, onChange, className, ...rest } = props;
 		const current = checked ?? defaultChecked ?? false;
 		useSakuga("toggle", inner, {
@@ -193512,7 +193529,7 @@ create: function(game) {
 			value,
 			disabled
 		}, { checked: current });
-		return (0, react.createElement)("sakuga-toggle", {
+		return createElement("sakuga-toggle", {
 			...hostProps(rest),
 			ref: (node) => {
 				inner.current = node;
@@ -193526,8 +193543,8 @@ create: function(game) {
 			onChange: () => onChange?.(inner.current?.checked ?? false)
 		});
 	});
-	(0, react.forwardRef)(function SakugaCheckbox(props, ref) {
-		const inner = (0, react.useRef)(null);
+	forwardRef(function SakugaCheckbox(props, ref) {
+		const inner = useRef(null);
 		const { children, checked, defaultChecked, name, value, disabled, onChange, className, ...rest } = props;
 		const current = checked ?? defaultChecked ?? false;
 		useSakuga("checkbox", inner, {
@@ -193536,7 +193553,7 @@ create: function(game) {
 			value,
 			disabled
 		}, { checked: current });
-		return (0, react.createElement)("sakuga-checkbox", {
+		return createElement("sakuga-checkbox", {
 			...hostProps(rest),
 			ref: (node) => {
 				inner.current = node;
@@ -193549,8 +193566,8 @@ create: function(game) {
 			onChange: () => onChange?.(inner.current?.checked ?? false)
 		}, children);
 	});
-	var SakugaRadio = (0, react.forwardRef)(function SakugaRadio(props, ref) {
-		const inner = (0, react.useRef)(null);
+	var SakugaRadio = forwardRef(function SakugaRadio(props, ref) {
+		const inner = useRef(null);
 		const { label, options, value, name, disabled, onChange, className, ...rest } = props;
 		const signature = options.map((o) => `${o.value}:${o.label}`).join("|");
 		useSakuga("radio", inner, {
@@ -193559,7 +193576,7 @@ create: function(game) {
 			name,
 			disabled
 		});
-		return (0, react.createElement)("sakuga-radio", {
+		return createElement("sakuga-radio", {
 			...hostProps(rest),
 			key: `${signature}|${label}`,
 			label,
@@ -193572,15 +193589,15 @@ create: function(game) {
 			role: rest.role ?? "radiogroup",
 			"aria-label": label,
 			onChange: () => onChange?.(inner.current?.value ?? "")
-		}, options.map((option) => (0, react.createElement)("option", {
+		}, options.map((option) => createElement("option", {
 			key: option.value,
 			value: option.value,
 			selected: option.selected,
 			disabled: option.disabled
 		}, option.label)));
 	});
-	var SakugaInput = (0, react.forwardRef)(function SakugaInput(props, ref) {
-		const inner = (0, react.useRef)(null);
+	var SakugaInput = forwardRef(function SakugaInput(props, ref) {
+		const inner = useRef(null);
 		const { type = "text", label, placeholder, value, defaultValue, name, disabled, autoComplete, autoFocus, required, pattern, minLength, maxLength, inputMode, readOnly, spellCheck, onChange, onKeyDown, onEnter, className, ...rest } = props;
 		useSakuga("input", inner, {
 			type,
@@ -193605,15 +193622,15 @@ create: function(game) {
 			"aria-describedby": rest["aria-describedby"],
 			"aria-required": required ? "true" : void 0
 		};
-		const innerRef = (0, react.useRef)(null);
-		const wiredInput = (0, react.useRef)(null);
-		const wiredHandler = (0, react.useRef)(null);
-		(0, react.useEffect)(() => () => {
+		const innerRef = useRef(null);
+		const wiredInput = useRef(null);
+		const wiredHandler = useRef(null);
+		useEffect(() => () => {
 			if (wiredInput.current && wiredHandler.current) wiredInput.current.removeEventListener("input", wiredHandler.current);
 			wiredInput.current = null;
 			wiredHandler.current = null;
 		}, []);
-		(0, react.useLayoutEffect)(() => {
+		useLayoutEffect(() => {
 			let timer = null;
 			let stop = null;
 			const apply = () => {
@@ -193671,7 +193688,7 @@ create: function(game) {
 				if (stop) clearTimeout(stop);
 			};
 		});
-		return (0, react.createElement)("sakuga-input", {
+		return createElement("sakuga-input", {
 			...hostProps(rest),
 			type,
 			label,
@@ -193697,8 +193714,8 @@ create: function(game) {
 			}
 		});
 	});
-	(0, react.forwardRef)(function SakugaSlider(props, ref) {
-		const inner = (0, react.useRef)(null);
+	forwardRef(function SakugaSlider(props, ref) {
+		const inner = useRef(null);
 		const { label, value, defaultValue, min = 0, max = 100, step = 1, unit, name, disabled, onChange, className, ...rest } = props;
 		useSakuga("slider", inner, {
 			label,
@@ -193710,7 +193727,7 @@ create: function(game) {
 			name,
 			disabled
 		}, { value: defaultValue ?? 50 });
-		return (0, react.createElement)("sakuga-slider", {
+		return createElement("sakuga-slider", {
 			...hostProps(rest),
 			ref: (node) => {
 				inner.current = node;
@@ -193723,15 +193740,15 @@ create: function(game) {
 			onChange: () => onChange?.(inner.current?.valueAsNumber ?? 0)
 		});
 	});
-	(0, react.forwardRef)(function SakugaTabs(props, ref) {
-		const inner = (0, react.useRef)(null);
+	forwardRef(function SakugaTabs(props, ref) {
+		const inner = useRef(null);
 		const { label, options, selected = 0, onChange, className, ...rest } = props;
 		const signature = options.map((o) => `${o.value}:${o.label}`).join("|");
 		useSakuga("tabs", inner, {
 			label,
 			selected
 		});
-		return (0, react.createElement)("sakuga-tabs", {
+		return createElement("sakuga-tabs", {
 			...hostProps(rest),
 			key: `${signature}|${label}`,
 			label,
@@ -193748,27 +193765,27 @@ create: function(game) {
 				const detail = custom.detail ?? custom.nativeEvent?.detail;
 				if (detail) onChange?.(detail);
 			}
-		}, options.map((option) => (0, react.createElement)("option", {
+		}, options.map((option) => createElement("option", {
 			key: option.value,
 			value: option.value
 		}, option.label)));
 	});
-	var SakugaProgress = (0, react.forwardRef)(function SakugaProgress(props, ref) {
-		const inner = (0, react.useRef)(null);
+	var SakugaProgress = forwardRef(function SakugaProgress(props, ref) {
+		const inner = useRef(null);
 		const { label, value = 0, doneLabel, onDone, className, ...rest } = props;
 		useSakuga("progress", inner, {
 			label,
 			value: Math.max(0, Math.min(1, value)),
 			"done-label": doneLabel
 		});
-		(0, react.useEffect)(() => {
+		useEffect(() => {
 			const el = inner.current;
 			if (!el) return;
 			const listener = () => onDone?.();
 			el.addEventListener("sakuga:done", listener);
 			return () => el.removeEventListener("sakuga:done", listener);
 		}, [onDone]);
-		return (0, react.createElement)("sakuga-progress", {
+		return createElement("sakuga-progress", {
 			...hostProps(rest),
 			ref: (node) => {
 				inner.current = node;
@@ -193783,12 +193800,12 @@ create: function(game) {
 			"aria-valuenow": Math.round(Math.max(0, Math.min(1, value)) * 100)
 		});
 	});
-	(0, react.forwardRef)(function SakugaLoading(props, ref) {
+	forwardRef(function SakugaLoading(props, ref) {
 		const { label = "Loading…", value, doneLabel, showLabel = true, className, style, id, onDone } = props;
 		const controlled = value !== void 0;
 		const clamped = controlled ? Math.max(0, Math.min(1, value)) : void 0;
-		const [crawl, setCrawl] = (0, react.useState)(clamped ?? .08);
-		(0, react.useEffect)(() => {
+		const [crawl, setCrawl] = useState(clamped ?? .08);
+		useEffect(() => {
 			if (controlled) return;
 			setCrawl(.08);
 			const timer = setInterval(() => {
@@ -193797,7 +193814,7 @@ create: function(game) {
 			return () => clearInterval(timer);
 		}, [controlled]);
 		const current = controlled ? clamped : crawl;
-		return (0, react.createElement)("div", {
+		return createElement("div", {
 			id,
 			className: ["qsk-loading", className].filter(Boolean).join(" "),
 			style,
@@ -193805,7 +193822,7 @@ create: function(game) {
 			"aria-live": "polite",
 			"aria-label": label,
 			"data-testid": props["data-testid"]
-		}, showLabel ? (0, react.createElement)("div", { className: "qsk-loading__label" }, label) : null, (0, react.createElement)(SakugaProgress, {
+		}, showLabel ? createElement("div", { className: "qsk-loading__label" }, label) : null, createElement(SakugaProgress, {
 			ref,
 			label,
 			value: current,
@@ -193813,8 +193830,8 @@ create: function(game) {
 			onDone
 		}));
 	});
-	(0, react.forwardRef)(function SakugaRating(props, ref) {
-		const inner = (0, react.useRef)(null);
+	forwardRef(function SakugaRating(props, ref) {
+		const inner = useRef(null);
 		const { label, value = 0, name, disabled, onChange, className, ...rest } = props;
 		useSakuga("rating", inner, {
 			label,
@@ -193822,7 +193839,7 @@ create: function(game) {
 			name,
 			disabled
 		});
-		return (0, react.createElement)("sakuga-rating", {
+		return createElement("sakuga-rating", {
 			...hostProps(rest),
 			label,
 			ref: (node) => {
@@ -193836,14 +193853,14 @@ create: function(game) {
 			onChange: () => onChange?.(inner.current?.value ?? 0)
 		});
 	});
-	(0, react.forwardRef)(function SakugaTooltip(props, ref) {
-		const inner = (0, react.useRef)(null);
+	forwardRef(function SakugaTooltip(props, ref) {
+		const inner = useRef(null);
 		const { text, label = "Help", children, className, ...rest } = props;
 		useSakuga("tooltip", inner, {
 			text,
 			label
 		});
-		return (0, react.createElement)("sakuga-tooltip", {
+		return createElement("sakuga-tooltip", {
 			...hostProps(rest),
 			ref: (node) => {
 				inner.current = node;
@@ -193892,25 +193909,25 @@ create: function(game) {
 	function SakugaSelect(props) {
 		const { label, options, value, defaultValue, name, disabled, placeholder = "Choose…", className, style, id, onChange } = props;
 		const controlled = value !== void 0;
-		const [internal, setInternal] = (0, react.useState)(defaultValue ?? "");
+		const [internal, setInternal] = useState(defaultValue ?? "");
 		const current = controlled ? value : internal;
-		const [open, setOpen] = (0, react.useState)(false);
-		const [filter, setFilter] = (0, react.useState)("");
-		const wrapper = (0, react.useRef)(null);
-		const trigger = (0, react.useRef)(null);
-		const listId = (0, react.useId)();
+		const [open, setOpen] = useState(false);
+		const [filter, setFilter] = useState("");
+		const wrapper = useRef(null);
+		const trigger = useRef(null);
+		const listId = useId();
 		const selected = options.find((option) => option.value === current);
-		const filtered = (0, react.useMemo)(() => {
+		const filtered = useMemo(() => {
 			const needle = filter.trim().toLowerCase();
 			if (!needle) return options;
 			return options.filter((option) => option.label.toLowerCase().includes(needle));
 		}, [filter, options]);
-		const close = (0, react.useCallback)((restoreFocus = true) => {
+		const close = useCallback((restoreFocus = true) => {
 			setOpen(false);
 			setFilter("");
 			if (restoreFocus) trigger.current?.focus();
 		}, []);
-		const choose = (0, react.useCallback)((next) => {
+		const choose = useCallback((next) => {
 			if (!controlled) setInternal(next);
 			onChange?.(next);
 			close();
@@ -193919,7 +193936,7 @@ create: function(game) {
 			controlled,
 			onChange
 		]);
-		(0, react.useEffect)(() => {
+		useEffect(() => {
 			if (!open) return;
 			const onPointer = (event) => {
 				if (!wrapper.current?.contains(event.target)) close(false);
@@ -193942,7 +193959,7 @@ create: function(game) {
 			setOpen((wasOpen) => !wasOpen);
 			if (trigger.current) emitFxAt("impact", trigger.current, { scale: .6 });
 		};
-		return (0, react.createElement)("div", {
+		return createElement("div", {
 			ref: wrapper,
 			className,
 			id,
@@ -193952,11 +193969,11 @@ create: function(game) {
 				...style
 			},
 			"data-testid": props["data-testid"]
-		}, name ? (0, react.createElement)("input", {
+		}, name ? createElement("input", {
 			type: "hidden",
 			name,
 			value: current ?? ""
-		}) : null, (0, react.createElement)("button", {
+		}) : null, createElement("button", {
 			ref: trigger,
 			type: "button",
 			role: "combobox",
@@ -193968,17 +193985,17 @@ create: function(game) {
 			disabled,
 			style: TRIGGER_STYLE,
 			onClick: openPanel
-		}, (0, react.createElement)("span", { style: {
+		}, createElement("span", { style: {
 			overflow: "hidden",
 			textOverflow: "ellipsis",
 			whiteSpace: "nowrap"
-		} }, selected?.label ?? placeholder), (0, react.createElement)("span", {
+		} }, selected?.label ?? placeholder), createElement("span", {
 			"aria-hidden": "true",
 			style: {
 				transform: open ? "rotate(180deg)" : void 0,
 				transition: "transform 120ms"
 			}
-		}, "▾")), open ? (0, react.createElement)("div", {
+		}, "▾")), open ? createElement("div", {
 			id: listId,
 			role: "dialog",
 			"aria-label": `${label} options`,
@@ -193986,13 +194003,13 @@ create: function(game) {
 			onKeyDown: (event) => {
 				if (event.key === "Tab") close(false);
 			}
-		}, (0, react.createElement)(SakugaInput, {
+		}, createElement(SakugaInput, {
 			label: `Filter ${label}`,
 			placeholder: "Filter…",
 			value: filter,
 			onChange: setFilter,
 			className: "qsk-select-filter"
-		}), filtered.length ? (0, react.createElement)(SakugaRadio, {
+		}), filtered.length ? createElement(SakugaRadio, {
 			label,
 			name: `${listId}-options`,
 			options: filtered.map((option) => ({
@@ -194003,7 +194020,7 @@ create: function(game) {
 			})),
 			value: current,
 			onChange: choose
-		}) : (0, react.createElement)("p", { style: {
+		}) : createElement("p", { style: {
 			margin: "10px 0 0",
 			color: "var(--sk-dim, #8580b0)"
 		} }, "No matches")) : null);
@@ -194053,7 +194070,7 @@ create: function(game) {
 	/** A label + control + optional description, the dense settings-row shape. */
 	function ExtraField(props) {
 		const { label, htmlFor, description, children, className, style } = props;
-		return (0, react.createElement)("div", {
+		return createElement("div", {
 			className: ["qsk-extra", className].filter(Boolean).join(" "),
 			style: {
 				display: "flex",
@@ -194062,15 +194079,15 @@ create: function(game) {
 				minWidth: 0,
 				...style
 			}
-		}, label ? (0, react.createElement)("label", {
+		}, label ? createElement("label", {
 			htmlFor,
 			style: LABEL_STYLE
-		}, label) : null, children, description ? (0, react.createElement)("span", { style: DESCRIPTION_STYLE }, description) : null);
+		}, label) : null, children, description ? createElement("span", { style: DESCRIPTION_STYLE }, description) : null);
 	}
 	/** A keystroke cue, coalesced so a fast typist does not spawn a cue per key. */
 	function useTypeFx() {
-		const last = (0, react.useRef)(0);
-		return (0, react.useCallback)((el) => {
+		const last = useRef(0);
+		return useCallback((el) => {
 			const now = Date.now();
 			if (now - last.current < 70) return;
 			last.current = now;
@@ -194079,7 +194096,7 @@ create: function(game) {
 	}
 	/** A focus cue (three wedges and a puff, the upstream input reaction). */
 	function useFocusFx() {
-		return (0, react.useCallback)((el) => {
+		return useCallback((el) => {
 			emitFxAt("focus", el, { scale: .6 });
 		}, []);
 	}
@@ -194091,19 +194108,19 @@ create: function(game) {
 		return next;
 	}
 	// ../qubit-shared/src/sakuga/extras/textarea.tsx
-	var SakugaTextarea = (0, react.forwardRef)(function SakugaTextarea(props, ref) {
+	var SakugaTextarea = forwardRef(function SakugaTextarea(props, ref) {
 		const { label, value, defaultValue, placeholder, rows = 3, name, required, disabled, maxLength, autoFocus, readOnly, id, className, style, description, onChange } = props;
-		const autoId = (0, react.useId)();
+		const autoId = useId();
 		const fieldId = id ?? `qsk-textarea-${autoId}`;
 		const typeFx = useTypeFx();
 		const focusFx = useFocusFx();
-		return (0, react.createElement)(ExtraField, {
+		return createElement(ExtraField, {
 			label,
 			htmlFor: fieldId,
 			description,
 			className,
 			style
-		}, (0, react.createElement)("textarea", {
+		}, createElement("textarea", {
 			id: fieldId,
 			ref,
 			className: "qsk-extra__control qsk-textarea",
@@ -194130,11 +194147,11 @@ create: function(game) {
 			onFocus: (event) => focusFx(event.currentTarget)
 		}));
 	});
-	(0, react.forwardRef)(function SakugaNumber(props, ref) {
+	forwardRef(function SakugaNumber(props, ref) {
 		const { label, value, defaultValue, min, max, step = 1, name, disabled, id, className, style, description, onChange } = props;
-		const autoId = (0, react.useId)();
+		const autoId = useId();
 		const fieldId = id ?? `qsk-number-${autoId}`;
-		const inputRef = (0, react.useRef)(null);
+		const inputRef = useRef(null);
 		const controlled = value !== void 0;
 		const shown = controlled ? value === void 0 || value === null ? "" : String(value) : void 0;
 		const typeFx = useTypeFx();
@@ -194164,13 +194181,13 @@ create: function(game) {
 		const hasNumber = nativeValue !== "" && Number.isFinite(nativeNumber);
 		const atMin = typeof min === "number" && hasNumber && nativeNumber <= min;
 		const atMax = typeof max === "number" && hasNumber && nativeNumber >= max;
-		return (0, react.createElement)(ExtraField, {
+		return createElement(ExtraField, {
 			label,
 			htmlFor: fieldId,
 			description,
 			className,
 			style
-		}, (0, react.createElement)("div", { style: ROW_STYLE }, (0, react.createElement)(SakugaButton, {
+		}, createElement("div", { style: ROW_STYLE }, createElement(SakugaButton, {
 			variant: "secondary",
 			fx: false,
 			type: "button",
@@ -194178,7 +194195,7 @@ create: function(game) {
 			"aria-label": "Decrease",
 			className: "qsk-stepper",
 			onClick: () => stepBy(-1)
-		}, "−"), (0, react.createElement)("input", {
+		}, "−"), createElement("input", {
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -194214,7 +194231,7 @@ create: function(game) {
 				}
 			},
 			onFocus: (event) => focusFx(event.currentTarget)
-		}), (0, react.createElement)(SakugaButton, {
+		}), createElement(SakugaButton, {
 			variant: "secondary",
 			fx: false,
 			type: "button",
@@ -194225,11 +194242,11 @@ create: function(game) {
 		}, "+")));
 	});
 	// ../qubit-shared/src/sakuga/extras/date-time.tsx
-	var DateTimeField = (0, react.forwardRef)(function DateTimeField(props, ref) {
+	var DateTimeField = forwardRef(function DateTimeField(props, ref) {
 		const { label, value, defaultValue, min, max, name, disabled, id, className, style, description, onChange, type, openLabel } = props;
-		const autoId = (0, react.useId)();
+		const autoId = useId();
 		const fieldId = id ?? `qsk-${type}-${autoId}`;
-		const inputRef = (0, react.useRef)(null);
+		const inputRef = useRef(null);
 		const typeFx = useTypeFx();
 		const focusFx = useFocusFx();
 		const openPicker = () => {
@@ -194240,13 +194257,13 @@ create: function(game) {
 			} catch {}
 			emitFxAt("pop", input, { scale: .5 });
 		};
-		return (0, react.createElement)(ExtraField, {
+		return createElement(ExtraField, {
 			label,
 			htmlFor: fieldId,
 			description,
 			className,
 			style
-		}, (0, react.createElement)("div", { style: ROW_STYLE }, (0, react.createElement)("input", {
+		}, createElement("div", { style: ROW_STYLE }, createElement("input", {
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -194272,7 +194289,7 @@ create: function(game) {
 				onChange?.(event.currentTarget.value);
 			},
 			onFocus: (event) => focusFx(event.currentTarget)
-		}), (0, react.createElement)(SakugaButton, {
+		}), createElement(SakugaButton, {
 			variant: "secondary",
 			fx: false,
 			type: "button",
@@ -194282,16 +194299,16 @@ create: function(game) {
 			onClick: openPicker
 		}, "▾")));
 	});
-	(0, react.forwardRef)(function SakugaDate(props, ref) {
-		return (0, react.createElement)(DateTimeField, {
+	forwardRef(function SakugaDate(props, ref) {
+		return createElement(DateTimeField, {
 			...props,
 			ref,
 			type: "date",
 			openLabel: "Open date picker"
 		});
 	});
-	(0, react.forwardRef)(function SakugaTime(props, ref) {
-		return (0, react.createElement)(DateTimeField, {
+	forwardRef(function SakugaTime(props, ref) {
+		return createElement(DateTimeField, {
 			...props,
 			ref,
 			type: "time",
@@ -194328,13 +194345,13 @@ create: function(game) {
 		lineHeight: 1.2,
 		cursor: "pointer"
 	};
-	(0, react.forwardRef)(function SakugaFile(props, ref) {
+	forwardRef(function SakugaFile(props, ref) {
 		const { label, accept, multiple, onFiles, name, disabled, id, className, style, description, buttonLabel } = props;
-		const autoId = (0, react.useId)();
+		const autoId = useId();
 		const fieldId = id ?? `qsk-file-${autoId}`;
-		const [files, setFiles] = (0, react.useState)([]);
-		const inputRef = (0, react.useRef)(null);
-		const triggerRef = (0, react.useRef)(null);
+		const [files, setFiles] = useState([]);
+		const inputRef = useRef(null);
+		const triggerRef = useRef(null);
 		const publish = (next) => {
 			setFiles(next);
 			onFiles?.(next);
@@ -194355,16 +194372,16 @@ create: function(game) {
 			publish(next);
 			emitFxAt("pop", target, { scale: .6 });
 		};
-		return (0, react.createElement)(ExtraField, {
+		return createElement(ExtraField, {
 			label,
 			htmlFor: fieldId,
 			description,
 			className,
 			style
-		}, (0, react.createElement)("div", { style: {
+		}, createElement("div", { style: {
 			...ROW_STYLE,
 			flexWrap: "wrap"
-		} }, (0, react.createElement)(SakugaButton, {
+		} }, createElement(SakugaButton, {
 			ref: (node) => {
 				triggerRef.current = node;
 			},
@@ -194374,7 +194391,7 @@ create: function(game) {
 			disabled,
 			"aria-label": `${buttonLabel ?? (multiple ? "Choose files" : "Choose file")}: ${label}`,
 			onClick: () => inputRef.current?.click()
-		}, buttonLabel ?? (multiple ? "Choose files" : "Choose file")), (0, react.createElement)("input", {
+		}, buttonLabel ?? (multiple ? "Choose files" : "Choose file")), createElement("input", {
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -194390,49 +194407,49 @@ create: function(game) {
 			"aria-hidden": "true",
 			style: HIDDEN_INPUT_STYLE,
 			onChange: onPick
-		}), files.map((file, index) => (0, react.createElement)("span", {
+		}), files.map((file, index) => createElement("span", {
 			key: `${file.name}-${index}`,
 			style: CHIP_STYLE,
 			"data-qsk-file": file.name
-		}, (0, react.createElement)("span", {
+		}, createElement("span", {
 			style: CHIP_NAME_STYLE,
 			title: file.name
-		}, file.name), (0, react.createElement)("button", {
+		}, file.name), createElement("button", {
 			type: "button",
 			style: CHIP_REMOVE_STYLE,
 			"aria-label": `Remove ${file.name}`,
 			disabled,
 			onClick: (event) => remove(index, event.currentTarget)
-		}, "×")))), files.length ? (0, react.createElement)("span", {
+		}, "×")))), files.length ? createElement("span", {
 			style: DESCRIPTION_STYLE,
 			"aria-live": "polite"
 		}, multiple ? `${files.length} file${files.length === 1 ? "" : "s"} selected` : files[0].name) : null);
 	});
 	// ../qubit-shared/src/sakuga/extras/hover-tooltip.tsx
 	function SakugaHoverTooltip({ content, label, children, placement = "top", className, disabled = false, closeDelay = 90 }) {
-		const [open, setOpen] = (0, react.useState)(false);
-		const [bump, setBump] = (0, react.useState)(0);
-		const wrap = (0, react.useRef)(null);
-		const timer = (0, react.useRef)(null);
+		const [open, setOpen] = useState(false);
+		const [bump, setBump] = useState(0);
+		const wrap = useRef(null);
+		const timer = useRef(null);
 		const clear = () => {
 			if (timer.current) {
 				clearTimeout(timer.current);
 				timer.current = null;
 			}
 		};
-		const show = (0, react.useCallback)(() => {
+		const show = useCallback(() => {
 			if (disabled) return;
 			clear();
 			setOpen(true);
 			if (wrap.current) emitFxAt("tick", wrap.current, { scale: .45 });
 		}, [disabled]);
-		const hide = (0, react.useCallback)(() => {
+		const hide = useCallback(() => {
 			if (disabled) return;
 			clear();
 			timer.current = setTimeout(() => setOpen(false), closeDelay);
 		}, [closeDelay, disabled]);
-		(0, react.useEffect)(() => () => clear(), []);
-		(0, react.useEffect)(() => {
+		useEffect(() => () => clear(), []);
+		useEffect(() => {
 			if (!open) return;
 			const onKey = (event) => {
 				if (event.key === "Escape") setOpen(false);
@@ -194446,7 +194463,7 @@ create: function(game) {
 			setOpen(true);
 			if (wrap.current) emitFxAt("pop", wrap.current, { scale: .5 });
 		};
-		return (0, react.createElement)("span", {
+		return createElement("span", {
 			ref: wrap,
 			className: ["qsk-hover-tip", className].filter(Boolean).join(" "),
 			"data-open": open || void 0,
@@ -194455,12 +194472,12 @@ create: function(game) {
 			onFocusCapture: show,
 			onBlurCapture: hide,
 			onClick
-		}, children, open ? (0, react.createElement)("span", {
+		}, children, open ? createElement("span", {
 			key: bump,
 			role: "tooltip",
 			className: "qsk-hover-tip__bubble",
 			"data-placement": placement
-		}, label ? (0, react.createElement)("span", { className: "qsk-hover-tip__label" }, label) : null, (0, react.createElement)("span", { className: "qsk-hover-tip__text" }, content)) : null);
+		}, label ? createElement("span", { className: "qsk-hover-tip__label" }, label) : null, createElement("span", { className: "qsk-hover-tip__text" }, content)) : null);
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/sakuga-form.ts
 	function textOf(node) {
@@ -194472,8 +194489,8 @@ create: function(game) {
 	/** Flatten the `<option>` children callers already build into select options. */
 	function optionsFrom(children) {
 		const out = [];
-		for (const child of react.Children.toArray(children)) {
-			if (!(0, react.isValidElement)(child)) continue;
+		for (const child of Children.toArray(children)) {
+			if (!isValidElement(child)) continue;
 			const props = child.props;
 			const value = props.value === void 0 ? textOf(props.children) : String(props.value);
 			out.push({
@@ -194487,7 +194504,7 @@ create: function(game) {
 	function OfficeInput(props) {
 		const { value, placeholder, type, disabled, autoComplete, autoFocus, className, style, ref, onChange, onInput, onKeyDown, id } = props;
 		const label = props.label ?? props["aria-label"] ?? placeholder ?? "Search";
-		return (0, react.createElement)(SakugaInput, {
+		return createElement(SakugaInput, {
 			type: type === "search" ? "search" : "text",
 			label,
 			placeholder,
@@ -194513,7 +194530,7 @@ create: function(game) {
 	/** A native-shaped `<select>` rendered as the composed `SakugaSelect`. */
 	function OfficeSelect(props) {
 		const { value, disabled, className, style, children, placeholder, onChange, id } = props;
-		return (0, react.createElement)(SakugaSelect, {
+		return createElement(SakugaSelect, {
 			label: props.label ?? props["aria-label"] ?? id ?? "Select",
 			options: optionsFrom(children),
 			value: value === void 0 || value === null ? "" : String(value),
@@ -194529,7 +194546,7 @@ create: function(game) {
 	/** A native-shaped textarea rendered as the composed `SakugaTextarea`. */
 	function OfficeTextarea(props) {
 		const { value, rows = 3, disabled, placeholder, className, onChange, id } = props;
-		return (0, react.createElement)(SakugaTextarea, {
+		return createElement(SakugaTextarea, {
 			label: props.label || props["aria-label"] || "Text",
 			value,
 			rows,
@@ -194543,7 +194560,7 @@ create: function(game) {
 	}
 	/** The hover/focus/tap bubble around an arbitrary host-shell trigger. */
 	function OfficeTooltip(props) {
-		return (0, react.createElement)(SakugaHoverTooltip, props);
+		return createElement(SakugaHoverTooltip, props);
 	}
 	var SEAT_MODEL_ROUTE = `/agent/api/office/habblaud/agents`;
 	function seatModelUrl(agentId) {
@@ -211998,4 +212015,4 @@ create: function(game) {
 			})))
 		};
 	}
-})(React);
+})();
