@@ -2,17 +2,22 @@
  *
  * Upstream has no multi-line control; this is a real textarea with the
  * documented `--sk-*` palette and the compact chrome, plus the engine's dust
- * (`type`) on input and wedges (`focus`) on focus. Because it is the native
- * element, value/name, required, maxLength and form submission are unchanged.
+ * (`type`) on input and wedges (`focus`) on focus. Native props (onKeyDown,
+ * onPaste, onDrop, aria-*, data-*, autoFocus …) pass through, so a composer
+ * can keep Enter-to-send, image paste/drop and its own test ids. Auto-resize
+ * is opt-in; the height follows scrollHeight when enabled.
  */
 import {
   createElement,
   forwardRef,
   useId,
+  useLayoutEffect,
+  useRef,
   type CSSProperties,
   type ChangeEvent,
   type FocusEvent,
   type ReactNode,
+  type TextareaHTMLAttributes,
 } from 'react';
 import {
   ExtraField,
@@ -21,65 +26,78 @@ import {
   useTypeFx,
 } from './common';
 
-export interface SakugaTextareaProps {
-  label: string;
+export interface SakugaTextareaProps
+  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value' | 'defaultValue' | 'className' | 'style'> {
+  label?: string;
   value?: string;
   defaultValue?: string;
-  placeholder?: string;
   rows?: number;
-  name?: string;
-  required?: boolean;
-  disabled?: boolean;
-  maxLength?: number;
-  autoFocus?: boolean;
-  readOnly?: boolean;
-  id?: string;
   className?: string;
   style?: CSSProperties;
   description?: ReactNode;
+  autoResize?: boolean;
   onChange?: (value: string) => void;
 }
 
 export const SakugaTextarea = forwardRef<HTMLTextAreaElement, SakugaTextareaProps>(
   function SakugaTextarea(props, ref) {
     const {
-      label, value, defaultValue, placeholder, rows = 3, name, required,
-      disabled, maxLength, autoFocus, readOnly, id, className, style,
-      description, onChange,
+      label, value, defaultValue, onChange, className, style, description,
+      autoResize = false, rows = 3, onInput, ...rest
     } = props;
     const autoId = useId();
-    const fieldId = id ?? `qsk-textarea-${autoId}`;
+    const fieldId = rest.id ?? `qsk-textarea-${autoId}`;
     const typeFx = useTypeFx();
     const focusFx = useFocusFx();
+    const innerRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const resize = () => {
+      if (!autoResize) return;
+      const element = innerRef.current;
+      if (!element) return;
+      element.style.height = 'auto';
+      element.style.height = `${Math.max(rows * 20 + 16, element.scrollHeight)}px`;
+    };
+
+    useLayoutEffect(() => {
+      resize();
+    }, [autoResize, rows, value, defaultValue]);
 
     return createElement(
       ExtraField,
-      { label, htmlFor: fieldId, description, className, style },
+      { label, htmlFor: label ? fieldId : undefined, description, className, style },
       createElement('textarea', {
+        ...rest,
         id: fieldId,
-        ref,
+        ref: (node: HTMLTextAreaElement | null) => {
+          innerRef.current = node;
+          if (typeof ref === 'function') ref(node);
+          else if (ref) (ref as { current: HTMLTextAreaElement | null }).current = node;
+        },
         className: 'qsk-extra__control qsk-textarea',
         style: {
           ...FIELD_STYLE,
           width: '100%',
           minHeight: rows * 20 + 16,
-          resize: 'vertical',
+          resize: autoResize ? 'none' : 'vertical',
+          ...style,
         },
-        name,
-        placeholder,
         rows,
-        required,
-        disabled,
-        maxLength,
-        autoFocus,
-        readOnly,
         value,
         defaultValue,
         onChange: (event: ChangeEvent<HTMLTextAreaElement>) => {
           typeFx(event.currentTarget);
           onChange?.(event.currentTarget.value);
+          resize();
         },
-        onFocus: (event: FocusEvent<HTMLTextAreaElement>) => focusFx(event.currentTarget),
+        onInput: (event) => {
+          resize();
+          onInput?.(event);
+        },
+        onFocus: (event: FocusEvent<HTMLTextAreaElement>) => {
+          focusFx(event.currentTarget);
+          rest.onFocus?.(event);
+        },
       }),
     );
   },

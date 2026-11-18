@@ -40,6 +40,7 @@ export interface SakugaDateTimeProps {
   style?: CSSProperties;
   description?: ReactNode;
   onChange?: (value: string) => void;
+  inputProps?: Record<string, unknown>;
 }
 
 interface DateTimeFieldProps extends SakugaDateTimeProps {
@@ -51,7 +52,7 @@ const DateTimeField = forwardRef<HTMLInputElement, DateTimeFieldProps>(
   function DateTimeField(props, ref) {
     const {
       label, value, defaultValue, min, max, name, disabled,
-      id, className, style, description, onChange, type, openLabel,
+      id, className, style, description, onChange, type, openLabel, inputProps,
     } = props;
     const autoId = useId();
     const fieldId = id ?? `qsk-${type}-${autoId}`;
@@ -77,6 +78,7 @@ const DateTimeField = forwardRef<HTMLInputElement, DateTimeFieldProps>(
         'div',
         { style: ROW_STYLE },
         createElement('input', {
+          ...(inputProps ?? {}),
           id: fieldId,
           ref: (node: HTMLInputElement | null) => {
             inputRef.current = node;

@@ -39,6 +39,14 @@ export interface SakugaFileProps {
   description?: ReactNode;
   /** Visible trigger text. Defaults to "Choose file(s)". */
   buttonLabel?: string;
+  /** Children replace the trigger label (e.g. an icon button). */
+  children?: ReactNode;
+  /** Hide the selected-file chips (programmatic pickers behind an icon). */
+  showList?: boolean;
+  /** Directory picker (`webkitdirectory`). */
+  directory?: boolean;
+  /** Extra props for the native input (data-testid, aria-*). */
+  inputProps?: Record<string, unknown>;
 }
 
 const CHIP_STYLE: CSSProperties = {
@@ -77,7 +85,7 @@ export const SakugaFile = forwardRef<HTMLInputElement, SakugaFileProps>(
   function SakugaFile(props, ref) {
     const {
       label, accept, multiple, onFiles, name, disabled, id, className, style,
-      description, buttonLabel,
+      description, buttonLabel, children, showList = true, directory, inputProps,
     } = props;
     const autoId = useId();
     const fieldId = id ?? `qsk-file-${autoId}`;
@@ -117,7 +125,7 @@ export const SakugaFile = forwardRef<HTMLInputElement, SakugaFileProps>(
       { label, htmlFor: fieldId, description, className, style },
       createElement(
         'div',
-        { style: { ...ROW_STYLE, flexWrap: 'wrap' } },
+        { style: { ...ROW_STYLE, flexWrap: 'wrap', display: showList ? undefined : 'contents' } },
         createElement(SakugaButton, {
           ref: (node: HTMLElement | null) => {
             triggerRef.current = node;
@@ -128,9 +136,11 @@ export const SakugaFile = forwardRef<HTMLInputElement, SakugaFileProps>(
           disabled,
           'aria-label': `${buttonLabel ?? (multiple ? 'Choose files' : 'Choose file')}: ${label}`,
           onClick: () => inputRef.current?.click(),
-        }, buttonLabel ?? (multiple ? 'Choose files' : 'Choose file')),
+        }, children ?? buttonLabel ?? (multiple ? 'Choose files' : 'Choose file')),
         createElement('input', {
+          ...(inputProps ?? {}),
           id: fieldId,
+          webkitdirectory: directory ? '' : undefined,
           ref: (node: HTMLInputElement | null) => {
             inputRef.current = node;
             if (typeof ref === 'function') ref(node);

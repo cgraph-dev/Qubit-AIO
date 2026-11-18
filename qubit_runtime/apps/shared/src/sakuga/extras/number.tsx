@@ -41,13 +41,14 @@ export interface SakugaNumberProps {
   style?: CSSProperties;
   description?: ReactNode;
   onChange?: (value: number | string) => void;
+  inputProps?: Record<string, unknown>;
 }
 
 export const SakugaNumber = forwardRef<HTMLInputElement, SakugaNumberProps>(
   function SakugaNumber(props, ref) {
     const {
       label, value, defaultValue, min, max, step = 1, name, disabled,
-      id, className, style, description, onChange,
+      id, className, style, description, onChange, inputProps,
     } = props;
     const autoId = useId();
     const fieldId = id ?? `qsk-number-${autoId}`;
@@ -104,6 +105,7 @@ export const SakugaNumber = forwardRef<HTMLInputElement, SakugaNumberProps>(
           onClick: () => stepBy(-1),
         }, '−'),
         createElement('input', {
+          ...(inputProps ?? {}),
           id: fieldId,
           ref: (node: HTMLInputElement | null) => {
             inputRef.current = node;
