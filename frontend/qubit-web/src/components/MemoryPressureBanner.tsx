@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import type { StatusResponse } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { Button } from "@/sakuga/ui";
 
 /**
  * App-wide warning banner for resource trouble (NS-656): memory pressure
@@ -173,14 +174,15 @@ export function MemoryPressureBanner({
     >
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">{message}</span>
-      <button
+      <Button
+        variant="secondary"
         type="button"
         aria-label={t.app.dismiss ?? "Dismiss"}
         onClick={dismiss}
         className="shrink-0 opacity-70 hover:opacity-100"
       >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }

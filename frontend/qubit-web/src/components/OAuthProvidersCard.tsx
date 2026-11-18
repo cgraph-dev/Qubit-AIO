@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { api, type OAuthProvider } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { CopyButton } from "@nous-research/ui/ui/components/command-block";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import {
@@ -106,8 +106,7 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
             </CardTitle>
           </div>
           <Button
-            ghost
-            size="icon"
+            variant="secondary"
             className="text-muted-foreground hover:text-foreground"
             onClick={refresh}
             disabled={loading}
@@ -231,7 +230,6 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
                   )}
                   {!p.status.logged_in && p.flow !== "external" && (
                     <Button
-                      size="sm"
                       className="uppercase"
                       onClick={() => setLoginFor(p)}
                     >
@@ -240,13 +238,12 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
                   )}
                   {p.status.logged_in && p.flow !== "external" && (
                     <Button
-                      size="sm"
-                      outlined
+                      variant="secondary"
                       className="uppercase"
                       onClick={() => setDisconnectTarget(p)}
                       disabled={isBusy}
-                      prefix={isBusy ? <Spinner /> : undefined}
                     >
+                      {isBusy ? <Spinner /> : null}
                       {t.oauth.disconnect}
                     </Button>
                   )}

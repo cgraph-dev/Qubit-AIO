@@ -108,7 +108,7 @@ describe("MemoryPressureBanner", () => {
       <MemoryPressureBanner status={statusWith({ pressure: "elevated" })} />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -123,7 +123,7 @@ describe("MemoryPressureBanner", () => {
       <MemoryPressureBanner status={statusWith({ pressure: "elevated" })} />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -144,7 +144,7 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -186,7 +186,7 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -218,7 +218,7 @@ describe("MemoryPressureBanner", () => {
       <MemoryPressureBanner status={statusWith({ pressure: "critical" })} />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -239,7 +239,7 @@ describe("MemoryPressureBanner", () => {
       <MemoryPressureBanner status={statusWith({ pressure: "elevated" })} />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     await rerender(
@@ -316,7 +316,7 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -338,7 +338,7 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();
@@ -357,7 +357,7 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     // User frees space (or grows the disk)...
@@ -387,14 +387,14 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     // Trigger shown is memory critical (outranks disk elevated) — dismiss it.
     await act(async () => dismiss.click());
     // Disk warning is next in line and has its own key, so it surfaces...
     expect(banner()?.textContent).toContain("disk is filling up");
     const dismissDisk = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismissDisk.click());
     expect(banner()).toBeNull();
@@ -420,7 +420,7 @@ describe("MemoryPressureBanner", () => {
       />,
     );
     const dismiss = container.querySelector(
-      '[data-testid="memory-pressure-banner"] button',
+      '[data-testid="memory-pressure-banner"] sakuga-button',
     ) as HTMLButtonElement;
     await act(async () => dismiss.click());
     expect(banner()).toBeNull();

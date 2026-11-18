@@ -7,7 +7,7 @@ import { Terminal as XtermTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { Terminal, X } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useProfileScope } from "@/contexts/useProfileScope";
 import { api } from "@/lib/api";
@@ -545,8 +545,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
             </div>
           </div>
           <Button
-            ghost
-            size="icon"
+            variant="secondary"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground"
             aria-label="Close console"
