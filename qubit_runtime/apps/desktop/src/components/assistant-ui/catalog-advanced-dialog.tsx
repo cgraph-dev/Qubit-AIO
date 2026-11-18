@@ -268,7 +268,11 @@ function InstallControls(props: InstallControlsProps) {
     <Section title={props.m.includesHeading}>
       <div className="grid gap-2 rounded-lg border border-(--ui-stroke-tertiary) px-3 py-2">
         <label className="flex items-start gap-3">
-          <Checkbox checked={props.agentHalf} onCheckedChange={value => props.onAgentHalfChange(value === true)} />
+          <Checkbox
+            aria-label={props.m.agentLabel}
+            checked={props.agentHalf}
+            onCheckedChange={value => props.onAgentHalfChange(value === true)}
+          />
           <span className="font-medium text-foreground">{props.m.agentLabel}</span>
         </label>
         <label className="grid gap-1 pl-7">
@@ -278,7 +282,11 @@ function InstallControls(props: InstallControlsProps) {
       </div>
       {props.hasDesktopHalf ? (
         <label className="flex items-start gap-3 rounded-lg border border-(--ui-stroke-tertiary) px-3 py-2">
-          <Checkbox checked={props.desktopHalf} onCheckedChange={value => props.onDesktopHalfChange(value === true)} />
+          <Checkbox
+            aria-label={props.m.desktopLabel}
+            checked={props.desktopHalf}
+            onCheckedChange={value => props.onDesktopHalfChange(value === true)}
+          />
           <span className="font-medium text-foreground">{props.m.desktopLabel}</span>
         </label>
       ) : null}

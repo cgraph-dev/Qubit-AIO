@@ -179,6 +179,7 @@ export function ModelVisibilityDialog({
                       />
                     </Button>
                     <Checkbox
+                      aria-label={provider.name}
                       checked={checkState}
                       onCheckedChange={next => setProviderVisible(provider, next !== false)}
                     />
