@@ -1,0 +1,129 @@
+/* Qubit manga skin: optional web-dashboard appearance layer.
+ * Load via MangaSkinGate; all rules below are inert unless enabled.
+ * No backend logic, semantic markup or Sakuga animation internals are replaced.
+ */
+html[data-qubit-manga="on"] {
+  --qm-bg:#0a0a1f;
+  --qm-panel:#171027;
+  --qm-raised:#2b1741;
+  --qm-ink:#fff0ff;
+  --qm-magenta:#ff269a;
+  --qm-violet:#b965ff;
+  --qm-yellow:#ffe500;
+  --qm-cyan:#27e9f3;
+  --qm-black:#080615;
+  --qm-outline:2px solid var(--qm-magenta);
+  --qm-lift:3px 3px 0 var(--qm-black),5px 5px 0 rgba(255,240,255,.8);
+  --qplate-panel:var(--qm-panel);
+  --qplate-sunk:var(--qm-bg);
+  --qplate-raised:var(--qm-raised);
+  --qplate-rule:rgba(255,38,154,.6);
+  --qplate-rule-soft:rgba(185,101,255,.4);
+  --qplate-ink:var(--qm-ink);
+  --qplate-muted:#eddbff;
+  --qplate-faint:#d7bbf1;
+}
+.qm-skin-switch {
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  flex-shrink:0;min-width:44px;min-height:27px;padding:3px 6px;
+  border:2px solid #ff269a;border-radius:4px;background:#171027;
+  color:#fff0ff;font:700 10px/1.2 system-ui,sans-serif;cursor:pointer;
+}
+.qm-skin-switch[aria-pressed="true"] {background:#ffe500;color:#080615;border-color:#080615;box-shadow:2px 2px 0 #ff269a}
+.qm-skin-switch__spark {font-size:13px;color:#ff269a}
+.qm-skin-switch[aria-pressed="true"] .qm-skin-switch__spark {color:#080615}
+.qm-skin-switch__lamp {width:6px;height:6px;border-radius:50%;background:#777}
+.qm-skin-switch__lamp[data-active="true"] {background:#28d577;box-shadow:0 0 0 1px #080615}
+.qm-skin-switch:focus-visible {outline:2px solid #ffe500;outline-offset:3px}
+@media (max-width: 1023px) {.qm-skin-switch{min-height:36px}}
+@media (min-width: 1024px) {
+  #app-sidebar[data-collapsed="true"] .qm-skin-switch {width:32px;min-width:0;margin-inline:auto}
+  #app-sidebar[data-collapsed="true"] .qm-skin-switch__label,
+  #app-sidebar[data-collapsed="true"] .qm-skin-switch__lamp {display:none}
+}
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar {
+  --qrail-panel:var(--qm-panel);--qrail-sunk:var(--qm-bg);
+  --qrail-raised:var(--qm-raised);--qrail-rule:rgba(255,38,154,.6);
+  --qrail-rule-soft:rgba(185,101,255,.4);
+  --qrail-ink:var(--qm-ink);--qrail-muted:#eddbff;--qrail-faint:#d7bbf1;
+  border-right:3px solid var(--qm-magenta)!important;
+  box-shadow:3px 0 0 var(--qm-black),5px 0 0 rgba(255,240,255,.6);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop-scrim {background:var(--qm-bg);opacity:.91}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
+  border-bottom:3px solid var(--qm-magenta)!important;
+  background:linear-gradient(115deg,rgba(255,38,154,.32),var(--qm-bg) 76%)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+  background:linear-gradient(95deg,var(--qm-magenta) 0%,#6e1d6d 72%,transparent 99%);
+  color:var(--qm-ink)!important;border-left:3px solid var(--qm-yellow);
+  clip-path:polygon(0 0,96% 0,100% 50%,96% 100%,0 100%);
+  font-weight:800;letter-spacing:.1em;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-index {color:var(--qm-yellow)!important}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+  border:1px solid rgba(185,101,255,.28);border-radius:3px;
+  background:rgba(10,10,31,.5);transition:background 130ms ease,border-color 130ms ease;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  background:linear-gradient(90deg,rgba(255,38,154,.3),rgba(185,101,255,.11));
+  border-color:var(--qm-magenta);color:var(--qm-ink)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+  color:var(--qm-black)!important;background:var(--qm-yellow)!important;
+  border:2px solid var(--qm-black)!important;box-shadow:3px 3px 0 var(--qm-magenta)!important;
+  font-weight:800;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] svg,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] .qagent-sidebar__link-label {color:var(--qm-black)!important}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:focus-visible {outline:2px solid var(--qm-yellow);outline-offset:2px}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system {
+  border-color:var(--qm-magenta)!important;background:rgba(23,16,39,.92);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {border-top:2px solid var(--qm-magenta)}
+html[data-qubit-manga="on"] .qplate-module__head {
+  color:var(--qm-ink);background:linear-gradient(95deg,rgba(255,38,154,.35),transparent 82%);
+  border-left:3px solid var(--qm-yellow);
+}
+html[data-qubit-manga="on"] .qchat__side,
+html[data-qubit-manga="on"] .qrail-flyout {
+  border:2px solid var(--qm-magenta)!important;background:var(--qm-panel)!important;
+  box-shadow:var(--qm-lift);
+}
+html[data-qubit-manga="on"] .qchat__side .qplate-row:is(:hover,:focus-visible),
+html[data-qubit-manga="on"] .qchat__side .qplate-row[data-selected="true"] {
+  background:rgba(255,38,154,.25);border-color:var(--qm-violet);color:var(--qm-ink);
+}
+html[data-qubit-manga="on"] .qchat {
+  --qchat-signal:var(--qm-magenta);
+  --qchat-violet:var(--qm-violet);--qchat-cyan:var(--qm-cyan);
+  --qchat-amber:var(--qm-yellow);
+}
+html[data-qubit-manga="on"] .qchat::before {height:4px;background:linear-gradient(90deg,var(--qm-magenta) 56%,var(--qm-yellow) 78%,var(--qm-cyan))}
+html[data-qubit-manga="on"] :is(main,.settings-page,.qchat) :is(.settings-section,.settings-group,[data-slot="card"]) {
+  border:2px solid rgba(255,38,154,.7)!important;border-radius:5px!important;
+  background-color:rgba(23,16,39,.95);box-shadow:var(--qm-lift);
+}
+html[data-qubit-manga="on"] :is(.settings-page,.qchat) :is(input:not([type="checkbox"]):not([type="radio"]),textarea,select) {
+  border:2px solid var(--qm-violet);background:var(--qm-bg);
+  color:var(--qm-ink);border-radius:4px;
+}
+html[data-qubit-manga="on"] :is(.settings-page,.qchat) :is(input,textarea,select):focus-visible {
+  outline:2px solid var(--qm-yellow);outline-offset:2px;
+}
+html[data-qubit-manga="on"] sakuga-button::part(button) {
+  border-color:var(--qm-ink);background:var(--qm-magenta);
+  color:var(--qm-black);box-shadow:3px 4px 0 var(--qm-black),5px 6px 0 var(--qm-violet);
+}
+html[data-qubit-manga="on"] sakuga-button::part(button):focus-visible {outline:3px solid var(--qm-yellow)}
+html[data-qubit-manga="on"] sakuga-input::part(input) {border-color:var(--qm-violet);box-shadow:3px 4px 0 var(--qm-magenta)}
+html[data-qubit-manga="on"] [role="dialog"] {border:3px solid var(--qm-magenta);box-shadow:var(--qm-lift)}
+html[data-qubit-manga="on"] :is(button,a,input,select,textarea,[role="button"]):focus-visible {
+  outline:2px solid var(--qm-yellow);outline-offset:2px;
+}
+html[data-qubit-manga="on"] ::selection {background:var(--qm-magenta);color:var(--qm-black)}
+@media (prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] :is(.qagent-sidebar__link,.qplate-row) {transition:none!important}
+}
