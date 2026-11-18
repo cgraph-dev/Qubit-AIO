@@ -12,29 +12,30 @@
  */
 
 :root {
-  /* surfaces, darkest to lightest */
-  --office-void: #0b0f16;
-  --office-ground: #1b2230;
-  --office-plate: #2a3342;
-  --office-wall: #39445a;
+  /* surfaces, darkest to lightest. The 2Five office theme: deep plum void,
+     raised plum panels and a wine-red banner wall. */
+  --office-void: #14081e;
+  --office-ground: #14081e;
+  --office-plate: #2c1637;
+  --office-wall: #4c0d27;
 
   /* ink */
-  --office-ink: #e8edf6;
-  --office-muted: #8b97ad;
-  --office-dim: rgba(232, 237, 246, 0.55);
+  --office-ink: #ebd2c3;
+  --office-muted: #a2758f;
+  --office-dim: #8891b5;
 
   /* accent + semantic state (mirrors the scene animation colours) */
-  --office-accent: #e08fb0;
-  --office-ok: #6fd3a6;
-  --office-warn: #f0c05a;
-  --office-bad: #e0554a;
+  --office-accent: #eb5086;
+  --office-ok: #4fd18b;
+  --office-warn: #efaf67;
+  --office-bad: #f54c86;
 
   /* the frame */
   --office-radius: 6px;
   /* Border COLOURS are separate tokens so a host theme's `--ui-line*` can
      replace them without touching the border width (paint, not layout). */
-  --office-line: rgba(255, 255, 255, 0.12);
-  --office-line-strong: rgba(255, 255, 255, 0.24);
+  --office-line: #c18867;
+  --office-line-strong: #efaf67;
   --office-border: 1px solid var(--office-line);
   --office-border-strong: 1px solid var(--office-line-strong);
   --office-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
@@ -42,10 +43,10 @@
   /* Where the side sheets begin, BELOW the vendored app's fixed top bar.
      The app's own `--top-h` is 64px (default), 124px while the usage row is
      shown, and 108px at phone width; that bar also hosts the injected Panels
-     group whose icons open these docks. 128px clears the tallest measured bar
-     (124px) with a 4px gap, so the HUD can never cover the group again
-     (measured live: HUD top≈75, Panels at y≈90). */
-  --office-dock-top: 128px;
+     group whose icons open these docks. The 2Five top bar is 74px with a
+     60px usage row, so 138px clears the tallest measured bar (134px) with a
+     4px gap and still clears every upstream height/page offset. */
+  --office-dock-top: 138px;
 
   /* spacing scale: 4px base. Every gap in the shell is one of these. */
   --office-s1: 4px;

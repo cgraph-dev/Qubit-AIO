@@ -610,3 +610,129 @@ describe("host theme + rerender stability", () => {
     }
   });
 });
+
+/*
+ * The 2Five iframe skin is installed by the shell, not by the vendored client.
+ * The skin is a single `<style>` in the iframe document, so the only honest
+ * contract to pin is: it exists after `load` and it is gone after unmount. The
+ * harness below is a minimal same-origin document double (the node environment
+ * has no DOM); the real skin rules are covered by `office-ui-skin.test.ts`.
+ */
+describe("office UI skin wiring", () => {
+  const makeElement = (tag: string) => ({
+    tagName: tag.toUpperCase(),
+    id: "",
+    rel: "",
+    href: "",
+    textContent: "",
+    parentNode: null as { children: unknown[] } | null,
+    attrs: {} as Record<string, string>,
+    setAttribute(key: string, value: string) { this.attrs[key] = value; },
+    remove() {
+      const parent = this.parentNode;
+      if (!parent) return;
+      const index = parent.children.indexOf(this);
+      if (index >= 0) parent.children.splice(index, 1);
+      this.parentNode = null;
+    },
+  });
+
+  const makeDocument = () => {
+    const head = {
+      children: [] as Array<ReturnType<typeof makeElement>>,
+      appendChild(node: ReturnType<typeof makeElement>) {
+        if (node.parentNode) {
+          const index = node.parentNode.children.indexOf(node);
+          if (index >= 0) node.parentNode.children.splice(index, 1);
+        }
+        node.parentNode = head;
+        head.children.push(node);
+        return node;
+      },
+    };
+    const doc = {
+      title: "",
+      head,
+      body: head,
+      createElement: (tag: string) => makeElement(tag),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      getElementById: (id: string) =>
+        head.children.find((node) => node.id === id) ?? null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+    return doc;
+  };
+
+  it("installs the skin on load and removes it on unmount", () => {
+    const doc = makeDocument();
+    const fakeWin = {
+      document: doc,
+      setTimeout,
+      fetch: vi.fn(),
+      // The real shell delegates to the browser's MutationObserver; the skin
+      // installer tolerates its absence, which keeps this double tiny.
+      MutationObserver: undefined,
+    };
+    const frame = {
+      contentWindow: fakeWin,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      src: "",
+    };
+    let load: (() => void) | undefined;
+    frame.addEventListener.mockImplementation((type: string, fn: () => void) => {
+      if (type === "load") load = fn;
+    });
+    const tree: Array<{ type: unknown; props: Record<string, unknown> }> = [];
+    const refSlots: Array<{ current: unknown }> = [];
+    let refIndex = 0;
+    const React = {
+      createElement(type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) {
+        const element = { type, props: { ...(props ?? {}), children } };
+        tree.push(element);
+        if (type === "iframe") {
+          Object.assign(frame, element.props);
+          const ref = element.props.ref as { current: unknown } | undefined;
+          if (ref) ref.current = frame;
+        }
+        return element;
+      },
+    };
+    const effectCleanups: Array<() => void> = [];
+    const hooks = {
+      useState: (initial: unknown) => [initial, vi.fn()],
+      useRef: (initial: unknown) => {
+        const seed = refIndex === 0 ? frame : initial;
+        const slot = refSlots[refIndex] ?? (refSlots[refIndex] = { current: seed });
+        refIndex += 1;
+        return slot;
+      },
+      useEffect: (fn: () => void | (() => void)) => {
+        const cleanup = fn();
+        if (typeof cleanup === "function") effectCleanups.push(cleanup);
+      },
+    };
+
+    const previous = (globalThis as { MutationObserver?: unknown }).MutationObserver;
+    (globalThis as { MutationObserver?: unknown }).MutationObserver = class {
+      observe() {}
+      disconnect() {}
+    };
+    vi.useFakeTimers();
+    try {
+      const App = createOfficeApp(React as never, hooks as never);
+      App({});
+      expect(load).toBeTypeOf("function");
+      load?.();
+      expect(doc.getElementById("qubit-office-ui-skin")).not.toBeNull();
+      for (const cleanup of effectCleanups.splice(0)) cleanup();
+      expect(doc.getElementById("qubit-office-ui-skin")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      if (previous === undefined) delete (globalThis as { MutationObserver?: unknown }).MutationObserver;
+      else (globalThis as { MutationObserver?: unknown }).MutationObserver = previous;
+    }
+  });
+});
