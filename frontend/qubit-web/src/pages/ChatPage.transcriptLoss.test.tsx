@@ -151,7 +151,7 @@ async function typeAndSend(text: string) {
     setter?.call(box, text);
     box.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  const send = Array.from(container.querySelectorAll("button")).find(
+  const send = Array.from(container.querySelectorAll("button, sakuga-button")).find(
     (b) => (b.textContent ?? "").trim() === "Send",
   );
   if (!send) throw new Error("Send button not found");

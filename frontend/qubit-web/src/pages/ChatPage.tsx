@@ -12,7 +12,7 @@
  * and the sessions switcher.
  */
 
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Checkbox, Select, emitFx, emitFxAt } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
@@ -1097,6 +1097,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     (raw: string, activity: "thinking" | "summarizing" = "thinking") => {
       const text = (raw || "").trim();
       if (!text || busy) return;
+      void emitFxAt("impact", composerRef.current, { scale: 0.7 });
       setInput("");
       setError(null);
       setRetryText(null);
@@ -1230,6 +1231,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               ]),
             );
             setStreamingText("");
+            void emitFx("success", { target: composerRef.current });
             // The turn persisted on the canonical session store (the reply and
             // session metadata), so remount/refetch the session list: a brand
             // new default row or an updated ordering surfaces without a manual
@@ -1254,6 +1256,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             );
             setRetryText(text);
             setStreamingText("");
+            void emitFx("error", { target: composerRef.current });
             // A failed turn may still have touched the session row (it was
             // created/persisted before the error), so re-sync the list.
             setSessionListNonce((n) => n + 1);
@@ -1268,6 +1271,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             );
             setStreamingText("");
             setVoiceNotice("turn cancelled — the shared backend aborted it");
+            void emitFx("warning", { target: composerRef.current });
             setSessionListNonce((n) => n + 1);
           },
         },
@@ -1463,6 +1467,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // The URL target at press time: if the operator picks another session
     // while this request is in flight, the pick wins.
     const resumeAtStart = resumeParamRef.current;
+    void emitFx("pop");
     setMessages([]);
     setError(null);
     setRetryText(null);
@@ -2167,19 +2172,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {model ? `model ${model}` : "model —"}
               </span>
               {isVoiceSession ? (
-                <label
-                  className="flex items-center gap-1 text-xs text-text-tertiary"
-                  title="Follow this voice session live — new voice turns appear automatically"
+                <Checkbox
+                  data-testid="voice-follow-toggle"
+                  checked={followVoice}
+                  onChange={setFollowVoice}
+                  className="text-xs text-text-tertiary"
                 >
-                  <input
-                    type="checkbox"
-                    data-testid="voice-follow-toggle"
-                    checked={followVoice}
-                    onChange={(event) => setFollowVoice(event.target.checked)}
-                    className="h-3 w-3 accent-current"
-                  />
                   follow
-                </label>
+                </Checkbox>
               ) : null}
               {followLiveVoice ? (
                 <span
@@ -2201,8 +2201,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 </span>
               ) : null}
               {newestVoiceSession && newestVoiceSession !== session ? (
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   data-testid="open-voice-session"
                   onClick={() => {
                     if (newestVoiceSession) openVoiceSession(newestVoiceSession);
@@ -2211,7 +2211,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   className="rounded border border-accent/40 px-1.5 py-0.5 text-xs text-midground hover:bg-midground/10"
                 >
                   Open live voice session
-                </button>
+                </Button>
               ) : null}
               {isVoiceSession ? (
                 <div
@@ -2251,31 +2251,27 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
             <div className="flex items-center gap-1">
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={() => setTerminalNoticeOpen((open) => !open)}
-                aria-expanded={terminalNoticeOpen}
+                {...{ "aria-expanded": terminalNoticeOpen }}
                 aria-label="Terminal input"
                 title="Terminal input (Qubit policy)"
               >
                 <Terminal className="h-4 w-4" />
               </Button>
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={() => setDebugOpen((open) => !open)}
-                aria-expanded={debugOpen}
+                {...{ "aria-expanded": debugOpen }}
                 aria-label={debugOpen ? "Hide debug overlay" : "Show debug overlay"}
                 title="Debug overlay (runtime + logs)"
               >
                 <Bug className="h-4 w-4" />
               </Button>
               <Button
-                ghost
-                size="icon"
+                variant="secondary"
                 onClick={() => setSidePanelOpen((open) => !open)}
-                aria-expanded={sidePanelOpen}
-                aria-controls="chat-side-panel"
+                {...{ "aria-expanded": sidePanelOpen, "aria-controls": "chat-side-panel" }}
                 aria-label={
                   sidePanelOpen
                     ? "Collapse chat side panel"
@@ -2312,13 +2308,13 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               >
                 open in /chat
               </a>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={startFresh}
                 className="ml-auto rounded px-1.5 py-0.5 text-text-tertiary hover:bg-midground/10 hover:text-foreground"
               >
                 start a new Qubit chat
-              </button>
+              </Button>
             </div>
           ) : null}
 
@@ -2476,13 +2472,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   Debug · runtime
                 </span>
                 <Button
-                  ghost
-                  size="xs"
+                  variant="secondary"
                   onClick={loadDebug}
                   disabled={debugState === "loading"}
                   aria-label="Refresh debug overlay"
                 >
-                  {debugState === "loading" ? <Spinner /> : "refresh"}
+                  {debugState === "loading" ? <span>…</span> : "refresh"}
                 </Button>
               </div>
               {debugState === "loading" ? (
@@ -2572,8 +2567,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 <div className="qchat__mission-picker" aria-label="Mission presets">
                   <h2 className="qchat__mission-caption">Choose a mission</h2>
                   <div className="qchat__mission-list">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
                       className="qchat__mission-card qchat__mission-card--violet"
                       onClick={() => loadMission("Help me trace a bug. Inspect the available context, list three plausible causes, then suggest the safest next check before changing anything.")}
                       aria-label="Load the Trace a bug mission into the composer"
@@ -2582,9 +2577,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                       <span>TRACE A BUG</span>
                       <span className="qchat__mission-detail">Find the cause and safest next check</span>
                       <ArrowUpRight className="qchat__mission-arrow" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="secondary"
                       className="qchat__mission-card qchat__mission-card--cyan"
                       onClick={() => loadMission("Map this system for me. Explain its key components, how data moves between them, and where a new feature should be added.")}
                       aria-label="Load the Map this system mission into the composer"
@@ -2593,9 +2588,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                       <span>MAP THE SYSTEM</span>
                       <span className="qchat__mission-detail">See the components and data flow</span>
                       <ArrowUpRight className="qchat__mission-arrow" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="secondary"
                       className="qchat__mission-card qchat__mission-card--amber"
                       onClick={() => loadMission("Pressure-test this plan. Find hidden assumptions, failure modes, and the smallest experiment that would prove or disprove it.")}
                       aria-label="Load the Pressure-test a plan mission into the composer"
@@ -2604,7 +2599,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                       <span>PRESSURE-TEST A PLAN</span>
                       <span className="qchat__mission-detail">Expose assumptions and smallest test</span>
                       <ArrowUpRight className="qchat__mission-arrow" aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -2619,17 +2614,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                       {selectedMessages.size} selected
                     </span>
                     <Button
-                      size="xs"
-                      outlined
+                      variant="secondary"
                       onClick={copySelected}
-                      prefix={<Copy className="h-3.5 w-3.5" />}
                       aria-label="Copy selected messages"
                     >
+                      <Copy className="h-3.5 w-3.5" />
                       {copyState === "copied" ? "copied" : "copy selected"}
                     </Button>
                     <Button
-                      ghost
-                      size="xs"
+                      variant="secondary"
                       onClick={() => setSelectedMessages(new Set())}
                       aria-label="Clear message selection"
                     >
@@ -2670,15 +2663,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                         <span className="text-xs font-semibold tracking-wide text-text-secondary">
                           {message.role === "user" ? "You" : "Qubit"}
                         </span>
-                        <label className="flex items-center gap-1 text-xs text-text-tertiary">
-                          <input
-                            type="checkbox"
-                            checked={selectedMessages.has(index)}
-                            onChange={() => toggleSelected(index)}
-                            aria-label={`Select message ${index + 1} from ${message.role === "user" ? "You" : "Qubit"}`}
-                            className="h-3 w-3 accent-current"
-                          />
-                        </label>
+                        <Checkbox
+                          checked={selectedMessages.has(index)}
+                          onChange={() => toggleSelected(index)}
+                          aria-label={`Select message ${index + 1} from ${message.role === "user" ? "You" : "Qubit"}`}
+                          className="text-xs text-text-tertiary"
+                        />
                       </div>
                     )}
                     <div className="whitespace-pre-wrap break-words">
@@ -2850,12 +2840,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <span className="min-w-0 flex-1 break-words">{error}</span>
               {retryText ? (
                 <Button
-                  size="sm"
-                  outlined
+                  variant="secondary"
                   onClick={() => send(retryText)}
-                  prefix={<RotateCcw className="h-3.5 w-3.5" />}
                   aria-label="Retry the last message"
                 >
+                  <RotateCcw className="h-3.5 w-3.5" />
                   Retry
                 </Button>
               ) : null}
@@ -2900,7 +2889,6 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 </span>
               </div>
               <Button
-                size="sm"
                 onClick={() => send("yes")}
                 disabled={busy}
                 aria-label="Confirm the staged action"
@@ -2908,8 +2896,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 Confirm
               </Button>
               <Button
-                size="sm"
-                outlined
+                variant="secondary"
                 onClick={() => send("no")}
                 disabled={busy}
                 aria-label="Cancel the staged action"
@@ -2926,42 +2913,44 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <label className="sr-only" htmlFor="qubit-chat-input">
               Message Qubit
             </label>
-            <label className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary">
+            <label
+              className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary"
+              title={voiceEngineTitle}
+            >
               <span className="sr-only">Voice engine</span>
-              <select
-                aria-label="Voice engine"
+              <Select
+                label="Voice engine"
                 data-testid="voice-engine-picker"
-                className="rounded border border-current/15 bg-background-base/60 px-1 py-1 text-xs text-text-secondary"
-                title={voiceEngineTitle}
+                className="text-xs text-text-secondary"
                 value={inputEngine}
-                onChange={(e) =>
-                  handleEngineChange(normalizeVoiceEngine(e.target.value))
+                onChange={(value) =>
+                  handleEngineChange(normalizeVoiceEngine(value))
                 }
-              >
-                <option value="auto">Voice: auto</option>
-                <option value="browser">Voice: browser</option>
-                <option value="local">Voice: local STT</option>
-                <option value="terminal">Voice: terminal</option>
-              </select>
+                options={[
+                  { value: "auto", label: "Voice: auto" },
+                  { value: "browser", label: "Voice: browser" },
+                  { value: "local", label: "Voice: local STT" },
+                  { value: "terminal", label: "Voice: terminal" },
+                ]}
+              />
             </label>
             {supportsReasoning ? (
               <label className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary">
                 <span className="sr-only">Reasoning effort</span>
-                <select
-                  aria-label="Reasoning effort"
+                <Select
+                  label="Reasoning effort"
                   data-testid="chat-reasoning-picker"
-                  className="rounded border border-current/15 bg-background-base/60 px-1 py-1 text-xs text-text-secondary"
-                  title="Reasoning effort: per-request output budget sent to the model and receipted per turn"
+                  className="text-xs text-text-secondary"
                   value={reasoning ?? ""}
-                  onChange={(e) => handleReasoningChange(e.target.value)}
-                >
-                  <option value="">Reasoning: default</option>
-                  {CHAT_REASONING_LEVELS.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.id} · {l.budget}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleReasoningChange}
+                  options={[
+                    { value: "", label: "Reasoning: default" },
+                    ...CHAT_REASONING_LEVELS.map((l) => ({
+                      value: l.id,
+                      label: `${l.id} · ${l.budget}`,
+                    })),
+                  ]}
+                />
               </label>
             ) : null}
             {/* Context ring: display-only. Fed from data this page already
@@ -3071,72 +3060,68 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             />
             <Button
               type="button"
-              outlined
+              variant="secondary"
               onClick={() => attachInputRef.current?.click()}
               disabled={busy || attachState === "describing"}
               aria-label="Attach image, PDF or file"
               title="Attach or paste an image (routed to the agent), or a PDF/text file (extracted into the composer to review before sending)"
-              prefix={<ImagePlus className="h-4 w-4" />}
             >
+              <ImagePlus className="h-4 w-4" />
               {attachState === "describing" ? "Reading…" : "Attach"}
             </Button>
             <Button
               type="button"
-              outlined
+              variant="secondary"
               onClick={toggleVoice}
               disabled={busy}
               aria-label={
                 voiceState === "listening" ? "Stop voice input" : "Voice input"
               }
               title="Speak instead of typing (same backend turn)"
-              prefix={
-                voiceState === "listening" ? (
-                  <Square className="h-4 w-4" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )
-              }
             >
+              {voiceState === "listening" ? (
+                <Square className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
               {voiceState === "listening" ? "Stop" : "Voice"}
             </Button>
             <Button
-              type="submit"
+              type="button"
               disabled={busy || !input.trim()}
               aria-label="Send"
-              prefix={<Send className="h-4 w-4" />}
+              onClick={() => send(input)}
             >
+              <Send className="h-4 w-4" />
               Send
             </Button>
           </form>
 
           <div className="qchat__session-actions mt-2 flex items-center justify-between gap-2">
             <Button
-              ghost
-              size="sm"
+              variant="secondary"
               onClick={startFresh}
-              prefix={<RotateCcw className="h-3.5 w-3.5" />}
               aria-label="Start a new chat session"
             >
+              <RotateCcw className="h-3.5 w-3.5" />
               New chat
             </Button>
             <Button
-              ghost
-              size="sm"
+              variant="secondary"
               onClick={copyLast}
               disabled={!messages.some((m) => m.role === "assistant")}
-              prefix={<Copy className="h-3.5 w-3.5" />}
               aria-label="Copy last assistant response"
             >
+              <Copy className="h-3.5 w-3.5" />
               {copyState === "copied" ? "copied" : "copy last response"}
             </Button>
             <Button
-              ghost
-              size="sm"
+              variant="secondary"
               onClick={summarizeSession}
               disabled={busy || messages.length === 0}
-              prefix={<FileText className="h-3.5 w-3.5" />}
               aria-label="Ask the local brain to report on this session"
             >
+              <FileText className="h-3.5 w-3.5" />
               summarize
             </Button>
             <a

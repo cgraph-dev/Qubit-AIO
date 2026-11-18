@@ -233,7 +233,7 @@ describe("/qubit-chat context ring", () => {
     });
     await act(async () => {
       container
-        .querySelector('button[aria-label="Send"]')!
+        .querySelector('[aria-label="Send"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -255,7 +255,7 @@ describe("/qubit-chat voice path survives the ring", () => {
     });
     await renderChat();
     expect(ring()).not.toBeNull();
-    const mic = container.querySelector('button[aria-label="Voice input"]');
+    const mic = container.querySelector('[aria-label="Voice input"]');
     expect(mic).not.toBeNull();
     await act(async () => {
       mic!.dispatchEvent(new MouseEvent("click", { bubbles: true }));

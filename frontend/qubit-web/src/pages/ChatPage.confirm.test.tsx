@@ -210,21 +210,21 @@ async function typeAndSend(value: string) {
   });
   await act(async () => {
     container
-      .querySelector('button[aria-label="Send"]')!
+      .querySelector('[aria-label="Send"]')!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
 }
 
-function confirmButton(): HTMLButtonElement {
+function confirmButton(): HTMLElement {
   return container.querySelector(
-    'button[aria-label="Confirm the staged action"]',
-  ) as HTMLButtonElement;
+    '[aria-label="Confirm the staged action"]',
+  ) as HTMLElement;
 }
 
-function cancelButton(): HTMLButtonElement {
+function cancelButton(): HTMLElement {
   return container.querySelector(
-    'button[aria-label="Cancel the staged action"]',
-  ) as HTMLButtonElement;
+    '[aria-label="Cancel the staged action"]',
+  ) as HTMLElement;
 }
 
 beforeEach(() => {
@@ -298,7 +298,7 @@ describe("Qubit ChatPage pending confirmation", () => {
     await vi.waitFor(() => expect(confirmButton()).not.toBeNull());
     // The confirm affordance is disabled while a turn is in flight; wait until
     // the raising turn has fully settled before clicking.
-    await vi.waitFor(() => expect(confirmButton().disabled).toBe(false));
+    await vi.waitFor(() => expect(confirmButton().hasAttribute("disabled")).toBe(false));
 
     await act(async () => {
       confirmButton().dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -319,7 +319,7 @@ describe("Qubit ChatPage pending confirmation", () => {
     await typeAndSend("reply to that");
 
     await vi.waitFor(() => expect(cancelButton()).not.toBeNull());
-    await vi.waitFor(() => expect(cancelButton().disabled).toBe(false));
+    await vi.waitFor(() => expect(cancelButton().hasAttribute("disabled")).toBe(false));
 
     await act(async () => {
       cancelButton().dispatchEvent(new MouseEvent("click", { bubbles: true }));

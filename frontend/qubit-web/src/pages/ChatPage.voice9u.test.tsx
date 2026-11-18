@@ -57,6 +57,33 @@ const apiMocks = vi.hoisted(() => ({
 
 const streamChatTurn = vi.hoisted(() => vi.fn());
 
+// SakugaSelect is an ARIA combobox built from shadow-DOM controls that a node
+// test cannot upgrade. Swap only Select for a native <select> so the existing
+// value/change contract stays testable; every other Sakuga surface is real.
+vi.mock("@/sakuga/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/sakuga/ui")>();
+  const { createElement } = await import("react");
+  return {
+    ...actual,
+    Select: ({ label, options, value, onChange, ...rest }: {
+      label: string;
+      options: ReadonlyArray<{ value: string; label: string }>;
+      value?: string;
+      onChange?: (value: string) => void;
+      [key: string]: unknown;
+    }) => createElement(
+      "select",
+      {
+        "aria-label": label,
+        "data-testid": rest["data-testid"],
+        value,
+        onChange: (event: { target: { value: string } }) => onChange?.(event.target.value),
+      },
+      options.map((option) => createElement("option", { key: option.value, value: option.value }, option.label)),
+    ),
+  };
+});
+
 vi.mock("@/lib/api", () => ({
   api: {
     getModelInfo: apiMocks.getModelInfo,
@@ -222,7 +249,7 @@ function statusText(): string {
 async function clickVoice() {
   await act(async () => {
     container
-      .querySelector('button[aria-label="Voice input"]')!
+      .querySelector('[aria-label="Voice input"]')!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
 }

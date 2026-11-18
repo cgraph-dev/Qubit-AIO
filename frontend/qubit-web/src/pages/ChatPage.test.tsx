@@ -68,6 +68,33 @@ const apiMocks = vi.hoisted(() => ({
 
 const streamChatTurn = vi.hoisted(() => vi.fn());
 
+// SakugaSelect is an ARIA combobox built from shadow-DOM controls that a node
+// test cannot upgrade. Swap only Select for a native <select> so the existing
+// value/change contract stays testable; every other Sakuga surface is real.
+vi.mock("@/sakuga/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/sakuga/ui")>();
+  const { createElement } = await import("react");
+  return {
+    ...actual,
+    Select: ({ label, options, value, onChange, ...rest }: {
+      label: string;
+      options: ReadonlyArray<{ value: string; label: string }>;
+      value?: string;
+      onChange?: (value: string) => void;
+      [key: string]: unknown;
+    }) => createElement(
+      "select",
+      {
+        "aria-label": label,
+        "data-testid": rest["data-testid"],
+        value,
+        onChange: (event: { target: { value: string } }) => onChange?.(event.target.value),
+      },
+      options.map((option) => createElement("option", { key: option.value, value: option.value }, option.label)),
+    ),
+  };
+});
+
 vi.mock("@/lib/api", () => ({
   api: {
     getModelInfo: apiMocks.getModelInfo,
@@ -275,7 +302,7 @@ async function typeAndSend(value: string) {
   });
   await act(async () => {
     container
-      .querySelector('button[aria-label="Send"]')!
+      .querySelector('[aria-label="Send"]')!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
 }
@@ -360,7 +387,7 @@ describe("Qubit ChatPage", () => {
     expect(toolsHead?.textContent).toContain("tools");
     expect(toolsHead?.textContent).not.toContain("&");
     expect(
-      container.querySelector('button[aria-label="Collapse chat side panel"]'),
+      container.querySelector('[aria-label="Collapse chat side panel"]'),
     ).not.toBeNull();
   });
 
@@ -599,7 +626,7 @@ describe("Qubit ChatPage", () => {
 
     await act(async () => {
       container
-        .querySelector('button[aria-label="Retry the last message"]')!
+        .querySelector('[aria-label="Retry the last message"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -639,7 +666,7 @@ describe("Qubit ChatPage", () => {
     // The truncated provisional text must not linger as a committed reply.
     expect(container.textContent).not.toContain("half written");
     expect(
-      container.querySelector('button[aria-label="Retry the last message"]'),
+      container.querySelector('[aria-label="Retry the last message"]'),
     ).not.toBeNull();
   });
 
@@ -647,7 +674,7 @@ describe("Qubit ChatPage", () => {
     await renderChat();
     await act(async () => {
       container
-        .querySelector('button[aria-label="Voice input"]')!
+        .querySelector('[aria-label="Voice input"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await vi.waitFor(() =>
@@ -690,17 +717,17 @@ describe("Qubit ChatPage", () => {
 
     await act(async () => {
       container
-        .querySelector('button[aria-label="Collapse chat side panel"]')!
+        .querySelector('[aria-label="Collapse chat side panel"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(container.querySelector("#chat-side-panel")).toBeNull();
     expect(
-      container.querySelector('button[aria-label="Show chat side panel"]'),
+      container.querySelector('[aria-label="Show chat side panel"]'),
     ).not.toBeNull();
 
     await act(async () => {
       container
-        .querySelector('button[aria-label="Show chat side panel"]')!
+        .querySelector('[aria-label="Show chat side panel"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(container.querySelector("#chat-side-panel")).not.toBeNull();
@@ -729,7 +756,7 @@ describe("Qubit ChatPage", () => {
     await renderChat();
     await act(async () => {
       container
-        .querySelector('button[aria-label="Show debug overlay"]')!
+        .querySelector('[aria-label="Show debug overlay"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -1006,7 +1033,7 @@ describe("Qubit ChatPage", () => {
     // Drive the same state a session switch produces: clear + reload.
     await act(async () => {
       const btn = container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Start a new chat session"]',
+        '[aria-label="Start a new chat session"]',
       );
       btn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
@@ -1107,13 +1134,13 @@ describe("ChatPage New chat mint reliability", () => {
     await renderChatWithProbe("/qubit-chat?resume=voice-old");
     await vi.waitFor(() =>
       expect(
-        container.querySelector('button[aria-label="Start a new chat session"]'),
+        container.querySelector('[aria-label="Start a new chat session"]'),
       ).not.toBeNull(),
     );
 
     await act(async () => {
       const btn = container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Start a new chat session"]',
+        '[aria-label="Start a new chat session"]',
       );
       btn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       btn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1150,14 +1177,14 @@ describe("ChatPage New chat mint reliability", () => {
     await renderChatWithProbe("/qubit-chat?resume=voice-old");
     await vi.waitFor(() =>
       expect(
-        container.querySelector('button[aria-label="Start a new chat session"]'),
+        container.querySelector('[aria-label="Start a new chat session"]'),
       ).not.toBeNull(),
     );
 
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="Start a new chat session"]',
+          '[aria-label="Start a new chat session"]',
         )
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
