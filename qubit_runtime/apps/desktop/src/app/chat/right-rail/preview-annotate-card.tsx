@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useEffect, useRef } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -106,14 +107,14 @@ export function PreviewAnnotateCard({
         style={{ caretColor: ANNOTATE_PILL_FG, color: ANNOTATE_PILL_FG, colorScheme: 'dark' }}
         value={note}
       />
-      <button
+      <Button variant="secondary"
         aria-label={saveLabel}
         className="grid size-8 shrink-0 place-items-center rounded-full text-white/85 hover:text-white"
         style={{ background: ANNOTATE_PILL_SEND }}
         type="submit"
       >
         <Codicon name="arrow-up" size="0.875rem" />
-      </button>
+      </Button>
     </form>
   )
 }

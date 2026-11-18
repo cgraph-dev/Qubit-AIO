@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import type * as React from 'react'
 
 import { ActionsContextMenu, ActionsMenu, type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
@@ -54,7 +55,7 @@ export function WorkspaceAddButton({
 }) {
   return (
     <Tip label={label}>
-      <button
+      <Button variant="secondary"
         aria-label={label}
         className="grid size-4 shrink-0 place-items-center rounded-sm bg-transparent text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/workspace:opacity-100"
         onClick={onClick}
@@ -62,7 +63,7 @@ export function WorkspaceAddButton({
         type="button"
       >
         <Codicon name="add" size="0.75rem" />
-      </button>
+      </Button>
     </Tip>
   )
 }
@@ -116,14 +117,14 @@ export function WorkspaceShowMoreButton({
 
   return (
     <Tip label={text}>
-      <button
+      <Button variant="secondary"
         aria-label={text}
         className="mr-2 ml-auto grid size-5 place-items-center rounded-sm bg-transparent text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground"
         onClick={onClick}
         type="button"
       >
         <Codicon name="ellipsis" size="0.75rem" />
-      </button>
+      </Button>
     </Tip>
   )
 }
@@ -176,14 +177,14 @@ export function WorkspaceMenu({ path, onRemove }: { path: null | string; onRemov
 
   return (
     <ActionsMenu ariaLabel={p.menu} contentClassName="w-48" items={items}>
-      <button
+      <Button variant="secondary"
         aria-label={p.menu}
         className="grid size-4 shrink-0 place-items-center rounded-sm bg-transparent text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/workspace:opacity-100 data-[state=open]:opacity-100"
         onClick={event => event.stopPropagation()}
         type="button"
       >
         <Codicon name="kebab-vertical" size="0.75rem" />
-      </button>
+      </Button>
     </ActionsMenu>
   )
 }
@@ -221,7 +222,7 @@ export function StartWorkButton({ repoPath }: { repoPath: string }) {
 
   return (
     <Tip label={p.startWork}>
-      <button
+      <Button variant="secondary"
         aria-label={p.startWork}
         className="grid size-4 shrink-0 place-items-center rounded-sm bg-transparent text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/section:opacity-100 focus-visible:opacity-100"
         // Publish the intent. The one WorktreeDialog in the sidebar renders it.
@@ -230,7 +231,7 @@ export function StartWorkButton({ repoPath }: { repoPath: string }) {
         type="button"
       >
         <Codicon name="git-branch" size="0.75rem" />
-      </button>
+      </Button>
     </Tip>
   )
 }
@@ -266,7 +267,7 @@ export function WorkspaceHeader({
       ref={ref}
       {...rest}
     >
-      <button
+      <Button variant="secondary"
         className={cn(
           'flex min-w-0 flex-1 items-center gap-1.5 bg-transparent text-left',
           emphasis ? 'hover:text-foreground' : 'hover:text-(--ui-text-secondary)'
@@ -280,7 +281,7 @@ export function WorkspaceHeader({
           className="shrink-0 text-(--ui-text-tertiary) opacity-0 transition group-hover/workspace:opacity-100"
           open={open}
         />
-      </button>
+      </Button>
       {action}
     </div>
   )

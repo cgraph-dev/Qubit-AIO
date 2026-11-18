@@ -1,7 +1,7 @@
 import { memo, useCallback, useState } from 'react'
 
 import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import type { SessionControlEntry } from '@/store/session-control'

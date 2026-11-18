@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { readUseRealProfile } from '@/app/settings/browser-real-profile-panel'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import {
   Dialog,
   DialogContent,
@@ -171,14 +171,14 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
         </ul>
 
         <DialogFooter className="items-center sm:justify-between">
-          <button
+          <Button variant="secondary"
             className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary) underline-offset-4 transition-colors hover:text-foreground hover:underline"
             disabled={busy}
             onClick={() => $realProfilePromptDismissed.set(true)}
             type="button"
           >
             {prompt.dontShowAgain}
-          </button>
+          </Button>
           <div className="flex gap-2">
             <Button disabled={busy} onClick={() => $realProfilePromptMuted.set(true)} type="button" variant="ghost">
               {prompt.notNow}

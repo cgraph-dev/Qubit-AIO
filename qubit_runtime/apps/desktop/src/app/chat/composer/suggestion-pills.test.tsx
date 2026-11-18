@@ -41,11 +41,11 @@ function pill(id: string, provider = 'mcp'): { suggestion: ComposerSuggestion; f
   return { flow: flow as Flow, suggestion }
 }
 
-const labels = (container: HTMLElement) => [...container.querySelectorAll('button')].map(button => button.textContent)
+const labels = (container: HTMLElement) => [...container.querySelectorAll('[role="button"]')].map(button => button.textContent)
 
 const click = async (container: HTMLElement) => {
   await act(async () => {
-    container.querySelector('button')!.click()
+    (container.querySelector('[role="button"]') as HTMLElement)!.click()
   })
 }
 

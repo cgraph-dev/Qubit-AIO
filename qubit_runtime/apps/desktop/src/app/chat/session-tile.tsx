@@ -34,7 +34,7 @@ import {
   workspaceOwnerTitle,
   workspaceSessionRenameable
 } from '@/components/pane-shell/workspace-scope'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { type ResolvedOwner, transcribeAudio } from '@/qubit'
 import { useI18n } from '@/i18n'

@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 
@@ -146,7 +147,7 @@ function AttachmentPill({ attachment, onRemove }: { attachment: ComposerAttachme
     <>
       <Tip label={attachment.path || attachment.detail || attachment.label}>
         <div className="group/attachment relative min-w-0 shrink-0">
-          <button
+          <Button variant="secondary"
             aria-busy={isUploading || undefined}
             aria-label={canPreview ? c.previewLabel(attachment.label) : attachment.label}
             className={cn(
@@ -196,16 +197,16 @@ function AttachmentPill({ attachment, onRemove }: { attachment: ComposerAttachme
                 </span>
               )}
             </span>
-          </button>
+          </Button>
           {onRemove && (
-            <button
+            <Button variant="secondary"
               aria-label={c.removeAttachment(attachment.label)}
               className="absolute -right-1 -top-1 grid size-3.5 place-items-center rounded-full border border-border/70 bg-background text-muted-foreground opacity-0 shadow-xs transition hover:bg-accent hover:text-foreground group-hover/attachment:opacity-100 focus-visible:opacity-100"
               onClick={() => onRemove(attachment.id)}
               type="button"
             >
               <Codicon name="close" size="0.625rem" />
-            </button>
+            </Button>
           )}
         </div>
       </Tip>

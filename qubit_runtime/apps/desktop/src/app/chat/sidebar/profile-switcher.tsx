@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router'
 
 import type { ProfileScope } from '@/api/client'
 import { CodeEditor } from '@/components/chat/code-editor'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { ColorSwatches } from '@/components/ui/color-swatches'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -769,14 +769,14 @@ function EditSoulDialog({
 function AddProfileButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <Tip label={label}>
-      <button
+      <Button variant="secondary"
         aria-label={label}
         className="grid size-5 shrink-0 place-items-center rounded-[3px] text-(--ui-text-tertiary) opacity-55 transition hover:bg-(--ui-control-hover-background) hover:text-foreground hover:opacity-100"
         onClick={onClick}
         type="button"
       >
         <Codicon name="add" size="0.75rem" />
-      </button>
+      </Button>
     </Tip>
   )
 }
@@ -787,14 +787,14 @@ function AddProfileButton({ label, onClick }: { label: string; onClick: () => vo
 function ImportProfileButton({ label }: { label: string }) {
   return (
     <Tip label={label}>
-      <button
+      <Button variant="secondary"
         aria-label={label}
         className="grid size-5 shrink-0 place-items-center rounded-[3px] text-(--ui-text-tertiary) opacity-55 transition hover:bg-(--ui-control-hover-background) hover:text-foreground hover:opacity-100"
         onClick={() => void runImportProfileFlow()}
         type="button"
       >
         <Codicon name="cloud-download" size="0.75rem" />
-      </button>
+      </Button>
     </Tip>
   )
 }
@@ -1224,7 +1224,7 @@ function RestSquare({
             <PopoverAnchor asChild>
               <ContextMenuTrigger asChild>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button variant="secondary"
                     aria-busy={pending || undefined}
                     aria-label={statusText ? `${label}, ${statusText}` : label}
                     className="relative grid size-5 shrink-0 select-none place-items-center rounded-[3px] text-[0.5625rem] font-semibold uppercase leading-none opacity-35 transition-opacity hover:opacity-100 aria-busy:opacity-100"
@@ -1245,7 +1245,7 @@ function RestSquare({
                         <ProfileStatusDot summary={summary} />
                       </span>
                     )}
-                  </button>
+                  </Button>
                 </TooltipTrigger>
               </ContextMenuTrigger>
             </PopoverAnchor>
@@ -1405,7 +1405,7 @@ function ProfileSquare({
             <PopoverAnchor asChild>
               <ContextMenuTrigger asChild>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button variant="secondary"
                     className={cn(
                       'relative grid size-5 shrink-0 cursor-grab touch-none select-none place-items-center rounded-[3px] text-[0.5625rem] font-semibold uppercase leading-none transition-opacity hover:opacity-100',
                       active ? 'opacity-100' : 'opacity-55',
@@ -1486,7 +1486,7 @@ function ProfileSquare({
                         <ProfileStatusDot summary={summary} />
                       </span>
                     )}
-                  </button>
+                  </Button>
                 </TooltipTrigger>
               </ContextMenuTrigger>
             </PopoverAnchor>

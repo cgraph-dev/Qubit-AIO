@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import type { HermesBranchPullRequest } from '@/global'
@@ -38,7 +39,7 @@ export function PrTag({
 
   return (
     <Tip label={`#${pr.number} ${pr.title}`}>
-      <button
+      <Button variant="secondary"
         aria-label={`Open pull request #${pr.number}`}
         // A flex box doesn't pass text-decoration down to its items, so the
         // underline goes on the number itself rather than the chip.
@@ -64,7 +65,7 @@ export function PrTag({
         {showIcon && <Codicon name={style.icon} size="0.75rem" />}
         {/* Without the glyph the number needs the `#` to still read as a PR. */}
         <span className="underline-offset-1 group-hover/pr:underline">{showIcon ? pr.number : `#${pr.number}`}</span>
-      </button>
+      </Button>
     </Tip>
   )
 }

@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { createCronTriggerController, type CronTriggerController } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -190,7 +191,7 @@ export function SidebarCronJobsSection({
   return (
     <SidebarGroup className="shrink-0 p-0 pb-1">
       <div className="group/section flex shrink-0 items-center justify-between pb-1 pt-1.5">
-        <button
+        <Button variant="secondary"
           className="group/section-label flex w-fit min-w-0 items-center gap-1 bg-transparent text-left leading-none"
           onClick={onToggle}
           type="button"
@@ -200,7 +201,7 @@ export function SidebarCronJobsSection({
             className="text-(--ui-text-tertiary) opacity-0 transition group-hover/section-label:opacity-100"
             open={open}
           />
-        </button>
+        </Button>
       </div>
       {open && (
         <SidebarGroupContent className="scrollbar-fade flex max-h-72 flex-col gap-px overflow-x-hidden overflow-y-auto overscroll-contain pb-1.75 compact:max-h-none compact:overflow-visible">
@@ -334,7 +335,7 @@ function CronJobSidebarRow({
               </span>
               <div className="hidden items-center gap-0.5 group-hover/cron:flex">
                 <Tip label={c.triggerNow}>
-                  <button
+                  <Button variant="secondary"
                     aria-label={c.triggerNow}
                     className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:cursor-wait disabled:opacity-60"
                     disabled={busy}
@@ -346,17 +347,17 @@ function CronJobSidebarRow({
                     ) : (
                       <Codicon name="zap" size="0.75rem" />
                     )}
-                  </button>
+                  </Button>
                 </Tip>
                 <Tip label={c.manage}>
-                  <button
+                  <Button variant="secondary"
                     aria-label={c.manage}
                     className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
                     onClick={onManage}
                     type="button"
                   >
                     <Codicon name="watch" size="0.75rem" />
-                  </button>
+                  </Button>
                 </Tip>
               </div>
             </div>
@@ -482,7 +483,7 @@ function CronJobSidebarRuns({
             ) : (
               // One click to the run's transcript; a run the scheduler never
               // closed (watchdog kill / crash) opens view-only (#88443).
-              <button
+              <Button variant="secondary"
                 className={cn(
                   'truncate rounded-md px-1.5 py-0.5 text-left text-[0.6875rem] tabular-nums focus-visible:bg-(--chrome-action-hover) focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
                   run.id === selectedSessionId
@@ -494,7 +495,7 @@ function CronJobSidebarRuns({
                 type="button"
               >
                 {formatRunTime(run.last_active || run.started_at)}
-              </button>
+              </Button>
             )
           )}
         </>

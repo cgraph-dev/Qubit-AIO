@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import DOMPurify from 'dompurify'
 import { useEffect, useMemo, useState } from 'react'
@@ -126,7 +127,7 @@ function VersionStepper({
   return (
     <>
       <Tip label={copy.olderVersion}>
-        <button
+        <Button variant="secondary"
           aria-label={copy.olderVersion}
           className={HEADER_BUTTON_CLASS}
           disabled={current === 0}
@@ -134,13 +135,13 @@ function VersionStepper({
           type="button"
         >
           <ChevronLeft className="size-3" />
-        </button>
+        </Button>
       </Tip>
       <span className="text-[0.625rem] font-bold tabular-nums text-muted-foreground">
         {copy.versionOf(current + 1, total)}
       </span>
       <Tip label={copy.newerVersion}>
-        <button
+        <Button variant="secondary"
           aria-label={copy.newerVersion}
           className={HEADER_BUTTON_CLASS}
           disabled={current === total - 1}
@@ -148,16 +149,16 @@ function VersionStepper({
           type="button"
         >
           <ChevronRight className="size-3" />
-        </button>
+        </Button>
       </Tip>
       {current < total - 1 && (
-        <button
+        <Button variant="secondary"
           className="text-[0.625rem] font-bold text-muted-foreground underline decoration-current/25 underline-offset-4 transition-colors hover:text-foreground"
           onClick={() => onSelect(total - 1)}
           type="button"
         >
           {copy.latest}
-        </button>
+        </Button>
       )}
     </>
   )
@@ -225,7 +226,7 @@ export function ArtifactPreview({ onClose, target }: { onClose?: () => void; tar
               text={version.content}
             />
             <Tip label={copy.download}>
-              <button
+              <Button variant="secondary"
                 aria-label={copy.download}
                 className={HEADER_BUTTON_CLASS}
                 onClick={() =>
@@ -238,11 +239,11 @@ export function ArtifactPreview({ onClose, target }: { onClose?: () => void; tar
                 type="button"
               >
                 <Download className="size-3" />
-              </button>
+              </Button>
             </Tip>
             {record.kind === 'html' && window.hermesDesktop && (
               <Tip label={copy.openInBrowser}>
-                <button
+                <Button variant="secondary"
                   aria-label={copy.openInBrowser}
                   className={HEADER_BUTTON_CLASS}
                   onClick={() =>
@@ -251,7 +252,7 @@ export function ArtifactPreview({ onClose, target }: { onClose?: () => void; tar
                   type="button"
                 >
                   <ExternalLink className="size-3" />
-                </button>
+                </Button>
               </Tip>
             )}
           </>

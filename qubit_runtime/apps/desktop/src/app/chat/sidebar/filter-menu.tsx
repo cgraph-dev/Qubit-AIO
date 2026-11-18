@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 
 import { sessionDotClassName } from '@/app/chat/session-status-dot'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import {
   DropdownMenu,

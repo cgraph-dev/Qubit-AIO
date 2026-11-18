@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { memo, useState } from 'react'
 
 import { composerFloatingPill } from '@/components/chat/composer-dock'
@@ -56,7 +57,7 @@ export const ActionBadges = memo(function ActionBadges({ sessionId }: { sessionI
     const glyph = running ? 'loading' : action.icon
 
     return (
-      <button
+      <Button variant="secondary"
         className={PILL}
         disabled={action.disabled || Boolean(runningId)}
         key={action.id}
@@ -65,7 +66,7 @@ export const ActionBadges = memo(function ActionBadges({ sessionId }: { sessionI
       >
         {glyph && <Codicon className="shrink-0 opacity-70" name={glyph} size="0.75rem" spinning={running} />}
         <span className="truncate">{action.label}</span>
-      </button>
+      </Button>
     )
   })
 })

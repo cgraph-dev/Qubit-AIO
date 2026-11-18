@@ -5,7 +5,7 @@
 // session (the existing fresh-draft path, same copy as the turn-error card)
 // next to Retry. No lease/takeover touch: this only navigates away from the
 // stranded route; the failed session and its owner are left intact.
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ErrorState } from '@/components/ui/error-state'
 import { useI18n } from '@/i18n'
 import { requestFreshSession } from '@/store/profile'

@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import { $restoredDraftNotice, dismissRestoredDraftNotice, undoRestoredDraft } from '@/store/composer'
 

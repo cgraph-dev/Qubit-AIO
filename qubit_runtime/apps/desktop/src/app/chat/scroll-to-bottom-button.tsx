@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useReducedMotion } from 'motion/react'
 import { useMemo, useRef } from 'react'
@@ -97,7 +98,7 @@ export function ScrollToBottomButton({ sessionId }: { sessionId: string | null }
       : t.assistant.thread.scrollToBottom
 
   return (
-    <button
+    <Button variant="secondary"
       aria-hidden={!visible}
       aria-label={label}
       className={cn(
@@ -137,6 +138,6 @@ export function ScrollToBottomButton({ sessionId }: { sessionId: string | null }
           {afterCount}
         </span>
       )}
-    </button>
+    </Button>
   )
 }

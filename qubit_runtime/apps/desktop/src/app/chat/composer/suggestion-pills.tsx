@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useEffect, useState } from 'react'
 
 import { composerFloatingPill } from '@/components/chat/composer-dock'
@@ -130,7 +131,7 @@ function SessionSuggestionPills({ sessionId }: { sessionId: null | string }) {
 
     return (
       <Tip key={key} label={tip}>
-        <button
+        <Button variant="secondary"
           className={cn(composerFloatingPill, 'max-w-56', phase === 'done' && 'cursor-default')}
           onClick={() => {
             if (phase === 'working') {
@@ -152,7 +153,7 @@ function SessionSuggestionPills({ sessionId }: { sessionId: null | string }) {
             <Codicon className="shrink-0 opacity-70" name={suggestion.icon ?? 'lightbulb'} size="0.75rem" />
           )}
           <span className="truncate">{label}</span>
-        </button>
+        </Button>
       </Tip>
     )
   })

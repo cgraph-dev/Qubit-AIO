@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import {
   DropdownMenu,

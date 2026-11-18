@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
@@ -86,7 +87,7 @@ function ConsoleRow({ copyText, log, onSend, onToggleSelect, selected }: Console
       )}
     >
       <Tip label={selected ? copy.deselect : copy.select}>
-        <button
+        <Button variant="secondary"
           className={cn(
             'mt-0.5 text-left uppercase opacity-70 transition-colors hover:opacity-100',
             consoleLevelClass[log.level] ?? consoleLevelClass[0]
@@ -95,7 +96,7 @@ function ConsoleRow({ copyText, log, onSend, onToggleSelect, selected }: Console
           type="button"
         >
           {consoleLevelLabel[log.level] || 'log'}
-        </button>
+        </Button>
       </Tip>
       <div className="min-w-0" data-selectable-text="true">
         <span className={cn('block wrap-break-word', consoleLevelClass[log.level] ?? consoleLevelClass[0])}>
@@ -119,13 +120,13 @@ function ConsoleRow({ copyText, log, onSend, onToggleSelect, selected }: Console
           text={copyText}
         />
         <Tip label={copy.sendEntry}>
-          <button
+          <Button variant="secondary"
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             onClick={onSend}
             type="button"
           >
             <Send className="size-3" />
-          </button>
+          </Button>
         </Tip>
       </span>
     </div>
@@ -220,7 +221,7 @@ export function PreviewConsolePanel({
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <Button variant="secondary"
             className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
             disabled={sendableLogs.length === 0}
             onClick={() => sendLogsToComposer(sendableLogs)}
@@ -228,7 +229,7 @@ export function PreviewConsolePanel({
           >
             <Send className="size-3" />
             {copy.sendToChat}
-          </button>
+          </Button>
           <CopyButton
             appearance="inline"
             className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
@@ -240,7 +241,7 @@ export function PreviewConsolePanel({
           >
             {copy.copy}
           </CopyButton>
-          <button
+          <Button variant="secondary"
             className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
             disabled={logs.length === 0}
             onClick={consoleState.clear}
@@ -248,7 +249,7 @@ export function PreviewConsolePanel({
           >
             <Trash2 className="size-3" />
             {copy.clear}
-          </button>
+          </Button>
         </div>
       </div>
       <div

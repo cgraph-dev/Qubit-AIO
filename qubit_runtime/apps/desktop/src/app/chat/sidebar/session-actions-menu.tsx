@@ -17,7 +17,7 @@ import {
   type MenuKit,
   renderActionItem
 } from '@/components/ui/actions-menu'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { ColorSwatches } from '@/components/ui/color-swatches'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -259,7 +259,7 @@ function useSessionActions({
   const r = t.sidebar.row
   const [renameOpen, setRenameOpen] = useState(false)
   // The rename item opens a Dialog. When a menu closes, Radix restores focus to
-  // its trigger — for a sidebar row that trigger is the row's own <button>, so
+  // its trigger — for a sidebar row that trigger is the row's own <Button variant="secondary">, so
   // focus lands there instead of the dialog's input: Space then activates the
   // row (selecting the session) and the arrow keys move the list rather than
   // the caret. Suppress that one restore so the dialog keeps focus; every other

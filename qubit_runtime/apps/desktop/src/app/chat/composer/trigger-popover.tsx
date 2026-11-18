@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import type { Unstable_TriggerItem } from '@assistant-ui/core'
 import { Fragment, useEffect, useRef } from 'react'
 
@@ -201,7 +202,7 @@ export function ComposerTriggerPopover({
             <Fragment key={item.id}>
               {showHeader && <div className={cn(GROUP_HEADER_CLASS, isFirstHeader ? 'pt-0.5' : 'pt-2')}>{group}</div>}
               <Tip delayDuration={400} label={kind === '/' ? description : undefined} placement="row" sideOffset={4}>
-                <button
+                <Button variant="secondary"
                   className={ROW_CLASS}
                   data-highlighted={active ? '' : undefined}
                   onClick={() => onPick(item)}
@@ -230,7 +231,7 @@ export function ComposerTriggerPopover({
                       )}
                     </>
                   )}
-                </button>
+                </Button>
               </Tip>
             </Fragment>
           )

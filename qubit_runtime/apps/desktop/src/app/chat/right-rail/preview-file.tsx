@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import type {
@@ -133,7 +134,7 @@ export function PreviewEmptyState({
         {(primaryAction || secondaryAction) && (
           <div className="grid justify-items-center gap-2">
             {primaryAction && (
-              <button
+              <Button variant="secondary"
                 className={cn(
                   'rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-xs transition-colors disabled:cursor-default disabled:opacity-60',
                   styles.primary
@@ -143,17 +144,17 @@ export function PreviewEmptyState({
                 type="button"
               >
                 {primaryAction.label}
-              </button>
+              </Button>
             )}
             {secondaryAction && (
-              <button
+              <Button variant="secondary"
                 className="text-[0.6875rem] font-medium text-muted-foreground underline decoration-current/20 underline-offset-4 transition-colors hover:text-foreground disabled:cursor-default disabled:text-muted-foreground/55 disabled:no-underline"
                 disabled={secondaryAction.disabled}
                 onClick={secondaryAction.onClick}
                 type="button"
               >
                 {secondaryAction.label}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -548,7 +549,7 @@ export function PreviewModeSwitcher({
     <div className="flex h-7 shrink-0 items-center justify-end gap-3 border-b border-border/40 px-3">
       {showModes &&
         modes.map(mode => (
-          <button
+          <Button variant="secondary"
             className={cn(
               'text-[0.625rem] font-bold underline-offset-4 transition-colors',
               mode === active
@@ -560,7 +561,7 @@ export function PreviewModeSwitcher({
             type="button"
           >
             {label[mode]}
-          </button>
+          </Button>
         ))}
       {trailing && <div className="flex items-center gap-1.5">{trailing}</div>}
     </div>
@@ -584,15 +585,15 @@ function EditControls({
 
   return (
     <>
-      <button
+      <Button variant="secondary"
         className="flex items-center gap-1 rounded-md px-1.5 text-[0.625rem] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={onCancel}
         type="button"
       >
         <X className="size-3" />
         {t.common.cancel}
-      </button>
-      <button
+      </Button>
+      <Button variant="secondary"
         className="flex items-center gap-1 rounded-md bg-primary px-2 py-0.5 text-[0.625rem] font-bold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 disabled:opacity-50"
         disabled={!dirty || saving}
         onClick={onSave}
@@ -600,7 +601,7 @@ function EditControls({
       >
         <Check className="size-3" />
         {saving ? t.common.saving : t.common.save}
-      </button>
+      </Button>
     </>
   )
 }
@@ -1103,20 +1104,20 @@ export function LocalFilePreview({
             <div className="font-semibold">{t.preview.diskChangedTitle}</div>
             <div className="mt-0.5 leading-relaxed">{t.preview.diskChangedBody}</div>
             <div className="mt-1.5 flex gap-3">
-              <button
+              <Button variant="secondary"
                 className="font-bold underline underline-offset-4 transition-opacity hover:opacity-80"
                 onClick={() => void saveEdit(true)}
                 type="button"
               >
                 {t.preview.overwrite}
-              </button>
-              <button
+              </Button>
+              <Button variant="secondary"
                 className="font-bold underline underline-offset-4 transition-opacity hover:opacity-80"
                 onClick={discardAndReload}
                 type="button"
               >
                 {t.preview.discardReload}
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -1262,14 +1263,14 @@ export function LocalFilePreview({
           trailing={
             canEdit ? (
               <Tip label={`${t.preview.edit} (e)`}>
-                <button
+                <Button variant="secondary"
                   className="flex items-center gap-1 text-[0.625rem] font-bold text-muted-foreground underline-offset-4 transition-colors hover:text-foreground"
                   onClick={beginEdit}
                   type="button"
                 >
                   <Pencil className="size-3" />
                   {t.preview.edit}
-                </button>
+                </Button>
               </Tip>
             ) : null
           }

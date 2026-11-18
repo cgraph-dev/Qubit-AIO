@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new-session-drag'
 import { type ProfileGroupHeaderContribution, SIDEBAR_PROFILE_GROUP_HEADER_AREA } from '@/app/routes'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import {
   Dialog,
