@@ -251,14 +251,50 @@ export function menuIconGeometry(spec: MenuButtonSpec): {
   };
 }
 
+/** Load the vendored button script into the office document once and flatten it
+ * into the app's 34px icon-button chrome. The host keeps `ui-icon-btn` layout,
+ * the inner Sakuga button owns the press reaction. */
+function ensureSakugaMenuChrome(doc: Document): void {
+  const win = doc.defaultView;
+  if (!win) return;
+  if (!win.customElements.get("sakuga-button")
+    && !doc.querySelector('script[data-qubit-sakuga-button]')) {
+    const script = doc.createElement("script");
+    script.src = "/sakuga-vfx/button/button.js";
+    script.async = false;
+    script.setAttribute("data-qubit-sakuga-button", "1");
+    doc.head.append(script);
+  }
+  if (!doc.getElementById("qubit-sakuga-menu-style")) {
+    const style = doc.createElement("style");
+    style.id = "qubit-sakuga-menu-style";
+    style.textContent = `
+      sakuga-button.office-theme-menu-btn { display: inline-flex; }
+      sakuga-button.office-theme-menu-btn::part(button) {
+        width: 34px; height: 34px; min-height: 0; padding: 0;
+        display: grid; place-items: center; border: 0; border-radius: 6px;
+        background: transparent; box-shadow: none; color: inherit;
+      }
+      sakuga-button.office-theme-menu-btn[aria-pressed="true"]::part(button) {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      sakuga-button.office-theme-menu-btn::part(button):hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+    `;
+    doc.head.append(style);
+  }
+}
+
 /** Build one button with the app's own classes and icon convention. */
 function buildButton(
   doc: Document,
   spec: MenuButtonSpec,
   onActivate: () => void,
-): HTMLButtonElement {
-  const button = doc.createElement("button");
-  button.type = "button";
+): HTMLElement {
+  ensureSakugaMenuChrome(doc);
+  const button = doc.createElement("sakuga-button");
+  button.setAttribute("type", "button");
   // The app's own visual classes (so colour/hover/pressed match for free) plus
   // Qubit's stable theme hooks: Task 7 scopes its token chrome to these, never
   // to Habblaud's internal structure.
@@ -317,7 +353,7 @@ export function installOfficeMenuButtons(
   const doc = win.document;
   if (!doc || !doc.body) return null;
 
-  const byId: Record<MenuButtonId, HTMLButtonElement | null> = {
+  const byId: Record<MenuButtonId, HTMLElement | null> = {
     agents: null,
     hud: null,
     approvals: null,
@@ -396,7 +432,7 @@ export function installOfficeMenuButtons(
     }
   };
 
-  const insert = (group: Element, button: HTMLButtonElement): void => {
+  const insert = (group: Element, button: HTMLElement): void => {
     // Before the two utilities (Settings, Help), after the tools: the added
     // icons belong with the panels, not with the app's settings.
     const settings = Array.from(group.querySelectorAll("button"))

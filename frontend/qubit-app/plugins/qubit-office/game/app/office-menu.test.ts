@@ -301,7 +301,7 @@ describe("command center, timeline, studio and campus icons", () => {
       const button = group.querySelector(
         `[data-testid="${testId}"]`) as HTMLButtonElement;
       expect(button).not.toBeNull();
-      expect(button.tagName).toBe("BUTTON");
+      expect(button.tagName).toBe("SAKUGA-BUTTON");
       expect(button.getAttribute("aria-label")).toBe(label);
       expect(button.getAttribute("title")).toContain(label);
       expect(button.getAttribute("aria-controls")).toBe(controls);

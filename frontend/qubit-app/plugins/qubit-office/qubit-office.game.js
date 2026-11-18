@@ -193792,10 +193792,44 @@ html body .ui-root .ui-deliv-card:active {
 			d: spec.icon.d
 		};
 	}
+	/** Load the vendored button script into the office document once and flatten it
+	* into the app's 34px icon-button chrome. The host keeps `ui-icon-btn` layout,
+	* the inner Sakuga button owns the press reaction. */
+	function ensureSakugaMenuChrome(doc) {
+		const win = doc.defaultView;
+		if (!win) return;
+		if (!win.customElements.get("sakuga-button") && !doc.querySelector("script[data-qubit-sakuga-button]")) {
+			const script = doc.createElement("script");
+			script.src = "/sakuga-vfx/button/button.js";
+			script.async = false;
+			script.setAttribute("data-qubit-sakuga-button", "1");
+			doc.head.append(script);
+		}
+		if (!doc.getElementById("qubit-sakuga-menu-style")) {
+			const style = doc.createElement("style");
+			style.id = "qubit-sakuga-menu-style";
+			style.textContent = `
+      sakuga-button.office-theme-menu-btn { display: inline-flex; }
+      sakuga-button.office-theme-menu-btn::part(button) {
+        width: 34px; height: 34px; min-height: 0; padding: 0;
+        display: grid; place-items: center; border: 0; border-radius: 6px;
+        background: transparent; box-shadow: none; color: inherit;
+      }
+      sakuga-button.office-theme-menu-btn[aria-pressed="true"]::part(button) {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      sakuga-button.office-theme-menu-btn::part(button):hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+    `;
+			doc.head.append(style);
+		}
+	}
 	/** Build one button with the app's own classes and icon convention. */
 	function buildButton(doc, spec, onActivate) {
-		const button = doc.createElement("button");
-		button.type = "button";
+		ensureSakugaMenuChrome(doc);
+		const button = doc.createElement("sakuga-button");
+		button.setAttribute("type", "button");
 		button.className = `ui-icon-btn office-theme-menu-btn office-theme-menu-${spec.id}`;
 		button.setAttribute("aria-label", spec.label);
 		button.setAttribute("title", spec.title);
