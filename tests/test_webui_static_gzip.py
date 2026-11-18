@@ -290,3 +290,24 @@ def test_dashboard_shell_does_not_serve_a_cached_injection(tmp_path):
     assert "token-one" in first
     assert "token-two" in second
     assert "token-one" not in second
+
+
+def test_sakuga_vfx_paths_are_dashboard_assets(tmp_path):
+    """The vendored engine is a root static prefix, not an SPA route.
+
+    A regression here is loud and total: the browser receives the dashboard
+    HTML for `/sakuga-vfx/core.js` and refuses to execute it as `text/html`.
+    """
+    assert ui.is_dashboard_asset_path("/sakuga-vfx/core.js")
+    assert ui.is_dashboard_asset_path("/sakuga-vfx/button/button.js")
+    assert not ui.is_dashboard_asset_path("/sakuga-vfx")
+    assert not ui.is_dashboard_asset_path("/unknown/core.js")
+
+    asset = tmp_path / "sakuga-vfx"
+    asset.mkdir()
+    (asset / "core.js").write_bytes(b"window.SakugaFX = {};")
+    handler, captured = _handler(tmp_path)
+    handler._serve_qubit_static("/sakuga-vfx/core.js")
+    assert captured["code"] == 200
+    assert captured["headers"]["Content-Type"].startswith("application/javascript")
+    assert handler.wfile.getvalue() == b"window.SakugaFX = {};"

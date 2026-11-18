@@ -61,6 +61,25 @@ _SSE_HEARTBEAT_S = 15.0
 #: and the vendoring script's rewrite target must agree — three copies of this
 #: string is three chances to drift.
 OFFICE_APP_PREFIX = "/plugin-apps/"
+
+#: Built dashboard paths served as static files rather than the SPA shell.
+#: `/sakuga-vfx/` is the vendored VFX engine and its control scripts; without
+#: this prefix the request fell through to the shell and every script was
+#: refused as `text/html`.
+DASHBOARD_ASSET_PREFIXES: tuple[str, ...] = (
+    "/assets/",
+    "/fonts/",
+    "/fonts-terminal/",
+    "/media/",
+    "/plugins/",
+    "/sakuga-vfx/",
+)
+
+
+def is_dashboard_asset_path(path: str) -> bool:
+    """True when a GET path names a built dashboard asset (not the SPA shell)."""
+    return any(path.startswith(prefix) for prefix in DASHBOARD_ASSET_PREFIXES)
+
 #: The ported workbench's canonical public path. `/wb` is its short alias —
 #: upstream's own JS and its shim assume that shorter form, so both are routed
 #: to the same tree. Keep them in sync with `workbench_ui_routes.MOUNT`.
@@ -4298,10 +4317,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._qubit_api("GET")
             return
         # Built dashboard assets are served from Qubit-owned root paths.
-        if (path.startswith("/assets/") or path.startswith("/fonts/")
-                or path.startswith("/fonts-terminal/")
-                or path.startswith("/media/")
-                or path.startswith("/plugins/")):
+        if is_dashboard_asset_path(path):
             self._serve_qubit_static(path)
             return
         # Root-level files of the built dashboard. These do not sit under one of
