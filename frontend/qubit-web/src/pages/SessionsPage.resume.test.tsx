@@ -132,7 +132,7 @@ async function renderSessionsPage(rows: Record<string, unknown>[], overview: Rec
       </I18nProvider>,
     ),
   );
-  await waitFor(() => Boolean(document.querySelector('button[aria-label="Session source"]')));
+  await waitFor(() => Boolean(document.querySelector('[aria-label="Session source"]')));
 }
 
 function locationSearch() {
@@ -182,7 +182,7 @@ describe("SessionsPage resume routing", () => {
     await waitFor(() => Boolean(document.querySelector('[data-testid="session-row-sid-guanli"]')));
 
     const resume = document.querySelector(
-      '[data-testid="session-row-sid-guanli"] button[aria-label="Resume in Chat"]',
+      '[data-testid="session-row-sid-guanli"] [aria-label="Resume in Chat"]',
     );
     await act(async () => click(resume));
 
@@ -196,7 +196,7 @@ describe("SessionsPage resume routing", () => {
     await waitFor(() => Boolean(document.querySelector('[data-testid="session-row-sid-default"]')));
 
     const resume = document.querySelector(
-      '[data-testid="session-row-sid-default"] button[aria-label="Resume in Chat"]',
+      '[data-testid="session-row-sid-default"] [aria-label="Resume in Chat"]',
     );
     await act(async () => click(resume));
 
@@ -210,7 +210,7 @@ describe("SessionsPage resume routing", () => {
 
     const card = document.querySelector('[data-testid="recent-session-sid-recent"]');
     expect(card).not.toBeNull();
-    const resume = card?.querySelector('button[aria-label="Resume in Chat"]');
+    const resume = card?.querySelector('[aria-label="Resume in Chat"]');
     expect(resume).not.toBeNull();
 
     // Keyboard activation must not double as the disclosure toggle.

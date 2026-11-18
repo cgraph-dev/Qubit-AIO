@@ -54,9 +54,7 @@ import { Markdown } from "@/components/Markdown";
 import { StructuredReasoning } from "@/components/StructuredReasoning";
 import { shouldRenderStructuredReasoning } from "@/lib/reasoning-markup";
 import { PlatformsCard } from "@/components/PlatformsCard";
-import { Toast } from "@nous-research/ui/ui/components/toast";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
+import { Button, Input as SakugaInput, Checkbox, showSakugaToast, emitFx } from "@/sakuga/ui";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { Segmented } from "@nous-research/ui/ui/components/segmented";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
@@ -74,7 +72,6 @@ import {
   DialogTitle,
 } from "@nous-research/ui/ui/components/dialog";
 import { useSystemActions } from "@/contexts/useSystemActions";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -590,8 +587,7 @@ function RecentSessionCard({ session }: { session: SessionInfo }) {
 
           {!session.archived && (
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               className="text-muted-foreground hover:text-success"
               aria-label={t.sessions.resumeInChat}
               title={t.sessions.resumeInChat}
@@ -705,8 +701,7 @@ function SessionRow({
 
       {resumeInChatEnabled && !session.archived && (
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-success"
           aria-label={t.sessions.resumeInChat}
           title={t.sessions.resumeInChat}
@@ -721,8 +716,7 @@ function SessionRow({
 
       {!session.archived && (
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-foreground"
           aria-label="Rename session"
           title="Rename session"
@@ -742,8 +736,7 @@ function SessionRow({
 
       {!session.archived && (
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-foreground"
           aria-label="Export session"
           title="Export session JSON"
@@ -758,8 +751,7 @@ function SessionRow({
 
       {session.archived ? (
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-success"
           aria-label="Restore session"
           title="Restore archived session"
@@ -772,9 +764,7 @@ function SessionRow({
         </Button>
       ) : (
         <Button
-          ghost
-          destructive
-          size="icon"
+          variant="primary"
           aria-label={t.sessions.deleteSession}
           onClick={(e) => {
             e.stopPropagation();
@@ -838,21 +828,20 @@ function SessionRow({
                     className="flex min-w-0 flex-1 items-center gap-1.5"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Input
-                      autoFocus
+                    <SakugaInput
+                      label="Session title"
                       value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
+                      onChange={setRenameValue}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") void submitRename();
                         else if (e.key === "Escape") setRenaming(false);
                       }}
                       placeholder="Session title"
-                      className="h-7 min-w-0 flex-1 py-0 text-sm"
+                      className="qsk-field h-7 min-w-0 flex-1 py-0 text-sm"
                       disabled={renameSaving}
                     />
                     <Button
-                      ghost
-                      size="icon"
+                      variant="secondary"
                       className="text-muted-foreground hover:text-success"
                       aria-label="Save title"
                       title="Save title"
@@ -866,8 +855,7 @@ function SessionRow({
                       )}
                     </Button>
                     <Button
-                      ghost
-                      size="icon"
+                      variant="secondary"
                       className="text-muted-foreground hover:text-foreground"
                       aria-label="Cancel rename"
                       title="Cancel rename"
@@ -983,8 +971,7 @@ function SessionsPagination({
 
       <div className="flex items-center gap-1">
         <Button
-          outlined
-          size="icon"
+          variant="secondary"
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
           aria-label={t.sessions.previousPage}
@@ -995,8 +982,7 @@ function SessionsPagination({
           {t.common.page} {page + 1} {t.common.of} {pageCount}
         </span>
         <Button
-          outlined
-          size="icon"
+          variant="secondary"
           disabled={(page + 1) * PAGE_SIZE >= total}
           onClick={() => onPageChange(page + 1)}
           aria-label={t.sessions.nextPage}
@@ -1070,7 +1056,15 @@ export default function SessionsPage() {
   const [pruneDays, setPruneDays] = useState("90");
   const [pruning, setPruning] = useState(false);
   const [importingSessions, setImportingSessions] = useState(false);
-  const { toast, showToast } = useToast();
+  // Sakuga toast replaces the upstream toast host; the success/error tone still
+  // fires the matching effect so a deleted/merged session reads at a glance.
+  const showToast = useCallback(
+    (message: string, kind?: "success" | "error") => {
+      showSakugaToast(message, { position: "bottom-left" });
+      void emitFx(kind === "error" ? "error" : "success");
+    },
+    [],
+  );
   const { t } = useI18n();
   const { setAfterTitle, setEnd } = usePageHeader();
   const { activeAction, actionStatus, dismissLog } = useSystemActions();
@@ -1211,11 +1205,10 @@ export default function SessionsPage() {
   useEffect(() => {
     setEnd(
       <Button
-        outlined
-        size="sm"
+        variant="secondary"
         onClick={() => setPruneOpen(true)}
-        prefix={<Archive />}
       >
+        <Archive />
         Prune old sessions
       </Button>,
     );
@@ -1861,7 +1854,7 @@ export default function SessionsPage() {
   }
 
   if (loadError) return <div role="alert" className="p-6">
-    <p>{loadError}</p><Button disabled={loading} onClick={() => loadSessions(page)}>Retry</Button>
+    <p>{loadError}</p><Button variant="secondary" disabled={loading} onClick={() => loadSessions(page)}>Retry</Button>
   </div>;
   if (loading) {
     return (
@@ -1874,7 +1867,6 @@ export default function SessionsPage() {
   return (
     <div className="flex min-w-0 w-full max-w-full flex-col gap-4">
       <PluginSlot name="sessions:top" />
-      <Toast toast={toast} />
       <input
         ref={importInputRef}
         type="file"
@@ -1958,14 +1950,14 @@ export default function SessionsPage() {
           </div>
           <DialogFooter>
             <Button
-              outlined
+              variant="secondary"
               onClick={() => setPruneOpen(false)}
               disabled={pruning}
             >
               {t.common.cancel}
             </Button>
             <Button
-              destructive
+              variant="primary"
               onClick={() => void handlePrune()}
               disabled={pruning}
               className="gap-1.5"
@@ -2079,8 +2071,7 @@ export default function SessionsPage() {
             </div>
 
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               onClick={dismissLog}
               className="shrink-0 text-text-secondary hover:text-foreground"
               aria-label={t.common.close}
@@ -2117,20 +2108,17 @@ export default function SessionsPage() {
 
             <div ref={sourceMenuRef} className="relative shrink-0">
               <Button
-                outlined
-                size="sm"
-                prefix={<ListFilter />}
-                suffix={
-                  <ChevronDown
-                    className={`transition-transform ${sourceMenuOpen ? "rotate-180" : ""}`}
-                  />
-                }
+                variant="secondary"
                 className="h-8 min-w-[10rem] max-w-[14rem] justify-between text-xs"
                 aria-label={t.sessions.sourceFilter}
-                aria-expanded={sourceMenuOpen}
+                {...{ "aria-expanded": String(sourceMenuOpen) }}
                 onClick={() => setSourceMenuOpen((open) => !open)}
               >
+                <ListFilter />
                 <span className="min-w-0 truncate">{sourceFilterLabel}</span>
+                <ChevronDown
+                  className={`transition-transform ${sourceMenuOpen ? "rotate-180" : ""}`}
+                />
               </Button>
 
               {sourceMenuOpen && (
@@ -2143,8 +2131,7 @@ export default function SessionsPage() {
                     </span>
                     {selectedSources !== null && (
                       <Button
-                        ghost
-                        size="xs"
+                        variant="secondary"
                         onClick={clearSourceFilters}
                         className="shrink-0"
                       >
@@ -2228,8 +2215,7 @@ export default function SessionsPage() {
                 />
                 {search && (
                   <Button
-                    ghost
-                    size="xs"
+                    variant="secondary"
                     className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={() => updateSearch("")}
                     aria-label={t.common.clear}
@@ -2242,15 +2228,13 @@ export default function SessionsPage() {
 
             {showList && emptyCount > 0 && !isSearching && (
               <Button
-                outlined
-                destructive
-                size="sm"
+                variant="primary"
                 className="shrink-0"
                 onClick={() => setDeleteEmptyOpen(true)}
                 aria-label={t.sessions.deleteEmpty}
                 title={t.sessions.deleteEmpty}
-                prefix={<Eraser />}
               >
+                <Eraser />
                 <span className="font-mondwest normal-case text-xs">
                   {t.sessions.deleteEmpty} ({emptyCount})
                 </span>
@@ -2259,15 +2243,14 @@ export default function SessionsPage() {
 
             {!isSearching && (
               <Button
-                outlined
-                size="sm"
+                variant="secondary"
                 className="shrink-0"
                 disabled={importingSessions}
                 onClick={() => importInputRef.current?.click()}
                 aria-label="Import exported sessions"
                 title="Import exported session JSON or JSONL"
-                prefix={importingSessions ? <Spinner /> : <Upload />}
               >
+                {importingSessions ? <Spinner /> : <Upload />}
                 <span className="font-mondwest normal-case text-xs">
                   Import sessions
                 </span>
@@ -2304,8 +2287,7 @@ export default function SessionsPage() {
           </span>
           {filtered.some((s) => !selectedIds.has(s.id)) && (
             <Button
-              ghost
-              size="sm"
+              variant="secondary"
               onClick={() => selectAllOnPage(filtered)}
               aria-label={t.sessions.selectAllOnPage}
               title={t.sessions.selectAllOnPage}
@@ -2316,8 +2298,7 @@ export default function SessionsPage() {
             </Button>
           )}
           <Button
-            ghost
-            size="sm"
+            variant="secondary"
             onClick={clearSelection}
             aria-label={t.sessions.clearSelection}
             title={t.sessions.clearSelection}
@@ -2327,9 +2308,7 @@ export default function SessionsPage() {
             </span>
           </Button>
           <Button
-            outlined
-            destructive
-            size="sm"
+            variant="primary"
             className="ml-auto"
             onClick={() => setDeleteSelectedOpen(true)}
             aria-label={t.sessions.deleteSelected.replace(
@@ -2340,8 +2319,8 @@ export default function SessionsPage() {
               "{count}",
               String(selectedIds.size),
             )}
-            prefix={<Trash2 />}
           >
+            <Trash2 />
             <span className="font-mondwest normal-case text-xs">
               {t.sessions.deleteSelected.replace(
                 "{count}",

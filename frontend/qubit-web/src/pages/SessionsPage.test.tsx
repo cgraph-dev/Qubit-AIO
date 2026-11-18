@@ -23,6 +23,36 @@ const apiMocks = vi.hoisted(() => ({
   getSessionStats: vi.fn(),
 }));
 
+// SakugaInput is a shadow-DOM custom element; node tests cannot upgrade it, so
+// swap only Input for a native <input> while every other Sakuga surface stays
+// real. This keeps the rename field's value/change contract testable.
+vi.mock("@/sakuga/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/sakuga/ui")>();
+  const { createElement } = await import("react");
+  return {
+    ...actual,
+    Input: (props: {
+      label?: string;
+      value?: string;
+      placeholder?: string;
+      className?: string;
+      disabled?: boolean;
+      onChange?: (value: string) => void;
+      onKeyDown?: (event: { key: string }) => void;
+      [key: string]: unknown;
+    }) => createElement("input", {
+      "aria-label": props.label,
+      "data-testid": props["data-testid"],
+      value: props.value,
+      placeholder: props.placeholder,
+      className: props.className,
+      disabled: props.disabled,
+      onChange: (event: { target: { value: string } }) => props.onChange?.(event.target.value),
+      onKeyDown: props.onKeyDown,
+    }),
+  };
+});
+
 vi.mock("@/lib/api", () => ({
   api: apiMocks,
   // ProfileProvider mirrors its selection into the api module.
@@ -55,7 +85,7 @@ function click(el: Element | null) {
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }
 
-const button = (label: string) => document.querySelector(`button[aria-label="${label}"]`);
+const button = (label: string) => document.querySelector(`[aria-label="${label}"]`);
 
 async function renderSessionsPage(
   rows: Record<string, unknown>[],
