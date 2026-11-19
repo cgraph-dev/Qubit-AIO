@@ -3,8 +3,9 @@
  * Every visual is an independent element: no baked-in text, no duplicated
  * status-panel frames, no interaction handlers, and no changes to the PTY.
  *
- * High-resolution approved PNG cutouts may replace the SVGs at these paths
- * without changing React, but SVG files provide an always-available fallback.
+ * Optimized approved PNG cutouts ship with the dashboard. Replacing them with
+ * the optional high-resolution PNG pack requires no JSX or CSS changes.
+ * Separate editable vector studies are retained alongside the PNGs.
  */
 export function MangaStudioTitleOrnaments() {
   return (
