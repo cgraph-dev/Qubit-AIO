@@ -298,3 +298,92 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-st
     animation:none!important;
   }
 }
+
+
+/* ======================================================================
+   APPROVED ILLUSTRATED SIDEBAR PLATE — THE SOURCE ARTWORK, NOT THE
+   SIMPLIFIED SVG RECONSTRUCTION. Includes the replaced three-star cluster.
+   Production asset: manga-sidebar-plate-reference.webp (transparent WebP).
+   Legacy corners, bars, and frame pseudo-elements are intentionally hidden:
+   they are ALREADY painted in the composite art and must not stack twice.
+   Live section numbers/titles remain React text.
+   ====================================================================== */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+  width: calc(100% - 12px) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: 300 / 72 !important;
+  padding: 2px 27% 0 18% !important;
+  margin: 7px 6px 12px !important;
+  gap: 6px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  background-color: transparent !important;
+  background-image: url("/manga-ui/manga-sidebar-plate-reference.webp") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  filter: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head::after {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qm-studio-title-corner,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qm-studio-charge-bars,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qm-manga-charge-cells,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qagent-sidebar__section-rule {
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qagent-sidebar__section-index {
+  flex: 0 0 auto !important;
+  position: relative !important;
+  z-index: 2 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(5px) !important;
+  color: #ffde27 !important;
+  font: 900 16px/1.15 var(--theme-font-mono, ui-monospace, monospace) !important;
+  letter-spacing: -0.035em !important;
+  -webkit-text-stroke: .15px #4b2705 !important;
+  text-shadow: 1px 2px 0 #100615 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > span:nth-child(2) {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  position: relative !important;
+  z-index: 2 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(5px) !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  color: #fffaff !important;
+  font: italic 900 14px/1.18 var(--qm-display, system-ui, sans-serif) !important;
+  letter-spacing: 0 !important;
+  text-shadow: 1px 2px 0 #090314 !important;
+}
+@media (max-width: 420px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+    padding-right: 24% !important;
+    padding-left: 18% !important;
+    margin-inline: 5px !important;
+    width: calc(100% - 10px) !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > span:nth-child(2) {
+    font-size: 13px !important;
+  }
+}
