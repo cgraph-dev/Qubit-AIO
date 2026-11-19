@@ -1,8 +1,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { SakugaSelect as OriginalSelect, type SakugaSelectProps } from "@qubit/shared/sakuga";
-import { currentMangaEnabled, mangaRouteEligible, subscribeManga } from "@/manga-skin/manga-store";
-import { useSyncExternalStore } from "react";
+import { useMangaLayerActive } from "@/manga-skin/useMangaLayerActive";
 
 /**
  * Web-only replacement for SakugaSelect when Q6/Q6-L is enabled.
@@ -11,11 +10,8 @@ import { useSyncExternalStore } from "react";
  * narrow inspector; viewport clamping keeps every option accessible.
  */
 export function MangaAwareSelect(props: SakugaSelectProps) {
-  const mangaEnabled = useSyncExternalStore(subscribeManga, currentMangaEnabled, () => false);
-  const eligible = typeof window !== "undefined" && mangaRouteEligible(window.location.pathname);
-  return mangaEnabled && eligible
-    ? <MangaSelect {...props} />
-    : <OriginalSelect {...props} />;
+  const layerActive = useMangaLayerActive();
+  return layerActive ? <MangaSelect {...props} /> : <OriginalSelect {...props} />;
 }
 
 function MangaSelect({
@@ -31,6 +27,7 @@ function MangaSelect({
   const panel = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   const menuId = useId();
+  const listId = `${menuId}-listbox`;
   const current = controlled ? value : internal;
   const chosen = options.find((opt) => opt.value === current);
   const shown = options.filter((opt) => opt.label.toLocaleLowerCase().includes(filter.trim().toLocaleLowerCase()));
@@ -114,7 +111,7 @@ function MangaSelect({
         aria-label={label}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
+        aria-controls={open ? listId : undefined}
         disabled={disabled}
         onClick={() => { if (!open) reposition(); setOpen((v) => !v); }}
       >
@@ -147,7 +144,12 @@ function MangaSelect({
               }}
             />
           </div>
-          <div className="qm-select-popover__options" role="listbox" aria-label={label}>
+          <div
+            id={listId}
+            className="qm-select-popover__options"
+            role="listbox"
+            aria-label={label}
+          >
             {shown.length === 0 && <div className="qm-select-empty">No matches</div>}
             {shown.map((option) => (
               <button

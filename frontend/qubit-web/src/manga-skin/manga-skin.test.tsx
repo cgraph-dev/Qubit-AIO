@@ -40,6 +40,9 @@ function RouteButtons() {
       <button type="button" onClick={() => navigate("/qubit-office")}>
         office
       </button>
+      <button type="button" onClick={() => navigate("/qubit-workbench")}>
+        workbench
+      </button>
     </div>
   );
 }
@@ -81,9 +84,9 @@ describe("manga route eligibility", () => {
     }
   });
 
-  it("keeps the terminal TUI unskinned", () => {
-    expect(mangaRouteEligible("/chat")).toBe(false);
-    expect(mangaRouteEligible("/chat/child")).toBe(false);
+  it("skins the /chat host shell while leaving the terminal as its own surface", () => {
+    expect(mangaRouteEligible("/chat")).toBe(true);
+    expect(mangaRouteEligible("/chat/child")).toBe(true);
   });
 
   it("allows ordinary dashboard routes", () => {
@@ -108,8 +111,11 @@ describe("MangaSkinGate", () => {
     mount("/sessions");
     expect(skinOn()).toBe(true);
 
-    clickText("office");
+    clickText("workbench");
     expect(skinOn()).toBe(false);
+
+    clickText("office");
+    expect(skinOn()).toBe(true);
 
     clickText("sessions");
     expect(skinOn()).toBe(true);
@@ -140,6 +146,9 @@ describe("bootstrapMangaSkin", () => {
     expect(skinOn()).toBe(true);
 
     bootstrapMangaSkin("/qubit-office");
+    expect(skinOn()).toBe(true);
+
+    bootstrapMangaSkin("/qubit-workbench");
     expect(skinOn()).toBe(false);
   });
 });

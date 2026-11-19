@@ -24,10 +24,16 @@ describe("manga human-first UX", () => {
     expect(mangaGuideForPath("/random-plugin")).toBeUndefined();
   });
 
-  it("never skins protected routes", () => {
-    for (const path of ["/chat", "/qubit-workbench", "/qubit-hud", "/qubit-office", "/qubit-office2", "/qubit-office3"]) {
+  it("never skins Workbench or HUD", () => {
+    for (const path of ["/qubit-workbench", "/qubit-hud"]) {
       expect(mangaRouteEligible(path)).toBe(false);
       expect(mangaGuideForPath(path)).toBeUndefined();
+    }
+  });
+
+  it("skins the chat and office host shells", () => {
+    for (const path of ["/chat", "/qubit-office", "/qubit-office2", "/qubit-office3"]) {
+      expect(mangaRouteEligible(path)).toBe(true);
     }
   });
 });

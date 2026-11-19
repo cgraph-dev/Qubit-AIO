@@ -26,6 +26,12 @@ function mount(onChange = vi.fn()) {
   return onChange;
 }
 
+async function settle() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+}
+
 beforeEach(() => {
   setMangaEnabled(true);
   document.documentElement.dataset.qubitManga = "on";
@@ -69,5 +75,21 @@ describe("MangaAwareSelect portal", () => {
     act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(document.body.querySelector(".qm-select-popover")).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("follows the gate attribute instead of a stale route snapshot", async () => {
+    mount();
+    expect(container!.querySelector(".qm-select-trigger")).not.toBeNull();
+
+    // Client navigation to /chat, Office, etc. removes the marker while the
+    // manga theme stays selected; the select must fall back to the shared control.
+    delete document.documentElement.dataset.qubitManga;
+    await settle();
+    expect(container!.querySelector(".qm-select-trigger")).toBeNull();
+    expect(container!.querySelector('[role="combobox"]')).not.toBeNull();
+
+    document.documentElement.dataset.qubitManga = "on";
+    await settle();
+    expect(container!.querySelector(".qm-select-trigger")).not.toBeNull();
   });
 });

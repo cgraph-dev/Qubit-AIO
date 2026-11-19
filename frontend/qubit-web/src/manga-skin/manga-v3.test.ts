@@ -23,9 +23,12 @@ describe("Manga V2/V3 integration contracts", () => {
     for (const css of [v2, v3, v4, v5]) expect(css).toContain('html[data-qubit-manga="on"]');
   });
 
-  it("protects terminal, office, workbench and HUD surfaces", () => {
-    for (const route of ["/chat", "/qubit-workbench", "/qubit-hud", "/qubit-office", "/qubit-office2", "/qubit-office3"]) {
+  it("protects the Workbench and HUD while skinning chat and office", () => {
+    for (const route of ["/qubit-workbench", "/qubit-hud"]) {
       expect(store).toContain(`"${route}"`);
+    }
+    for (const route of ["/chat", "/qubit-office", "/qubit-office2", "/qubit-office3"]) {
+      expect(store).not.toContain(`"${route}"`);
     }
     expect(store).toContain('pathname.startsWith(path + "/")');
   });
@@ -34,7 +37,7 @@ describe("Manga V2/V3 integration contracts", () => {
     expect(webSelect).toContain("createPortal(");
     expect(webSelect).toContain('document.body');
     expect(webSelect).toContain('position: "fixed"');
-    expect(webSelect).toContain("mangaRouteEligible(");
+    expect(webSelect).toContain("useMangaLayerActive(");
     expect(webSelect).toContain("OriginalSelect");
   });
 

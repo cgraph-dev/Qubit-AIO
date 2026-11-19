@@ -25,9 +25,12 @@ describe("Manga V3 asset and layout integration", () => {
       expect(layer).toContain(`v3-${name}.svg`);
     }
   });
-  it("keeps excluded web routes and /chat terminal untouched", () => {
-    for (const p of ["/chat","/qubit-workbench","/qubit-hud","/qubit-office","/qubit-office2","/qubit-office3"]) {
+  it("keeps only Workbench and HUD excluded and allows the chat/office host shells", () => {
+    for (const p of ["/qubit-workbench","/qubit-hud"]) {
       expect(routes).toContain(`"${p}"`);
+    }
+    for (const p of ["/chat","/qubit-office","/qubit-office2","/qubit-office3"]) {
+      expect(routes).not.toContain(`"${p}"`);
     }
     expect(layer).toContain('html[data-qubit-manga="on"]');
   });
