@@ -7,15 +7,16 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme ids are Qubit-owned (`q1`..`q5`); the picker shows Q1..Q5. Every
- * theme ships a "-L" large variant (Q1-L .. Q5-L) that keeps the same look
+ * Theme ids are Qubit-owned (`q2`..`q6`); the picker shows Q2..Q6. Q1, Q1-L,
+ * Q5 and Q5-L were retired at owner request (the Q1/Q5 theme definitions
+ * remain only as internal fallbacks, never as picker entries). Every remaining
+ * theme ships a "-L" large variant (Q2-L .. Q6-L) that keeps the same look
  * with a bigger root size and roomier spacing. Theme names must stay in sync
  * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
  * `qubit_cli/web_server_dashboard.py`.
  *
- * `default` is the canonical first theme and keeps its id (it is the
- * fallback in `resolveTheme`, the boot splash, and the persisted default);
- * it is presented as Q1.
+ * `defaultTheme` (Q1) is no longer selectable; it remains a definition for
+ * legacy fallbacks only. The live fallback is Q2 (`midnightTheme`).
  */
 
 // ---------------------------------------------------------------------------
@@ -218,6 +219,21 @@ export const mangaTheme: DashboardTheme = {
 export const MANGA_THEME_NAME = "q6";
 export const MANGA_THEME_LARGE_NAME = "q6-l";
 
+/** Theme ids retired at owner request. They are filtered out of a served
+ *  list even if an older/rolling backend still returns them. */
+export const RETIRED_THEME_IDS: ReadonlySet<string> = new Set([
+  "default",
+  "q1",
+  "q1-l",
+  "q5",
+  "q5-l",
+  "qubit",
+]);
+
+export function isRetiredThemeName(name: string | null | undefined): boolean {
+  return Boolean(name && RETIRED_THEME_IDS.has(name));
+}
+
 /** True for the manga base and large theme ids. */
 export function isMangaThemeName(name: string | null | undefined): boolean {
   return name === MANGA_THEME_NAME || name === MANGA_THEME_LARGE_NAME;
@@ -243,24 +259,18 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
   };
 }
 
-export const bigDefaultTheme = largeVariant(defaultTheme, "q1-l", 1);
 export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 2);
 export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 3);
 export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 4);
-export const bigContrastTheme = largeVariant(contrastTheme, "q5-l", 5);
 export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 6);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
-  default: defaultTheme,
-  "q1-l": bigDefaultTheme,
   q2: midnightTheme,
   "q2-l": bigMidnightTheme,
   q3: monoTheme,
   "q3-l": bigMonoTheme,
   q4: cyberpunkTheme,
   "q4-l": bigCyberpunkTheme,
-  q5: contrastTheme,
-  "q5-l": bigContrastTheme,
   q6: mangaTheme,
   "q6-l": bigMangaTheme,
 };

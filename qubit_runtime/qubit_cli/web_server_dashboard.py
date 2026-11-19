@@ -324,38 +324,39 @@ def mount_spa(application: FastAPI):
 # ---------------------------------------------------------------------------
 
 # Built-in themes — label + description only; colors live in web/src/themes/presets.ts.
-# Qubit-owned ids (Q1..Q6, each with a `-L` large variant); `default` stays the
-# canonical first theme and is presented as Q1. Keep in sync with
-# BUILTIN_THEMES in presets.ts.
+# Qubit-owned ids (Q2..Q6, each with a `-L` large variant). Q1/Q1-L/Q5/Q5-L were
+# retired at owner request; `default` and those ids are read-old aliases only.
+# Keep in sync with BUILTIN_THEMES in presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "default", "label": "Q1",   "description": "Q1 — deep teal canvas with warm cream ink and an amber glow"},
-    {"name": "q1-l",    "label": "Q1-L", "description": "Q1-L — the Q1 look with larger type and roomier spacing"},
     {"name": "q2",      "label": "Q2",   "description": "Q2 — near-black navy canvas with a lilac tint and violet glow"},
     {"name": "q2-l",    "label": "Q2-L", "description": "Q2-L — the Q2 look with larger type and roomier spacing"},
     {"name": "q3",      "label": "Q3",   "description": "Q3 — neutral greyscale canvas with square corners and no accent hue"},
     {"name": "q3-l",    "label": "Q3-L", "description": "Q3-L — the Q3 look with larger type and roomier spacing"},
     {"name": "q4",      "label": "Q4",   "description": "Q4 — black canvas, monospace throughout, bright mint signal colour"},
     {"name": "q4-l",    "label": "Q4-L", "description": "Q4-L — the Q4 look with larger type and roomier spacing"},
-    {"name": "q5",      "label": "Q5",   "description": "Q5 — pure black canvas, pure white ink, maximum contrast"},
-    {"name": "q5-l",    "label": "Q5-L", "description": "Q5-L — the Q5 look with larger type and roomier spacing"},
     {"name": "q6",      "label": "Q6",   "description": "Q6 — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
     {"name": "q6-l",    "label": "Q6-L", "description": "Q6-L — the Q6 look with larger type and roomier spacing"},
 ]
 
-# Theme ids a preference may still carry from before the Q1..Q5 renaming.
+# Theme ids a preference may still carry from before the Q2..Q6 set.
 # Read-old so a persisted value (localStorage or server-side config) still
-# resolves to the Qubit theme it looks like instead of silently falling back
-# to the default. Retired themes (rose, ember, blue) have no successor and
-# deliberately fall back to the default.
+# resolves to a surviving theme instead of silently falling back to Q1/Q5 or
+# the retired Qubit Command overlay. Retired ids with no successor map to Q2.
 _THEME_NAME_ALIASES: Dict[str, str] = {
     "nous-blue": "q3",
     "lens-5i": "q3",
     "qubit-blue": "q3",
-    "default-large": "q1-l",
+    "default": "q2",
+    "q1": "q2",
+    "q1-l": "q2-l",
+    "q5": "q2",
+    "q5-l": "q2-l",
+    "qubit": "q2",
+    "default-large": "q2-l",
     "midnight": "q2",
     "mono": "q3",
     "cyberpunk": "q4",
-    "qubit-contrast": "q5",
+    "qubit-contrast": "q2",
 }
 
 

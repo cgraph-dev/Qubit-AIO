@@ -13,9 +13,13 @@ const root = fileURLToPath(new URL("../../public/manga-ui/", import.meta.url));
 describe("manga skin stylesheet", () => {
   it("is gated behind the document marker", () => {
     expect(css).toContain('html[data-qubit-manga="on"]');
-    // The skin switch itself is the only unscoped control: it is never
-    // rendered unless the gate is active.
-    expect(css).toMatch(/\.qm-skin-switch\s*\{/);
+    // The retired standalone MANGA switch must not come back.
+    expect(css).not.toContain(".qm-skin-switch");
+  });
+
+  it("styles the Q6 theme-panel entry and active trigger", () => {
+    expect(css).toContain(".qm-theme-trigger[data-manga-theme=\"true\"]");
+    expect(css).toContain("sakuga-button.qm-theme-row--manga::part(button)");
   });
 
   it("carries the full manga palette", () => {

@@ -7,11 +7,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { BUILTIN_THEMES, defaultTheme, isMangaThemeName } from "./presets";
+import {
+  BUILTIN_THEMES,
+  isMangaThemeName,
+  isRetiredThemeName,
+  midnightTheme,
+} from "./presets";
 import {
   applyMangaAttribute,
   mangaRouteEligible,
-  rememberMangaReturnTheme,
   setMangaEnabled,
 } from "@/manga-skin/manga-store";
 import { migrateThemeName } from "./themeAliases";
@@ -452,7 +456,7 @@ function applyTheme(theme: DashboardTheme) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Name of the currently active theme (built-in id or user YAML name). */
   const [themeName, setThemeName] = useState<string>(() => {
-    if (typeof window === "undefined") return "default";
+    if (typeof window === "undefined") return "q2";
     // The server injects the persisted active theme into the HTML; trust it
     // first so the initial render (and first paint) is already correct and
     // there is no flash while the async theme list loads.
@@ -463,7 +467,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored =
       injected ||
       readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ||
-      "default";
+      "q2";
     const migrated = migrateThemeName(stored);
     // Write the migrated name back so future reads converge on the new
     // key and we eventually retire the alias entry.
@@ -516,7 +520,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       return (
         BUILTIN_THEMES[name] ??
         userThemeDefs[name] ??
-        defaultTheme
+        midnightTheme
       );
     },
     [userThemeDefs],
@@ -543,7 +547,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         typeof window !== "undefined" ? window.location.pathname : "/";
       applyMangaAttribute(mangaRouteEligible(path));
     } else {
-      rememberMangaReturnTheme(themeName);
       setMangaEnabled(false);
     }
   }, [themeName]);
@@ -559,12 +562,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           (resp.themes ?? []).map((t) => t.name),
         );
         if (resp.themes?.length) {
-          const served = resp.themes.map((t) => ({
-            name: t.name,
-            label: t.label,
-            description: t.description,
-            definition: t.definition,
-          }));
+          const served = resp.themes
+            .filter((t) => !isRetiredThemeName(t.name))
+            .map((t) => ({
+              name: t.name,
+              label: t.label,
+              description: t.description,
+              definition: t.definition,
+            }));
           // Keep built-ins that this client knows about but a not-yet-restarted
           // server does not list (e.g. a newly shipped Q6). A built-in is
           // client-owned; the server list is authoritative only for user YAMLs
@@ -651,7 +656,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         ...availableThemes.map((t) => t.name),
         ...Object.keys(userThemeDefs),
       ]);
-      const next = knownNames.has(name) ? name : "default";
+      const next = knownNames.has(name) ? name : "q2";
       setThemeName(next);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(STORAGE_KEY, next);
@@ -691,7 +696,7 @@ export function useTheme(): ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: defaultTheme,
+  theme: midnightTheme,
   themeName: "default",
   availableThemes: Object.values(BUILTIN_THEMES).map((t) => ({
     name: t.name,

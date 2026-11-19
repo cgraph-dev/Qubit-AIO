@@ -2,11 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useNavigate } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@/sakuga/ui", () => ({
-  emitFx: vi.fn(() => Promise.resolve()),
-}));
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { MangaSkinGate } from "./MangaSkin";
 import {
@@ -14,7 +10,6 @@ import {
   MANGA_SKIN_KEY,
   bootstrapMangaSkin,
   mangaRouteEligible,
-  readMangaPreference,
   setMangaEnabled,
 } from "./manga-store";
 
@@ -75,9 +70,6 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
-  document
-    .querySelectorAll(".qagent-sidebar__utility")
-    .forEach((node) => node.remove());
 });
 
 describe("manga route eligibility", () => {
@@ -119,59 +111,17 @@ describe("MangaSkinGate", () => {
     expect(skinOn()).toBe(true);
   });
 
-  it("stays off when the preference is disabled", () => {
+  it("stays off when the theme/preference is disabled", () => {
     mount("/sessions");
     setMangaEnabled(false);
     act(() => {});
     expect(skinOn()).toBe(false);
   });
-});
 
-describe("MangaSkinToggle", () => {
-  function installHost() {
-    const sidebar = document.createElement("aside");
-    sidebar.id = "app-sidebar";
-    const host = document.createElement("div");
-    host.className = "qagent-sidebar__utility";
-    sidebar.append(host);
-    document.body.append(sidebar);
-    return host;
-  }
-
-  it("renders beside the theme controls with an accessible state", () => {
-    installHost();
+  it("renders no separate skin switch", () => {
+    setMangaEnabled(true);
     mount("/sessions");
-    const toggle = document.querySelector<HTMLButtonElement>(".qm-skin-switch");
-    expect(toggle).not.toBeNull();
-    expect(toggle!.getAttribute("aria-pressed")).toBe("false");
-    expect(toggle!.getAttribute("aria-label")).toMatch(/enable/i);
-    expect(toggle!.textContent).toContain("Manga");
-  });
-
-  it("persists ON/OFF and restores the default appearance", () => {
-    installHost();
-    mount("/sessions");
-    const toggle = () =>
-      document.querySelector<HTMLButtonElement>(".qm-skin-switch")!;
-
-    act(() => toggle().click());
-    expect(readMangaPreference()).toBe(true);
-    expect(window.localStorage.getItem(MANGA_SKIN_KEY)).toBe("true");
-    expect(skinOn()).toBe(true);
-    expect(toggle().getAttribute("aria-pressed")).toBe("true");
-
-    act(() => toggle().click());
-    expect(readMangaPreference()).toBe(false);
-    expect(window.localStorage.getItem(MANGA_SKIN_KEY)).toBe("false");
-    expect(skinOn()).toBe(false);
-    expect(toggle().getAttribute("aria-pressed")).toBe("false");
-  });
-
-  it("is not offered on an excluded route", () => {
-    installHost();
-    mount("/qubit-office");
     expect(document.querySelector(".qm-skin-switch")).toBeNull();
-    expect(skinOn()).toBe(false);
   });
 });
 

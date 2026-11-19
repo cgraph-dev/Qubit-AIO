@@ -1,3 +1,7 @@
+> **Historical captures:** these screenshots predate the owner-requested removal of the
+> standalone MANGA switch and the Q1/Q1-L/Q5/Q5-L/Qubit Command theme entries. The current
+> UI selects Q6/Q6-L from the Theme panel; there is no separate switch.
+
 # Manga skin — visual evidence
 
 Captured from the real web dashboard (live backend APIs) at 1440×900 and 390×844 while the

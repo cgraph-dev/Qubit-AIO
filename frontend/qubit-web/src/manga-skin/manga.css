@@ -420,19 +420,6 @@ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system {
   background: var(--qm-panel) !important;
 }
 
-/* The utility strip carries theme + language + the skin switch. Let the
-   switch take its own full-width row so nothing is clipped by the rail. */
-html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility {
-  flex-wrap: wrap;
-  justify-content: center;
-  row-gap: 0.3rem;
-}
-
-html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility > .qm-skin-switch {
-  flex: 1 1 100%;
-  max-width: 100%;
-}
-
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility > div {
   min-width: 0;
   flex: 1 1 0;
@@ -481,117 +468,7 @@ html[data-qubit-manga="on"] .qchat__side * {
   scrollbar-width: thin;
 }
 
-/* --------------------------------------------------------- skin switch */
-
-.qm-skin-switch {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  flex-shrink: 0;
-  min-width: 58px;
-  min-height: 27px;
-  padding: 3px 7px;
-  border: 2px solid var(--qm-magenta, #ff269a);
-  border-radius: 2px;
-  background: #150e27;
-  color: #fff2ff;
-  font: 800 10px/1.2 "Arial Black", "Segoe UI", system-ui, sans-serif;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  box-shadow: 2px 2px 0 #05030f;
-  transition:
-    background 130ms ease,
-    color 130ms ease,
-    border-color 130ms ease,
-    box-shadow 130ms ease,
-    transform 130ms ease;
-}
-
-.qm-skin-switch:hover {
-  border-color: #ffe500;
-  transform: translateY(-1px);
-}
-
-.qm-skin-switch:active {
-  transform: translateY(1px);
-  box-shadow: 1px 1px 0 #05030f;
-}
-
-.qm-skin-switch[data-state="on"] {
-  background: #ffe500;
-  color: #080615;
-  border-color: #05030f;
-  box-shadow: 2px 2px 0 #ff269a;
-}
-
-.qm-skin-switch:focus-visible {
-  outline: 2px solid #ffe500;
-  outline-offset: 3px;
-}
-
-.qm-skin-switch__spark {
-  color: #ff269a;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.qm-skin-switch[data-state="on"] .qm-skin-switch__spark {
-  color: #080615;
-}
-
-.qm-skin-switch__lamp {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #6b5a80;
-  box-shadow: 0 0 0 1px #05030f;
-}
-
-.qm-skin-switch[data-state="on"] .qm-skin-switch__lamp {
-  background: #28d577;
-  box-shadow:
-    0 0 0 1px #05030f,
-    0 0 7px 1px rgba(40, 213, 119, 0.8);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .qm-skin-switch[data-state="on"] .qm-skin-switch__spark {
-    animation: qm-spark 2.4s ease-in-out infinite;
-  }
-}
-
-@keyframes qm-spark {
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(18deg) scale(1.18);
-  }
-}
-
-/* The switch is the opt-in entry point, so it must be visible BEFORE the
-   skin is enabled. These rules are intentionally outside the manga gate: they
-   only affect the utility strip that contains the toggle. */
-#app-sidebar .qagent-sidebar__utility:has(.qm-skin-switch) {
-  flex-wrap: wrap;
-  row-gap: 0.3rem;
-}
-
-#app-sidebar .qagent-sidebar__utility > .qm-skin-switch {
-  flex: 1 1 100%;
-  max-width: 100%;
-}
-
-#app-sidebar .qagent-sidebar__utility:has(.qm-skin-switch) .language-switcher {
-  --sk-input-width: 6.5rem !important;
-  max-width: 100%;
-}
-
-/* Theme picker: Q6 / Q6-L look like the sidebar MANGA switch. These rules are
+/* Theme picker: Q6 / Q6-L use the yellow manga badge. These rules are
    deliberately unscoped — the row must already look like the manga button
    while another theme is active and the picker is open. */
 .qm-theme-trigger[data-manga-theme="true"]::part(button) {
@@ -673,25 +550,6 @@ sakuga-button.qm-theme-row--manga .text-text-tertiary {
   box-shadow:
     0 0 0 1px #05030f,
     0 0 7px 1px rgba(40, 213, 119, 0.8);
-}
-
-@media (max-width: 1023px) {
-  .qm-skin-switch {
-    min-height: 34px;
-  }
-}
-
-@media (min-width: 1024px) {
-  #app-sidebar[data-collapsed="true"] .qm-skin-switch {
-    width: 32px;
-    min-width: 0;
-    padding: 3px;
-    margin-inline: auto;
-  }
-  #app-sidebar[data-collapsed="true"] .qm-skin-switch__label,
-  #app-sidebar[data-collapsed="true"] .qm-skin-switch__lamp {
-    display: none;
-  }
 }
 
 /* ---------------------------------------------------------------- cards */
@@ -1053,7 +911,7 @@ html[data-qubit-manga="on"] :is(button, [role="button"])[aria-disabled="true"] {
 }
 
 /* Native icon buttons in page toolbars share the angular frame. */
-html[data-qubit-manga="on"] #qubit-main-content button:not(.qm-skin-switch) {
+html[data-qubit-manga="on"] #qubit-main-content button {
   border-radius: 2px;
 }
 
@@ -1506,10 +1364,5 @@ html[data-qubit-manga="on"] #qubit-main-content .overflow-hidden[class*="bg-back
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-  }
-  .qm-skin-switch,
-  .qm-skin-switch:hover,
-  .qm-skin-switch:active {
-    transform: none;
   }
 }
