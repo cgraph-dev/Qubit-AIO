@@ -10,11 +10,9 @@ const chrome = read("./manga-layout-repair.css");
 const routes = read("./manga-store.ts");
 
 describe("Manga V3 asset and layout integration", () => {
-  it("imports the vector asset layer after existing Manga CSS", () => {
-    expect(imported).toContain('import "./manga-assets-integrated.css";');
-    expect(imported.indexOf('manga-title-and-inspector.css')).toBeLessThan(
-      imported.indexOf('manga-assets-integrated.css'),
-    );
+  it("does not load stretched SVG navigation plates after the reported regression", () => {
+    expect(imported).not.toContain('import "./manga-assets-integrated.css";');
+    expect(imported).toContain('import "./manga-rail-reference.css";');
   });
   it("ships all five text-free reference-inspired SVG assets", () => {
     for (const name of ["nav-row-normal","nav-row-hover","nav-row-selected","nav-section-title","corner-yellow"]) {

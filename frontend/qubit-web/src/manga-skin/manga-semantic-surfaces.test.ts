@@ -13,9 +13,9 @@ describe("shared Manga panel anatomy", () => {
    expect(css).toContain(`data-qm-surface="${surface}"`);
   }
  });
- it("keeps Manga styling route-scoped and imported after asset plates", () => {
-  expect(gate.indexOf("manga-assets-integrated.css")).toBeGreaterThan(0);
-  expect(gate.indexOf("manga-semantic-surfaces.css")).toBeGreaterThan(gate.indexOf("manga-assets-integrated.css"));
+ it("keeps Manga styling route-scoped without the stretched V3 plate import", () => {
+  expect(gate).not.toContain('import "./manga-assets-integrated.css";');
+  expect(gate).toContain('import "./manga-semantic-surfaces.css";');
   expect(css).toContain('html[data-qubit-manga="on"]');
  });
  it("preserves live controls and accessible messages", () => {
