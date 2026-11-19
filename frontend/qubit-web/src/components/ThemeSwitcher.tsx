@@ -28,6 +28,7 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
   const { themeName, availableThemes, setTheme, fontId, fontChoices, setFont } = useTheme();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [, setFlyoutLayoutVersion] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const narrowViewport = useBelowBreakpoint(640);
@@ -55,6 +56,22 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open, close, useMobileSheet]);
+
+  // A portal is not clipped by the rail, but it still needs to follow its
+  // trigger and stay inside the visible viewport during resize/scroll.
+  useEffect(() => {
+    if (!open || useMobileSheet) return;
+    const refresh = (event?: Event) => {
+      if (dropdownRef.current?.contains(event?.target as Node)) return;
+      setFlyoutLayoutVersion((v) => v + 1);
+    };
+    window.addEventListener("resize", refresh);
+    window.addEventListener("scroll", refresh, true);
+    return () => {
+      window.removeEventListener("resize", refresh);
+      window.removeEventListener("scroll", refresh, true);
+    };
+  }, [open, useMobileSheet]);
 
   const current = availableThemes.find((th) => th.name === themeName);
   const label = current?.label ?? themeName;
@@ -138,6 +155,10 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             ? sidebarRight + 8
             : (rect?.right ?? 0) + 8
           : undefined;
+        const flyoutHeight = Math.min(570, Math.max(220, window.innerHeight - 24));
+        const flyoutWidth = Math.min(366, Math.max(260, window.innerWidth - 24));
+        const boundedLeft = Math.max(12, Math.min(flyoutLeft ?? 12, window.innerWidth - flyoutWidth - 12));
+        const boundedTop = Math.max(12, Math.min((rect?.bottom ?? 0) - flyoutHeight, window.innerHeight - flyoutHeight - 12));
         const dropdown = (
           <div
             ref={dropdownRef}
@@ -151,8 +172,11 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             style={
               dropUp && rect
                 ? {
-                    bottom: window.innerHeight - rect.top + 4,
-                    left: flyoutLeft,
+                    top: boundedTop,
+                    left: boundedLeft,
+                    width: flyoutWidth,
+                    maxHeight: flyoutHeight,
+                    bottom: "auto",
                   }
                 : undefined
             }
