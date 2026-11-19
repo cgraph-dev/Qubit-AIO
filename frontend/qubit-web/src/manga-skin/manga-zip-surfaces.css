@@ -28,11 +28,14 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] header[role="banner"]:
   inset:0;background:url("/manga-ui/zip/header-full.svg") center/100% 100% no-repeat;
   opacity:.32;
 }
+/* The original ZIP module-header is a decorative multi-strip asset, NOT a
+ * scalable heading background. Stretching it across 100%-width headings
+ * produces the four clipped/title plates seen on Qubit TV and Talk.
+ * The single shared heading rule in manga-panel-integrity.css owns it now. */
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
   .settings-page__title,.settings-section__heading,.qplate-module__head
 ) {
-  background-image:url("/manga-ui/zip/module-header.svg")!important;
-  background-position:center;background-size:100% 100%;background-repeat:no-repeat;
+  background-repeat:no-repeat;
 }
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
   .settings-section,.settings-group,.kitchen-panel,.workboard-card,[data-slot="card"]
