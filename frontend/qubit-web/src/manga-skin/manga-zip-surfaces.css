@@ -1,0 +1,158 @@
+/* Optional *original ZIP* asset integration for the existing Q6/Q6-L skin.
+ * All selectors are guarded by data-qubit-manga-zip="ready", set only after
+ * the complete installed asset manifest passes a runtime presence check.
+ * Uninstalled dashboards keep their existing, functional Manga look.
+ * Background art never contains text; interactive DOM remains live.
+ */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] {
+  --qmz-panel-xs:url("/manga-ui/zip/panel-xs.svg");
+  --qmz-panel-sm:url("/manga-ui/zip/panel-sm.svg");
+  --qmz-panel-md:url("/manga-ui/zip/panel-md.svg");
+  --qmz-panel-lg:url("/manga-ui/zip/panel-lg.svg");
+  --qmz-panel-xl:url("/manga-ui/zip/panel-xl.svg");
+  --qmz-panel-horizontal:url("/manga-ui/zip/panel-horizontal.svg");
+  --qmz-panel-vertical:url("/manga-ui/zip/panel-vertical.svg");
+  --qmz-impact-yellow:url("/manga-ui/zip/impact-yellow.svg");
+  --qmz-impact-magenta:url("/manga-ui/zip/impact-magenta.svg");
+  --qmz-impact-cyan:url("/manga-ui/zip/impact-cyan.svg");
+  --qmz-corner-pink:url("/manga-ui/zip/corner-magenta.svg");
+  --qmz-corner-violet:url("/manga-ui/zip/corner-violet.svg");
+  --qmz-corner-yellow:url("/manga-ui/zip/corner-yellow.svg");
+  --qmz-corner-cyan:url("/manga-ui/zip/corner-cyan.svg");
+}
+
+/* Header, footer, titles and dividers: use the ZIP as small-size accents,
+ * not stretched full-width bitmap copies. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] header[role="banner"]::before {
+  content:"";position:absolute;pointer-events:none;z-index:0;
+  inset:0;background:url("/manga-ui/zip/header-full.svg") center/100% 100% no-repeat;
+  opacity:.32;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
+  .settings-page__title,.settings-section__heading,.qplate-module__head
+) {
+  background-image:url("/manga-ui/zip/module-header.svg")!important;
+  background-position:center;background-size:100% 100%;background-repeat:no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
+  .settings-section,.settings-group,.kitchen-panel,.workboard-card,[data-slot="card"]
+) {position:relative;isolation:isolate}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
+  .settings-section,.settings-group,.kitchen-panel,.workboard-card,[data-slot="card"]
+)::before {
+  content:"";position:absolute;pointer-events:none;z-index:0;
+  left:-4px;top:-4px;width:48px;height:48px;
+  background:var(--qmz-corner-pink) left top/contain no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
+  .settings-section,.settings-group,.kitchen-panel,.workboard-card,[data-slot="card"]
+)>* {position:relative;z-index:1}
+
+/* Navigation: default, hover, keyboard focus and disabled states from the ZIP.
+ * Selected stays the existing yellow SVG + impact-star animation (untouched). */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:not([aria-current="page"]) {
+  background:url("/manga-ui/zip/nav-default.svg") center/100% 100% no-repeat!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  background-image:url("/manga-ui/zip/nav-hover.svg")!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:focus-visible:not([aria-current="page"]) {
+  background-image:url("/manga-ui/zip/nav-focused.svg")!important;outline:3px solid #ffe525!important;outline-offset:2px;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-disabled="true"] {
+  background-image:url("/manga-ui/zip/nav-disabled.svg")!important;opacity:.55;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
+  background-image:url("/manga-ui/zip/sidebar-gateway.svg")!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon {
+  /* Footer art is ornamentation only; live LED and version/brand stay above. */
+  background:
+    url("/manga-ui/zip/sidebar-footer-plate.svg") center/100% 100% no-repeat!important;
+}
+
+/* Right chat panel, model and tools, session and telemetry sections. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side {
+  border-image:none!important;outline:2px solid #ff269a;outline-offset:2px;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side > :is(
+  .qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts
+) {border:2px solid #b965ff!important;background-color:#171027!important}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side > .qchat__model-panel::before {
+  background-image:url("/manga-ui/zip/right-model.svg")!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side > .qchat__tools::before {
+  background-image:url("/manga-ui/zip/right-tools.svg")!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side > .qchat__sessions::before {
+  background-image:url("/manga-ui/zip/right-sessions.svg")!important;
+}
+
+/* Chat transcript, composer, tool/artifact cards and code/terminal surfaces. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat :is(
+  .qchat__transcript,.qchat__messages,.qchat__composer
+) {border:2px solid #b965ff;background-color:#10091e}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat :is(
+  .qchat__composer,.qchat__input
+) {border-image:none;background-image:url("/manga-ui/zip/chat-composer.svg");background-size:100% 100%}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  .qchat__tool-card,.qchat__artifact-card
+) {border:2px solid #ff269a;box-shadow:2px 2px 0 #080615}
+
+/* Forms, lists, cards and dialogs: preserve actual control semantics. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  .settings-page,.qchat
+) input:not([type="checkbox"]):not([type="radio"]),
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  .settings-page,.qchat
+) textarea,
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  .settings-page,.qchat
+) select {
+  border:2px solid #b965ff!important;
+  border-radius:3px!important;background-color:#0a0a1f!important;
+  color:#fff0ff!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  .settings-page,.qchat
+) :is(input,textarea,select):focus-visible {
+  outline:3px solid #ffe500!important;outline-offset:2px;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  .cron-table,.sessions-table,.workboard-table,.settings-table
+) {border:2px solid #ff269a;box-shadow:3px 3px #080615}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [role="dialog"] {
+  border:3px solid #ff269a!important;
+  box-shadow:0 0 0 2px #fff0ff,5px 5px #080615!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-confirm-dialog::before {
+  background-image:url("/manga-ui/zip/modal-confirm.svg")!important;
+}
+/* Utility escape hatch for future page-specific React components. The 89 named
+ * files are installed and can be selected without modifying global selectors.
+ * Add data-qm-zip-asset="name" only to a real decorative element. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset] {
+  position:relative;isolation:isolate;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="analytics-stat"] {
+  border-color:#b965ff;background-image:url("/manga-ui/zip/analytics-stat.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="plugin-card"] {
+  background-image:url("/manga-ui/zip/plugin-card.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="model-card"] {
+  background-image:url("/manga-ui/zip/model-card.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="profile-card"] {
+  background-image:url("/manga-ui/zip/profile-card.svg");
+}
+@media(max-width:760px) {
+  html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
+    .settings-section,.settings-group,.kitchen-panel,[data-slot="card"]
+  ) {max-width:100%;min-width:0}
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] * {
+    scroll-behavior:auto!important;
+  }
+}
