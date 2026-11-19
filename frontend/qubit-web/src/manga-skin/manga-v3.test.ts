@@ -7,6 +7,7 @@ const here = (file: string) => readFileSync(fileURLToPath(new URL(file, import.m
 const v2 = here("./manga-v2.css");
 const v3 = here("./manga-v3.css");
 const v4 = here("./manga-v4.css");
+const v5 = here("./manga-v5.css");
 const store = here("./manga-store.ts");
 const gate = here("./MangaSkin.tsx");
 const webSelect = here("../sakuga/MangaAwareSelect.tsx");
@@ -18,7 +19,8 @@ describe("Manga V2/V3 integration contracts", () => {
     expect(gate).toContain('import "./manga-v2.css";');
     expect(gate).toContain('import "./manga-v3.css";');
     expect(gate).toContain('import "./manga-v4.css";');
-    for (const css of [v2, v3, v4]) expect(css).toContain('html[data-qubit-manga="on"]');
+    expect(gate).toContain('import "./manga-v5.css";');
+    for (const css of [v2, v3, v4, v5]) expect(css).toContain('html[data-qubit-manga="on"]');
   });
 
   it("protects terminal, office, workbench and HUD surfaces", () => {
@@ -52,5 +54,8 @@ describe("Manga V2/V3 integration contracts", () => {
     expect(v3).toContain("@keyframes qm-comic-pop");
     expect(v2).toContain("@keyframes qm-star-enter");
     expect(v4).toContain("@keyframes qm-rail-select");
+    expect(v5).toContain(".sessions-table");
+    expect(v5).toContain(".cron-table");
+    expect(v5).toContain(".workboard-card");
   });
 });
