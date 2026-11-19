@@ -6,14 +6,14 @@ routes. The Workbench, Office and chat terminal renderer remain unchanged.
 
 ## Install exact approved art
 
-Download **qubit_manga_REPAIRED_v2_assets.zip** from the design conversation
+Download **qubit_manga_POLISHED_v3_assets.zip** from the design conversation
 and save it in the **repository root** (the folder containing `frontend/`).
 
 From the repository root:
 
 ```sh
 git pull origin main
-node frontend/qubit-web/scripts/install-manga-approved.mjs qubit_manga_REPAIRED_v2_assets.zip
+node frontend/qubit-web/scripts/install-manga-approved.mjs qubit_manga_POLISHED_v3_assets.zip
 ```
 
 Alternatively, copying the ZIP to that location before `npm run dev` or
@@ -58,3 +58,13 @@ cd frontend/qubit-web
 npm run typecheck
 npm test
 ```
+
+## Polished v3 refinements
+
+The tooltip plate now includes the polished circled exclamation badge. The
+SYSTEM title bar is rendered from a clean independent high-resolution SVG and
+all 14 image assets use softened magenta/chrome highlights (~35% reduced glow).
+Sidebar navigation rows use one straight outer outline with white-square icons
+and a halftone right gutter; no duplicate nested octagon is shown. Artwork is
+static until the optional animation pass. Replace 13_star_only.webp on its own
+to change the star without affecting the starless titleplate.
