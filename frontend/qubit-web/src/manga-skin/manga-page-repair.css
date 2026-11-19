@@ -353,3 +353,38 @@ html[data-qubit-manga="on"] .qm-bot-page .qb-below-body :is(
   transition:none!important;transform:none!important;
  }
 }
+
+
+/* Skills popup templates retain library focus trap and keyboard management.
+ * The outer class is on the actual portaled dialog surface. */
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) {
+ width:min(96vw,760px);min-width:0;
+ max-height:min(90dvh,900px);overflow-y:auto;overflow-x:hidden;
+ padding:clamp(14px,1.8vw,23px)!important;
+ border:3px solid var(--qm-page-pink)!important;
+ border-top:5px solid var(--qm-page-yellow)!important;
+ border-radius:3px!important;
+ background:linear-gradient(128deg,#271239,#11091e 72%)!important;
+ box-shadow:3px 3px 0 #080615,6px 6px 0 #fff0ff!important;
+}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ h2,[class*="dialog-title"],[data-slot="dialog-title"]
+) {
+ color:#fff0ff!important;
+ font:800 clamp(1.15rem,1.8vw,1.42rem)/1.25 var(--qm-page-heading)!important;
+ letter-spacing:.045em!important;
+}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ [class*="dialog-description"],[data-slot="dialog-description"],p
+) {
+ color:var(--qm-page-muted);line-height:1.5;
+}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ sakuga-input,sakuga-textarea,input,textarea
+) {min-width:0;max-width:100%;width:100%}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ sakuga-button,button
+) {min-height:38px;max-width:100%}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ sakuga-button,button
+):focus-visible {outline:2px solid var(--qm-page-yellow)!important;outline-offset:3px}
