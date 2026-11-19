@@ -337,3 +337,57 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qm-motion="pau
     animation:none!important;transition:none!important;
   }
 }
+
+
+/* Nine-slice frame prevents the approved chrome corners stretching when the
+   gateway is rendered at its real ~260px sidebar width. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {
+  border:15px solid transparent!important;
+  border-image-source:url("/manga-ui/approved/02_system_panel_frame.webp")!important;
+  border-image-slice:29 fill!important;
+  border-image-width:15px!important;
+  border-image-outset:0!important;
+  border-image-repeat:stretch!important;
+  background:none!important;
+  padding:3px 6px 5px!important;
+}
+/* A very small neon streak in the empty lower-right frame gutter. Do not
+   place graphic strokes behind telemetry text or stretch them across pages. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::before {
+  display:block!important;content:""!important;
+  position:absolute!important;z-index:0!important;
+  right:9px!important;bottom:8px!important;width:28px!important;height:16px!important;
+  background:url("/manga-ui/approved/10_impact_strokes.webp") center/contain no-repeat!important;
+  pointer-events:none!important;opacity:.48!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > :is(.qagent-sidebar__section-head,a) {
+  position:relative!important;z-index:2!important;
+}
+/* Optional native checkboxes use the individually approved idle/active SVG
+   cutouts. No form semantics are changed and custom switches are untouched. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #qubit-main-content input[type="checkbox"]:not([role="switch"]),
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qchat__side input[type="checkbox"]:not([role="switch"]) {
+  appearance:none!important;-webkit-appearance:none!important;
+  box-sizing:border-box!important;display:inline-block!important;
+  flex:0 0 22px!important;width:22px!important;height:22px!important;
+  margin:0 5px 0 0!important;padding:0!important;
+  border:0!important;border-radius:0!important;
+  background:url("/manga-ui/approved/08_checkbox_idle.webp") center/100% 100% no-repeat!important;
+  box-shadow:none!important;
+  vertical-align:middle!important;cursor:pointer;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #qubit-main-content input[type="checkbox"]:checked:not([role="switch"]),
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qchat__side input[type="checkbox"]:checked:not([role="switch"]) {
+  background-image:url("/manga-ui/approved/09_checkbox_active.webp")!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] :is(#qubit-main-content,.qchat__side) input[type="checkbox"]:disabled {
+  opacity:.48!important;cursor:not-allowed!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] :is(#qubit-main-content,.qchat__side) input[type="checkbox"]:focus-visible {
+  outline:2px solid #fff087!important;outline-offset:2px!important;
+}
+/* Tooltip entrance: a single small composited opacity transition. Hover
+   movement retains the existing stable anchor positioning. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
+  transition:opacity 130ms ease-out!important;
+}
