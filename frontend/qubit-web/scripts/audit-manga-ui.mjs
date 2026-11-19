@@ -31,6 +31,8 @@ try {
  console.error("Playwright is required for the browser audit. Install it in the local QA environment; do not modify the Qubit production dependencies.");
  process.exit(2);
 }
+// Sensitive routes still receive layout checks, but never screenshot their data.
+const screenshotRestricted = ["/env", "/admin/users"];
 const checks = [];
 const problems = [];
 await mkdir(output, { recursive:true });
@@ -51,6 +53,9 @@ try {
     const response = await page.goto(base + route, { waitUntil:"domcontentloaded",timeout:30000 });
     await page.waitForTimeout(650);
     record.status = String(response?.status() ?? "unknown");
+    record.requestedUrl = base + route;
+    record.finalUrl = page.url();
+    if (new URL(record.finalUrl).pathname !== route) problems.push({width,route,kind:"redirect",finalUrl:record.finalUrl});
     if (response && !response.ok()) problems.push({width,route,kind:"http-error",status:response.status()});
     const metrics = await page.evaluate(() => {
       const root = document.documentElement;
@@ -92,9 +97,13 @@ try {
     if(record.scrollOverflow)problems.push({width,route,kind:"document-horizontal-overflow"});
     if(record.clippedInputs.length)problems.push({width,route,kind:"offscreen-control",count:record.clippedInputs.length});
     if(errors.length)problems.push({width,route,kind:"browser-errors",errors:errors.slice()});
-    const file=width+"_"+safeName(route)+".png";
-    await page.screenshot({path:resolve(output,file),fullPage:false,animations:"disabled"});
-    record.screenshot=file;
+    if (screenshotRestricted.some((p) => route === p || route.startsWith(p + "/"))) {
+      record.screenshot = "SKIPPED_SENSITIVE_ROUTE";
+    } else {
+      const file=width+"_"+safeName(route)+".png";
+      await page.screenshot({path:resolve(output,file),fullPage:false,animations:"disabled"});
+      record.screenshot=file;
+    }
     record.errors=errors.splice(0);
    }catch(error){
     record.status="ERROR";
