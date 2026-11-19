@@ -1778,6 +1778,7 @@ function SidebarSystemActions({
       {!collapsed && (
         <div className="qagent-sidebar__telemetry" role="group" aria-label={t.app.system}>
           <span className="qagent-sidebar__section-head" style={{ margin: "0 0 .2rem", borderTop: 0 }}>
+            <span className="qm-manga-system-index" aria-hidden="true">07</span>
             <span>{t.app.system}</span>
             <span aria-hidden className="qagent-sidebar__section-rule" />
           </span>
