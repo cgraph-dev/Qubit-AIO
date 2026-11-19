@@ -435,3 +435,21 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {
   background:none!important;box-shadow:none!important;
 }
+
+
+/* Final star ownership: the decoration container uses exactly ONE separate
+   image URL; no CSS 'content' replacement ambiguity and no ghost star.
+   To change the star, replace approved/13_star_only.webp only. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-title-corner {
+  display:block!important;
+  background: url("/manga-ui/approved/13_star_only.webp") center / contain no-repeat!important;
+  border:0!important;box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-title-corner__star,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-title-corner__chrome {
+  display:none!important;
+}
+/* Toolbar and frame are single layers; CSS must not add another frame. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::after {
+  animation:none!important;
+}
