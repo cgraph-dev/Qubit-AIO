@@ -76,10 +76,11 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([d
   display:flex!important;
   align-items:flex-end!important;
   justify-content:flex-end!important;
-  flex:0 0 130px!important;
+  flex:0 0 auto!important;
   width:100%!important;
-  height:130px!important;
-  min-height:130px!important;
+  height:auto!important;
+  min-height:0!important;
+  aspect-ratio:742 / 351!important;
   margin:0!important;
   padding:0 5px 6px!important;
   box-sizing:border-box!important;
@@ -632,7 +633,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__to
   max-height:138.125px!important;
   aspect-ratio:320 / 170!important;
   margin:0!important;
-  padding:25px 53px 29px 24px!important;
+  padding:25px 71px 29px 24px!important;
   gap:5px!important;
   background:url("/manga-ui/manga-tooltip-precision.svg") center / 100% 100% no-repeat!important;
   border:0!important;
@@ -682,11 +683,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *::aft
  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar {
    padding:9px 9px 8px!important;
  }
- html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
-   flex-basis:116px!important;
-   height:116px!important;
-   min-height:116px!important;
- }
  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {
    height:156px!important;min-height:156px!important;max-height:156px!important;
    padding-top:58px!important;
@@ -702,4 +698,17 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *::aft
  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
    transition:none!important;
  }
+}
+
+/* Collapsed rail is functional: don't spend a 56px icon rail on 24px padding. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar[data-collapsed="true"] {
+  padding:5px!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row {
+  flex:0 0 56px!important;
+  min-height:56px!important;
+  height:56px!important;
+  padding:2px!important;
+  background:none!important;
+  border:0!important;
 }
