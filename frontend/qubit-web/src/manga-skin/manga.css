@@ -1590,3 +1590,27 @@ html[data-qubit-manga="on"] #app-sidebar :is(button,[role="button"],a):focus-vis
     line-height: 1.5;
   }
 }
+
+
+/* Artwork-backed framing, with text kept as real accessible DOM. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
+  background: url("/manga-ui/sidebar-footer-plate.svg") center / 100% 100% no-repeat !important;
+  border: 0 !important;
+  min-height: 64px;
+  padding: 1.1rem 1.2rem .7rem;
+}
+html[data-qubit-manga="on"] .qagent-sidebar__tooltip {
+  background: url("/manga-ui/tooltip.svg") center / 100% 100% no-repeat !important;
+  border: 0 !important;
+  padding: 1.15rem 1.3rem !important;
+  min-height: 78px;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section, .settings-card, .analytics-card) {
+  background-image: linear-gradient(130deg,rgba(255,38,154,.09),rgba(11,7,29,.02)) !important;
+  background-position: center;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section__heading, .page-section__heading) {
+  text-wrap: balance;
+  font-family: var(--qm-display);
+  letter-spacing: .045em;
+}
