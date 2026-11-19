@@ -675,11 +675,19 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__to
   text-shadow:none!important;
   overflow-wrap:break-word!important;
 }
-/* The screenshot complaint was distortion; pause ALL decorative loops until
-   a real motion review, without disabling native hover/focus feedback. */
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *,
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *::before,
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *::after {
+/* Keep artwork reflections and ornamental loops static until motion
+   review, but DO NOT disable animations across every sidebar descendant.
+   The old universal * rule suppressed Sakuga button interaction feedback. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
+  .qm-manga-outer-frame,.qm-studio-title-corner__star,.qm-studio-brand-atom,
+  .qagent-sidebar__backdrop,.qm-studio-charge-bars,.qm-manga-charge-cells
+),
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
+  .qagent-sidebar__brand-row,.qm-manga-gateway-plate
+)::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
+  .qagent-sidebar__brand-row,.qm-manga-gateway-plate
+)::after {
   animation:none!important;
 }
 @media(max-width:390px){
