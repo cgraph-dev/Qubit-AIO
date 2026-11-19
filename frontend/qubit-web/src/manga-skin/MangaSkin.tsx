@@ -27,6 +27,7 @@ import "./manga-zip-sidebar-fix.css";
 import "./manga-zip-surfaces.css";
 import "./manga-zip-registry.css";
 import "./manga-zip-routes.css";
+import "./manga-sidebar-final.css";
 import "./manga-zip-controls.css";
 import "./manga-atom-titles.css";
 
