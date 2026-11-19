@@ -209,6 +209,14 @@ describe("seat toggle containment", () => {
     expect(Number(z?.[1])).toBeLessThan(Number(dockZ?.[1]));
   });
 
+  it("moves into the dashboard header on desktop, not over the office canvas", () => {
+    const media = /@media \(min-width:\s*700px\)\s*\{[^}]*\.office-game\s*>\s*\.seat-model__toggle\s*\{([^}]*)\}/s.exec(css);
+    expect(media).not.toBeNull();
+    expect(media?.[1] ?? "").toMatch(/position:\s*fixed/);
+    expect(media?.[1] ?? "").toMatch(/top:\s*0\.65rem/);
+    expect(media?.[1] ?? "").toMatch(/right:\s*9rem/);
+  });
+
   it("fits every measured width without horizontal overflow", () => {
     // Measured button box on the live page: 101.3 x 32px. The office shell
     // clips overflow, so the inset + width must fit the narrowest target.

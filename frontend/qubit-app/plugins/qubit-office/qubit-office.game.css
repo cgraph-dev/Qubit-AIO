@@ -3963,6 +3963,18 @@
   z-index: 3;
   max-width: calc(100% - (2 * var(--office-s3)));
 }
+
+@media (min-width: 700px) {
+  /* On desktop the dashboard header has room to the right of the title; keep
+     the seat router out of the office canvas. Below 700px the base rule above
+     keeps it under the header so it cannot hit the mobile brand. */
+  .office-game > .seat-model__toggle {
+    position: fixed;
+    top: 0.65rem;
+    right: 9rem;
+    z-index: 50;
+  }
+}
 /* Stage 8/9 — Office ambient motion (repo-aware, zero control motion).
  *
  * WHAT THIS IS
