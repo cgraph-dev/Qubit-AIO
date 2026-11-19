@@ -1,0 +1,339 @@
+/**
+ * Approved manga studio sheet (2026-11-19).
+ *
+ * Production artwork is shipped in the separate checksum-verified asset pack:
+ * /manga-ui/approved/. Nothing is activated until MANIFEST.json is present.
+ * This is deliberately the LAST stylesheet: it replaces earlier prototypes
+ * instead of stacking more panels behind old panel art.
+ *
+ * ALL labels and values stay in React. Artwork has no baked-in text.
+ * No /workbench, /office or xterm selectors appear here.
+ */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] {
+  --qm-approved-light:#fff6fd;
+  --qm-approved-yellow:#ffe72b;
+  --qm-approved-dark:#120618;
+  --qm-approved-copy:#f7ecff;
+  --qm-approved-lavender:#d894f7;
+  --qm-approved-studio-shadow:0 0 12px rgba(255,37,159,.25);
+}
+
+/* 1. Sidebar brand: eye art panel, separate atom, live brand text/buttons.
+   No Qubit cat, old orbital backgrounds, or double frame. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row {
+  position:relative!important; isolation:isolate!important; overflow:visible!important;
+  min-height:99px!important; height:99px!important;
+  padding:15px 11px 11px 19px!important;
+  background:linear-gradient(90deg,rgba(8,3,18,.60),rgba(8,3,18,.08) 68%),
+    url("/manga-ui/approved/12_anime_eye_panel.webp") center/100% 100% no-repeat!important;
+  border:0!important; border-radius:0!important;
+  box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row::before {
+  content:"";position:absolute;inset:6px 5px 5px;pointer-events:none;
+  border:2px solid rgba(255,190,250,.75);border-radius:3px;
+  box-shadow:0 0 0 2px #1b0a26,0 0 9px rgba(255,32,175,.48),inset 0 0 6px rgba(255,42,165,.23);
+  z-index:-1;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-brand-emblem {
+  position:relative!important;flex:0 0 69px!important;
+  width:69px!important;height:69px!important;overflow:visible!important;
+  border:0!important;background:none!important;box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-brand-emblem > svg {
+  display:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-studio-brand-atom {
+  display:block!important;position:absolute!important;inset:0!important;
+  width:69px!important;height:69px!important;
+  content:url("/manga-ui/approved/11_atom_emblem.webp")!important;
+  object-fit:contain!important;filter:none!important;
+  animation:qm-approved-atom-breathe 7.8s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-name,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qbrand-label {
+  color:#fffaff!important;font:800 14px/1.28 system-ui,sans-serif!important;
+  text-shadow:0 1px 3px #07030b!important;letter-spacing:0!important;
+  min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row button {
+  position:relative;z-index:5;flex-shrink:0;
+}
+
+/* 2. Section titleplate: star and bar sprite separately replaceable.
+   The approved starless clean plate prevents ghost stars under the ornament.
+   Every title stays in the center, with enough width for 01–07 labels. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section {
+  position:relative!important;
+  overflow:visible!important;
+  background:#100817!important;
+  margin:9px 5px 13px!important;padding:8px 5px!important;
+  border:2px solid #fc2aa3!important;
+  border-radius:2px!important;
+  box-shadow:inset 0 0 0 1px rgba(255,223,255,.42)!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section::after {
+  display:none!important;content:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+  position:relative!important;isolation:isolate!important;
+  display:flex!important;align-items:center!important;
+  width:calc(100% - 4px)!important;min-width:0!important;
+  height:64px!important;min-height:64px!important;
+  margin:2px 2px 10px!important;
+  padding:13px 69px 12px 52px!important;gap:6px!important;
+  background: url("/manga-ui/approved/05_section_titlebar_clean.webp") center/100% 100% no-repeat!important;
+  border:0!important;outline:0!important;clip-path:none!important;
+  border-radius:0!important;box-shadow:none!important;filter:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head::after {
+  display:none!important;content:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-index {
+  flex:0 0 auto!important;z-index:5!important;
+  position:relative!important;
+  transform:none!important;color:var(--qm-approved-yellow)!important;
+  font:900 16px/1.1 ui-monospace,monospace!important;
+  text-shadow:1px 2px 0 #210c25!important;
+  letter-spacing:0!important;-webkit-text-stroke:0!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > span:nth-child(2) {
+  flex:1 1 auto!important;min-width:0!important;
+  z-index:5!important;position:relative!important;
+  transform:none!important;
+  color:var(--qm-approved-light)!important;
+  font:italic 850 14px/1.2 system-ui,sans-serif!important;
+  letter-spacing:0!important;text-shadow:1px 2px 0 #13061a!important;
+  white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-title-corner {
+  display:block!important;position:absolute!important;
+  z-index:12!important;top:0!important;left:-4px!important;
+  width:57px!important;height:57px!important;
+  background:none!important;border:0!important;box-shadow:none!important;
+  pointer-events:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-title-corner__chrome {
+  display:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-title-corner__star {
+  display:block!important;position:absolute!important;
+  inset:0!important;width:57px!important;height:57px!important;
+  content:url("/manga-ui/approved/13_star_only.webp")!important;
+  object-fit:contain!important;filter:none!important;transform:none!important;
+  animation:qm-approved-star-pulse 8.5s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-charge-bars {
+  position:absolute!important;display:block!important;
+  right:5px!important;top:11px!important;z-index:10!important;
+  height:40px!important;width:59px!important;
+  background:url("/manga-ui/approved/14_three_gold_bars.webp") center/100% 100% no-repeat!important;
+  border:0!important;box-shadow:none!important;filter:none!important;
+  clip-path:none!important;transform:none!important;animation:qm-approved-bars-glint 6.3s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qm-studio-charge-bars > img {
+  display:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__section-rule {
+  display:none!important;
+}
+/* Navigation menus: one outline per row, not repeated nested cards. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__section > ul {
+  padding:2px 4px 4px!important;min-width:0!important;
+  background:linear-gradient(160deg,#1a0b25,#100719)!important;
+  border:0!important;box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link {
+  display:flex;align-items:center;min-height:39px!important;
+  padding:8px 11px!important;margin:3px 0!important;
+  color:#f7eaff!important;
+  font:650 13px/1.45 system-ui,sans-serif!important;
+  text-shadow:none!important;letter-spacing:0!important;
+  border:1px solid rgba(242,177,255,.55)!important;
+  border-radius:2px!important;
+  background:linear-gradient(108deg,rgba(43,17,61,.90),rgba(24,9,38,.92))!important;
+  box-shadow:none!important;clip-path:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link[aria-current="page"] {
+  color:#10061b!important;font-weight:800!important;
+  background:linear-gradient(90deg,#fff78a,#ffe51e)!important;
+  border-color:#fff3a4!important;
+  box-shadow:inset 0 0 0 1px #e4a500!important;
+}
+
+/* 3. Fixed gateway status: frame and lavender label are separate sprites.
+   Labels always have a 60/40 grid; dynamic values cannot overflow. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell {
+  display:block!important;position:relative!important;isolation:isolate!important;
+  margin:5px 6px 7px!important;padding:0!important;min-height:0!important;
+  border:0!important;box-shadow:none!important;background:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell::after {
+  content:none!important;display:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {
+  position:relative!important;isolation:isolate!important;
+  display:flex!important;flex-direction:column!important;
+  justify-content:flex-start!important;box-sizing:border-box!important;
+  width:100%!important;min-width:0!important;
+  min-height:173px!important;margin:0!important;
+  padding:16px 21px 18px!important;
+  background:url("/manga-ui/approved/02_system_panel_frame.webp") center/100% 100% no-repeat!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  overflow:visible!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::after {
+  content:none!important;display:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head {
+  box-sizing:border-box!important;position:relative!important;
+  height:47px!important;min-height:47px!important;
+  margin:2px 0 11px!important;padding:10px 18px!important;
+  display:flex!important;align-items:center!important;
+  background:url("/manga-ui/approved/03_system_titlebar.webp") center/100% 100% no-repeat!important;
+  border:0!important;outline:0!important;border-radius:0!important;
+  box-shadow:none!important;clip-path:none!important;
+  color:#160821!important;font:italic 900 16px/1.15 system-ui,sans-serif!important;
+  letter-spacing:0!important;text-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head::after {
+  content:none!important;display:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head > span:first-child {
+  color:#190725!important;font:italic 900 16px/1 system-ui,sans-serif!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-row {
+  display:grid!important;
+  grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)!important;
+  align-items:center!important;gap:7px!important;
+  min-height:24px!important;max-width:100%!important;
+  margin:0!important;padding:1px 0!important;white-space:normal!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-key {
+  min-width:0!important;overflow-wrap:normal!important;
+  color:var(--qm-approved-yellow)!important;
+  font:750 clamp(9px,.68rem,11px)/1.25 ui-monospace,monospace!important;
+  letter-spacing:0!important;text-shadow:none!important;
+  white-space:nowrap!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-value {
+  min-width:0!important;max-width:100%!important;
+  overflow-wrap:anywhere!important;text-align:right!important;
+  color:#fff8ff!important;
+  font:750 clamp(10px,.75rem,12px)/1.25 ui-monospace,monospace!important;
+  white-space:normal!important;text-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell > ul {
+  display:flex!important;align-items:stretch!important;gap:7px!important;
+  flex-wrap:nowrap!important;margin:10px 0 0!important;
+  padding:0!important;border:0!important;background:none!important;
+  box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell > ul > li {
+  flex:1 1 0!important;min-width:0!important;margin:0!important;
+  padding:0!important;border:0!important;background:none!important;
+  box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__action {
+  min-height:43px!important;display:block!important;
+  padding:0!important;border:0!important;box-shadow:none!important;
+  background: url("/manga-ui/approved/06_primary_button.webp") center/100% 100% no-repeat!important;
+  color:#fff8ff!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__action:disabled {
+  background-image:url("/manga-ui/approved/07_disabled_button.webp")!important;
+  opacity:.78!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__action::part(button) {
+  box-sizing:border-box!important;width:100%!important;height:100%!important;min-height:43px!important;
+  padding:6px 8px!important;gap:6px!important;
+  color:inherit!important;background:transparent!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  font:750 10.5px/1.25 system-ui,sans-serif!important;
+  text-shadow:0 1px 1px #080410!important;
+}
+
+/* 4. Tooltip: enough inset space for body text, and clamp to viewport.
+   CSS animates only transform/opacity during entrance. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
+  box-sizing:border-box!important;
+  width:232px!important;min-width:232px!important;
+  max-width:min(232px,calc(100vw - 18px))!important;
+  min-height:111px!important;
+  padding:27px 23px 26px!important;
+  display:flex!important;flex-direction:column!important;
+  align-items:flex-start!important;justify-content:center!important;
+  gap:6px!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  color:#fff8ff!important;
+  background:url("/manga-ui/approved/04_tooltip_plate.webp") center/100% 100% no-repeat!important;
+  font:500 13px/1.35 system-ui,sans-serif!important;
+  letter-spacing:0!important;text-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-title {
+  display:block!important;max-width:100%!important;
+  font:850 13.5px/1.25 system-ui,sans-serif!important;
+  color:#ffe82b!important;text-shadow:none!important;
+  overflow-wrap:anywhere!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-detail {
+  display:block!important;max-width:100%!important;
+  font:520 12px/1.35 system-ui,sans-serif!important;
+  color:#fff4ff!important;text-shadow:none!important;
+  overflow-wrap:anywhere!important;
+}
+
+/* 5. Accent reflections. Transform + opacity are cheap to composite; no
+   frame-by-frame WebGL or backdrop blur. Two glints per 8–13 seconds max. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row::after,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::after {
+  content:""!important;display:block!important;position:absolute!important;z-index:1!important;
+  pointer-events:none!important;inset:3px!important;
+  background:linear-gradient(105deg,transparent 0 43%,rgba(255,250,255,.25) 49%,transparent 55% 100%)!important;
+  background-size:100% 100%!important;clip-path:inset(0 round 2px)!important;
+  transform:translate3d(-120%,0,0)!important;opacity:0!important;
+  animation:qm-approved-reflection 11s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::after {
+  animation-delay:-5.1s!important;animation-duration:13s!important;
+}
+@keyframes qm-approved-reflection {
+  0%,30%,100%{transform:translate3d(-120%,0,0);opacity:0}
+  36%{opacity:.35}
+  42%{transform:translate3d(120%,0,0);opacity:0}
+}
+@keyframes qm-approved-star-pulse {
+  0%,75%,100%{opacity:1;filter:brightness(1)}
+  81%{opacity:1;filter:brightness(1.2) drop-shadow(0 0 3px rgba(255,222,75,.4))}
+}
+@keyframes qm-approved-atom-breathe {
+  0%,100%{opacity:1;filter:brightness(1)}
+  50%{opacity:1;filter:brightness(1.13)}
+}
+@keyframes qm-approved-bars-glint {
+  0%,100%{opacity:1;filter:brightness(1)}
+  47%{opacity:1;filter:brightness(1.14)}
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qm-motion="paused"] #app-sidebar *,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qm-motion="paused"] #app-sidebar *::after {
+  animation-play-state:paused!important;
+}
+@media(max-width:480px) {
+  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {
+    padding-inline:16px!important;
+  }
+  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-key {
+    font-size:10px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *,
+  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar *::after {
+    animation:none!important;transition:none!important;
+  }
+}
