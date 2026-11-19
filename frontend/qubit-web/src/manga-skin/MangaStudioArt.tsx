@@ -10,10 +10,18 @@
 export function MangaStudioTitleOrnaments() {
   return (
     <>
-      {/* Original approved gold-bar asset is still styled by the existing
-          qm-manga-charge-cells rule; no extra bars or plate background. */}
-      <span className="qm-manga-charge-cells" aria-hidden="true">
-        <i /><i /><i />
+      {/* Three independently animated bevelled studio bars.
+          React renders no text or fake panel inside the artwork. */}
+      <span className="qm-manga-charge-cells qm-studio-charge-bars" aria-hidden="true">
+        {[0, 1, 2].map((bar) => (
+          <img
+            key={bar}
+            className="qm-studio-charge-bar"
+            src="/manga-ui/manga-gold-charge-bar.svg"
+            alt=""
+            draggable={false}
+          />
+        ))}
       </span>
       <span className="qm-studio-title-corner" aria-hidden="true">
         <img
