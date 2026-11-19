@@ -37,7 +37,7 @@ describe("Manga web-dashboard page panel integrity", () => {
     expect(gate).toContain('pathname === "/chat"');
   });
   it("does not target the terminal, office, workbench, or unrelated themes", () => {
-    expect(styles).toContain('html[data-qubit-manga="on"]');
+    expect(styles).toContain('html:root[data-qubit-manga="on"]');
     expect(styles).not.toContain("xterm");
     expect(styles).not.toContain("/workbench");
     expect(styles).not.toContain("/qubit-office");
