@@ -43,6 +43,16 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(css).toContain("@keyframes qm-live-star-glint");
     expect(skin).toContain('import "./manga-studio-art.css";');
   });
+  it("ships an intact illustrated sidebar plate with live text overlays", () => {
+    const plate = readFileSync(fileURLToPath(new URL("../../public/manga-ui/manga-sidebar-plate-reference.webp", import.meta.url)));
+    expect(plate.toString("ascii", 0, 4)).toBe("RIFF");
+    expect(plate.toString("ascii", 8, 12)).toBe("WEBP");
+    expect(plate.readUInt32LE(4) + 8).toBe(plate.length);
+    expect(studioCss).toContain('url("/manga-ui/manga-sidebar-plate-reference.webp")');
+    expect(studioCss).toContain("aspect-ratio: 300 / 72");
+    expect(studioCss).toContain(".qm-studio-title-corner,");
+    expect(studioCss).toContain(".qm-studio-charge-bars,");
+  });
   it("keeps Studio atom and impact strokes independent from title text", () => {
     expect(studio).toContain("function MangaStudioBrandAtom");
     expect(studio).toContain("function MangaStudioImpactStrokes");
