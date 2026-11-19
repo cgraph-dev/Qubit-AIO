@@ -1126,9 +1126,8 @@ export default function App() {
                   key={section.id}
                   role="group"
                 >
-                  {/* The first section needs no heading — the primary surface
-                      is obvious and a label there is pure chrome. */}
-                  {sectionIndex > 0 && (
+                  {/* The primary heading is retained for Manga; other themes hide it via CSS. */}
+                  {(sectionIndex > 0 || useMangaNavigation) && (
                     <span
                       className={cn(
                         "qagent-sidebar__section-head",
