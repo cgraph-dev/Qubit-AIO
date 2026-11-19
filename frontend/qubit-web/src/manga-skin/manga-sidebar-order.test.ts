@@ -13,9 +13,8 @@ describe("Manga sidebar section numbering and plugin position", () => {
       ["06", "Voice & Media"], ["07", "System"],
     ]);
   });
-  it("uses index 07 for Manga status and retains 06 for other themes", () => {
-    expect(app).toContain('systemSectionIndex={useMangaNavigation ? "07" : "06"}');
-    expect(app).toContain("{systemSectionIndex}");
+  it("does not repeat a section index in the compact System panel", () => {
+    expect(app).not.toContain("systemSectionIndex");
   });
   it("keeps extension/plugin navigation after numbered groups and before status", () => {
     expect(app.indexOf("sidebarSections.map(")).toBeLessThan(app.indexOf("sidebarNav.pluginItems.length > 0"));

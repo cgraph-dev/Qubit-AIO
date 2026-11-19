@@ -1211,7 +1211,6 @@ export default function App() {
 
             <SidebarSystemActions
               collapsed={isDesktopCollapsed}
-              systemSectionIndex={useMangaNavigation ? "07" : "06"}
               onNavigate={closeMobile}
               status={sidebarStatus}
               tooltipWarmRef={tooltipWarmRef}
@@ -1574,7 +1573,6 @@ function SidebarNavGroup({
 
 function SidebarSystemActions({
   collapsed,
-  systemSectionIndex,
   onNavigate,
   status,
   tooltipWarmRef,
@@ -1773,7 +1771,6 @@ function SidebarSystemActions({
       {!collapsed && (
         <div className="qagent-sidebar__telemetry" role="group" aria-label={t.app.system}>
           <span className="qagent-sidebar__section-head" style={{ margin: "0 0 .2rem", borderTop: 0 }}>
-            <span className="qagent-sidebar__section-index">{systemSectionIndex}</span>
             <span>{t.app.system}</span>
             <span aria-hidden className="qagent-sidebar__section-rule" />
           </span>
@@ -1783,7 +1780,7 @@ function SidebarSystemActions({
 
       <GatewayDot collapsed={collapsed} status={status} tooltipWarmRef={tooltipWarmRef} />
 
-      <ul className="flex flex-col">
+      <ul className="flex flex-row gap-2">
         {items.map((item) => (
           <SystemActionButton
             key={item.action}
@@ -1856,6 +1853,7 @@ function SystemActionButton({
 
   return (
     <li
+      className="min-w-0 flex-1"
       onMouseEnter={collapsed ? showTooltip : undefined}
       onMouseLeave={collapsed ? hideTooltip : undefined}
     >
@@ -2033,7 +2031,6 @@ interface SidebarNavLinkProps {
 
 interface SidebarSystemActionsProps {
   collapsed: boolean;
-  systemSectionIndex: string;
   onNavigate: () => void;
   status: StatusResponse | null;
   tooltipWarmRef: TooltipWarmRef;
