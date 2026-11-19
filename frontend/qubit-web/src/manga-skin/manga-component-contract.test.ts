@@ -12,6 +12,8 @@ const read = (relative: string) =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
 
 const css = read("./manga-component-contract.css");
+const studio = read("./MangaStudioArt.tsx");
+const studioCss = read("./manga-studio-art.css");
 const app = read("../App.tsx");
 const skin = read("./MangaSkin.tsx");
 const routes = read("./manga-store.ts");
@@ -22,14 +24,28 @@ const kit = read("../../scripts/prepare-manga-zip.mjs");
 
 describe("Qubit Manga sidebar and gateway visual contract", () => {
   it("mounts a real star in both navigation headings and loads the contract last", () => {
-    expect((app.match(/className="qm-manga-section-star hidden"/g) ?? []).length).toBe(2);
-    expect(css).toContain("/manga-ui/manga-anime-corner-star.svg");
+    expect((app.match(/<MangaStudioTitleOrnaments \/>/g) ?? []).length).toBe(2);
+    expect(studio).toContain("/manga-ui/studio-star.png");
+    expect(studio).toContain("/manga-ui/manga-corner-reflection.svg");
+    expect(studioCss).toContain(".qm-studio-title-corner__star");
     expect(css).toContain("nav .qagent-sidebar__section-head::before");
     expect(skin.trimEnd().indexOf('import "./manga-precision-repair.css";')).toBeLessThan(
       skin.trimEnd().indexOf('import "./manga-component-contract.css";')
     );
     expect(css).toContain("@keyframes qm-live-charge");
     expect(css).toContain("@keyframes qm-live-star-glint");
+    expect(skin).toContain('import "./manga-studio-art.css";');
+  });
+  it("keeps Studio atom and impact strokes independent from title text", () => {
+    expect(studio).toContain("function MangaStudioBrandAtom");
+    expect(studio).toContain("function MangaStudioImpactStrokes");
+    expect(app).toContain("<MangaStudioBrandAtom />");
+    expect(studioCss).toContain("section-head::before");
+    expect(studioCss).not.toContain("data-slot=\"card\"");
+    for (const filename of ["studio-star.png", "studio-atom.png", "studio-strokes.png"]) {
+      const raw = readFileSync(fileURLToPath(new URL("../../public/manga-ui/" + filename, import.meta.url)));
+      expect(raw.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    }
   });
   it("keeps the numbered System menu separate from the fixed gateway instrument", () => {
     expect(app).toContain('className="qagent-sidebar__system qm-manga-gateway-shell"');

@@ -33,6 +33,7 @@ import "./manga-atom-titles.css";
 import "./manga-final-fidelity.css";
 import "./manga-precision-repair.css";
 import "./manga-component-contract.css";
+import "./manga-studio-art.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {

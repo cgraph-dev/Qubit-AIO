@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Golden Qubit atomic emblem"><defs>
+<linearGradient id="orbit" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffefa"/><stop offset=".12" stop-color="#fff09d"/><stop offset=".31" stop-color="#ffc537"/><stop offset=".52" stop-color="#8e4907"/><stop offset=".72" stop-color="#ffbd20"/><stop offset=".86" stop-color="#fffbb8"/><stop offset="1" stop-color="#b46918"/></linearGradient>
+<radialGradient id="core"><stop stop-color="#ffffff"/><stop offset=".25" stop-color="#fff8d2"/><stop offset=".54" stop-color="#ffda4e"/><stop offset="1" stop-color="#ec900d"/></radialGradient>
+<linearGradient id="magenta" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff65d0"/><stop offset=".55" stop-color="#f12ca4"/><stop offset="1" stop-color="#992071"/></linearGradient>
+</defs>
+<!-- outer HUD: thin magenta arcs, not a filled background -->
+<circle cx="128" cy="128" r="96" fill="none" stroke="url(#magenta)" stroke-width="3" stroke-dasharray="32 18 9 25 19 16" transform="rotate(-36 128 128)"/>
+<circle cx="128" cy="128" r="89" fill="none" stroke="#c42a89" opacity=".3" stroke-width="1" stroke-dasharray="3 9"/>
+<!-- two intersecting golden orbitals with bold dark keylines -->
+<ellipse cx="128" cy="128" rx="112" ry="53" transform="rotate(-39 128 128)" fill="none" stroke="#110713" stroke-width="15"/>
+<ellipse cx="128" cy="128" rx="112" ry="53" transform="rotate(-39 128 128)" fill="none" stroke="url(#orbit)" stroke-width="10"/>
+<ellipse cx="128" cy="128" rx="112" ry="53" transform="rotate(41 128 128)" fill="none" stroke="#110713" stroke-width="15"/>
+<ellipse cx="128" cy="128" rx="112" ry="53" transform="rotate(41 128 128)" fill="none" stroke="url(#orbit)" stroke-width="10"/>
+<ellipse cx="128" cy="128" rx="112" ry="53" transform="rotate(41 128 128)" fill="none" stroke="#fff3a1" stroke-width="2" opacity=".82"/>
+<!-- four point radiant center -->
+<path d="M128 49 L139 112 L203 128 L139 139 L128 207 L117 139 L53 128 L117 117 Z" fill="#120817" stroke="#120817" stroke-width="5"/>
+<path d="M128 59 L137 116 L193 128 L137 136 L128 197 L119 137 L63 128 L119 120 Z" fill="url(#core)" stroke="#fff8d7" stroke-width="2"/>
+<circle cx="128" cy="128" r="12" fill="#fff"/>
+<!-- orbiting electron beads -->
+<g stroke="#31110b" stroke-width="3">
+<circle cx="79" cy="57" r="12" fill="url(#core)"/><circle cx="67" cy="188" r="12" fill="url(#core)"/><circle cx="203" cy="183" r="12" fill="url(#core)"/>
+</g><g fill="#fff"><circle cx="75" cy="53" r="4"/><circle cx="63" cy="184" r="4"/><circle cx="199" cy="179" r="4"/></g>
+<!-- pin-sharp glints -->
+<g fill="#fff6c4"><path d="m128 6 3 14 14 3-14 3-3 14-3-14-14-3 14-3Z"/><path d="m235 119 3 12 12 3-12 3-3 12-3-12-12-3 12-3Z"/><path d="m24 112 3 12 12 3-12 3-3 12-3-12-12-3 12-3Z"/></g>
+</svg>

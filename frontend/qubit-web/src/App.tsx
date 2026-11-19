@@ -96,6 +96,7 @@ import { SidebarTooltip } from "@/components/SidebarTooltip";
 import { navDescription, sectionizeNav, MANGA_SIDEBAR_SECTIONS } from "@/lib/sidebar-sections";
 import { isMangaThemeName } from "@/themes/presets";
 import { mangaRouteEligible } from "@/manga-skin/manga-store";
+import { MangaStudioBrandAtom, MangaStudioTitleOrnaments } from "@/manga-skin/MangaStudioArt";
 import "@/styles/qplate.css";
 import "@/styles/sidebar-studio.css";
 import "@/styles/qubit-mark.css";
@@ -1071,7 +1072,7 @@ export default function App() {
                 )}
               >
                 <PluginSlot name="header-left" />
-                <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><img className="qm-brand-cat" src="/manga-ui/qubit-cat-atom.svg" alt="" draggable={false} /></span>
+                <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><MangaStudioBrandAtom /></span>
                 <span
                   className="qagent-sidebar__brand-name"
                   data-brand={t.app.brand}
@@ -1142,8 +1143,11 @@ export default function App() {
                       {!collapsed && (
                         <>
                           <span aria-hidden className="qagent-sidebar__section-rule" />
-                          <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
-                          {useMangaNavigation && <img className="qm-manga-section-star hidden" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
+                          {useMangaNavigation ? (
+                            <MangaStudioTitleOrnaments />
+                          ) : (
+                            <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
+                          )}
                         </>
                       )}
                     </span>
@@ -1195,8 +1199,11 @@ export default function App() {
                     {!collapsed && (
                       <>
                         <span aria-hidden className="qagent-sidebar__section-rule" />
-                        <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
-                          {useMangaNavigation && <img className="qm-manga-section-star hidden" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
+                        {useMangaNavigation ? (
+                            <MangaStudioTitleOrnaments />
+                          ) : (
+                            <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
+                          )}
                       </>
                     )}
                   </span>

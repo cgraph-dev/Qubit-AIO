@@ -1,0 +1,135 @@
+/*
+ * Studio artwork integration — one corner, one star, one approved bar image.
+ * No new panel backgrounds, containers, text masks, or route overlays.
+ * This layer only owns the small standalone graphic elements.
+ */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head::before {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section::before,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section::after {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+  position: relative !important;
+  overflow: visible !important;
+  isolation: isolate !important;
+  padding-left: 42px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-studio-title-corner {
+  position: absolute !important;
+  display: block !important;
+  z-index: 20 !important;
+  top: -7px !important;
+  left: -5px !important;
+  width: 48px !important;
+  height: 48px !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  animation: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-studio-title-corner__chrome {
+  display: block !important;
+  position: absolute !important;
+  left: 6px !important;
+  top: 6px !important;
+  width: 39px !important;
+  height: 39px !important;
+  object-fit: contain !important;
+  transform: none !important;
+  filter: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-studio-title-corner__star {
+  display: block !important;
+  position: absolute !important;
+  left: -2px !important;
+  top: -4px !important;
+  width: 43px !important;
+  height: 42px !important;
+  object-fit: contain !important;
+  transform: none !important;
+  filter: none !important;
+  animation: qm-studio-star-light 4.4s ease-in-out infinite;
+}
+@keyframes qm-studio-star-light {
+  0%,75%,100% { opacity:1; filter:brightness(1) }
+  82% { opacity:1; filter:brightness(1.28) drop-shadow(0 0 3px #ffd55c) }
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells {
+  /* Preserve the original approved triple-bar art from section-slashes.svg. */
+  background-image: url("/manga-ui/section-slashes.svg") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+}
+/* Brand: replace the little cat only. Existing QubitMark/logo text stays live. */
+html[data-qubit-manga="on"] #app-sidebar .qm-studio-brand-atom {
+  object-fit: contain !important;
+  filter: none !important;
+}
+html:not([data-qubit-manga="on"]) #app-sidebar .qm-studio-brand-atom {
+  display: none !important;
+}
+/* The strokes component is opt-in; it does NOT paint giant backgrounds on cards. */
+html[data-qubit-manga="on"] .qm-studio-impact-strokes {
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+}
+@media (max-width: 420px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-studio-title-corner {
+    left: -3px !important;
+    width: 44px !important;
+    height: 44px !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-studio-title-corner__star {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-qubit-manga="on"] #app-sidebar .qm-studio-title-corner__star {
+    animation: none !important;
+  }
+}
+
+/* Remove the obsolete cat that older styles painted BEHIND the new atom.
+   Keep one atom image only; the logo mark and brand text remain functional. */
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem {
+  background-image: none !important;
+  background-color: transparent !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem::before,
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem::after {
+  display: none !important;
+  content: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-studio-brand-atom {
+  position: relative !important;
+  display: block !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform: none !important;
+  filter: none !important;
+  object-fit: contain !important;
+  image-rendering: auto !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row:hover .qm-studio-brand-atom {
+  transform: none !important;
+  filter: brightness(1.12) !important;
+}
+/* No legacy 'star in a header pseudo-element': the star is one PNG child. */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head .qm-manga-section-star {
+  content: none !important;
+  display: none !important;
+}
