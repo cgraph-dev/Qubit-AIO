@@ -25,7 +25,7 @@ const kit = read("../../scripts/prepare-manga-zip.mjs");
 describe("Qubit Manga sidebar and gateway visual contract", () => {
   it("mounts a real star in both navigation headings and loads the contract last", () => {
     expect((app.match(/<MangaStudioTitleOrnaments \/>/g) ?? []).length).toBe(2);
-    expect(studio).toContain("/manga-ui/studio-star.svg");
+    expect(studio).toContain("/manga-ui/studio-star.png");
     expect(studio).toContain("/manga-ui/manga-corner-reflection.svg");
     expect(studioCss).toContain(".qm-studio-title-corner__star");
     expect(css).toContain("nav .qagent-sidebar__section-head::before");
@@ -42,8 +42,9 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(app).toContain("<MangaStudioBrandAtom />");
     expect(studioCss).toContain("section-head::before");
     expect(studioCss).not.toContain("data-slot=\"card\"");
-    for (const filename of ["studio-star.svg", "studio-atom.svg", "studio-strokes.svg"]) {
-      expect(read("../../public/manga-ui/" + filename)).toContain("<svg");
+    for (const filename of ["studio-star.png", "studio-atom.png", "studio-strokes.png"]) {
+      const raw = readFileSync(fileURLToPath(new URL("../../public/manga-ui/" + filename, import.meta.url)));
+      expect(raw.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
     }
   });
   it("keeps the numbered System menu separate from the fixed gateway instrument", () => {
