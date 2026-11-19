@@ -176,3 +176,6 @@ graphify-out.*/
 # every run.
 /owned/
 /test_durations.json
+
+# Original Q6 Manga UI images are restored from checksum-verified ZIP parts before Vite.
+/frontend/qubit-web/public/manga-ui/zip/
