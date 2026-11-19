@@ -8,6 +8,7 @@ import {
 } from "./manga-store";
 import "./manga.css";
 import "./manga-v2.css";
+import "./manga-v3.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {
