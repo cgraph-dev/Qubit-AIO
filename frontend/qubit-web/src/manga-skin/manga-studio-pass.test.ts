@@ -14,6 +14,7 @@ describe("Manga studio styling contract", () => {
     expect(css).toContain('html[data-qubit-manga="on"]');
     expect(store).toContain('"/chat"');
     expect(store).toContain('"/qubit-workbench"');
+    expect(store).toContain('"/workbench"');
     expect(store).toContain('pathname.startsWith(path + "/")');
   });
   it("uses original install-package colors without fixed-size row artwork", () => {
