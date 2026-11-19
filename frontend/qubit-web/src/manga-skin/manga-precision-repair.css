@@ -432,3 +432,46 @@ html[data-qubit-manga="on"] .qm-chat-session-search input[type="search"]::-webki
   flex-wrap:wrap!important;
  }
 }
+
+
+/* ZIP-sourced overlays. The update notice is rendered outside React, so
+   these selectors explicitly target its DOM ID rather than page containers. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-build-notice {
+ min-height:74px!important;
+ padding:17px 25px!important;
+ border:0!important;
+ border-radius:0!important;
+ background:url("/manga-ui/zip/toast-info.svg") center/100% 100% no-repeat!important;
+ box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+ .dropdown-panel,[role="listbox"],[role="menu"]
+) {
+ border:0!important;border-radius:0!important;
+ padding:12px!important;
+ background:url("/manga-ui/zip/dropdown-panel.svg") center/100% 100% no-repeat!important;
+ box-shadow:0 3px 0 #070411!important;
+ color:#fff3ff!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+ .qagent-sidebar__tooltip,[role="tooltip"]
+) {
+ border:0!important;border-radius:0!important;
+ background:url("/manga-ui/zip/tooltip.svg") center/100% 100% no-repeat!important;
+ box-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+ [data-sonner-toast],[role="alert"]
+) {
+ border:2px solid #f2e3ff!important;
+ border-radius:2px!important;
+ background-color:#1b0d2b!important;
+ color:#fff3ff!important;
+ box-shadow:3px 3px 0 #0a0415!important;
+}
+html[data-qubit-manga="on"] #qubit-build-notice > span {
+ color:#fff7ff!important;
+ font-size:13px!important;
+ font-weight:700!important;
+ text-shadow:1px 1px 0 #090412!important;
+}
