@@ -17,7 +17,6 @@ const LEGACY_THEME_STORAGE_KEY = "hermes-dashboard-theme";
 export const MANGA_EXCLUDED_PATHS = [
   "/qubit-workbench",
   "/workbench", // Explicitly preserve the standalone Workbench route and descendants.
-  "/chat", // Preserve the terminal-style chat/TUI without Manga overrides.
   "/qubit-hud",
   "/qubit-office",
   "/qubit-office2",
