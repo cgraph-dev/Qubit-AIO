@@ -1,0 +1,143 @@
+/* PR11 reference-matching layer. Intentionally restricted to Q6/Q6-L Manga
+   and imported AFTER PR10 styling. Never stretched full-panel SVG screenshots:
+   live React controls occupy responsive frames; ornaments keep their aspect. */
+html[data-qubit-manga="on"] {
+  --qm-art-pink:#ff269a;--qm-art-paper:#fff0ff;
+  --qm-art-yellow:#ffe500;--qm-art-ink:#080615;
+  --qm-art-purple:#171027;--qm-art-glow:#27e9f3;
+}
+/* Illustration 4: full-height cat branding ABOVE navigation. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
+  position:relative;isolation:isolate;min-height:86px!important;
+  padding:11px 7px!important;overflow:hidden;
+  border:3px solid var(--qm-art-pink)!important;
+  background:radial-gradient(ellipse at 28% 50%,#472052,transparent 60%),#11091e!important;
+  box-shadow:inset 0 0 0 2px var(--qm-art-ink),inset 0 0 0 4px var(--qm-art-paper),0 3px 0 #080615!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-emblem {
+  width:64px!important;height:64px!important;flex:0 0 64px!important;min-width:64px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-cat {
+  display:block!important;width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 0 6px rgba(39,233,243,.7));
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-name {
+  font:italic 900 1.12rem/1 var(--qm-display)!important;letter-spacing:.01em!important;
+  text-shadow:2px 2px 0 var(--qm-art-ink),0 0 10px rgba(255,38,154,.4);
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row::before {
+  content:"";position:absolute;pointer-events:none;right:5px;top:5px;width:61px;height:9px;
+  background:repeating-linear-gradient(110deg,var(--qm-art-pink) 0 8px,var(--qm-art-ink) 8px 13px,var(--qm-art-yellow) 13px 21px,var(--qm-art-ink) 21px 26px);
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row::after {
+  content:"";position:absolute;pointer-events:none;left:4px;bottom:2px;width:40px;height:20px;
+  background:url("/manga-ui/manga-reference-three-strokes.svg") center/contain no-repeat;
+}
+/* Illustration 3: section title plates with a real lightning corner, stacked
+   navigation cards, yellow action state. Keep rows interactive and legible. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+  margin:12px 6px 7px!important;min-height:32px!important;
+  padding:5px 30px 5px 18px!important;color:var(--qm-art-paper)!important;
+  border:2px solid var(--qm-art-ink)!important;border-left:0!important;
+  background:linear-gradient(100deg,#ff38ae 0%,#e6269a 63%,#46134c)!important;
+  /* Keep outside-the-plate lightning visible: clipping the whole element also\n     clips its corner ornament. The angled plate is conveyed by the gradient. */
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
+  content:"";display:block!important;position:absolute;pointer-events:none;
+  width:31px;height:31px;left:-10px;top:-9px;
+  background:url("/manga-ui/v3-original-ornament-corner.svg") center/contain no-repeat;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
+  content:"";display:block!important;position:absolute;pointer-events:none;
+  width:29px;height:18px;right:15px;top:50%;transform:translateY(-50%);
+  background:url("/manga-ui/manga-reference-three-strokes.svg") center/contain no-repeat;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link {
+  min-height:37px!important;margin:3px 4px!important;padding:7px 10px!important;
+  color:var(--qm-art-paper)!important;border-radius:2px!important;
+  border:1px solid #803a9d!important;border-left:3px solid #b965ff!important;
+  background:linear-gradient(100deg,#190d2c,#0d081b)!important;
+  box-shadow:inset 0 1px 0 rgba(255,240,255,.1),1px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"] {
+  background:var(--qm-art-yellow)!important;color:var(--qm-art-ink)!important;
+  border-color:var(--qm-art-pink)!important;border-left-color:var(--qm-art-paper)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon {
+  border-top:2px solid var(--qm-art-pink)!important;
+  background:linear-gradient(110deg,#29133b,#0e081e)!important;
+}
+/* Illustration 1: long horizontal header frame, perspective-cut pink title,
+   hazard right cap and three independent indicator dots. */
+html[data-qubit-manga="on"] header[role="banner"] {
+  position:relative;isolation:isolate;min-height:52px!important;
+  border-block:2px solid var(--qm-art-pink)!important;
+  background:linear-gradient(95deg,#291036 0%,#0c081e 70%)!important;
+  box-shadow:inset 0 0 0 2px #080615,inset 0 -2px 0 var(--qm-art-paper),0 3px 0 #080615!important;
+}
+html[data-qubit-manga="on"] header[role="banner"] h1 {
+  display:inline-flex;align-items:center;min-height:35px;max-width:max-content;
+  margin-right:115px;padding:5px 22px!important;
+  background:linear-gradient(95deg,#ff3cb2,#d82998)!important;
+  border:2px solid #080615!important;
+  clip-path:polygon(0 0,100% 0,calc(100% - 15px) 100%,0 100%);
+}
+html[data-qubit-manga="on"] header[role="banner"]::after {
+  content:"";position:absolute;pointer-events:none;z-index:0;
+  width:111px;height:18px;right:14px;top:50%;
+  transform:translateY(-50%);opacity:1;
+  background:
+    radial-gradient(circle at 92% 50%,#fff0ff 0 4px,#080615 4.5px 5.5px,transparent 6px),
+    radial-gradient(circle at 79% 50%,#ff269a 0 4px,#080615 4.5px 5.5px,transparent 6px),
+    radial-gradient(circle at 66% 50%,#ffe500 0 4px,#080615 4.5px 5.5px,transparent 6px),
+    repeating-linear-gradient(115deg,#ff269a 0 9px,#080615 9px 14px);
+  background-size:100% 100%,100% 100%,100% 100%,53% 100%;
+  background-position:center,center,center,left center;background-repeat:no-repeat;
+}
+/* Illustration 2: responsive layered panel/popup anatomy, with original fixed
+   corner artwork rather than distorted whole-frame image backgrounds. */
+html[data-qubit-manga="on"] :is(
+ .qm-confirm-dialog,[data-qm-surface="panel"],.kitchen-panel,
+ .qchat__side > .qchat__model-panel,.qchat__side > .qchat__tools,
+ .qchat__side > .qchat__artifacts,.qchat__side > .qchat__sessions
+) {
+  position:relative;isolation:isolate;min-width:0;
+  border:3px solid var(--qm-art-pink)!important;border-radius:4px!important;
+  background:linear-gradient(125deg,#271339 0%,#10091e 74%)!important;
+  box-shadow:inset 0 0 0 2px var(--qm-art-ink),inset 0 0 0 4px var(--qm-art-paper),
+    3px 3px 0 var(--qm-art-ink),5px 5px 0 var(--qm-art-pink)!important;
+}
+html[data-qubit-manga="on"] :is(
+ .qm-confirm-dialog,[data-qm-surface="panel"],.kitchen-panel,
+ .qchat__side > .qchat__model-panel,.qchat__side > .qchat__tools,
+ .qchat__side > .qchat__artifacts,.qchat__side > .qchat__sessions
+)::before {
+  content:"";pointer-events:none;position:absolute;z-index:2;
+  width:42px;height:42px;left:-10px;top:-12px;
+  background:url("/manga-ui/v3-original-ornament-corner.svg") center/contain no-repeat;
+}
+html[data-qubit-manga="on"] :is(
+ .qm-confirm-dialog,[data-qm-surface="panel"],.kitchen-panel,
+ .qchat__side > .qchat__model-panel,.qchat__side > .qchat__tools,
+ .qchat__side > .qchat__artifacts,.qchat__side > .qchat__sessions
+)::after {
+  content:"";pointer-events:none;position:absolute;z-index:2;
+  width:34px;height:34px;right:-5px;bottom:-6px;
+  background:url("/manga-ui/v3-original-corner-pink.svg") center/contain no-repeat;
+}
+/* New motion is a short, one-off flourish. Sakuga continues to own its animations.
+   No endless full-surface filters, layout properties or giant will-change lists. */
+@keyframes qm-pr11-plate-in {
+  0% {opacity:0;transform:translate3d(0,6px,0)}
+  100% {opacity:1;transform:translate3d(0,0,0)}
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog {
+  animation:qm-pr11-plate-in 300ms cubic-bezier(.16,1,.3,1) both!important;
+}
+@media (max-width:640px) {
+ html[data-qubit-manga="on"] header[role="banner"] h1 {max-width:calc(100% - 118px);font-size:.82rem!important;}
+ html[data-qubit-manga="on"] header[role="banner"]::after {width:75px;right:7px;}
+}
+@media (prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] .qm-confirm-dialog {animation:none!important;}
+}

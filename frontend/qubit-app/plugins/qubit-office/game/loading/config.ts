@@ -39,7 +39,7 @@ export const DEFAULT_LOADING_CONFIG: Readonly<OfficeLoadingConfig> = Object.free
   hysteresisMs: 60 * 1000,
   reducedMotion: null,
   lowPower: null,
-  effects: true,
+  effects: false, // Decorative pixel-weather effects are opt-in; Sakuga progress remains active.
 });
 
 /** A partial owner/host overrides object; `weather` may be an unknown raw snapshot. */

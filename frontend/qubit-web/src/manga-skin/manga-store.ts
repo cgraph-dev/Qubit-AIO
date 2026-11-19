@@ -16,6 +16,7 @@ const LEGACY_THEME_STORAGE_KEY = "hermes-dashboard-theme";
 /** Surfaces that must never be skinned. */
 export const MANGA_EXCLUDED_PATHS = [
   "/qubit-workbench",
+  "/workbench", // Explicitly preserve the standalone Workbench route and descendants.
   "/qubit-hud",
 ] as const;
 

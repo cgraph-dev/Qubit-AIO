@@ -40,7 +40,7 @@ describe("resolveLoadingConfig", () => {
     expect(config.background).toBe("");
     expect(config.backgroundDim).toBeGreaterThan(0);
     expect(config.brand).toBe("Qubit Office");
-    expect(config.effects).toBe(true);
+    expect(config.effects).toBe(false);
     expect(config.location).toBeNull();
     expect(config.weather).toBeNull();
     expect(config.tips.length).toBeGreaterThan(0);

@@ -38,6 +38,7 @@ describe("Manga V2/V3 integration contracts", () => {
     expect(webSelect).toContain('document.body');
     expect(webSelect).toContain('position: "fixed"');
     expect(webSelect).toContain("useMangaLayerActive(");
+    expect(here("./useMangaLayerActive.ts")).toContain('dataset.qubitManga === "on"');
     expect(webSelect).toContain("OriginalSelect");
   });
 
