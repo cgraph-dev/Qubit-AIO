@@ -1,0 +1,144 @@
+/* Interaction and utility assets from the original ZIP.
+ * Applied only to active Q6/Q6-L pages with a complete extracted SVG set.
+ * Never replace live browser controls or selected navigation behavior.
+ */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] {
+  --qmz-input:url("/manga-ui/zip/input.svg");
+  --qmz-search:url("/manga-ui/zip/search.svg");
+  --qmz-select:url("/manga-ui/zip/select.svg");
+  --qmz-textarea:url("/manga-ui/zip/textarea.svg");
+  --qmz-number:url("/manga-ui/zip/number-input.svg");
+  --qmz-date:url("/manga-ui/zip/date-picker.svg");
+  --qmz-filter:url("/manga-ui/zip/filter-input.svg");
+  --qmz-field-stroke:#b965ff;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+ .settings-page,.qplate-module,.qchat
+) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
+  border-color:var(--qmz-field-stroke)!important;
+  box-shadow:inset 0 0 0 1px #1a0a2b!important;
+  color:#fff0ff!important;
+  background-color:#10091f!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] input[type="search"] {
+  background-image:var(--qmz-search)!important;background-size:100% 100%;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] input[type="number"] {
+  background-image:var(--qmz-number)!important;background-size:100% 100%;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  input[type="date"],input[type="datetime-local"]
+) {background-image:var(--qmz-date)!important;background-size:100% 100%}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-page,.qplate-module
+) select {background-image:var(--qmz-select)!important;background-size:100% 100%}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-page,.qplate-module
+) textarea {background-image:var(--qmz-textarea)!important;background-size:100% 100%}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-page,.qplate-module
+) input:not([type="checkbox"]):not([type="radio"]):not([type="number"]):not([type="date"]):not([type="search"]) {
+  background-image:var(--qmz-input)!important;background-size:100% 100%;
+}
+/* Keep browser autocomplete and focus outlines visible even with framed fields. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  input,textarea,select
+):focus-visible {outline:3px solid #ffe500!important;outline-offset:2px!important}
+
+/* Table and card frames are edge accents, not screenshots of table data. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .cron-table,.sessions-table,.workboard-table
+) {background-color:#171027;border:2px solid #ff269a}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .cron-table,.sessions-table,.workboard-table
+)::after {
+  content:"";position:absolute;z-index:0;pointer-events:none;right:1px;bottom:1px;width:29px;height:29px;
+  background:url("/manga-ui/zip/table-surface.svg") right bottom/contain no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] .settings-row {
+  border-bottom:1px solid #8942b4;
+  background-image:linear-gradient(90deg,rgba(185,101,255,.07),transparent);
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] .settings-section__header {
+  border-bottom:2px solid #ff269a;
+  background-image:url("/manga-ui/zip/settings-section.svg");
+  background-size:auto 100%;background-repeat:no-repeat;
+}
+
+/* Programmatic task status indicator — maintain semantic color, do not
+ * turn warnings/success into indistinguishable pink badges. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset="progress-track"] {
+  background:url("/manga-ui/zip/progress-track.svg") center/100% 100% no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset="task-card"] {
+  background:url("/manga-ui/zip/task-card.svg") center/100% 100% no-repeat;
+}
+
+/* Modal, tooltip, dropdown, toasts and warnings. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-confirm-dialog,
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [role="dialog"] {
+  border:3px solid #ff269a!important;background-color:#171027!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="modal-warning"] {
+  background-image:url("/manga-ui/zip/modal-warning.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is([role="tooltip"],.qagent-sidebar__tooltip) {
+  border:2px solid #ff269a!important;background:#171027!important;
+  box-shadow:2px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  [role="listbox"],[role="menu"],.dropdown-panel
+) {border:2px solid #b965ff!important;background-color:#171027!important}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  [data-sonner-toast],[role="alert"]
+) {border-color:#ff269a;box-shadow:3px 3px #080615}
+
+/* Right-hand model/reasoning/status modules, without altering their heights. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side :is(
+  .qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts
+) {position:relative}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side :is(
+  .qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts
+)::after {
+  content:"";position:absolute;pointer-events:none;width:26px;height:26px;
+  right:0;bottom:0;background:url("/manga-ui/zip/corner-cyan.svg") right bottom/contain no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-reasoning"] {
+  background-image:url("/manga-ui/zip/right-reasoning.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-status"] {
+  background-image:url("/manga-ui/zip/right-status.svg");
+}
+
+/* Voice, media, terminal and code surfaces (opt-in onto existing page nodes). */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/voice-edit"] :is(
+ .voice-edit-page,.qsk-field
+) {border-color:#b965ff}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="voice-panel"] {
+  background-image:url("/manga-ui/zip/voice-panel.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="media-toolbar"] {
+  background-image:url("/manga-ui/zip/media-toolbar.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="terminal-shell"] {
+  background-image:url("/manga-ui/zip/terminal-shell.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-tool-card"] {
+  background-image:url("/manga-ui/zip/chat-tool-card.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-artifact-card"] {
+  background-image:url("/manga-ui/zip/chat-artifact-card.svg");
+}
+
+/* Accessible interaction states for all six control tones. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset^="button-"]:where(:hover,:focus-visible) {
+  filter:brightness(1.12);
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset^="button-"]:disabled {
+  opacity:.45;filter:grayscale(.6);
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset] {
+    animation:none!important;transition-duration:0s!important;
+  }
+}
