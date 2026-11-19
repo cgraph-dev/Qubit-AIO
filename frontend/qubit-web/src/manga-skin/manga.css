@@ -1,0 +1,1515 @@
+/* ==========================================================================
+   Qubit — optional MANGA skin for the MAIN WEB DASHBOARD
+   --------------------------------------------------------------------------
+   Everything in this file is scoped behind `html[data-qubit-manga="on"]`.
+   The gate (MangaSkin.tsx) adds the attribute only on eligible routes, so the
+   excluded surfaces (/qubit-workbench, /qubit-hud, /qubit-office,
+   /qubit-office2, /qubit-office3 and their descendants) never see a rule.
+
+   Layering strategy (no component rewrite):
+     1. theme tokens        — recolours the entire DS/utility vocabulary
+     2. Sakuga --sk-* vars  — recolours controls inside shadow roots
+     3. shell chrome        — rail, page headers, plates
+     4. shared primitives   — cards, settings, tables, forms, dialogs
+     5. route chrome        — chat, files, analytics, tasks, calendar, etc.
+
+   Typography stays the theme's own; headings use a local display stack so no
+   network font is required. Text is always live DOM — the ornaments are
+   scalable SVG/CSS and never carry copy.
+   ========================================================================== */
+
+html[data-qubit-manga="on"] {
+  /* ---- manga palette -------------------------------------------------- */
+  --qm-bg: #08061a;
+  --qm-bg-deep: #05030f;
+  --qm-panel: #150e27;
+  --qm-panel-2: #1c1233;
+  --qm-panel-3: #261543;
+  --qm-ink: #fff2ff;
+  --qm-muted: #e3d1fb;
+  --qm-faint: #c3a6e4;
+  --qm-magenta: #ff269a;
+  --qm-hot: #ff0f85;
+  --qm-violet: #b965ff;
+  --qm-yellow: #ffe500;
+  --qm-cyan: #27e9f3;
+  --qm-black: #05030f;
+  --qm-green: #4ade80;
+  --qm-red: #ff4d80;
+  --qm-display: "Arial Black", "Arial Bold", "Segoe UI", system-ui, sans-serif;
+  --qm-mono: var(--theme-font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+
+  --qm-line: rgba(255, 38, 154, 0.55);
+  --qm-line-soft: rgba(185, 101, 255, 0.28);
+  --qm-wash: rgba(255, 38, 154, 0.14);
+  --qm-wash-strong: rgba(255, 38, 154, 0.28);
+  --qm-lift: 4px 4px 0 var(--qm-black), 6px 6px 0 rgba(185, 101, 255, 0.42);
+  --qm-lift-sm: 3px 3px 0 var(--qm-black), 5px 5px 0 rgba(255, 38, 154, 0.4);
+
+  /* ---- theme tokens (win over ThemeProvider's inline values) ---------- */
+  --background: var(--qm-bg) !important;
+  --background-base: var(--qm-bg) !important;
+  --background-alpha: 1 !important;
+  --midground: var(--qm-ink) !important;
+  --midground-base: #f7e9ff !important;
+  --midground-alpha: 1 !important;
+  --foreground: #ffffff !important;
+  --foreground-base: #ffffff !important;
+  --foreground-alpha: 1 !important;
+
+  --theme-radius: 3px !important;
+  --radius: 3px !important;
+  --radius-lg: 3px !important;
+  --radius-md: 2px !important;
+  --radius-sm: 2px !important;
+  --radius-xl: 4px !important;
+
+  /* DS semantic ladder */
+  --text-primary: var(--qm-ink) !important;
+  --text-secondary: var(--qm-muted) !important;
+  --text-tertiary: var(--qm-faint) !important;
+  --text-disabled: #8f78ab !important;
+  --text-display: #ffffff !important;
+  --text-on-accent: var(--qm-black) !important;
+  --destructive: var(--qm-red) !important;
+  --success: var(--qm-green) !important;
+  --warning: #ffbd38 !important;
+
+  /* shadcn-compat slots used by page code */
+  --color-background: var(--qm-bg) !important;
+  --color-background-base: var(--qm-bg) !important;
+  --color-card: var(--qm-panel) !important;
+  --color-card-foreground: var(--qm-ink) !important;
+  --color-popover: var(--qm-panel-2) !important;
+  --color-popover-foreground: var(--qm-ink) !important;
+  --color-primary: var(--qm-magenta) !important;
+  --color-primary-foreground: var(--qm-black) !important;
+  --color-secondary: var(--qm-panel-3) !important;
+  --color-secondary-foreground: var(--qm-ink) !important;
+  --color-muted: var(--qm-panel-3) !important;
+  --color-muted-foreground: var(--qm-muted) !important;
+  --color-accent: rgba(255, 38, 154, 0.16) !important;
+  --color-accent-foreground: var(--qm-ink) !important;
+  --color-border: rgba(185, 101, 255, 0.38) !important;
+  --color-input: rgba(185, 101, 255, 0.55) !important;
+  --color-ring: var(--qm-yellow) !important;
+  --color-foreground: var(--qm-ink) !important;
+
+  /* plate ladder */
+  --qplate-contrast: #ffffff !important;
+  --qplate-panel: var(--qm-panel) !important;
+  --qplate-sunk: var(--qm-bg-deep) !important;
+  --qplate-raised: var(--qm-panel-3) !important;
+  --qplate-wash: var(--qm-panel-3) !important;
+  --qplate-wash-strong: var(--qm-panel-2) !important;
+  --qplate-rule: var(--qm-line) !important;
+  --qplate-rule-soft: var(--qm-line-soft) !important;
+  --qplate-ink: var(--qm-ink) !important;
+  --qplate-muted: var(--qm-muted) !important;
+  --qplate-faint: var(--qm-faint) !important;
+
+  /* scanline dossier utilities */
+  --scan-accent: var(--qm-yellow) !important;
+  --scan-accent-dim: var(--qm-magenta) !important;
+  --scan-ink: var(--qm-ink) !important;
+  --scan-muted: var(--qm-muted) !important;
+  --scan-faint: var(--qm-faint) !important;
+  --scan-hairline: rgba(255, 38, 154, 0.22) !important;
+  --scan-hairline-strong: rgba(255, 38, 154, 0.55) !important;
+  --scan-canvas: var(--qm-bg) !important;
+  --scan-panel: var(--qm-panel) !important;
+  --scan-panel-raised: var(--qm-panel-2) !important;
+
+  /* data-series accents (Analytics / Models charts) */
+  --series-input-token: var(--qm-yellow) !important;
+  --series-output-token: var(--qm-cyan) !important;
+
+  /* Card primitive seam (see @nous-research/ui card.tsx) */
+  --component-card-background:
+    linear-gradient(135deg, rgba(255, 38, 154, 0.08), transparent 44%),
+    var(--qm-panel) !important;
+  --component-card-box-shadow: var(--qm-lift) !important;
+  --component-card-clip-path: none !important;
+  --component-card-border-image: none !important;
+
+  /* ---- Sakuga control seam ------------------------------------------- */
+  /* The vendored engine declares these in `:where(:root)`, so this scope
+     reaches every shadow root without touching component internals. */
+  --sk-card: var(--qm-panel-2);
+  --sk-ink: var(--qm-ink);
+  --sk-dim: var(--qm-muted);
+  --sk-soft: #2b1741;
+  --sk-pri: var(--qm-magenta);
+  --sk-pri-ink: var(--qm-black);
+  --sk-acc: var(--qm-yellow);
+  --sk-track: #3a2454;
+  --sk-r: 3px;
+  --sk-bw: 2.4px;
+  --sk-sh: 3px 4px 0 var(--qm-black);
+  --sk-btn-sh: 4px 5px 0 var(--qm-magenta);
+  --sk-btn-line: var(--qm-black);
+  --sk-alt-sh: 3px 4px 0 var(--qm-black);
+  --sk-alt-line: var(--qm-magenta);
+  --sk-tick: var(--qm-ink);
+  --sk-fill: var(--qm-yellow);
+  --sk-on-pri: var(--qm-black);
+
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- canvas */
+
+html[data-qubit-manga="on"] body,
+html[data-qubit-manga="on"] #root,
+html[data-qubit-manga="on"] .bg-background-base {
+  background-color: var(--qm-bg) !important;
+}
+
+html[data-qubit-manga="on"] #root > div {
+  background-color: var(--qm-bg) !important;
+  background-image:
+    radial-gradient(ellipse 55% 45% at 8% 0%, rgba(255, 38, 154, 0.16), transparent 62%),
+    radial-gradient(ellipse 50% 45% at 100% 8%, rgba(185, 101, 255, 0.16), transparent 62%),
+    radial-gradient(ellipse 70% 50% at 50% 110%, rgba(39, 233, 243, 0.07), transparent 60%);
+  background-attachment: fixed;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content {
+  background-color: transparent !important;
+  background-image:
+    linear-gradient(rgba(255, 240, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 240, 255, 0.026) 1px, transparent 1px);
+  background-size: 30px 30px, 30px 30px;
+  background-position: -1px -1px, -1px -1px;
+}
+
+/* The ambient video reads as a distant, low-saturation city; keep it behind
+   the comic layers instead of competing with the panels. The Sakuga FX canvas
+   is deliberately NOT dimmed — it carries the impact lettering and bursts. */
+html[data-qubit-manga="on"] video[src*="qubit-backdrop"],
+html[data-qubit-manga="on"] video[src*="sidebar-backdrop"] {
+  opacity: 0.14;
+  filter: grayscale(0.75) saturate(0.6) contrast(1.15) brightness(0.6);
+}
+
+/* ------------------------------------------------------------- page header */
+
+html[data-qubit-manga="on"] header[role="banner"] {
+  background: linear-gradient(100deg, #2b0a2a 0%, #160e28 42%, #1b0f34 100%) !important;
+  border-bottom: 2px solid var(--qm-magenta) !important;
+  box-shadow:
+    0 3px 0 var(--qm-black),
+    0 4px 0 rgba(255, 38, 154, 0.45) !important;
+  color: var(--qm-ink) !important;
+}
+
+html[data-qubit-manga="on"] header[role="banner"] h1 {
+  padding-left: 0.65rem;
+  border-left: 4px solid var(--qm-yellow);
+  color: var(--qm-ink) !important;
+  font-family: var(--qm-display);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0 var(--qm-black);
+}
+
+/* Mobile top bar (no role) */
+html[data-qubit-manga="on"] #root > div > header {
+  background: linear-gradient(100deg, #2b0a2a, #160e28) !important;
+  border-bottom: 2px solid var(--qm-magenta) !important;
+  box-shadow: 0 3px 0 var(--qm-black) !important;
+}
+
+html[data-qubit-manga="on"] .settings-page__title {
+  font-family: var(--qm-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qm-ink);
+  text-shadow: 2px 2px 0 rgba(5, 3, 15, 0.9);
+}
+
+/* ------------------------------------------------------------- the rail */
+
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar {
+  --qrail-panel: var(--qm-panel);
+  --qrail-sunk: var(--qm-bg-deep);
+  --qrail-raised: var(--qm-panel-3);
+  --qrail-wash: rgba(255, 38, 154, 0.2);
+  --qrail-wash-strong: rgba(255, 38, 154, 0.34);
+  --qrail-rule: var(--qm-line);
+  --qrail-rule-soft: var(--qm-line-soft);
+  --qrail-ink: var(--qm-ink);
+  --qrail-muted: var(--qm-muted);
+  --qrail-faint: var(--qm-faint);
+  --qrail-radius: 2px;
+
+  background: var(--qm-bg-deep) !important;
+  border-right: 3px solid var(--qm-magenta) !important;
+  box-shadow:
+    4px 0 0 var(--qm-black),
+    7px 0 0 rgba(185, 101, 255, 0.55) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar::before {
+  opacity: 0.42;
+  background-image:
+    url("/manga-ui/halftone.svg"),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 23px,
+      rgba(255, 38, 154, 0.06) 23px 24px
+    );
+  background-size: 24px 24px, auto;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop-scrim {
+  background: linear-gradient(180deg, rgba(21, 14, 39, 0.94), rgba(5, 3, 15, 0.96)) !important;
+  opacity: 0.9 !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
+  background: linear-gradient(115deg, rgba(255, 38, 154, 0.42), var(--qm-bg-deep) 74%) !important;
+  border-bottom: 3px solid var(--qm-magenta) !important;
+}
+
+/* Make room for the wordmark: the mobile close control is hidden at desktop
+   width and the atom mark is scaled to a chip. */
+@media (min-width: 1024px) {
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > sakuga-button.lg\:hidden {
+    display: none !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > div:first-child > svg {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+    flex: 1 1 auto;
+    min-width: 6.9rem;
+    font-size: 1.02rem;
+    letter-spacing: 0.01em;
+  }
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > sakuga-button.lg\:flex::part(button) {
+    padding: 4px 6px;
+  }
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+  font-family: var(--qm-display);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--qm-ink);
+  text-shadow: 2px 2px 0 var(--qm-black);
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__pulse {
+  box-shadow: 0 0 0 2px var(--qm-black);
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+  margin: 0.55rem 0.5rem 0.22rem;
+  padding: 0.34rem 0.55rem;
+  border-left: 3px solid var(--qm-yellow) !important;
+  border-top: 0 !important;
+  border-radius: 0;
+  background-color: var(--qm-magenta);
+  background-image:
+    url("/manga-ui/section-slashes.svg"),
+    linear-gradient(92deg, var(--qm-magenta) 0%, #7c1a6c 62%, #2a1746 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: right 6px center, center;
+  background-size: 46px 14px, 100% 100%;
+  color: #ffffff !important;
+  font-family: var(--qm-display);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-shadow: 1px 1px 0 var(--qm-black);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-index {
+  color: var(--qm-yellow) !important;
+  font-weight: 900;
+  text-shadow: 1px 1px 0 var(--qm-black);
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-rule {
+  background: linear-gradient(90deg, rgba(255, 229, 0, 0.7), transparent) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+  border: 1px solid var(--qm-line-soft) !important;
+  border-radius: 0 !important;
+  background: rgba(255, 255, 255, 0.018) !important;
+  color: var(--qm-muted) !important;
+  transition:
+    color 130ms ease,
+    background 130ms ease,
+    border-color 130ms ease,
+    transform 130ms ease;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  border-color: var(--qm-magenta) !important;
+  background:
+    linear-gradient(90deg, rgba(255, 38, 154, 0.32), rgba(185, 101, 255, 0.12)) !important;
+  color: #ffffff !important;
+  transform: translateX(2px);
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+  border: 2px solid var(--qm-black) !important;
+  border-radius: 0 !important;
+  background: var(--qm-yellow) !important;
+  color: var(--qm-black) !important;
+  box-shadow: 3px 3px 0 var(--qm-magenta) !important;
+  font-weight: 800;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] > svg,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] .qagent-sidebar__link-label {
+  color: var(--qm-black) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::before {
+  background: var(--qm-black) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::after {
+  right: 0.45rem;
+  width: 0.78rem;
+  height: 0.78rem;
+  border-radius: 0;
+  background: url("/manga-ui/impact-star.svg") center / contain no-repeat;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--qm-faint) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested[aria-current="page"] {
+  background: var(--qm-yellow) !important;
+  color: var(--qm-black) !important;
+  border-color: var(--qm-black) !important;
+  margin-left: 1.15rem;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested[aria-current="page"]::after {
+  left: -0.5rem;
+  top: 50%;
+  right: auto;
+  width: 0.42rem;
+  height: 2px;
+  border-radius: 0;
+  background: var(--qm-black);
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:focus-visible {
+  outline: 2px solid var(--qm-yellow) !important;
+  outline-offset: 2px;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system {
+  border: 1px solid var(--qm-line) !important;
+  border-radius: 0 !important;
+  background: var(--qm-panel) !important;
+}
+
+/* The utility strip carries theme + language + the skin switch. Let the
+   switch take its own full-width row so nothing is clipped by the rail. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility {
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 0.3rem;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility > .qm-skin-switch {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility > div {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .language-switcher {
+  --sk-input-width: 6.5rem !important;
+  max-width: 100%;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry {
+  border: 1px solid var(--qm-line-soft) !important;
+  border-radius: 0 !important;
+  background: var(--qm-bg-deep) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry-key {
+  color: var(--qm-yellow) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry-value {
+  color: var(--qm-ink) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__action {
+  border-radius: 0 !important;
+  color: var(--qm-muted) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__action:hover:not(:disabled) {
+  border-color: var(--qm-magenta) !important;
+  background: var(--qm-wash) !important;
+  color: #ffffff !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
+  border-top: 2px solid var(--qm-magenta) !important;
+  color: var(--qm-faint) !important;
+}
+
+/* rail scrollbar */
+html[data-qubit-manga="on"] #app-sidebar *,
+html[data-qubit-manga="on"] #qubit-main-content *,
+html[data-qubit-manga="on"] .qchat__side * {
+  scrollbar-color: rgba(255, 38, 154, 0.55) transparent;
+  scrollbar-width: thin;
+}
+
+/* --------------------------------------------------------- skin switch */
+
+.qm-skin-switch {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-width: 58px;
+  min-height: 27px;
+  padding: 3px 7px;
+  border: 2px solid var(--qm-magenta, #ff269a);
+  border-radius: 2px;
+  background: #150e27;
+  color: #fff2ff;
+  font: 800 10px/1.2 "Arial Black", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #05030f;
+  transition:
+    background 130ms ease,
+    color 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 130ms ease;
+}
+
+.qm-skin-switch:hover {
+  border-color: #ffe500;
+  transform: translateY(-1px);
+}
+
+.qm-skin-switch:active {
+  transform: translateY(1px);
+  box-shadow: 1px 1px 0 #05030f;
+}
+
+.qm-skin-switch[data-state="on"] {
+  background: #ffe500;
+  color: #080615;
+  border-color: #05030f;
+  box-shadow: 2px 2px 0 #ff269a;
+}
+
+.qm-skin-switch:focus-visible {
+  outline: 2px solid #ffe500;
+  outline-offset: 3px;
+}
+
+.qm-skin-switch__spark {
+  color: #ff269a;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.qm-skin-switch[data-state="on"] .qm-skin-switch__spark {
+  color: #080615;
+}
+
+.qm-skin-switch__lamp {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6b5a80;
+  box-shadow: 0 0 0 1px #05030f;
+}
+
+.qm-skin-switch[data-state="on"] .qm-skin-switch__lamp {
+  background: #28d577;
+  box-shadow:
+    0 0 0 1px #05030f,
+    0 0 7px 1px rgba(40, 213, 119, 0.8);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .qm-skin-switch[data-state="on"] .qm-skin-switch__spark {
+    animation: qm-spark 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes qm-spark {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(18deg) scale(1.18);
+  }
+}
+
+/* The switch is the opt-in entry point, so it must be visible BEFORE the
+   skin is enabled. These rules are intentionally outside the manga gate: they
+   only affect the utility strip that contains the toggle. */
+#app-sidebar .qagent-sidebar__utility:has(.qm-skin-switch) {
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
+}
+
+#app-sidebar .qagent-sidebar__utility > .qm-skin-switch {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+#app-sidebar .qagent-sidebar__utility:has(.qm-skin-switch) .language-switcher {
+  --sk-input-width: 6.5rem !important;
+  max-width: 100%;
+}
+
+/* Theme picker: Q6 / Q6-L look like the sidebar MANGA switch. These rules are
+   deliberately unscoped — the row must already look like the manga button
+   while another theme is active and the picker is open. */
+.qm-theme-trigger[data-manga-theme="true"]::part(button) {
+  background: #ffe500 !important;
+  color: #080615 !important;
+  border-color: #05030f !important;
+  box-shadow: 3px 4px 0 #ff269a !important;
+  font-style: italic;
+  font-weight: 900;
+}
+
+.qm-theme-trigger__spark {
+  color: #080615;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.qm-theme-trigger__label {
+  color: #080615 !important;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.qm-theme-trigger__lamp {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #28d577;
+  box-shadow:
+    0 0 0 1px #05030f,
+    0 0 7px 1px rgba(40, 213, 119, 0.8);
+}
+
+sakuga-button.qm-theme-row--manga::part(button) {
+  min-height: 2.45rem;
+  background: #ffe500 !important;
+  color: #080615 !important;
+  border-color: #05030f !important;
+  box-shadow: 3px 4px 0 #ff269a !important;
+  font-style: italic;
+  font-weight: 900;
+}
+
+sakuga-button.qm-theme-row--manga::part(button):hover {
+  background: #fff45c !important;
+}
+
+sakuga-button.qm-theme-row--manga .text-display {
+  color: #080615 !important;
+  font-weight: 900;
+}
+
+sakuga-button.qm-theme-row--manga .text-text-tertiary {
+  color: rgba(8, 6, 21, 0.72) !important;
+}
+
+.qm-theme-row__spark {
+  display: inline-flex;
+  width: 1.15rem;
+  flex: 0 0 auto;
+  justify-content: center;
+  color: #080615;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.qm-theme-row__lamp {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #6b5a80;
+  box-shadow: 0 0 0 1px #05030f;
+}
+
+.qm-theme-row__lamp--on {
+  background: #28d577;
+  box-shadow:
+    0 0 0 1px #05030f,
+    0 0 7px 1px rgba(40, 213, 119, 0.8);
+}
+
+@media (max-width: 1023px) {
+  .qm-skin-switch {
+    min-height: 34px;
+  }
+}
+
+@media (min-width: 1024px) {
+  #app-sidebar[data-collapsed="true"] .qm-skin-switch {
+    width: 32px;
+    min-width: 0;
+    padding: 3px;
+    margin-inline: auto;
+  }
+  #app-sidebar[data-collapsed="true"] .qm-skin-switch__label,
+  #app-sidebar[data-collapsed="true"] .qm-skin-switch__lamp {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- cards */
+
+html[data-qubit-manga="on"] #qubit-main-content div[class*="bg-background-base/80"][class*="border-midground/15"] {
+  position: relative;
+  border: 2px solid var(--qm-magenta) !important;
+  border-radius: 2px !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content div[class*="bg-background-base/80"][class*="border-midground/15"]::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: 10px;
+  width: 34px;
+  height: 7px;
+  background: var(--qm-yellow);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  pointer-events: none;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content div[class*="border-b"][class*="border-midground/15"] {
+  border-bottom-color: var(--qm-violet) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .font-expanded {
+  letter-spacing: 0.07em;
+}
+
+/* ------------------------------------------------------ settings family */
+
+html[data-qubit-manga="on"] .settings-page {
+  --card: var(--qm-panel);
+  --bg-elevated: var(--qm-panel-2);
+  --border: rgba(185, 101, 255, 0.4);
+  --muted: var(--qm-muted);
+  --muted-strong: var(--qm-faint);
+  --accent: var(--qm-magenta);
+}
+
+html[data-qubit-manga="on"] .settings-section__heading {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.9rem 0.3rem 0.55rem;
+  border-left: 3px solid var(--qm-yellow);
+  background: linear-gradient(92deg, var(--qm-magenta), #6f1a63 78%, transparent);
+  color: #ffffff !important;
+  font-family: var(--qm-display);
+  font-size: var(--control-ui-text-xs, 0.7rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-shadow: 1px 1px 0 var(--qm-black);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+
+html[data-qubit-manga="on"] .settings-section__desc,
+html[data-qubit-manga="on"] .settings-page__desc {
+  color: var(--qm-muted) !important;
+}
+
+html[data-qubit-manga="on"] .settings-section > .settings-group,
+html[data-qubit-manga="on"] .settings-group {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--qm-line) !important;
+  border-radius: 2px !important;
+  background: var(--qm-panel) !important;
+  box-shadow: var(--qm-lift-sm) !important;
+}
+
+html[data-qubit-manga="on"] .settings-section > .settings-group::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 84px;
+  height: 84px;
+  background: url("/manga-ui/halftone.svg");
+  background-size: 24px 24px;
+  opacity: 0.55;
+  mask-image: linear-gradient(225deg, #000 0%, transparent 72%);
+  -webkit-mask-image: linear-gradient(225deg, #000 0%, transparent 72%);
+  pointer-events: none;
+}
+
+html[data-qubit-manga="on"] .settings-group--danger {
+  border-color: rgba(255, 77, 128, 0.7) !important;
+}
+
+html[data-qubit-manga="on"] .settings-row {
+  border-color: rgba(185, 101, 255, 0.22);
+  transition: background 130ms ease;
+}
+
+html[data-qubit-manga="on"] .settings-row:hover:not(.settings-row--nav) {
+  background: linear-gradient(90deg, rgba(255, 38, 154, 0.12), transparent 72%);
+}
+
+html[data-qubit-manga="on"] .settings-row__title {
+  color: var(--qm-ink) !important;
+  font-weight: 600;
+}
+
+html[data-qubit-manga="on"] .settings-row__desc {
+  color: var(--qm-muted) !important;
+}
+
+html[data-qubit-manga="on"] .settings-row__value,
+html[data-qubit-manga="on"] .settings-row__value--mono {
+  color: var(--qm-cyan) !important;
+}
+
+html[data-qubit-manga="on"] .settings-row--nav:hover {
+  background: var(--qm-wash) !important;
+  border-color: var(--qm-magenta) !important;
+}
+
+html[data-qubit-manga="on"] .settings-count {
+  border: 1px solid var(--qm-black);
+  border-radius: 2px;
+  background: var(--qm-magenta);
+  color: var(--qm-black);
+  font-weight: 800;
+}
+
+html[data-qubit-manga="on"] .settings-status {
+  color: var(--qm-ink);
+}
+
+html[data-qubit-manga="on"] .settings-status__dot {
+  box-shadow: 0 0 0 1px var(--qm-black);
+}
+
+html[data-qubit-manga="on"] .settings-status--ok .settings-status__dot {
+  background: var(--qm-green);
+}
+
+html[data-qubit-manga="on"] .settings-status--warn .settings-status__dot {
+  background: var(--qm-yellow);
+}
+
+html[data-qubit-manga="on"] .settings-status--danger .settings-status__dot {
+  background: var(--qm-red);
+}
+
+html[data-qubit-manga="on"] .settings-summary__tile {
+  border: 2px solid var(--qm-line-soft) !important;
+  border-radius: 2px !important;
+  background: var(--qm-panel-2) !important;
+  box-shadow: none !important;
+}
+
+html[data-qubit-manga="on"] .settings-summary dd {
+  color: var(--qm-yellow) !important;
+  font-family: var(--qm-display);
+}
+
+html[data-qubit-manga="on"] .settings-empty {
+  border: 1px dashed var(--qm-line) !important;
+  border-radius: 2px !important;
+  background: rgba(255, 38, 154, 0.05) !important;
+}
+
+html[data-qubit-manga="on"] .settings-loading-skeleton__row {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 38, 154, 0.16),
+    rgba(185, 101, 255, 0.28),
+    rgba(255, 38, 154, 0.16)
+  ) !important;
+  background-size: 220% 100% !important;
+  border-radius: 2px !important;
+}
+
+/* --------------------------------------------------------------- controls */
+
+html[data-qubit-manga="on"] .btn,
+html[data-qubit-manga="on"] .settings-input,
+html[data-qubit-manga="on"] .settings-select {
+  border: 2px solid var(--qm-violet) !important;
+  border-radius: 2px !important;
+  background: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
+}
+
+html[data-qubit-manga="on"] .btn {
+  font-family: var(--qm-display);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+html[data-qubit-manga="on"] .btn:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  border-color: var(--qm-yellow) !important;
+  background: var(--qm-panel-3) !important;
+}
+
+html[data-qubit-manga="on"] .btn.primary,
+html[data-qubit-manga="on"] .btn--primary {
+  border-color: var(--qm-black) !important;
+  background: var(--qm-magenta) !important;
+  color: var(--qm-black) !important;
+  box-shadow: 3px 3px 0 var(--qm-black) !important;
+}
+
+html[data-qubit-manga="on"] .btn.danger,
+html[data-qubit-manga="on"] .btn--danger {
+  border-color: var(--qm-black) !important;
+  background: var(--qm-red) !important;
+  color: var(--qm-black) !important;
+}
+
+html[data-qubit-manga="on"] .btn--ghost {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--qm-muted) !important;
+}
+
+html[data-qubit-manga="on"] .btn--ghost:hover:where(:not(:disabled, [aria-disabled="true"])) {
+  border-color: var(--qm-line) !important;
+  background: var(--qm-wash) !important;
+  color: var(--qm-ink) !important;
+}
+
+/* Sakuga input/select frames: the engine's default line is the ink colour,
+   which reads as a white outline on the navy plate. Manga panels use the
+   violet/magenta frame instead. */
+html[data-qubit-manga="on"] sakuga-input::part(input) {
+  border-color: var(--qm-violet);
+  box-shadow: 4px 5px 0 rgba(255, 38, 154, 0.4);
+}
+
+html[data-qubit-manga="on"] sakuga-input::part(input):focus-visible,
+html[data-qubit-manga="on"] sakuga-input::part(input):focus {
+  border-color: var(--qm-yellow);
+  box-shadow: 4px 5px 0 rgba(185, 101, 255, 0.55);
+}
+
+/* Active rows in Sakuga list compositions (config sections, picker rows). */
+html[data-qubit-manga="on"] sakuga-button.qsk-list-item[data-active="true"]::part(button),
+html[data-qubit-manga="on"] sakuga-button.qsk-list-item[aria-current="true"]::part(button),
+html[data-qubit-manga="on"] sakuga-button.qsk-list-item.is-active::part(button) {
+  background: rgba(255, 38, 154, 0.22);
+  border-color: var(--qm-magenta);
+  box-shadow: inset 3px 0 0 var(--qm-yellow);
+  color: var(--qm-ink);
+}
+
+html[data-qubit-manga="on"] sakuga-button.qsk-list-item::part(button):hover {
+  background: rgba(255, 38, 154, 0.14);
+}
+
+/* Status/metadata chips rendered as compressed spans. */
+html[data-qubit-manga="on"] #qubit-main-content .font-compressed[class*="border"] {
+  border-width: 2px !important;
+  border-color: var(--qm-violet) !important;
+  border-radius: 0 !important;
+  background: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
+  box-shadow: 2px 2px 0 var(--qm-black);
+}
+
+/* Sakuga button host — see --sk-* above for the shadow-tree palette. */
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item)::part(button) {
+  border-radius: 2px;
+  font-family: var(--qm-display);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+html[data-qubit-manga="on"] sakuga-button.qsk-list-item::part(button) {
+  border-radius: 0;
+}
+
+/* Qubit-owned SakugaSelect: the trigger/panel are plain buttons carrying
+   inline --sk-* colours, so restate the manga frame at the document level. */
+html[data-qubit-manga="on"] #qubit-main-content button[role="combobox"],
+html[data-qubit-manga="on"] .qchat__side button[role="combobox"],
+html[data-qubit-manga="on"] #app-sidebar button[role="combobox"] {
+  border: 2px solid var(--qm-violet) !important;
+  border-radius: 2px !important;
+  background: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
+  box-shadow: 4px 5px 0 rgba(255, 38, 154, 0.4) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content button[role="combobox"]:focus-visible,
+html[data-qubit-manga="on"] .qchat__side button[role="combobox"]:focus-visible {
+  border-color: var(--qm-yellow) !important;
+  outline: 2px solid var(--qm-yellow) !important;
+  outline-offset: 2px;
+}
+
+html[data-qubit-manga="on"] [role="dialog"][aria-label$="options"] {
+  border: 2px solid var(--qm-magenta) !important;
+  border-radius: 2px !important;
+  background: var(--qm-panel) !important;
+  box-shadow: var(--qm-lift) !important;
+}
+
+/* Native fields that are not Sakuga (e.g. the TUI helper textarea is
+   excluded on purpose). */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea),
+    select
+  ),
+html[data-qubit-manga="on"] .qchat__side :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea),
+    select
+  ),
+html[data-qubit-manga="on"] [role="dialog"] :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]):not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea),
+    select
+  ) {
+  border: 2px solid var(--qm-violet) !important;
+  border-radius: 2px !important;
+  background-color: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content :is(input, textarea, select):not(.xterm-helper-textarea)::placeholder,
+html[data-qubit-manga="on"] .qchat__side :is(input, textarea, select)::placeholder {
+  color: #9b83b7;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content input[type="checkbox"],
+html[data-qubit-manga="on"] #qubit-main-content input[type="radio"] {
+  accent-color: var(--qm-magenta);
+}
+
+html[data-qubit-manga="on"] select option {
+  background: var(--qm-panel-2);
+  color: var(--qm-ink);
+}
+
+html[data-qubit-manga="on"] #qubit-main-content :is(input, textarea, select):focus-visible,
+html[data-qubit-manga="on"] .qchat__side :is(input, textarea, select):focus-visible,
+html[data-qubit-manga="on"] .btn:focus-visible,
+html[data-qubit-manga="on"] button:focus-visible,
+html[data-qubit-manga="on"] a:focus-visible,
+html[data-qubit-manga="on"] [role="button"]:focus-visible,
+html[data-qubit-manga="on"] [role="tab"]:focus-visible {
+  outline: 2px solid var(--qm-yellow) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--qm-black) !important;
+}
+
+/* Disabled controls read as ink-struck, not invisible. */
+html[data-qubit-manga="on"] :is(button, [role="button"], input, select, textarea):disabled,
+html[data-qubit-manga="on"] :is(button, [role="button"])[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Native icon buttons in page toolbars share the angular frame. */
+html[data-qubit-manga="on"] #qubit-main-content button:not(.qm-skin-switch) {
+  border-radius: 2px;
+}
+
+/* Page-local h1 from the ported consoles (Operations, Docs, reports). The
+   routed page title lives in header[role=banner] and is styled separately. */
+html[data-qubit-manga="on"] #qubit-main-content h1 {
+  padding-left: 0.55rem;
+  border-left: 4px solid var(--qm-yellow);
+  color: var(--qm-ink);
+  font-family: var(--qm-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 var(--qm-black);
+}
+
+/* Page-level h2 headings (Agents, System, Profiles, admin rosters) get the
+   same comic spine as the settings sections. Card titles are h3 and keep their
+   own style. */
+html[data-qubit-manga="on"] #qubit-main-content h2:not(.settings-section__heading) {
+  padding-left: 0.55rem;
+  border-left: 4px solid var(--qm-yellow);
+  color: var(--qm-ink);
+  font-family: var(--qm-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 var(--qm-black);
+}
+
+/* Plain roster rows used by read-only agent/admin lists. */
+html[data-qubit-manga="on"] #qubit-main-content li[class*="bg-background-base/60"],
+html[data-qubit-manga="on"] #qubit-main-content li[class*="bg-background-base/40"],
+html[data-qubit-manga="on"] #qubit-main-content div[class*="bg-background-base/40"][class*="border-border"] {
+  border: 2px solid var(--qm-line-soft) !important;
+  border-radius: 0 !important;
+  background: var(--qm-panel) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content li[class*="bg-background-base/60"]:hover,
+html[data-qubit-manga="on"] #qubit-main-content li[class*="bg-background-base/40"]:hover {
+  border-color: var(--qm-magenta) !important;
+  background: var(--qm-wash) !important;
+}
+
+/* ------------------------------------------------------ tabs & segmented */
+
+html[data-qubit-manga="on"] #qubit-main-content [role="tab"] {
+  border-radius: 2px !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content [role="tab"][aria-selected="true"] {
+  background: var(--qm-yellow) !important;
+  color: var(--qm-black) !important;
+  border-color: var(--qm-black) !important;
+  box-shadow: 2px 2px 0 var(--qm-magenta) !important;
+  font-weight: 800;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content [role="tablist"],
+html[data-qubit-manga="on"] .sakuga-segmented {
+  border-color: var(--qm-line) !important;
+  border-radius: 2px !important;
+}
+
+/* --------------------------------------------------------------- tables */
+
+html[data-qubit-manga="on"] #qubit-main-content table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content thead tr {
+  background: linear-gradient(90deg, rgba(255, 38, 154, 0.42), rgba(185, 101, 255, 0.2));
+}
+
+html[data-qubit-manga="on"] #qubit-main-content thead th {
+  border-bottom: 2px solid var(--qm-black) !important;
+  color: #ffffff !important;
+  font-family: var(--qm-display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content tbody tr {
+  border-bottom: 1px solid rgba(185, 101, 255, 0.24) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content tbody tr:hover {
+  background: rgba(255, 38, 154, 0.12) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content tbody tr[aria-selected="true"],
+html[data-qubit-manga="on"] #qubit-main-content tbody tr[data-state="selected"] {
+  background: rgba(255, 229, 0, 0.14) !important;
+  box-shadow: inset 3px 0 0 var(--qm-yellow);
+}
+
+html[data-qubit-manga="on"] #qubit-main-content td {
+  border-color: rgba(185, 101, 255, 0.18) !important;
+}
+
+/* ------------------------------------------------------- list / menu rows */
+
+html[data-qubit-manga="on"] #qubit-main-content [role="option"],
+html[data-qubit-manga="on"] #qubit-main-content [role="menuitem"] {
+  border-radius: 0 !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content [role="option"]:hover,
+html[data-qubit-manga="on"] #qubit-main-content [role="option"][aria-selected="true"],
+html[data-qubit-manga="on"] #qubit-main-content [role="menuitem"]:hover {
+  background: var(--qm-wash) !important;
+  color: var(--qm-ink) !important;
+  box-shadow: inset 3px 0 0 var(--qm-magenta);
+}
+
+html[data-qubit-manga="on"] .qrail-flyout {
+  border: 2px solid var(--qm-magenta) !important;
+  border-radius: 2px !important;
+  background: var(--qm-panel) !important;
+  box-shadow: var(--qm-lift) !important;
+}
+
+html[data-qubit-manga="on"] .qrail-flyout__head {
+  border-bottom: 2px solid var(--qm-magenta) !important;
+  background: linear-gradient(90deg, rgba(255, 38, 154, 0.32), var(--qm-panel)) !important;
+  color: var(--qm-ink) !important;
+}
+
+/* ----------------------------------------------------------- dialogs etc */
+
+html[data-qubit-manga="on"] [role="dialog"] {
+  border: 3px solid var(--qm-magenta) !important;
+  border-radius: 3px !important;
+  background: var(--qm-panel) !important;
+  box-shadow: var(--qm-lift) !important;
+}
+
+html[data-qubit-manga="on"] [role="dialog"] [role="heading"],
+html[data-qubit-manga="on"] [role="dialog"] h2,
+html[data-qubit-manga="on"] [role="dialog"] h3 {
+  font-family: var(--qm-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+html[data-qubit-manga="on"] [role="dialog"] > :first-child {
+  border-top: 4px solid var(--qm-yellow);
+}
+
+html[data-qubit-manga="on"] [role="alertdialog"] {
+  border: 3px solid var(--qm-yellow) !important;
+  background: var(--qm-panel) !important;
+}
+
+html[data-qubit-manga="on"] sakuga-tooltip::part(tip) {
+  border: 2px solid var(--qm-magenta);
+  border-radius: 2px;
+  background: var(--qm-panel-2);
+  color: var(--qm-ink);
+}
+
+/* --------------------------------------------------------------- chat */
+
+html[data-qubit-manga="on"] .qchat {
+  --qchat-ink: var(--qm-ink);
+  --qchat-enamel: var(--qm-bg-deep);
+  --qchat-slab: var(--qm-panel);
+  --qchat-raised: var(--qm-panel-3);
+  --qchat-muted: var(--qm-muted);
+  --qchat-faint: var(--qm-faint);
+  --qchat-line: var(--qm-line-soft);
+  --qchat-line-hard: var(--qm-line);
+  --qchat-accent: var(--qm-magenta);
+  --qchat-signal: var(--qm-magenta);
+  --qchat-violet: var(--qm-violet);
+  --qchat-cyan: var(--qm-cyan);
+  --qchat-amber: var(--qm-yellow);
+  --qchat-ok: var(--qm-green);
+  --qchat-signal-wash: rgba(255, 38, 154, 0.16);
+  --qchat-wash: rgba(185, 101, 255, 0.14);
+  --qchat-radius: 2px;
+}
+
+html[data-qubit-manga="on"] .qchat::before {
+  height: 4px;
+  background: linear-gradient(90deg, var(--qm-magenta) 0 46%, var(--qm-yellow) 46% 62%, var(--qm-cyan) 62% 74%, var(--qm-violet) 74%);
+  width: 100%;
+  opacity: 1;
+}
+
+html[data-qubit-manga="on"] .qchat__header {
+  border-bottom: 2px solid var(--qm-magenta) !important;
+  background: linear-gradient(100deg, rgba(255, 38, 154, 0.2), transparent 70%);
+}
+
+html[data-qubit-manga="on"] .qchat__title {
+  color: var(--qm-ink) !important;
+  font-family: var(--qm-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 var(--qm-black);
+}
+
+html[data-qubit-manga="on"] .qchat__message {
+  border-width: 2px !important;
+  border-radius: 2px !important;
+  box-shadow: 3px 3px 0 rgba(5, 3, 15, 0.85);
+}
+
+html[data-qubit-manga="on"] .qchat__message--assistant {
+  border-color: var(--qm-magenta) !important;
+  background: var(--qm-panel) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__message--user {
+  border-color: var(--qm-yellow) !important;
+  background: rgba(255, 229, 0, 0.08) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__message--tool {
+  border-color: var(--qm-violet) !important;
+  background: var(--qm-panel-2) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__message--progress {
+  border-color: var(--qm-cyan) !important;
+  background: rgba(39, 233, 243, 0.08) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__composer {
+  border-top: 2px solid var(--qm-magenta) !important;
+  background: linear-gradient(180deg, transparent, rgba(255, 38, 154, 0.06));
+}
+
+html[data-qubit-manga="on"] .qchat__side.qchat__side,
+html[data-qubit-manga="on"] .qchat__artifacts {
+  border-left: 3px solid var(--qm-magenta) !important;
+  background: var(--qm-panel) !important;
+  box-shadow: -3px 0 0 var(--qm-black), -5px 0 0 rgba(185, 101, 255, 0.35);
+}
+
+html[data-qubit-manga="on"] .qchat__side .qchat-side__backdrop-scrim {
+  background: var(--qm-panel) !important;
+  opacity: 0.92 !important;
+}
+
+html[data-qubit-manga="on"] .qchat__side .qchat__side-head {
+  color: var(--qm-yellow) !important;
+  font-family: var(--qm-display);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+html[data-qubit-manga="on"] .qchat__side .qchat__side-head-rule {
+  background: linear-gradient(90deg, var(--qm-line), transparent) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__side > div:not(.qchat-side__backdrop) {
+  border-bottom: 1px solid rgba(185, 101, 255, 0.24) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__side .qchat__model-panel > div > * {
+  border-color: rgba(185, 101, 255, 0.28) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__side .qchat__model-panel [class*="text-display"] {
+  color: var(--qm-yellow) !important;
+}
+
+html[data-qubit-manga="on"] .qchat__side .qchat__model-panel button {
+  color: var(--qm-ink) !important;
+}
+
+/* Keep the embedded terminal itself untouched (canvas + xterm chrome). */
+html[data-qubit-manga="on"] .xterm,
+html[data-qubit-manga="on"] .xterm * {
+  border-radius: 0 !important;
+}
+
+/* -------------------------------------------------------------- panels */
+
+html[data-qubit-manga="on"] .qplate {
+  --qplate-panel: var(--qm-panel);
+  --qplate-sunk: var(--qm-bg-deep);
+  --qplate-raised: var(--qm-panel-3);
+  --qplate-rule: var(--qm-line);
+  --qplate-rule-soft: var(--qm-line-soft);
+}
+
+html[data-qubit-manga="on"] .qplate-module__head {
+  border-left: 3px solid var(--qm-yellow);
+  background: linear-gradient(92deg, rgba(255, 38, 154, 0.36), transparent 82%);
+  color: var(--qm-ink) !important;
+  font-family: var(--qm-display);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+html[data-qubit-manga="on"] .qplate-module__rule {
+  background: linear-gradient(90deg, var(--qm-line), transparent) !important;
+}
+
+html[data-qubit-manga="on"] .qplate-row:hover,
+html[data-qubit-manga="on"] .qplate-row[data-selected="true"] {
+  background: var(--qm-wash) !important;
+  border-color: var(--qm-magenta) !important;
+}
+
+/* ---------------------------------------------------- files / analytics */
+
+html[data-qubit-manga="on"] .file-tree,
+html[data-qubit-manga="on"] [class*="file-tree"] {
+  border-color: var(--qm-line) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content [class*="file"] [class*="row"]:hover {
+  background: var(--qm-wash) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content svg text {
+  fill: var(--qm-muted) !important;
+  font-family: var(--qm-mono);
+}
+
+html[data-qubit-manga="on"] #qubit-main-content svg [stroke="#ccc"],
+html[data-qubit-manga="on"] #qubit-main-content svg [stroke="#ccc"] * {
+  stroke: rgba(185, 101, 255, 0.45) !important;
+}
+
+/* Plot/observable chart canvases */
+html[data-qubit-manga="on"] #qubit-main-content canvas {
+  filter: saturate(1.15);
+}
+
+/* ---------------------------------------------------------- code / markdown */
+
+html[data-qubit-manga="on"] #qubit-main-content pre,
+html[data-qubit-manga="on"] #qubit-main-content code:not(.xterm *) {
+  border-color: var(--qm-line-soft) !important;
+  background: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content pre {
+  border: 2px solid var(--qm-line-soft);
+  border-left: 3px solid var(--qm-yellow);
+  border-radius: 2px;
+}
+
+/* -------------------------------------------------------------- feedback */
+
+html[data-qubit-manga="on"] #qubit-main-content [role="alert"] {
+  border: 2px solid var(--qm-red) !important;
+  border-left: 4px solid var(--qm-red) !important;
+  border-radius: 2px !important;
+  background: rgba(255, 77, 128, 0.1) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content [role="status"]:not(.qagent-sidebar__pulse) {
+  border-radius: 2px;
+}
+
+html[data-qubit-manga="on"] .callout {
+  border: 2px solid var(--qm-line-soft) !important;
+  border-left: 4px solid var(--qm-yellow) !important;
+  border-radius: 2px !important;
+  background: var(--qm-panel-2) !important;
+}
+
+/* Skeletons and generic pulses */
+html[data-qubit-manga="on"] .animate-pulse {
+  background-color: rgba(185, 101, 255, 0.18) !important;
+}
+
+/* Selection + caret */
+html[data-qubit-manga="on"] ::selection {
+  background: var(--qm-magenta);
+  color: var(--qm-black);
+}
+
+html[data-qubit-manga="on"] input,
+html[data-qubit-manga="on"] textarea {
+  caret-color: var(--qm-yellow);
+}
+
+/* ------------------------------------------------------------------ misc */
+
+html[data-qubit-manga="on"] hr {
+  border-color: var(--qm-line-soft);
+}
+
+html[data-qubit-manga="on"] kbd {
+  border: 1px solid var(--qm-line);
+  border-bottom-width: 2px;
+  border-radius: 2px;
+  background: var(--qm-bg-deep);
+  color: var(--qm-yellow);
+  font-family: var(--qm-mono);
+  box-shadow: 0 1px 0 var(--qm-black);
+}
+
+/* Cards with an explicit overflow clip keep their content legible: the
+   corner accent is the only element allowed to sit on the border. */
+html[data-qubit-manga="on"] #qubit-main-content .overflow-hidden[class*="bg-background-base/80"]::after {
+  display: none;
+}
+
+/* ---------------------------------------------------------- responsive */
+
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] .settings-section__heading {
+    width: 100%;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
+  }
+
+  html[data-qubit-manga="on"] header[role="banner"] h1 {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+  }
+
+  html[data-qubit-manga="on"] .qchat__side.qchat__side {
+    border-left-width: 2px !important;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+    box-shadow: 2px 2px 0 var(--qm-magenta) !important;
+  }
+
+  /* The desktop collapse control is hidden on the mobile rail; the close
+     control is the one that belongs there. Frees room for the wordmark. */
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > sakuga-button.lg\:flex {
+    display: none !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+    min-width: 5.2rem;
+  }
+}
+
+/* -------------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-qubit-manga="on"] *,
+  html[data-qubit-manga="on"] *::before,
+  html[data-qubit-manga="on"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .qm-skin-switch,
+  .qm-skin-switch:hover,
+  .qm-skin-switch:active {
+    transform: none;
+  }
+}

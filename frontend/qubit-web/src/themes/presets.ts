@@ -179,6 +179,50 @@ export const contrastTheme: DashboardTheme = {
   },
 };
 
+/** Q6 — the opt-in manga skin as a first-class theme. Selecting Q6 (or
+ *  Q6-L) enables the scoped `html[data-qubit-manga]` visual layer; selecting
+ *  any other theme turns it back off. The palette below is the fallback for
+ *  the brief frame before the layer applies and for the theme-picker swatch. */
+export const mangaTheme: DashboardTheme = {
+  name: "q6",
+  label: "Q6",
+  description:
+    "Q6 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
+  palette: {
+    background: { hex: "#08061a", alpha: 1 },
+    midground: { hex: "#f7e9ff", alpha: 1 },
+    foreground: { hex: "#ffffff", alpha: 0 },
+    warmGlow: "rgba(255, 38, 154, 0.42)",
+    noiseOpacity: 1,
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontDisplay: '"Arial Black", "Segoe UI", system-ui, sans-serif',
+    letterSpacing: "0.005em",
+  },
+  layout: {
+    ...DEFAULT_LAYOUT,
+    radius: "3px",
+    density: "comfortable",
+  },
+  colorOverrides: {
+    success: "#4ade80",
+    warning: "#ffe500",
+    destructive: "#ff4d80",
+  },
+  swatchColors: ["#08061a", "#ff269a", "#ffe500"],
+  terminalBackground: "#08061a",
+  terminalForeground: "#f7e9ff",
+};
+
+export const MANGA_THEME_NAME = "q6";
+export const MANGA_THEME_LARGE_NAME = "q6-l";
+
+/** True for the manga base and large theme ids. */
+export function isMangaThemeName(name: string | null | undefined): boolean {
+  return name === MANGA_THEME_NAME || name === MANGA_THEME_LARGE_NAME;
+}
+
 // ---------------------------------------------------------------------------
 // Large variants — same look, bigger type and roomier spacing
 // ---------------------------------------------------------------------------
@@ -204,6 +248,7 @@ export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 2);
 export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 3);
 export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 4);
 export const bigContrastTheme = largeVariant(contrastTheme, "q5-l", 5);
+export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 6);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
@@ -216,4 +261,6 @@ export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   "q4-l": bigCyberpunkTheme,
   q5: contrastTheme,
   "q5-l": bigContrastTheme,
+  q6: mangaTheme,
+  "q6-l": bigMangaTheme,
 };

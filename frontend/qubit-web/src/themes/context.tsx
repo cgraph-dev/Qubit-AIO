@@ -7,7 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { BUILTIN_THEMES, defaultTheme } from "./presets";
+import { BUILTIN_THEMES, defaultTheme, isMangaThemeName } from "./presets";
+import {
+  applyMangaAttribute,
+  mangaRouteEligible,
+  rememberMangaReturnTheme,
+  setMangaEnabled,
+} from "@/manga-skin/manga-store";
 import { migrateThemeName } from "./themeAliases";
 import {
   FONT_CHOICES,
@@ -525,6 +531,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyTheme(resolveTheme(themeName));
   }, [themeName, resolveTheme, fontId]);
 
+  // Q6/Q6-L is the manga theme. Keep the scoped skin layer in lockstep with
+  // the theme selection: choosing Q6 enables it, choosing any other theme
+  // disables it, and the last non-manga theme is remembered for the sidebar
+  // switch's OFF action.
+  useEffect(() => {
+    const manga = isMangaThemeName(themeName);
+    if (manga) {
+      setMangaEnabled(true);
+      const path =
+        typeof window !== "undefined" ? window.location.pathname : "/";
+      applyMangaAttribute(mangaRouteEligible(path));
+    } else {
+      rememberMangaReturnTheme(themeName);
+      setMangaEnabled(false);
+    }
+  }, [themeName]);
+
   // Load server-side themes (built-ins + user YAMLs) once on mount.
   useEffect(() => {
     let cancelled = false;
@@ -532,15 +555,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .getThemes()
       .then((resp) => {
         if (cancelled) return;
+        const servedNames = new Set<string>(
+          (resp.themes ?? []).map((t) => t.name),
+        );
         if (resp.themes?.length) {
-          setAvailableThemes(
-            resp.themes.map((t) => ({
+          const served = resp.themes.map((t) => ({
+            name: t.name,
+            label: t.label,
+            description: t.description,
+            definition: t.definition,
+          }));
+          // Keep built-ins that this client knows about but a not-yet-restarted
+          // server does not list (e.g. a newly shipped Q6). A built-in is
+          // client-owned; the server list is authoritative only for user YAMLs
+          // and for the exact metadata it does serve.
+          const servedNames = new Set(served.map((t) => t.name));
+          const missingBuiltins = Object.values(BUILTIN_THEMES)
+            .filter((t) => !servedNames.has(t.name))
+            .map((t) => ({
               name: t.name,
               label: t.label,
               description: t.description,
-              definition: t.definition,
-            })),
-          );
+            }));
+          setAvailableThemes([...served, ...missingBuiltins]);
           // Index any definitions the server shipped (user themes).
           const defs: Record<string, DashboardTheme> = {};
           for (const entry of resp.themes) {
@@ -552,15 +589,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
         if (resp.active) {
           const migratedActive = migrateThemeName(resp.active);
-          if (migratedActive !== themeName) {
-            setThemeName(migratedActive);
-            window.localStorage.setItem(STORAGE_KEY, migratedActive);
-          }
-          // If the server is still persisting the stale key, push the
-          // migrated value back so it converges too — otherwise every
-          // future page load would re-trigger this branch.
-          if (migratedActive !== resp.active) {
-            api.setTheme(migratedActive).catch(() => {});
+          // Forward compatibility: a new client can ship a built-in theme
+          // before the running server's list contains it. Do not let the
+          // older server's active value clobber that local choice; keep it
+          // and try to persist it (a stale server may 400 harmlessly).
+          const localBuiltinAheadOfServer =
+            Boolean(BUILTIN_THEMES[themeName]) &&
+            !servedNames.has(themeName);
+          if (localBuiltinAheadOfServer) {
+            api.setTheme(themeName).catch(() => {});
+          } else {
+            if (migratedActive !== themeName) {
+              setThemeName(migratedActive);
+              window.localStorage.setItem(STORAGE_KEY, migratedActive);
+            }
+            // If the server is still persisting the stale key, push the
+            // migrated value back so it converges too — otherwise every
+            // future page load would re-trigger this branch.
+            if (migratedActive !== resp.active) {
+              api.setTheme(migratedActive).catch(() => {});
+            }
           }
         }
       })
