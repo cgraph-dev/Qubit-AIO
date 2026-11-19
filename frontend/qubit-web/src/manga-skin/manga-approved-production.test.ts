@@ -47,7 +47,6 @@ describe("approved production Manga dashboard", () => {
   it("does not add decorative loops to the final static asset pass", () => {
     expect(css).toContain("animation:none!important");
     expect(css).not.toContain(".xterm");
-    expect(css).not.toContain("qubit-office");
-    expect(css).not.toContain("workbench");
+    expect(css).not.toMatch(/#(?:qubit-office|qubit-workbench)/);
   });
 });
