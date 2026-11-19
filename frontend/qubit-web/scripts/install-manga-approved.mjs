@@ -3,7 +3,7 @@
  * Install the 14 independently replaceable, user-approved Manga UI images.
  *
  * Run from the repo root:
- *   node frontend/qubit-web/scripts/install-manga-approved.mjs /path/to/qubit_manga_FINAL_approved_assets.zip
+ *   node frontend/qubit-web/scripts/install-manga-approved.mjs /path/to/qubit_manga_REPAIRED_v2_assets.zip
  *
  * Node built-ins only; no Python, no network, no dynamic JS from the archive.
  * Validates every SHA-256 before writing anything. Each image is a separate
@@ -23,7 +23,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const repoRoot = resolve(webRoot, "../..");
 const archive = resolve(
-  process.argv[2] ?? join(repoRoot, "qubit_manga_FINAL_approved_assets.zip"),
+  process.argv[2] ?? join(repoRoot, "qubit_manga_REPAIRED_v2_assets.zip"),
 );
 const target = resolve(webRoot, "public/manga-ui/approved");
 const prefix = "qubit_manga_approved_production/";
@@ -87,7 +87,7 @@ function unzip(data) {
 function install() {
   if (!existsSync(archive)) throw new Error(
     "Missing approved Manga art archive: " + archive + "\n" +
-    "Place qubit_manga_FINAL_approved_assets.zip in the repository root or pass its path.",
+    "Place qubit_manga_REPAIRED_v2_assets.zip in the repository root or pass its path.",
   );
   const entries = unzip(readFileSync(archive));
   const manifestBytes = entries.get(prefix + "MANIFEST.json");
