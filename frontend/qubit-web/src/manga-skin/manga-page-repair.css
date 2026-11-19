@@ -388,3 +388,58 @@ html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) 
 html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
  sakuga-button,button
 ):focus-visible {outline:2px solid var(--qm-page-yellow)!important;outline-offset:3px}
+
+
+/* Skills browse/filter/card family: apply the same readable plate hierarchy
+ * to the screen that often shows 578+ user skills. No cards are remounted. */
+html[data-qubit-manga="on"] .qm-skills-page {
+ min-width:0;gap:16px!important;
+ color:var(--qm-page-text);
+ font-family:var(--qm-page-body);
+}
+html[data-qubit-manga="on"] .qm-skills-filters {
+ min-width:0;
+}
+html[data-qubit-manga="on"] .qm-skills-filters > div > div {
+ border:2px solid var(--qm-page-pink)!important;
+ border-radius:3px!important;
+ background:linear-gradient(145deg,#231033,#10081c)!important;
+ box-shadow:2px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-skills-filters :is(.qsk-list-item,[role="button"]) {
+ min-height:36px;max-width:100%;
+ font:700 .8rem/1.35 var(--qm-page-body)!important;
+}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card {
+ min-width:0;max-width:100%;
+ border:2px solid var(--qm-page-pink)!important;
+ border-radius:3px!important;
+ background:linear-gradient(140deg,#1c0d30,#10081d 78%)!important;
+ box-shadow:2px 2px 0 #080615,4px 4px 0 rgba(255,240,255,.35)!important;
+}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ h2,h3,[data-slot="card-title"]
+) {font:800 1.03rem/1.3 var(--qm-page-heading)!important;color:#fff0ff!important}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ [data-slot="card-header"],.card-header
+) {
+ min-width:0;gap:10px;flex-wrap:wrap;
+ border-bottom:2px solid rgba(255,38,154,.55);
+}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ [data-slot="card-header"],.card-header
+) > div {flex-wrap:wrap;gap:9px;min-width:0}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ sakuga-button,button,sakuga-input,input
+) {max-width:100%}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ sakuga-button,button
+) {min-height:34px;white-space:normal}
+@media(max-width:700px) {
+ html[data-qubit-manga="on"] .qm-skills-page > div:nth-child(2) {
+  flex-wrap:wrap;gap:11px;
+ }
+ html[data-qubit-manga="on"] .qm-skills-filters {
+  width:100%!important;
+ }
+}
