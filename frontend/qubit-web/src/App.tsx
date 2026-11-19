@@ -1039,6 +1039,9 @@ export default function App() {
               collapsed && "lg:w-14",
             )}
           >
+            {/* A single reusable nine-slice chrome frame around the entire Manga rail.
+                Pointer-events are disabled; navigation and status remain live. */}
+            <div className="qm-manga-outer-frame" aria-hidden="true" />
             {/* Rail backdrop clip — this rail only. Sits at z-index:-2 behind the
                 engineering ruling (::before, z-index:-1) and every nav row.
                 Muted at the source by the stylesheet, then scrimmed, so 13px
