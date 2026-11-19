@@ -1,0 +1,158 @@
+/*
+ * ZIP asset correction for Manga sidebar (Q6/Q6-L only).
+ * Source: qubit_manga_web_install/public/manga-ui/sidebar-gateway.svg
+ * Previous mistake: CSS-built status borders and a zigzag lightning icon
+ * replaced the supplied decorative panel and desired anime sparkle.
+ * Keep all telemetry text live and the yellow selected-route CSS untouched.
+ */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
+  content:""!important;
+  width:37px!important;
+  height:40px!important;
+  left:-14px!important;
+  top:-9px!important;
+  transform:none!important;
+  transform-origin:center center!important;
+  background:url("/manga-ui/manga-anime-star.svg") center / contain no-repeat!important;
+  /* A gentle pulse instead of scaling or skewing the star artwork. */
+  animation:qm-anime-star-glimmer 3.6s ease-in-out infinite!important;
+  pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::before {
+  /* System has the hex-nut ornament, not a duplicate anime star. */
+  width:18px!important;height:18px!important;left:5px!important;top:50%!important;
+  transform:translateY(-50%)!important;
+  background:url("/manga-ui/neon-bolt-nut.svg") center / contain no-repeat!important;
+  animation:none!important;
+}
+
+/* Explicit three-frame charging effect: successive cells brighten and throw
+ * a visible neon halo. The cells remain separated, rather than being painted
+ * as a static repeating-linear-gradient on the entire heading. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells {
+  display:flex!important;align-items:stretch!important;justify-content:flex-end!important;
+  position:absolute!important;z-index:5!important;
+  width:max-content!important;height:calc(100% - 6px)!important;
+  right:1px!important;top:3px!important;
+  gap:4px!important;overflow:visible!important;pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i {
+  display:block!important;position:relative!important;width:15px!important;min-width:15px!important;
+  height:100%!important;transform:skewX(-24deg)!important;
+  background:#ffcf17!important;
+  border:1.5px solid #1b071d!important;
+  box-shadow:inset 0 0 2px #fff8af,0 0 1px #ffe629!important;
+  filter:none!important;opacity:1!important;
+  animation:qm-zip-charge-cell 2.1s steps(1,end) infinite!important;
+  will-change:auto;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(1) {
+  animation-delay:0s!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(2) {
+  animation-delay:-.7s!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(3) {
+  animation-delay:-1.4s!important;
+}
+/* White reflection makes charging visible even on smaller displays. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i::after {
+  content:"";position:absolute;inset:3px 3px auto 3px;height:35%;
+  background:linear-gradient(180deg,#fffbc9,#ffe62900);
+  opacity:.8;pointer-events:none;
+}
+@keyframes qm-zip-charge-cell {
+  0%,100% {
+    background:#c38c11;
+    box-shadow:inset 0 0 2px #9d7815,0 0 1px #aa7315;
+  }
+  33% {
+    background:#fff99b;
+    box-shadow:inset 0 0 8px #ffffff,0 0 9px 3px #ffe82b,0 0 17px #ffae17;
+  }
+  66% {
+    background:#ffdb1f;
+    box-shadow:inset 0 0 5px #fff9af,0 0 5px 1px #ffd61c;
+  }
+}
+@keyframes qm-anime-star-glimmer {
+  0%,100% {opacity:.85;filter:drop-shadow(0 0 2px #ffec2b)}
+  50% {opacity:1;filter:drop-shadow(0 0 7px #fff6a1) drop-shadow(0 0 4px #ff3aaa)}
+}
+/* Reattach the original ZIP's gateway panel art to the actual LIVE System
+ * section. The SVG is text-free: status, latency and actions remain DOM.
+ * A padding inset protects the 240x175 SVG's corner strokes from controls. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
+  position:relative!important;isolation:isolate!important;
+  min-height:172px!important;
+  flex:0 0 auto!important;
+  margin:5px 7px 5px!important;
+  padding:17px 13px 13px!important;
+  border:0!important;border-radius:0!important;
+  background:url("/manga-ui/sidebar-gateway.svg") center / 100% 100% no-repeat!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system > * {
+  position:relative;z-index:1;min-width:0;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry {
+  display:flex!important;flex-direction:column!important;
+  margin:0 0 5px!important;padding:2px 5px 5px!important;
+  background:#10071deb!important;
+  border:1px solid #bb5bec!important;
+  box-shadow:inset 0 0 8px #230b37!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head {
+  min-height:30px!important;
+  margin:0 0 6px!important;
+  padding:5px 8px 5px 29px!important;
+  color:#12091f!important;
+  background:linear-gradient(95deg,#c179f2,#e5a0ff 76%,#c16dea)!important;
+  border:2px solid #fff0ff!important;
+  box-shadow:2px 2px 0 #090517!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry-row {
+  justify-content:space-between!important;
+  gap:7px!important;white-space:nowrap;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry-key {
+  color:#ffe724!important;font-size:.64rem!important;
+  overflow:visible!important;text-overflow:clip!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry-value {
+  color:#fff2ff!important;font-size:.72rem!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system > ul {
+  display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;
+  gap:6px!important;padding:0 3px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system > ul li {
+  min-width:0!important;flex:1 1 94px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__action {
+  width:100%!important;min-height:29px!important;gap:4px!important;
+  padding:5px 6px!important;font-size:.64rem!important;
+  color:#fff0ff!important;background:#180a28!important;
+  border:1px solid #ff41b3!important;box-shadow:0 0 4px #e32d9d!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__action:disabled {
+  opacity:.47!important;filter:grayscale(.65);
+}
+/* The active item animation (yellow v3 selected SVG + star-pop) is deliberately
+ * NOT styled here, and neither is the functional minimize button. */
+@media (max-width:1023px) {
+ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
+   padding-inline:11px!important;
+ }
+}
+@media (prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head::before,
+ html[data-qubit-manga="on"] #app-sidebar .qm-manga-charge-cells i {
+   animation:none!important;
+ }
+ html[data-qubit-manga="on"] #app-sidebar .qm-manga-charge-cells i {
+   background:#ffe629!important;
+   box-shadow:inset 0 0 3px #fff9c1,0 0 2px #ffe629!important;
+ }
+}
