@@ -225,3 +225,53 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
     animation:none!important;transition:none!important;
   }
 }
+
+
+/* Dense-data typography: token/value lists and settings rows were rendered
+   at 9-10px by legacy comic labels. These are data, not decorative captions. */
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-row__title,.settings-row__value,.settings-row__label,
+  .settings-summary__tile dt,.settings-summary__tile dd,
+  [data-slot="card-title"],[data-slot="table-cell"],[data-slot="table-head"]
+) {
+  font-family:var(--qm-content-font)!important;
+  font-size:clamp(12px,.78rem,14px)!important;
+  line-height:1.4!important;
+  letter-spacing:normal!important;
+  text-shadow:none!important;
+  filter:none!important;
+  -webkit-font-smoothing:antialiased!important;
+}
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-row__title,[data-slot="card-title"]
+) {
+  font-weight:700!important;
+  color:var(--qm-content-heading)!important;
+}
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-row__value,.settings-summary__tile dd
+) {
+  font-variant-numeric:tabular-nums!important;
+  color:var(--qm-content-text)!important;
+}
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-row__description,.settings-section__desc,.settings-page__desc
+) {
+  font-size:clamp(12px,.76rem,14px)!important;
+  line-height:1.48!important;
+  color:var(--qm-content-muted)!important;
+  text-shadow:none!important;
+  max-width:76ch;
+}
+/* Stable checkbox/control focus layout; leave real Sakuga parts intact. */
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-row,[data-slot="table-row"]
+) {
+  min-width:0!important;
+  background-repeat:no-repeat!important;
+}
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-row,[data-slot="table-row"]
+) :is(button,a[href],input,select) {
+  min-width:0;
+}
