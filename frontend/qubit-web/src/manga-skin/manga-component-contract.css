@@ -424,3 +424,64 @@ html[data-qubit-manga="on"]:not([data-qubit-manga-zip="ready"]) .qagent-sidebar_
   box-shadow: 3px 3px 0 #05040f !important;
   color: #fff5ff !important;
 }
+
+
+/* Shared page rhythm: readable text without reflowing specialized canvases,
+   code editors, terminal glyphs, charts or motion surfaces. */
+html[data-qubit-manga="on"] #qubit-main-content {
+  font-family: var(--theme-font-sans,system-ui,sans-serif);
+  font-size: clamp(14px,.91rem,15px);
+  line-height: 1.55;
+  color: #f3e9fc;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(h1,h2,h3) {
+  color: #fff9ff !important;
+  line-height: 1.28 !important;
+  letter-spacing: .01em !important;
+  text-shadow: none !important;
+  text-wrap: balance;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-page,.settings-section,.settings-group,[data-slot="card"]) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section,.settings-group,[data-slot="card"]) {
+  padding-block: clamp(11px,1vw,18px);
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-row,.settings-subrow,.qplate-row) {
+  min-height: 39px;
+  gap: 10px;
+  line-height: 1.5;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-page,.qplate-module) :is(label,button,input:not(.xterm-helper-textarea),select,textarea:not(.xterm-helper-textarea)) {
+  font-family: var(--theme-font-sans,system-ui,sans-serif);
+  font-size: clamp(13px,.85rem,14px);
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(th,[role="columnheader"]) {
+  color: #fff9ff !important;
+  font-weight: 800 !important;
+  letter-spacing: .02em;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(td,[role="cell"],p,li,dd) {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-page,.qplate-module) :is(button,[role="button"]) {
+  gap: 8px;
+  min-height: 33px;
+}
+html[data-qubit-manga="on"] :is(.qchat__side,#app-sidebar,#qubit-main-content) :is(button,[role="button"],a,input,textarea,select):focus-visible {
+  outline: 2px solid #ffe62a !important;
+  outline-offset: 2px !important;
+}
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] #qubit-main-content {
+    font-size: 14px;
+  }
+  html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section,.settings-group,[data-slot="card"]) {
+    padding-block: 10px;
+  }
+}
