@@ -1137,7 +1137,7 @@ export default function App() {
                     >
                       <span className="qagent-sidebar__section-index">{section.index}</span>
                       <span className={cn(collapsed && "lg:hidden")}>
-                        {t.app.sections?.[section.id] ?? section.label}
+                        {useMangaNavigation ? section.label : (t.app.sections?.[section.id] ?? section.label)}
                       </span>
                       {!collapsed && (
                         <>
