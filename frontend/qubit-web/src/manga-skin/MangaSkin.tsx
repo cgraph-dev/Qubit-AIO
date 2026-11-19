@@ -25,6 +25,11 @@ import "./manga-neon-reference.css";
 import "./manga-fidelity.css";
 import "./manga-zip-sidebar-fix.css";
 import "./manga-zip-surfaces.css";
+import "./manga-zip-registry.css";
+import "./manga-zip-routes.css";
+import "./manga-sidebar-final.css";
+import "./manga-zip-controls.css";
+import "./manga-atom-titles.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {

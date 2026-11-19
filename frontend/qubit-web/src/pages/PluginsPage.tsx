@@ -1638,7 +1638,7 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: Plug
         : "outline";
 
   return (
-    <div className="border border-border bg-background/20 px-4 py-3">
+    <div data-qm-zip-asset="plugin-card" className="border border-border bg-background/20 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <span className="truncate text-sm font-semibold">

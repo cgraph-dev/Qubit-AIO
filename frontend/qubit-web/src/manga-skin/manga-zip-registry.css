@@ -1,0 +1,214 @@
+/* Complete original ZIP asset registry — one CSS token and a deliberately
+ * explicit per-element data attribute for each of the 89 source families.
+ * The build unpacks each original SVG; PNGs are available in the source ZIP.
+ * All rules require both Q6/Q6-L Manga AND a verified installed asset bundle.
+ */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] {
+  --qmz-sidebar-expanded:url("/manga-ui/zip/sidebar-expanded.svg");
+  --qmz-sidebar-collapsed:url("/manga-ui/zip/sidebar-collapsed.svg");
+  --qmz-right-sidebar:url("/manga-ui/zip/right-sidebar.svg");
+  --qmz-header-full:url("/manga-ui/zip/header-full.svg");
+  --qmz-footer-full:url("/manga-ui/zip/footer-full.svg");
+  --qmz-page-title-bar:url("/manga-ui/zip/page-title-bar.svg");
+  --qmz-module-header:url("/manga-ui/zip/module-header.svg");
+  --qmz-breadcrumb-bar:url("/manga-ui/zip/breadcrumb-bar.svg");
+  --qmz-panel-xl:url("/manga-ui/zip/panel-xl.svg");
+  --qmz-panel-lg:url("/manga-ui/zip/panel-lg.svg");
+  --qmz-panel-md:url("/manga-ui/zip/panel-md.svg");
+  --qmz-panel-sm:url("/manga-ui/zip/panel-sm.svg");
+  --qmz-panel-xs:url("/manga-ui/zip/panel-xs.svg");
+  --qmz-panel-horizontal:url("/manga-ui/zip/panel-horizontal.svg");
+  --qmz-panel-vertical:url("/manga-ui/zip/panel-vertical.svg");
+  --qmz-right-model:url("/manga-ui/zip/right-model.svg");
+  --qmz-right-reasoning:url("/manga-ui/zip/right-reasoning.svg");
+  --qmz-right-tools:url("/manga-ui/zip/right-tools.svg");
+  --qmz-right-sessions:url("/manga-ui/zip/right-sessions.svg");
+  --qmz-right-status:url("/manga-ui/zip/right-status.svg");
+  --qmz-sidebar-gateway:url("/manga-ui/zip/sidebar-gateway.svg");
+  --qmz-chat-transcript:url("/manga-ui/zip/chat-transcript.svg");
+  --qmz-chat-composer:url("/manga-ui/zip/chat-composer.svg");
+  --qmz-chat-user-bubble:url("/manga-ui/zip/chat-user-bubble.svg");
+  --qmz-chat-agent-bubble:url("/manga-ui/zip/chat-agent-bubble.svg");
+  --qmz-chat-tool-card:url("/manga-ui/zip/chat-tool-card.svg");
+  --qmz-chat-artifact-card:url("/manga-ui/zip/chat-artifact-card.svg");
+  --qmz-terminal-shell:url("/manga-ui/zip/terminal-shell.svg");
+  --qmz-code-block:url("/manga-ui/zip/code-block.svg");
+  --qmz-file-tree:url("/manga-ui/zip/file-tree.svg");
+  --qmz-file-grid:url("/manga-ui/zip/file-grid.svg");
+  --qmz-analytics-chart:url("/manga-ui/zip/analytics-chart.svg");
+  --qmz-analytics-stat:url("/manga-ui/zip/analytics-stat.svg");
+  --qmz-table-surface:url("/manga-ui/zip/table-surface.svg");
+  --qmz-table-compact:url("/manga-ui/zip/table-compact.svg");
+  --qmz-task-card:url("/manga-ui/zip/task-card.svg");
+  --qmz-kanban-column:url("/manga-ui/zip/kanban-column.svg");
+  --qmz-calendar:url("/manga-ui/zip/calendar.svg");
+  --qmz-settings-section:url("/manga-ui/zip/settings-section.svg");
+  --qmz-settings-row:url("/manga-ui/zip/settings-row.svg");
+  --qmz-profile-card:url("/manga-ui/zip/profile-card.svg");
+  --qmz-plugin-card:url("/manga-ui/zip/plugin-card.svg");
+  --qmz-model-card:url("/manga-ui/zip/model-card.svg");
+  --qmz-modal-confirm:url("/manga-ui/zip/modal-confirm.svg");
+  --qmz-modal-warning:url("/manga-ui/zip/modal-warning.svg");
+  --qmz-dropdown-panel:url("/manga-ui/zip/dropdown-panel.svg");
+  --qmz-tooltip:url("/manga-ui/zip/tooltip.svg");
+  --qmz-toast-info:url("/manga-ui/zip/toast-info.svg");
+  --qmz-toast-error:url("/manga-ui/zip/toast-error.svg");
+  --qmz-progress-track:url("/manga-ui/zip/progress-track.svg");
+  --qmz-media-toolbar:url("/manga-ui/zip/media-toolbar.svg");
+  --qmz-voice-panel:url("/manga-ui/zip/voice-panel.svg");
+  --qmz-upload-dropzone:url("/manga-ui/zip/upload-dropzone.svg");
+  --qmz-pagination:url("/manga-ui/zip/pagination.svg");
+  --qmz-sidebar-footer-plate:url("/manga-ui/zip/sidebar-footer-plate.svg");
+  --qmz-button-magenta:url("/manga-ui/zip/button-magenta.svg");
+  --qmz-badge-magenta:url("/manga-ui/zip/badge-magenta.svg");
+  --qmz-button-violet:url("/manga-ui/zip/button-violet.svg");
+  --qmz-badge-violet:url("/manga-ui/zip/badge-violet.svg");
+  --qmz-button-yellow:url("/manga-ui/zip/button-yellow.svg");
+  --qmz-badge-yellow:url("/manga-ui/zip/badge-yellow.svg");
+  --qmz-button-cyan:url("/manga-ui/zip/button-cyan.svg");
+  --qmz-badge-cyan:url("/manga-ui/zip/badge-cyan.svg");
+  --qmz-button-red:url("/manga-ui/zip/button-red.svg");
+  --qmz-badge-red:url("/manga-ui/zip/badge-red.svg");
+  --qmz-button-green:url("/manga-ui/zip/button-green.svg");
+  --qmz-badge-green:url("/manga-ui/zip/badge-green.svg");
+  --qmz-nav-default:url("/manga-ui/zip/nav-default.svg");
+  --qmz-nav-hover:url("/manga-ui/zip/nav-hover.svg");
+  --qmz-nav-selected:url("/manga-ui/zip/nav-selected.svg");
+  --qmz-nav-focused:url("/manga-ui/zip/nav-focused.svg");
+  --qmz-nav-disabled:url("/manga-ui/zip/nav-disabled.svg");
+  --qmz-input:url("/manga-ui/zip/input.svg");
+  --qmz-search:url("/manga-ui/zip/search.svg");
+  --qmz-select:url("/manga-ui/zip/select.svg");
+  --qmz-textarea:url("/manga-ui/zip/textarea.svg");
+  --qmz-number-input:url("/manga-ui/zip/number-input.svg");
+  --qmz-date-picker:url("/manga-ui/zip/date-picker.svg");
+  --qmz-filter-input:url("/manga-ui/zip/filter-input.svg");
+  --qmz-corner-magenta:url("/manga-ui/zip/corner-magenta.svg");
+  --qmz-corner-violet:url("/manga-ui/zip/corner-violet.svg");
+  --qmz-corner-yellow:url("/manga-ui/zip/corner-yellow.svg");
+  --qmz-corner-cyan:url("/manga-ui/zip/corner-cyan.svg");
+  --qmz-impact-yellow:url("/manga-ui/zip/impact-yellow.svg");
+  --qmz-impact-magenta:url("/manga-ui/zip/impact-magenta.svg");
+  --qmz-impact-cyan:url("/manga-ui/zip/impact-cyan.svg");
+  --qmz-separator-line:url("/manga-ui/zip/separator-line.svg");
+  --qmz-divider-module:url("/manga-ui/zip/divider-module.svg");
+  --qmz-timeline-rule:url("/manga-ui/zip/timeline-rule.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="sidebar-expanded"] {--qmz-active-art:var(--qmz-sidebar-expanded)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="sidebar-collapsed"] {--qmz-active-art:var(--qmz-sidebar-collapsed)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-sidebar"] {--qmz-active-art:var(--qmz-right-sidebar)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="header-full"] {--qmz-active-art:var(--qmz-header-full)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="footer-full"] {--qmz-active-art:var(--qmz-footer-full)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="page-title-bar"] {--qmz-active-art:var(--qmz-page-title-bar)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="module-header"] {--qmz-active-art:var(--qmz-module-header)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="breadcrumb-bar"] {--qmz-active-art:var(--qmz-breadcrumb-bar)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-xl"] {--qmz-active-art:var(--qmz-panel-xl)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-lg"] {--qmz-active-art:var(--qmz-panel-lg)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-md"] {--qmz-active-art:var(--qmz-panel-md)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-sm"] {--qmz-active-art:var(--qmz-panel-sm)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-xs"] {--qmz-active-art:var(--qmz-panel-xs)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-horizontal"] {--qmz-active-art:var(--qmz-panel-horizontal)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="panel-vertical"] {--qmz-active-art:var(--qmz-panel-vertical)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-model"] {--qmz-active-art:var(--qmz-right-model)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-reasoning"] {--qmz-active-art:var(--qmz-right-reasoning)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-tools"] {--qmz-active-art:var(--qmz-right-tools)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-sessions"] {--qmz-active-art:var(--qmz-right-sessions)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="right-status"] {--qmz-active-art:var(--qmz-right-status)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="sidebar-gateway"] {--qmz-active-art:var(--qmz-sidebar-gateway)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-transcript"] {--qmz-active-art:var(--qmz-chat-transcript)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-composer"] {--qmz-active-art:var(--qmz-chat-composer)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-user-bubble"] {--qmz-active-art:var(--qmz-chat-user-bubble)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-agent-bubble"] {--qmz-active-art:var(--qmz-chat-agent-bubble)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-tool-card"] {--qmz-active-art:var(--qmz-chat-tool-card)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="chat-artifact-card"] {--qmz-active-art:var(--qmz-chat-artifact-card)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="terminal-shell"] {--qmz-active-art:var(--qmz-terminal-shell)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="code-block"] {--qmz-active-art:var(--qmz-code-block)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="file-tree"] {--qmz-active-art:var(--qmz-file-tree)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="file-grid"] {--qmz-active-art:var(--qmz-file-grid)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="analytics-chart"] {--qmz-active-art:var(--qmz-analytics-chart)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="analytics-stat"] {--qmz-active-art:var(--qmz-analytics-stat)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="table-surface"] {--qmz-active-art:var(--qmz-table-surface)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="table-compact"] {--qmz-active-art:var(--qmz-table-compact)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="task-card"] {--qmz-active-art:var(--qmz-task-card)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="kanban-column"] {--qmz-active-art:var(--qmz-kanban-column)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="calendar"] {--qmz-active-art:var(--qmz-calendar)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="settings-section"] {--qmz-active-art:var(--qmz-settings-section)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="settings-row"] {--qmz-active-art:var(--qmz-settings-row)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="profile-card"] {--qmz-active-art:var(--qmz-profile-card)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="plugin-card"] {--qmz-active-art:var(--qmz-plugin-card)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="model-card"] {--qmz-active-art:var(--qmz-model-card)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="modal-confirm"] {--qmz-active-art:var(--qmz-modal-confirm)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="modal-warning"] {--qmz-active-art:var(--qmz-modal-warning)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="dropdown-panel"] {--qmz-active-art:var(--qmz-dropdown-panel)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="tooltip"] {--qmz-active-art:var(--qmz-tooltip)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="toast-info"] {--qmz-active-art:var(--qmz-toast-info)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="toast-error"] {--qmz-active-art:var(--qmz-toast-error)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="progress-track"] {--qmz-active-art:var(--qmz-progress-track)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="media-toolbar"] {--qmz-active-art:var(--qmz-media-toolbar)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="voice-panel"] {--qmz-active-art:var(--qmz-voice-panel)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="upload-dropzone"] {--qmz-active-art:var(--qmz-upload-dropzone)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="pagination"] {--qmz-active-art:var(--qmz-pagination)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="sidebar-footer-plate"] {--qmz-active-art:var(--qmz-sidebar-footer-plate)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="button-magenta"] {--qmz-active-art:var(--qmz-button-magenta)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="badge-magenta"] {--qmz-active-art:var(--qmz-badge-magenta)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="button-violet"] {--qmz-active-art:var(--qmz-button-violet)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="badge-violet"] {--qmz-active-art:var(--qmz-badge-violet)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="button-yellow"] {--qmz-active-art:var(--qmz-button-yellow)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="badge-yellow"] {--qmz-active-art:var(--qmz-badge-yellow)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="button-cyan"] {--qmz-active-art:var(--qmz-button-cyan)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="badge-cyan"] {--qmz-active-art:var(--qmz-badge-cyan)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="button-red"] {--qmz-active-art:var(--qmz-button-red)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="badge-red"] {--qmz-active-art:var(--qmz-badge-red)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="button-green"] {--qmz-active-art:var(--qmz-button-green)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="badge-green"] {--qmz-active-art:var(--qmz-badge-green)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="nav-default"] {--qmz-active-art:var(--qmz-nav-default)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="nav-hover"] {--qmz-active-art:var(--qmz-nav-hover)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="nav-selected"] {--qmz-active-art:var(--qmz-nav-selected)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="nav-focused"] {--qmz-active-art:var(--qmz-nav-focused)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="nav-disabled"] {--qmz-active-art:var(--qmz-nav-disabled)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="input"] {--qmz-active-art:var(--qmz-input)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="search"] {--qmz-active-art:var(--qmz-search)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="select"] {--qmz-active-art:var(--qmz-select)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="textarea"] {--qmz-active-art:var(--qmz-textarea)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="number-input"] {--qmz-active-art:var(--qmz-number-input)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="date-picker"] {--qmz-active-art:var(--qmz-date-picker)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="filter-input"] {--qmz-active-art:var(--qmz-filter-input)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="corner-magenta"] {--qmz-active-art:var(--qmz-corner-magenta)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="corner-violet"] {--qmz-active-art:var(--qmz-corner-violet)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="corner-yellow"] {--qmz-active-art:var(--qmz-corner-yellow)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="corner-cyan"] {--qmz-active-art:var(--qmz-corner-cyan)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="impact-yellow"] {--qmz-active-art:var(--qmz-impact-yellow)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="impact-magenta"] {--qmz-active-art:var(--qmz-impact-magenta)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="impact-cyan"] {--qmz-active-art:var(--qmz-impact-cyan)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="separator-line"] {--qmz-active-art:var(--qmz-separator-line)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="divider-module"] {--qmz-active-art:var(--qmz-divider-module)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="timeline-rule"] {--qmz-active-art:var(--qmz-timeline-rule)}
+
+/* Opt-in asset attachment. Page code may decorate any existing live control
+ * with data-qm-zip-asset, keeping the React element/ARIA/click handler intact.
+ * Default is an undersurface: the live text and children stay above the art. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset] {
+  position:relative;isolation:isolate;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset]::before {
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background-image:var(--qmz-active-art);
+  background-size:100% 100%;background-repeat:no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset]:focus-visible {
+  outline:3px solid #ffe500;outline-offset:2px;
+}
+/* Controls keep contrast, focus, disabled & busy signals. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  [data-qm-zip-asset^="button-"],[data-qm-zip-asset^="badge-"]
+) {border-color:transparent!important;background-color:transparent!important}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset^="button-"]:disabled {
+  opacity:.48;cursor:not-allowed;
+}
+/* Native desktop, Workbench, HUD & Office are excluded by mangaRouteEligible.
+ * This registry never adds new fake features or text content. */
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset]::before {
+    animation:none!important;
+  }
+}

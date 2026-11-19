@@ -151,7 +151,7 @@ function TokenBarChart({ daily }: { daily: AnalyticsDailyEntry[] }) {
   );
 
   return (
-    <Card>
+    <Card data-qm-zip-asset="analytics-chart">
       <CardHeader>
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-muted-foreground" />
@@ -253,7 +253,7 @@ function DailyTable({ daily }: { daily: AnalyticsDailyEntry[] }) {
   if (daily.length === 0) return null;
 
   return (
-    <Card>
+    <Card data-qm-zip-asset="table-surface">
       <CardHeader>
         <div className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-muted-foreground" />
@@ -312,7 +312,7 @@ function ModelTable({ models }: { models: AnalyticsModelEntry[] }) {
   if (models.length === 0) return null;
 
   return (
-    <Card>
+    <Card data-qm-zip-asset="table-surface">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Cpu className="h-5 w-5 text-muted-foreground" />
@@ -369,7 +369,7 @@ function SkillTable({ skills }: { skills: AnalyticsSkillEntry[] }) {
   if (skills.length === 0) return null;
 
   return (
-    <Card>
+    <Card data-qm-zip-asset="table-surface">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Brain className="h-5 w-5 text-muted-foreground" />
