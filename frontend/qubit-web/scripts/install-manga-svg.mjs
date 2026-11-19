@@ -1,63 +1,101 @@
 #!/usr/bin/env node
-/**
- * Restore ALL 89 original SVG assets from the user's qubit_manga_web_install
- * archive, committed as a lossless zlib+base64 JSON bundle.
- *
- * Runs in dev/build/test before Vite resolves public/ assets. PNG fallback
- * originals remain in the separately distributed source ZIP; the dashboard
- * renders the SVG versions at any density.
- *
- * Zero additional dependencies, strictly validates manifest/file names and
- * source hash, preserves other hand-authored manga-ui SVG assets.
+/** Restore every original Manga ZIP SVG and PNG using Node built-ins only.
+ * The exact uploaded archive is vendored as ten text chunks, to meet the
+ * repository's maximum new-blob size. SHA-256 binds all chunks to the ZIP.
+ * Runs as an npm predev/prebuild/pretest/pretypecheck hook before Vite.
  */
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inflateSync } from "node:zlib";
+import { inflateRawSync } from "node:zlib";
 import { createHash } from "node:crypto";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const bundle = resolve(here, "manga-original-svg-bundle.b64");
+const sourceDir = resolve(here, "manga-original-zip-parts");
 const output = resolve(here, "../public/manga-ui/zip");
-const EXPECTED_SOURCE_HASH = "3c1ddf1e2f216a57cf757e66c74fc95aa8fd446c770bdcad218a91864713a66f";
+const ZIP_SHA256 = "e385c8c5c5b928c84ea8fe88d975e41b65ba903b8ad58f44878f5982feaf68d0";
+const SOURCE_PREFIX = "qubit_manga_web_install/";
+const ASSET_PREFIX = SOURCE_PREFIX + "public/manga-ui/";
+const EXPECTED_FAMILIES = 89;
 
-export function installOriginalMangaSvgs() {
-  const compressed = Buffer.from(readFileSync(bundle, "utf8").trim(), "base64");
-  const raw = inflateSync(compressed);
-  const digest = createHash("sha256").update(raw).digest("hex");
-  if (digest !== EXPECTED_SOURCE_HASH) {
-    throw new Error("Manga SVG bundle checksum mismatch (corrupt or modified archive)");
+function unzip(buffer) {
+  let eocd = -1;
+  for (let p = buffer.length - 22; p >= Math.max(0, buffer.length - 65557); --p) {
+    if (buffer.readUInt32LE(p) === 0x06054b50) { eocd = p; break; }
   }
-  const { svg, manifest, palette } = JSON.parse(raw.toString("utf8"));
-  if (!Array.isArray(manifest) || manifest.length !== 89 || typeof svg !== "object") {
-    throw new Error("Expected all 89 source Manga assets");
+  if (eocd < 0) throw new Error("Corrupt Manga ZIP: no end-of-central-directory");
+  const count = buffer.readUInt16LE(eocd + 10);
+  let pos = buffer.readUInt32LE(eocd + 16);
+  const files = new Map();
+  for (let i = 0; i < count; ++i) {
+    if (buffer.readUInt32LE(pos) !== 0x02014b50) throw new Error("Invalid central directory");
+    const flags = buffer.readUInt16LE(pos + 8);
+    const method = buffer.readUInt16LE(pos + 10);
+    const size = buffer.readUInt32LE(pos + 20);
+    const expandedSize = buffer.readUInt32LE(pos + 24);
+    const nameLength = buffer.readUInt16LE(pos + 28);
+    const extraLength = buffer.readUInt16LE(pos + 30);
+    const commentLength = buffer.readUInt16LE(pos + 32);
+    const localPos = buffer.readUInt32LE(pos + 42);
+    const name = buffer.subarray(pos + 46, pos + 46 + nameLength).toString("utf8");
+    pos += 46 + nameLength + extraLength + commentLength;
+    if (!name.startsWith(SOURCE_PREFIX) || name.includes("..") || files.has(name)) {
+      throw new Error("Unexpected/duplicate ZIP entry: " + name);
+    }
+    if (flags & 1 || method !== 8) throw new Error("Encrypted/non-DEFLATE ZIP entry: " + name);
+    if (buffer.readUInt32LE(localPos) !== 0x04034b50) throw new Error("Invalid local header: " + name);
+    const start = localPos + 30 + buffer.readUInt16LE(localPos + 26) + buffer.readUInt16LE(localPos + 28);
+    if (start + size > buffer.length) throw new Error("Truncated ZIP entry: " + name);
+    const contents = inflateRawSync(buffer.subarray(start, start + size));
+    if (contents.length !== expandedSize) throw new Error("ZIP entry length mismatch: " + name);
+    files.set(name, contents);
   }
-  const names = new Set();
+  return files;
+}
+
+export function installOriginalMangaAssets() {
+  const parts = [..."ABCDEFGHIJ"].map((letter) => {
+    const part = readFileSync(join(sourceDir, "part-" + letter + ".b64"), "utf8").trim();
+    if (!/^[A-Za-z0-9+/=]+$/.test(part)) throw new Error("Invalid archive part: " + letter);
+    return part;
+  });
+  const originalZip = Buffer.from(parts.join(""), "base64");
+  if (createHash("sha256").update(originalZip).digest("hex") !== ZIP_SHA256) {
+    throw new Error("Original Manga ZIP checksum mismatch");
+  }
+  const files = unzip(originalZip);
+  const manifest = JSON.parse(files.get(SOURCE_PREFIX + "asset-manifest.json")?.toString("utf8") ?? "null");
+  const palette = JSON.parse(files.get(SOURCE_PREFIX + "palette.json")?.toString("utf8") ?? "null");
+  if (!Array.isArray(manifest) || manifest.length !== EXPECTED_FAMILIES || !palette) {
+    throw new Error("Missing 89-family original Manga manifest or palette");
+  }
+  const planned = [];
+  const used = new Set();
   for (const entry of manifest) {
-    const name = entry.name;
-    if (typeof name !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) {
-      throw new Error(`Invalid asset name: ${name}`);
+    const name = entry?.name;
+    if (typeof name !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || used.has(name)) {
+      throw new Error("Invalid/duplicate manifest asset: " + name);
     }
-    if (names.has(name)) throw new Error(`Duplicate Manga asset: ${name}`);
-    names.add(name);
-    const source = svg[`${name}.svg`];
-    if (typeof source !== "string" || !source.includes("<svg") || /<script\b/i.test(source)) {
-      throw new Error(`Missing or unsafe SVG: ${name}.svg`);
+    used.add(name);
+    for (const ext of [".svg", ".png"]) {
+      const original = files.get(ASSET_PREFIX + name + ext);
+      if (!original) throw new Error("Missing original artwork: " + name + ext);
+      if (ext === ".svg" && (!original.includes(Buffer.from("<svg")) || /<script\b/i.test(original.toString("utf8")))) {
+        throw new Error("Unsafe SVG asset: " + name);
+      }
+      planned.push({ name: name + ext, data: original });
     }
   }
-  if (Object.keys(svg).length !== names.size) {
-    throw new Error("Unexpected extra SVG assets not present in the manifest");
-  }
+  if (planned.length !== EXPECTED_FAMILIES * 2) throw new Error("Manga asset count mismatch");
+  // No writes occur until the entire archive/manifest has been validated.
   mkdirSync(output, { recursive: true });
-  for (const name of names) {
-    writeFileSync(join(output, `${name}.svg`), svg[`${name}.svg`], "utf8");
-  }
+  for (const item of planned) writeFileSync(join(output, item.name), item.data);
   writeFileSync(join(output, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   writeFileSync(join(output, "palette.json"), JSON.stringify(palette, null, 2) + "\n");
-  console.log(`Manga: installed ${names.size} original SVG assets into public/manga-ui/zip`);
-  return names.size;
+  console.log("Manga ZIP: installed 89 original SVGs + 89 original PNGs");
+  return planned.length;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  installOriginalMangaSvgs();
+  installOriginalMangaAssets();
 }
