@@ -831,14 +831,14 @@ html[data-qubit-manga="on"] sakuga-button.qsk-list-item::part(button) {
    primary = magenta plate, secondary = ink plate with a magenta keyline.
    This also keeps the outline and its offset shadow from collapsing to the
    same colour (the /sessions import action and /qubit-chat composer). */
-html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not([variant="secondary"])::part(button) {
-  background: var(--qm-magenta) !important;
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not(.qm-theme-trigger):not([variant="secondary"])::part(button) {
+  background: var(--qm-yellow) !important;
   color: var(--qm-black) !important;
   border-color: var(--qm-black) !important;
-  box-shadow: 4px 5px 0 var(--qm-yellow) !important;
+  box-shadow: 3px 4px 0 var(--qm-magenta) !important;
 }
 
-html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item)[variant="secondary"]::part(button) {
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not(.qm-theme-trigger)[variant="secondary"]::part(button) {
   background: var(--qm-panel-2) !important;
   color: var(--qm-ink) !important;
   border-color: var(--qm-magenta) !important;

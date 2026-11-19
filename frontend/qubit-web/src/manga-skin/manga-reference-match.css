@@ -141,3 +141,16 @@ html[data-qubit-manga="on"] .qm-confirm-dialog {
 @media (prefers-reduced-motion:reduce) {
  html[data-qubit-manga="on"] .qm-confirm-dialog {animation:none!important;}
 }
+
+
+/* The compact footer must keep the theme and language controls in their own
+   rows. The generic overflow guard shrank the utility to one row, so the
+   second control drew over the colophon. Let this stack take its natural
+   height; the nav above it is the flexible region. */
+@media(min-width:1024px) {
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility {
+  flex:0 0 auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+ }
+}

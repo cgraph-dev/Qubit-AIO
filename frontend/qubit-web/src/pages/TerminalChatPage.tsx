@@ -245,7 +245,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     const screen = term.element?.getBoundingClientRect();
     if (!cursor && !screen) return;
     const x = (cursor?.left ?? (screen ? screen.left + 24 : 0)) + window.scrollX;
-    const y = (cursor?.top ?? (screen ? screen.top + 24 : 0)) + (cursor?.height ?? 12) / 2 + window.scrollY;
+    // xterm's helper textarea can span several rows; the cursor line is at its
+    // top. Use the first line's centre so the smoke sits on the text.
+    const y = (cursor?.top ?? (screen ? screen.top + 24 : 0)) + 8 + window.scrollY;
     void emitFx('type', { x, y, scale: 0.5 });
   }, []);
   const fitRef = useRef<FitAddon | null>(null);
