@@ -1,18 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Cat with orbiting atom">
-<defs><linearGradient id="fur" x2="1" y2="1"><stop stop-color="#3b1749"/><stop offset="1" stop-color="#120a24"/></linearGradient><linearGradient id="orbit" x2="1" y2="1"><stop stop-color="#ff269a"/><stop offset=".5" stop-color="#ffe500"/><stop offset="1" stop-color="#b965ff"/></linearGradient></defs>
-<path d="M10 30 28 5 43 20Q64 14 86 20L103 4 116 37Q122 54 115 76 109 98 91 106Q65 120 38 109Q14 102 10 77Z" fill="#080615" stroke="#fff0ff" stroke-width="5" stroke-linejoin="round"/>
-<path d="M20 34 30 15 43 28Q64 21 85 28L99 14 108 38Q114 72 95 92Q64 115 36 94Q16 79 20 34Z" fill="url(#fur)" stroke="#ff269a" stroke-width="4" stroke-linejoin="round"/>
-<path d="M24 33 31 22 39 34ZM89 33 98 21 103 36Z" fill="#9751c9"/>
-<path d="M28 61Q43 44 54 61Q47 81 33 75Q28 71 28 61ZM73 61Q86 44 100 61Q97 79 81 77Q73 72 73 61Z" fill="#fff0ff" stroke="#080615" stroke-width="2"/>
-<ellipse cx="43" cy="65" rx="6" ry="11" fill="#28b8ff"/><ellipse cx="88" cy="65" rx="6" ry="11" fill="#28b8ff"/>
-<path d="M58 82 70 82 64 89Z" fill="#ff269a"/><path d="M64 89Q58 98 51 92M64 89Q70 98 77 92" fill="none" stroke="#fff0ff" stroke-width="2.5" stroke-linecap="round"/>
-<path d="M28 87 8 82M29 93 8 97M99 87 120 83M98 94 121 99" stroke="#fff0ff" stroke-width="2" stroke-linecap="round"/>
-<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(-34 64 62)" fill="none" stroke="#080615" stroke-width="7"/>
-<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(-34 64 62)" fill="none" stroke="url(#orbit)" stroke-width="4.5"/>
-<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(35 64 62)" fill="none" stroke="#080615" stroke-width="7"/>
-<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(35 64 62)" fill="none" stroke="#b965ff" stroke-width="4.5"/>
-<circle cx="64" cy="62" r="8" fill="#27e9f3" stroke="#080615" stroke-width="3"/>
-<circle cx="20" cy="32" r="6" fill="#ffe500" stroke="#080615" stroke-width="2"/>
-<circle cx="106" cy="29" r="6" fill="#ff269a" stroke="#080615" stroke-width="2"/>
-<path d="m112 8 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="#ffe500" stroke="#080615" stroke-width="1.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 145" role="img" aria-label="Neon black cat with blue eyes and orbiting stars">
+<defs>
+ <radialGradient id="fur" cx=".45" cy=".3" r=".85"><stop stop-color="#31305f"/><stop offset=".53" stop-color="#141026"/><stop offset="1" stop-color="#080718"/></radialGradient>
+ <linearGradient id="ear" x1="0" x2="1" y2="1"><stop stop-color="#7e326c"/><stop offset="1" stop-color="#26102a"/></linearGradient>
+ <radialGradient id="eye"><stop stop-color="#edffff"/><stop offset=".3" stop-color="#44eaff"/><stop offset=".63" stop-color="#147fff"/><stop offset="1" stop-color="#1519a8"/></radialGradient>
+ <linearGradient id="orbit"><stop stop-color="#ffe91a"/><stop offset=".45" stop-color="#ff42d1"/><stop offset=".8" stop-color="#ff8d2a"/><stop offset="1" stop-color="#fce545"/></linearGradient>
+ <filter id="glow" x="-65%" y="-65%" width="230%" height="230%"><feGaussianBlur stdDeviation="2.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <path id="star" d="M0 -13 3 -3 13 0 3 3 0 13 -3 3 -13 0 -3 -3Z"/>
+</defs>
+<g filter="url(#glow)" opacity=".85"><ellipse cx="102" cy="83" rx="98" ry="33" transform="rotate(-19 102 83)" fill="none" stroke="#ff31dc" stroke-width="3"/></g>
+<path d="M28 74 Q26 42 43 7 Q64 14 78 35 Q103 25 130 34 Q151 13 168 9 Q184 45 177 83 Q176 119 135 131 Q85 146 50 126 Q26 110 28 74Z" fill="url(#fur)" stroke="#fa35ba" stroke-width="3.8" stroke-linejoin="round" filter="url(#glow)"/>
+<path d="M39 50 45 21 69 43 54 55Z M143 42 164 21 172 50 156 55Z" fill="url(#ear)" stroke="#a5409f" stroke-width="1.6"/>
+<path d="M37 63 Q63 40 89 58 M118 57 Q146 40 174 62" fill="none" stroke="#4c4388" stroke-width="2" opacity=".9"/>
+<path d="M50 82 Q70 59 91 77 Q84 102 62 102 Q51 98 50 82Z" fill="#08142e" stroke="#2969ff" stroke-width="2.8"/>
+<path d="M115 79 Q139 57 159 80 Q151 103 128 101 Q117 96 115 79Z" fill="#08142e" stroke="#2969ff" stroke-width="2.8"/>
+<ellipse cx="73" cy="84" rx="15" ry="17" fill="url(#eye)" filter="url(#glow)"/><ellipse cx="140" cy="83" rx="15" ry="17" fill="url(#eye)" filter="url(#glow)"/>
+<ellipse cx="74" cy="85" rx="4.5" ry="11" fill="#090d3b"/><ellipse cx="140" cy="85" rx="4.5" ry="11" fill="#090d3b"/>
+<circle cx="68" cy="77" r="5.5" fill="#fff"/><circle cx="135" cy="76" r="5.5" fill="#fff"/>
+<path d="m99 106 13 0-7 7Z" fill="#dc6bc1" stroke="#080718" stroke-width="1.4"/>
+<path d="M105 113q-5 9-12 4m12-4q6 8 13 3" stroke="#bd8acb" fill="none" stroke-width="1.5"/>
+<g stroke="#e8ccf1" stroke-width="1.2" opacity=".8" fill="none"><path d="M89 108 30 101M90 114 33 118M120 109l61-9M120 115l55 8"/></g>
+<path d="M44 124q17-11 29 1 6 10-9 13H49q-13-3-5-14ZM136 124q17-10 31 0 8 13-10 14h-14q-14-4-7-14Z" fill="#141026" stroke="#c440a0" stroke-width="2"/>
+<g fill="none" stroke-width="3" filter="url(#glow)"><ellipse cx="103" cy="83" rx="98" ry="32" transform="rotate(-19 103 83)" stroke="url(#orbit)"/><path d="M10 91Q70 142 160 93" stroke="#ff62ef" opacity=".8"/></g>
+<g filter="url(#glow)"><use href="#star" x="12" y="32" fill="#fff" stroke="#ff38ed" stroke-width="2"/><use href="#star" x="197" y="21" fill="#fffbe2" stroke="#ffbc1d" stroke-width="2"/><use href="#star" x="182" y="116" fill="#fff" stroke="#ff9d24" stroke-width="1.6"/><circle cx="19" cy="124" r="3" fill="#ffde35"/><circle cx="170" cy="15" r="2.5" fill="#ff44e0"/></g>
 </svg>
