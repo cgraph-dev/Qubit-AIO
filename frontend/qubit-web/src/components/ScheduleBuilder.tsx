@@ -34,6 +34,27 @@ import {
  *    power-user workflows discoverable without making everyone scroll
  *    past it.
  */
+/** Human-readable preview; backend payloads still use buildScheduleString. */
+export function describeScheduleChoice(value: ScheduleBuilderState): string {
+  const time = value.timeOfDay || "09:00";
+  switch (value.mode) {
+    case "interval": {
+      const n = value.intervalValue;
+      const unit = n === 1 ? value.intervalUnit.replace(/s$/, "") : value.intervalUnit;
+      return n >= 1 ? `Run every ${n} ${unit}` : "Choose a valid interval";
+    }
+    case "daily": return `Run every day at ${time}`;
+    case "weekly": {
+      const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const days = value.weekdays.slice().sort((a, b) => a - b).map((day) => names[day]);
+      return `Run ${days.length ? "on " + days.join(", ") : "every day"} at ${time}`;
+    }
+    case "monthly": return `Run on day ${value.dayOfMonth} of each month at ${time}`;
+    case "once": return value.onceAt ? `Run once on ${value.onceAt.replace("T", " at ")}` : "Choose a date and time";
+    case "custom": return value.custom.trim() ? "Using a custom schedule" : "Enter your custom schedule";
+  }
+}
+
 export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
   const { t } = useI18n();
   const cronStrings = t.cron;
@@ -59,7 +80,7 @@ export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
   );
 
   return (
-    <div className="grid gap-3">
+    <div className="cron-schedule-builder grid gap-3">
       <div className="grid gap-2">
         <Label htmlFor="cron-schedule-mode">
           {cronStrings.scheduleMode ?? "Schedule"}
@@ -81,7 +102,7 @@ export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
       </div>
 
       {value.mode === "interval" && (
-        <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+        <div className="cron-interval-grid grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-2">
             <NumberField
               label={modeStrings.intervalEvery}
@@ -229,15 +250,11 @@ export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
         </div>
       )}
 
-      {/* Inline preview of what we'll send to the backend. Helps users
-          eyeball the result before hitting Create, and keeps the
-          schedule grammar discoverable for the custom mode. */}
-      <p className="text-xs text-muted-foreground">
-        <span className="opacity-70">{modeStrings.preview}: </span>
-        <span className="font-mono-ui text-foreground">
-          {buildScheduleString(value) || modeStrings.previewEmpty}
-        </span>
-      </p>
+      {/* Human outcome; the backend expression stays in buildScheduleString. */}
+      <div className="cron-schedule-preview" role="status" aria-live="polite">
+        <span className="cron-schedule-preview__title">Your schedule</span>
+        <strong>{buildScheduleString(value) ? describeScheduleChoice(value) : modeStrings.previewEmpty}</strong>
+      </div>
     </div>
   );
 }
