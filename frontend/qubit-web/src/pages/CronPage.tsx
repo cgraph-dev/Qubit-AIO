@@ -1055,7 +1055,7 @@ export default function CronPage() {
             </div>
             <footer className="cron-editor-dialog__actions flex items-center justify-end">
               <Button variant="secondary" size="sm" onClick={() => setCreateModalOpen(false)} disabled={creating}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button className="uppercase" size="sm" onClick={handleCreate} disabled={creating}>
                 {creating ? <><Spinner /> {t.common.creating}</> : t.common.create}
@@ -1116,7 +1116,7 @@ export default function CronPage() {
               </span>
               <div className="flex items-center gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setEditJob(null)} disabled={saving}>
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button className="uppercase" size="sm" onClick={handleEdit} disabled={saving}>
                   {saving ? <><Spinner /> {t.common.loading}</> : "Save changes"}
