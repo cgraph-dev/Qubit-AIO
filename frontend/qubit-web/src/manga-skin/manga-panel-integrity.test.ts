@@ -6,6 +6,7 @@ const read = (relative: string) =>
   readFileSync(new URL(relative, import.meta.url), "utf8");
 const styles = read("./manga-panel-integrity.css");
 const gate = read("./MangaSkin.tsx");
+const sidebar = read("./manga-production-layout-repair.css");
 
 describe("Manga web-dashboard page panel integrity", () => {
   it("loads the page contract after the approved sidebar styles", () => {
@@ -34,6 +35,8 @@ describe("Manga web-dashboard page panel integrity", () => {
     expect(styles).toContain("@media(prefers-reduced-motion:reduce)");
     expect(gate).toContain('emitFxAt("pop", action, { scale: 0.18 })');
     expect(gate).toContain("now - lastCue < 280");
+    expect(sidebar).not.toContain('#app-sidebar *\\n');
+    expect(sidebar).toContain("DO NOT disable animations across every sidebar descendant");
     expect(gate).toContain('pathname === "/chat"');
   });
   it("does not target the terminal, office, workbench, or unrelated themes", () => {
