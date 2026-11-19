@@ -2152,6 +2152,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       <div className="qchat__workspace flex min-h-0 flex-1 flex-col">
         <section
           aria-label="Qubit Chat transcript"
+          data-qm-zip-asset="chat-transcript"
           className={cn(
             "qchat__conversation relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg",
             "border border-current/15 bg-background-base/60 p-2 sm:p-3",

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" role="img" aria-label="Yellow anime sparkle star">
+  <defs>
+    <linearGradient id="yellow" x1="0" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#fffef3"/>
+      <stop offset=".40" stop-color="#fffbb5"/>
+      <stop offset=".72" stop-color="#ffe829"/>
+      <stop offset="1" stop-color="#ffc40c"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.1" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- One symmetrical eight-point sparkle silhouette; never scaled nonuniformly. -->
+  <path d="M35 3 Q38 24 43 28 Q49 33 69 35 Q47 38 43 44 Q38 49 35 69 Q31 47 27 43 Q22 39 3 35 Q23 32 28 28 Q32 23 35 3Z"
+        fill="#0b0413" stroke="#0b0413" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M35 8 Q37 26 42 30 Q48 34 64 35 Q46 37 42 42 Q38 47 35 64 Q32 46 28 42 Q24 38 8 35 Q25 33 29 29 Q33 24 35 8Z"
+        fill="url(#yellow)" stroke="#fff7c9" stroke-width="1.5" stroke-linejoin="round" filter="url(#glow)"/>
+  <path d="M35 17 Q35 32 39 34 L55 35 L39 37 Q36 40 35 54 Q33 39 30 37 L16 35 L30 33Z"
+        fill="#fffef8" opacity=".93"/>
+  <circle cx="11" cy="13" r="2.4" fill="#fff" stroke="#ff3eb5" stroke-width="1.5"/>
+  <circle cx="60" cy="57" r="2.2" fill="#fff5ca" stroke="#ffae20" stroke-width="1.2"/>
+</svg>

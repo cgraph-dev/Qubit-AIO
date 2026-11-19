@@ -492,7 +492,7 @@ export default function FilesPage() {
         </ListItem>
       </div>
 
-      <Card className="min-w-0 max-w-full overflow-hidden">
+      <Card data-qm-zip-asset="file-grid" className="min-w-0 max-w-full overflow-hidden">
         <CardContent className="overflow-x-auto p-0">
           {error && (
             <div

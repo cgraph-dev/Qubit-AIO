@@ -1139,7 +1139,7 @@ function ModelSettingsPanel({
   ).length ?? 0;
 
   return (
-    <Card className="min-w-0 max-w-full overflow-hidden">
+    <Card data-qm-zip-asset="model-card" className="min-w-0 max-w-full overflow-hidden">
       <CardHeader className="min-w-0 pb-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1395,7 +1395,7 @@ function ProfileUseAsPanel({ onAssigned }: { onAssigned(): void }) {
   );
 
   return (
-    <Card className="min-w-0 max-w-full overflow-hidden">
+    <Card data-qm-zip-asset="model-card" className="min-w-0 max-w-full overflow-hidden">
       <CardHeader className="min-w-0 pb-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Zap className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1673,7 +1673,7 @@ export default function ModelsPage() {
         <ProfileUseAsPanel onAssigned={onAssigned} />
 
         {data && (
-          <Card className="min-w-0 max-w-full overflow-hidden">
+          <Card data-qm-zip-asset="model-card" className="min-w-0 max-w-full overflow-hidden">
             <CardContent className="min-w-0 py-6">
               <div className="min-w-0 max-w-full [&_div.grid]:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <Stats
