@@ -399,11 +399,11 @@ export default function SkillsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="qm-skills-page flex flex-col gap-4">
       <PluginSlot name="skills:top" />
 
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-        <aside aria-label={t.skills.title} className="sm:w-56 sm:shrink-0">
+        <aside aria-label={t.skills.title} className="qm-skills-filters sm:w-56 sm:shrink-0">
           <div className="sm:sticky sm:top-0">
             <div className="flex flex-col rounded-none border border-border bg-muted/20">
               <div className="hidden sm:flex items-center gap-2 px-3 py-2 border-b border-border">
@@ -492,7 +492,7 @@ export default function SkillsPage() {
 
         <div className="flex-1 min-w-0">
           {isSearching ? (
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardHeader className="py-3 px-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -532,7 +532,7 @@ export default function SkillsPage() {
             </Card>
           ) : view === "skills" ? (
             /* Skills list */
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardHeader className="py-3 px-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -587,7 +587,7 @@ export default function SkillsPage() {
             /* Toolsets grid */
             <>
               {filteredToolsets.length === 0 ? (
-                <Card className="rounded-none">
+                <Card className="qm-skills-card rounded-none">
                   <CardContent className="py-8 text-center text-sm text-muted-foreground">
                     {t.skills.noToolsetsMatch}
                   </CardContent>
@@ -1021,7 +1021,7 @@ function HubBrowser({
   return (
     <div className="flex flex-col gap-3">
       {/* ── Search bar ── */}
-      <Card className="rounded-none">
+      <Card className="qm-skills-card rounded-none">
         <CardContent className="py-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -1051,7 +1051,7 @@ function HubBrowser({
 
       {/* ── Install/update action log ── */}
       {action && (
-        <Card className="rounded-none">
+        <Card className="qm-skills-card rounded-none">
           <CardContent className="py-3">
             <div className="flex items-center gap-2 mb-2">
               <Download className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1108,7 +1108,7 @@ function HubBrowser({
               ))}
             </div>
           ) : (
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 Search the hub above to browse installable skills from the
                 connected sources.
@@ -1135,7 +1135,7 @@ function HubBrowser({
             ms={searchMs}
           />
           {results.length === 0 ? (
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 No matching skills found in the hub.
               </CardContent>
