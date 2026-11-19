@@ -25,7 +25,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
   content:"";position:absolute;pointer-events:none;z-index:2;
   width:29px;height:29px;left:-12px;top:-10px;
-  background:url("/manga-ui/manga-reference-impact-corner.svg") top left/contain no-repeat;
+  background:url("/manga-ui/v3-original-ornament-corner.svg") top left/contain no-repeat;
   transform-origin:top left;
 }
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
@@ -87,7 +87,7 @@ html[data-qubit-manga="on"] .qchat__side > :is(
 html[data-qubit-manga="on"] [data-qm-surface="panel"]::before {
   content:"";pointer-events:none;z-index:2;
   position:absolute;left:-3px;top:-3px;width:35px;height:35px;
-  background:url("/manga-ui/manga-reference-impact-corner.svg") top left/contain no-repeat;
+  background:url("/manga-ui/v3-original-ornament-corner.svg") top left/contain no-repeat;
   transform-origin:top left;
 }
 html[data-qubit-manga="on"] .qchat__side > :is(
@@ -98,10 +98,10 @@ html[data-qubit-manga="on"] .kitchen-panel::after,
 html[data-qubit-manga="on"] .qm-confirm-dialog::after {
   content:"";pointer-events:none;z-index:2;
   position:absolute;right:-3px;bottom:-3px;width:29px;height:29px;
-  background:url("/manga-ui/manga-reference-corner-tip.svg") bottom right/contain no-repeat;
+  background:url("/manga-ui/v3-original-corner-pink.svg") bottom right/contain no-repeat;
 }
 html[data-qubit-manga="on"] .qm-confirm-dialog::before {
-  background:url("/manga-ui/manga-reference-impact-corner.svg") top left/contain no-repeat!important;
+  background:url("/manga-ui/v3-original-ornament-corner.svg") top left/contain no-repeat!important;
   width:44px;height:44px;left:-14px;top:-15px;
 }
 html[data-qubit-manga="on"] #qubit-build-notice.qm-build-notice::before {
@@ -115,12 +115,12 @@ html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) 
 html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog)::before {
   content:"";pointer-events:none;position:absolute;z-index:2;
   left:-11px;top:-11px;width:37px;height:37px;
-  background:url("/manga-ui/manga-reference-impact-corner.svg") top left/contain no-repeat;
+  background:url("/manga-ui/v3-original-ornament-corner.svg") top left/contain no-repeat;
 }
 html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog)::after {
   content:"";pointer-events:none;position:absolute;z-index:2;
   right:-4px;bottom:-4px;width:29px;height:29px;
-  background:url("/manga-ui/manga-reference-corner-tip.svg") bottom right/contain no-repeat;
+  background:url("/manga-ui/v3-original-corner-pink.svg") bottom right/contain no-repeat;
 }
 @media(max-width:580px) {
  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
@@ -134,4 +134,73 @@ html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog):
  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head::before {
   animation:none!important;transition:none!important;
  }
+}
+
+
+/* Proportional impact choreography for original V3 artwork: only transform
+ * pointer-transparent ornaments; never transform the actual input/nav hitbox.
+ * The existing Sakuga effects remain fully owned by Sakuga.
+ */
+@keyframes qm-reference-corner-arrive {
+  0% {opacity:0;transform:translate(-4px,-4px) scale(.82) rotate(-9deg)}
+  66% {opacity:1;transform:translate(1px,1px) scale(1.08) rotate(3deg)}
+  100% {opacity:1;transform:translate(0,0) scale(1) rotate(0)}
+}
+@keyframes qm-reference-ink-reveal {
+  0% {opacity:0;clip-path:inset(0 100% 0 0)}
+  100% {opacity:1;clip-path:inset(0 0 0 0)}
+}
+@keyframes qm-reference-star-pop {
+  0% {opacity:0;transform:scale(.6) rotate(-20deg)}
+  60% {opacity:1;transform:scale(1.12) rotate(8deg)}
+  100% {opacity:1;transform:scale(1) rotate(0)}
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"] [data-qm-surface="panel"]::before,
+html[data-qubit-manga="on"] .qchat__side > :is(
+ .qchat__model-panel,.qchat__tools,.qchat__artifacts,.qchat__sessions
+)::before,
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog)::before {
+  animation:qm-reference-corner-arrive 340ms cubic-bezier(.18,1.5,.34,1) both;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after,
+html[data-qubit-manga="on"] header[role="banner"] h1::after {
+  animation:qm-reference-ink-reveal 260ms ease-out 65ms both;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"]::after {
+  animation:qm-reference-star-pop 280ms cubic-bezier(.2,1.6,.42,1) both;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-cat {
+  transform-origin:center;
+  transition:filter 180ms ease,transform 180ms cubic-bezier(.18,1.45,.4,1);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row:hover .qm-brand-cat {
+  transform:rotate(-4deg) scale(1.045);
+  filter:drop-shadow(0 0 7px #28b8ff);
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog {
+  animation:qm-reference-dialog-reveal 240ms cubic-bezier(.2,1.18,.37,1) both;
+}
+@keyframes qm-reference-dialog-reveal {
+  from {opacity:0;translate:0 8px;filter:brightness(.85)}
+  to {opacity:1;translate:0 0;filter:brightness(1)}
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] :is(
+   #app-sidebar .qagent-sidebar__section-head,
+   #app-sidebar .qagent-sidebar__link[aria-current="page"],
+   .qm-confirm-dialog,
+   .qm-skill-editor-dialog,
+   .qm-skill-learn-dialog,
+   [data-qm-surface="panel"]
+  )::before,
+  html[data-qubit-manga="on"] :is(
+   #app-sidebar .qagent-sidebar__section-head,
+   #app-sidebar .qagent-sidebar__link[aria-current="page"]
+  )::after,
+  html[data-qubit-manga="on"] .qm-confirm-dialog,
+  html[data-qubit-manga="on"] #app-sidebar .qm-brand-cat {
+    animation:none!important;transition:none!important;transform:none!important;
+    translate:none!important;
+  }
 }
