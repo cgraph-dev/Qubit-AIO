@@ -1,0 +1,186 @@
+/* Q6 Manga studio pass. Source: supplied Manga reference plates + palette.json.
+ * Single opt-in component contract. No /chat TUI, Workbench, HUD, Office, desktop
+ * or Sakuga internals. All flourish is pointer-transparent; text stays live.
+ * Prefer CSS strokes and fixed-size ornaments, never stretch illustrated SVGs.
+ */
+html[data-qubit-manga="on"] {
+  --qm-bg:#0A0A1F; --qm-bg-deep:#080615;
+  --qm-panel:#171027; --qm-panel-2:#241334; --qm-panel-3:#2c1840;
+  --qm-ink:#FFF0FF; --qm-muted:#C8B9DD;
+  --qm-magenta:#FF269A; --qm-hot:#FF0F85;
+  --qm-violet:#B965FF; --qm-yellow:#FFE500; --qm-cyan:#27E9F3;
+  --qm-black:#080615; --qm-green:#4ADE80; --qm-red:#FF4D80;
+  --qm-page-pink:var(--qm-magenta); --qm-page-purple:var(--qm-violet);
+  --qm-page-yellow:var(--qm-yellow); --qm-page-ink:var(--qm-black);
+  --qm-page-text:var(--qm-ink); --qm-page-muted:var(--qm-muted);
+  --qm-display:"Rajdhani","Barlow Condensed","Arial Narrow","Arial Black",system-ui,sans-serif;
+  --qm-body:"Inter","IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --qm-page-heading:var(--qm-display); --qm-page-body:var(--qm-body);
+  --qm-motion-snap:cubic-bezier(.2,.85,.28,1);
+  --qm-motion-impact:cubic-bezier(.16,1.22,.32,1);
+  --qm-duration-fast:140ms; --qm-duration-ui:220ms; --qm-duration-enter:340ms;
+  --qm-studio-line:2px solid var(--qm-magenta);
+  font-family:var(--qm-body);
+}
+/* Headline typography is condensed and purposeful; form copy remains legible. */
+html[data-qubit-manga="on"] :is(
+  .qagent-sidebar__brand-name,.qagent-sidebar__section-head,
+  header[role="banner"] h1,.settings-page__title,.settings-section__heading,
+  .qplate-module__head,.qm-confirm-dialog__title
+) {font-family:var(--qm-display)!important;font-weight:800;letter-spacing:.055em;}
+html[data-qubit-manga="on"] :is(
+  #qubit-main-content,.qchat__side,.qm-confirm-dialog,
+  #app-sidebar .qagent-sidebar__link
+) {font-family:var(--qm-body);}
+html[data-qubit-manga="on"] :is(input,textarea,select) {font-family:var(--qm-body);}
+
+/* Brand is a real scalable mascot image and composited type, not tiny text on
+ * a stretched illustration. Icons and collapse control retain hit targets. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
+  position:relative;isolation:isolate;min-height:78px!important;
+  padding:10px 9px!important;overflow:hidden;
+  border:2px solid var(--qm-ink)!important;border-bottom:4px solid var(--qm-hot)!important;
+  background:radial-gradient(ellipse at 18% 60%,#392050 0%,transparent 65%),var(--qm-bg-deep)!important;
+  box-shadow:inset 0 0 0 3px var(--qm-magenta),0 4px 0 var(--qm-black)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row::before {
+  content:"";position:absolute;inset:3px 7px auto auto;width:68px;height:10px;pointer-events:none;
+  background:repeating-linear-gradient(115deg,var(--qm-yellow) 0 9px,var(--qm-black) 9px 13px,var(--qm-hot) 13px 22px,var(--qm-black) 22px 26px);
+  clip-path:polygon(10px 0,100% 0,100% 100%,0 100%);opacity:.92;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-emblem {
+  width:58px!important;height:58px!important;flex-basis:58px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-name {
+  font:italic 900 clamp(.9rem,1.15vw,1.14rem)/1.06 var(--qm-display)!important;
+  transform:skew(-5deg);text-shadow:2px 2px 0 var(--qm-black),0 0 13px rgba(255,38,154,.4);
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row::after {
+  content:"";position:absolute;pointer-events:none;bottom:2px;left:4px;width:44px;height:25px;
+  background:url("/manga-ui/manga-reference-three-strokes.svg") center/contain no-repeat;opacity:.8;
+}
+/* Constrained nav: never use whole-row SVG as a scalable background. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__nav > ul {padding-inline:7px;}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+  min-height:32px;margin:12px 5px 7px!important;padding:5px 33px 5px 20px!important;
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);
+  color:var(--qm-ink)!important;background:linear-gradient(105deg,var(--qm-hot),#ab278d 78%,#481451)!important;
+  box-shadow:inset 0 -2px 0 var(--qm-black)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link {
+  min-height:36px;margin-block:3px!important;padding-block:7px!important;
+  background:linear-gradient(95deg,#180d2a,#0d081e)!important;
+  color:var(--qm-ink)!important;border:1px solid #703c91!important;
+  border-left:3px solid var(--qm-violet)!important;border-radius:0!important;
+  box-shadow:inset 0 0 0 1px #0a0615,2px 2px 0 #080615!important;
+  transition:background-color var(--qm-duration-fast) ease,color var(--qm-duration-fast) ease,
+    border-color var(--qm-duration-fast) ease,filter var(--qm-duration-fast) ease!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  background:linear-gradient(95deg,#4b1c58,#170b29)!important;border-left-color:var(--qm-yellow)!important;
+  filter:brightness(1.13);
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"] {
+  background:var(--qm-yellow)!important;border-color:var(--qm-magenta)!important;
+  border-left-color:var(--qm-ink)!important;color:var(--qm-black)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:focus-visible {
+  outline:2px solid var(--qm-yellow)!important;outline-offset:2px;
+}
+/* No corner/tab pseudo-elements on the compressed rail; navigation stays usable. */
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row::before,
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row::after {content:none!important;}
+
+/* Studio plate frame: layered offset lines and independent non-stretched
+ * ornaments, with text and controls occupying the actual live panel. */
+html[data-qubit-manga="on"] :is(
+ .qchat__side > .qchat__model-panel,.qchat__side > .qchat__tools,
+ .qchat__side > .qchat__artifacts,.qchat__side > .qchat__sessions,
+ .qm-confirm-dialog,.kitchen-panel,[data-qm-surface="panel"]
+) {
+  border:2px solid var(--qm-magenta)!important;border-radius:3px!important;
+  background-color:var(--qm-panel)!important;
+  box-shadow:inset 0 0 0 2px var(--qm-black),inset 0 0 0 3px rgba(255,240,255,.8),
+    3px 3px 0 var(--qm-black),5px 5px 0 var(--qm-magenta)!important;
+}
+html[data-qubit-manga="on"] :is(
+ .qchat__side > .qchat__model-panel,.qchat__side > .qchat__tools,
+ .qchat__side > .qchat__artifacts,.qchat__side > .qchat__sessions,
+ .qm-confirm-dialog,.kitchen-panel,[data-qm-surface="panel"]
+) {min-width:0;}
+/* Header is a long edged art-directed band; tab and corner retain proportions. */
+html[data-qubit-manga="on"] header[role="banner"] {
+  position:relative;isolation:isolate;min-height:46px;
+  border-block:2px solid var(--qm-magenta)!important;
+  background:linear-gradient(100deg,#27112f,#0b081a 70%)!important;
+  box-shadow:inset 0 0 0 2px var(--qm-black),0 3px 0 var(--qm-ink)!important;
+}
+html[data-qubit-manga="on"] header[role="banner"]::after {
+  content:"";position:absolute;right:16px;top:7px;width:78px;height:12px;
+  pointer-events:none;opacity:.95;
+  background:repeating-linear-gradient(115deg,var(--qm-hot) 0 8px,var(--qm-black) 8px 12px);
+  clip-path:polygon(12px 0,100% 0,100% 100%,0 100%);
+}
+html[data-qubit-manga="on"] header[role="banner"] h1 {
+  position:relative;z-index:1;margin-right:85px;padding:6px 22px!important;
+  color:var(--qm-ink)!important;text-shadow:2px 2px 0 var(--qm-black);
+  background:linear-gradient(100deg,var(--qm-hot),#a52489)!important;
+  border:2px solid var(--qm-black)!important;clip-path:polygon(0 0,100% 0,calc(100% - 15px) 100%,0 100%);
+  max-width:max-content;
+}
+/* Form typography, affordances and space; never apply decorative animations to
+ * fields while typing or to scrollable/virtualized lists. */
+html[data-qubit-manga="on"] :is(
+ .qm-config-page,.kitchen-panel,.qm-skill-editor-dialog,.qm-skill-learn-dialog
+) {color:var(--qm-ink);line-height:1.5;}
+html[data-qubit-manga="on"] :is(
+ .qm-config-page,.kitchen-panel,.qm-skill-editor-dialog,.qm-skill-learn-dialog
+) :is(input,textarea,select) {
+  min-height:38px;max-width:100%;font-size:.875rem;line-height:1.4;
+}
+html[data-qubit-manga="on"] :is(
+ .qm-config-page,.kitchen-panel,.qm-skill-editor-dialog,.qm-skill-learn-dialog
+) :is(input,textarea,select):focus-visible {
+  outline:2px solid var(--qm-yellow)!important;outline-offset:2px;
+}
+/* Composition-only animation: once on mount/interaction, no perpetual paint
+ * storms, no filters on large panels, and never animate layout dimensions. */
+@keyframes qm-studio-enter {
+  from {opacity:0;transform:translate3d(0,8px,0)}
+  to {opacity:1;transform:translate3d(0,0,0)}
+}
+@keyframes qm-studio-corner {
+  0% {opacity:0;transform:translate3d(-5px,-5px,0) rotate(-8deg) scale(.88)}
+  70% {opacity:1;transform:translate3d(1px,1px,0) rotate(2deg) scale(1.05)}
+  100% {opacity:1;transform:translate3d(0,0,0) rotate(0) scale(1)}
+}
+@keyframes qm-studio-star {
+  0% {opacity:0;transform:scale(.7) rotate(-14deg)}
+  68% {opacity:1;transform:scale(1.1) rotate(4deg)}
+  100% {opacity:1;transform:scale(1) rotate(0)}
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog {animation:qm-studio-enter var(--qm-duration-enter) var(--qm-motion-snap) both!important;}
+html[data-qubit-manga="on"] .qm-confirm-dialog::before,
+html[data-qubit-manga="on"] [data-qm-surface="panel"]::before {
+  animation:qm-studio-corner var(--qm-duration-enter) var(--qm-motion-impact) both!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"]::after {
+  animation:qm-studio-star var(--qm-duration-ui) var(--qm-motion-impact) both!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__actions button {
+  transition:transform var(--qm-duration-fast) var(--qm-motion-snap),box-shadow var(--qm-duration-fast) ease!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__actions button:active {transform:translate(1px,2px);}
+@media (max-width:650px) {
+ html[data-qubit-manga="on"] header[role="banner"] h1 {font-size:.82rem!important;max-width:calc(100% - 95px);}
+ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {min-height:66px!important;}
+ html[data-qubit-manga="on"] .qm-confirm-dialog {max-width:calc(100vw - 24px);}
+}
+@media (prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] .qm-confirm-dialog,
+ html[data-qubit-manga="on"] .qm-confirm-dialog::before,
+ html[data-qubit-manga="on"] [data-qm-surface="panel"]::before,
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link::after {
+   animation:none!important;transition:none!important;transform:none!important;
+ }
+}
