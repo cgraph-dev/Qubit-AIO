@@ -1216,11 +1216,7 @@ html[data-qubit-manga="on"] .qchat__side .qchat__model-panel button {
   color: var(--qm-ink) !important;
 }
 
-/* Keep the embedded terminal itself untouched (canvas + xterm chrome). */
-html[data-qubit-manga="on"] .xterm,
-html[data-qubit-manga="on"] .xterm * {
-  border-radius: 0 !important;
-}
+/* The embedded xterm terminal is not part of the Manga skin. */
 
 /* -------------------------------------------------------------- panels */
 
@@ -1273,7 +1269,7 @@ html[data-qubit-manga="on"] #qubit-main-content svg [stroke="#ccc"] * {
 }
 
 /* Plot/observable chart canvases */
-html[data-qubit-manga="on"] #qubit-main-content canvas {
+html[data-qubit-manga="on"] #qubit-main-content canvas:not(.xterm canvas) {
   filter: saturate(1.15);
 }
 
