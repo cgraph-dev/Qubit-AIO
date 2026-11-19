@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { RefreshCw } from "lucide-react";
 
 import { Button, Input, emitFx } from "@/sakuga/ui";
 
@@ -172,8 +173,10 @@ export default function AgentWorkspacePage() {
               onClick={load}
               disabled={state === "loading"}
               aria-label="Refresh workspace"
+              aria-busy={state === "loading"}
             >
-              {state === "loading" ? <Spinner /> : "refresh"}
+              <RefreshCw aria-hidden="true" className={cn("qm-refresh-icon", state === "loading" && "qm-refresh-icon--spinning")} />
+              <span>Refresh</span>
             </Button>
           </div>
         </div>
