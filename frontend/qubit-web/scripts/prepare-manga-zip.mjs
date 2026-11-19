@@ -8,7 +8,8 @@
  * shipped. All 89 original SVGs + 89 PNGs are reconstructed automatically.
  */
 import { installOriginalMangaAssets } from "./install-manga-svg.mjs";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,13 +24,29 @@ if (installed !== 178) throw new Error("Incomplete Manga archive extraction");
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
-const approvedArchive = resolve(root, "qubit_manga_FINAL_approved_assets.zip");
-if (existsSync(approvedArchive)) {
-  const installedApproved = spawnSync(process.execPath, [
-    resolve(here, "install-manga-approved.mjs"), approvedArchive,
-  ], { encoding: "utf8", stdio: "inherit" });
-  if (installedApproved.error) throw installedApproved.error;
-  if (installedApproved.status !== 0) {
-    throw new Error("Qubit Manga approved production asset installation failed");
+const repairedArchive = resolve(root, "qubit_manga_REPAIRED_v2_assets.zip");
+const legacyArchive = resolve(root, "qubit_manga_FINAL_approved_assets.zip");
+const installedManifest = resolve(here, "../public/manga-ui/approved/MANIFEST.json");
+const stampFile = resolve(here, "../public/manga-ui/approved/.installed-archive-sha256");
+// Prefer the corrected 2x/high-resolution pack. Never overwrite a manually
+// installed repaired pack with the old ZIP merely because predev runs again.
+const approvedArchive = existsSync(repairedArchive)
+  ? repairedArchive
+  : !existsSync(installedManifest) && existsSync(legacyArchive)
+    ? legacyArchive
+    : null;
+if (approvedArchive) {
+  const archiveHash = createHash("sha256").update(readFileSync(approvedArchive)).digest("hex");
+  const alreadyInstalled = existsSync(installedManifest) && existsSync(stampFile) &&
+    readFileSync(stampFile, "utf8").trim() === archiveHash;
+  if (!alreadyInstalled) {
+    const installedApproved = spawnSync(process.execPath, [
+      resolve(here, "install-manga-approved.mjs"), approvedArchive,
+    ], { encoding: "utf8", stdio: "inherit" });
+    if (installedApproved.error) throw installedApproved.error;
+    if (installedApproved.status !== 0) {
+      throw new Error("Qubit Manga approved production asset installation failed");
+    }
+    writeFileSync(stampFile, archiveHash + "\n");
   }
 }
