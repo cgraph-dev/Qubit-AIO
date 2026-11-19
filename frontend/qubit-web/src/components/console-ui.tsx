@@ -52,7 +52,7 @@ export function SettingsPageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="settings-page__header">
+    <header className="settings-page__header" data-qm-surface="page-header">
       <div className="settings-page__copy">
         <h2 className="settings-page__title">{title}</h2>
         {description ? (
@@ -118,6 +118,7 @@ export function SettingsSection({
 
   return (
     <section
+      data-qm-surface="settings-section"
       className={`settings-section${danger ? " settings-section--danger" : ""}`}
       aria-label={ariaLabel}
       data-testid={testId}
@@ -137,7 +138,7 @@ export function SettingsGroup({
   children: ReactNode;
 }) {
   return (
-    <div className={`settings-group${danger ? " settings-group--danger" : ""}`}>
+    <div data-qm-surface="panel" className={`settings-group${danger ? " settings-group--danger" : ""}`}>
       {children}
     </div>
   );
@@ -173,7 +174,7 @@ export function SettingsRow({
     .join(" ");
 
   return (
-    <div className={cls} role={role} data-testid={testId}>
+    <div className={cls} data-qm-surface="row" role={role} data-testid={testId}>
       <div className="settings-row__text">
         <span className="settings-row__title">{title}</span>
         {description ? (
@@ -285,7 +286,7 @@ export function SettingsEmpty({
   title?: ReactNode;
 }) {
   return (
-    <div className="settings-empty">
+    <div className="settings-empty" data-qm-surface="empty">
       {title ? <span className="settings-empty__title">{title}</span> : null}
       {children ? <span className="settings-empty__desc">{children}</span> : null}
     </div>
@@ -294,7 +295,7 @@ export function SettingsEmpty({
 
 export function SettingsLoadingSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="settings-loading-skeleton" role="status" aria-busy="true">
+    <div className="settings-loading-skeleton" data-qm-surface="loading" role="status" aria-busy="true">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="settings-loading-skeleton__row" />
       ))}
