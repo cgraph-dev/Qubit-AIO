@@ -564,12 +564,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (resp.themes?.length) {
           const served = resp.themes
             .filter((t) => !isRetiredThemeName(t.name))
-            .map((t) => ({
-              name: t.name,
-              label: t.label,
-              description: t.description,
-              definition: t.definition,
-            }));
+            .map((t) => {
+              // The client owns the built-in labels/descriptions (normal-order
+              // naming). A rolling/stale backend may still return the old
+              // Q2..Q6 labels, so never let it overwrite a client built-in.
+              const builtin = BUILTIN_THEMES[t.name];
+              return {
+                name: t.name,
+                label: builtin?.label ?? t.label,
+                description: builtin?.description ?? t.description,
+                definition: t.definition,
+              };
+            });
           // Keep built-ins that this client knows about but a not-yet-restarted
           // server does not list (e.g. a newly shipped Q6). A built-in is
           // client-owned; the server list is authoritative only for user YAMLs

@@ -15,7 +15,7 @@ const EXPECTED_IDS = [
 ];
 
 describe("built-in theme ids", () => {
-  it("serves exactly Q2..Q6 plus one large variant each", () => {
+  it("serves exactly four base themes plus one large variant each", () => {
     expect(Object.keys(BUILTIN_THEMES).sort()).toEqual([...EXPECTED_IDS].sort());
   });
 
@@ -27,14 +27,14 @@ describe("built-in theme ids", () => {
 
   it("labels every theme with its Q-number", () => {
     for (const [id, label] of [
-      ["q2", "Q2"],
-      ["q3", "Q3"],
-      ["q4", "Q4"],
-      ["q6", "Q6"],
-      ["q2-l", "Q2-L"],
-      ["q3-l", "Q3-L"],
-      ["q4-l", "Q4-L"],
-      ["q6-l", "Q6-L"],
+      ["q2", "Q1"],
+      ["q3", "Q2"],
+      ["q4", "Q3"],
+      ["q6", "Q4"],
+      ["q2-l", "Q1-L"],
+      ["q3-l", "Q2-L"],
+      ["q4-l", "Q3-L"],
+      ["q6-l", "Q4-L"],
     ]) {
       expect(BUILTIN_THEMES[id].label).toBe(label);
     }
@@ -87,7 +87,7 @@ describe("large variants", () => {
     }
   });
 
-  it("Q6/Q6-L are the manga theme pair", () => {
+  it("q6/q6-l are the manga theme pair", () => {
     expect(isMangaThemeName("q6")).toBe(true);
     expect(isMangaThemeName("q6-l")).toBe(true);
     expect(isMangaThemeName("q2")).toBe(false);

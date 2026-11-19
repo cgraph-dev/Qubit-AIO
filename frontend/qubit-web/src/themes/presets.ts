@@ -7,11 +7,11 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme ids are Qubit-owned (`q2`..`q6`); the picker shows Q2..Q6. Q1, Q1-L,
- * Q5 and Q5-L were retired at owner request (the Q1/Q5 theme definitions
- * remain only as internal fallbacks, never as picker entries). Every remaining
- * theme ships a "-L" large variant (Q2-L .. Q6-L) that keeps the same look
- * with a bigger root size and roomier spacing. Theme names must stay in sync
+ * Theme ids are Qubit-owned (`q2`..`q6`); the picker presents them in normal
+ * order as Q1..Q4. Q1, Q1-L, Q5 and Q5-L were retired at owner request (the
+ * Q1/Q5 definitions remain only as internal fallbacks, never as picker
+ * entries). Every remaining theme ships a "-L" large variant (Q1-L .. Q4-L)
+ * that keeps the same look with a bigger root size and roomier spacing. Theme names must stay in sync
  * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
  * `qubit_cli/web_server_dashboard.py`.
  *
@@ -75,8 +75,8 @@ export const defaultTheme: DashboardTheme = {
 /** Q2 — deep blue-violet night canvas. */
 export const midnightTheme: DashboardTheme = {
   name: "q2",
-  label: "Q2",
-  description: "Q2 — near-black navy canvas with a lilac tint and violet glow",
+  label: "Q1",
+  description: "Q1 — near-black navy canvas with a lilac tint and violet glow",
   palette: {
     background: { hex: "#0a0a1f", alpha: 1 },
     midground: { hex: "#d4c8ff", alpha: 1 },
@@ -101,8 +101,8 @@ export const midnightTheme: DashboardTheme = {
 /** Q3 — grayscale, square corners. */
 export const monoTheme: DashboardTheme = {
   name: "q3",
-  label: "Q3",
-  description: "Q3 — neutral greyscale canvas with square corners and no accent hue",
+  label: "Q2",
+  description: "Q2 — neutral greyscale canvas with square corners and no accent hue",
   palette: {
     background: { hex: "#0e0e0e", alpha: 1 },
     midground: { hex: "#eaeaea", alpha: 1 },
@@ -126,8 +126,8 @@ export const monoTheme: DashboardTheme = {
 /** Q4 — high-chroma terminal look, monospace throughout. */
 export const cyberpunkTheme: DashboardTheme = {
   name: "q4",
-  label: "Q4",
-  description: "Q4 — black canvas, monospace throughout, bright mint signal colour",
+  label: "Q3",
+  description: "Q3 — black canvas, monospace throughout, bright mint signal colour",
   palette: {
     background: { hex: "#040608", alpha: 1 },
     midground: { hex: "#9bffcf", alpha: 1 },
@@ -186,9 +186,9 @@ export const contrastTheme: DashboardTheme = {
  *  the brief frame before the layer applies and for the theme-picker swatch. */
 export const mangaTheme: DashboardTheme = {
   name: "q6",
-  label: "Q6",
+  label: "Q4",
   description:
-    "Q6 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
+    "Q4 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
   palette: {
     background: { hex: "#08061a", alpha: 1 },
     midground: { hex: "#f7e9ff", alpha: 1 },
@@ -259,10 +259,10 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
   };
 }
 
-export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 2);
-export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 3);
-export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 4);
-export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 6);
+export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 1);
+export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 2);
+export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 3);
+export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 4);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   q2: midnightTheme,

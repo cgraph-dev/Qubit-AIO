@@ -1,14 +1,14 @@
 # Optional Manga Skin — Web Dashboard
 
 **Status:** implemented, typechecked, tested and built on this branch. Opt-in and reversible.
-The standalone MANGA button was removed at owner request; Q6/Q6-L in the Theme panel is the
+The standalone MANGA button was removed at owner request; Q4/Q4-L in the Theme panel is the
 only switch.
 **Scope:** the main React web dashboard under `frontend/qubit-web` only.
 
-Q6 is now a first-class theme in the dashboard Theme panel, with a Q6-L large variant. There is
-no separate MANGA button: selecting Q6/Q6-L is the only way to turn the skin on. Q1, Q1-L, Q5,
-Q5-L and Qubit Command were removed from the picker at owner request; the surviving themes are
-Q2/Q2-L, Q3/Q3-L, Q4/Q4-L and Q6/Q6-L.
+Q4 is now a first-class theme in the dashboard Theme panel, with a Q4-L large variant. There is
+no separate MANGA button: selecting Q4/Q4-L is the only way to turn the skin on. The old Q1 teal, Q1-L, Q5,
+Q5-L and Qubit Command were removed at owner request. The surviving themes are presented in
+normal order: Q1/Q1-L, Q2/Q2-L, Q3/Q3-L and Q4/Q4-L.
 
 ---
 
@@ -17,25 +17,25 @@ Q2/Q2-L, Q3/Q3-L, Q4/Q4-L and Q6/Q6-L.
 1. Build/launch the web dashboard as usual (`cd frontend/qubit-web && npm run build`, or run the
    packaged dashboard).
 2. Open the **Theme** panel from the palette button at the bottom of the left sidebar.
-3. Select **Q6** (or **Q6-L** for the larger-type variation).
-   - The theme button becomes the yellow manga badge (✦ + Q6/Q6-L + lamp).
+3. Select **Q4** (or **Q4-L** for the larger-type variation).
+   - The theme button becomes the yellow manga badge (✦ + Q4/Q4-L + lamp).
    - The dashboard applies the manga skin immediately.
 4. Keyboard: the theme trigger is a native button with a visible focus ring; `Tab` then
    `Enter`/`Space` opens the picker.
 5. Mobile: open the sidebar with the menu button, then the Theme panel.
 
-Q6/Q6-L are persisted like every other theme (server-side theme preference plus the local
+Q4/Q4-L are persisted like every other theme (server-side theme preference plus the local
 theme cache), so the choice survives reloads. The skin is derived from the selected theme; there
-is no second switch to keep in sync. Selecting any non-Q6 theme removes the skin.
+is no second switch to keep in sync. Selecting any non-Q4 theme removes the skin.
 
-### Q6 / Q6-L
+### Q4 / Q4-L
 
 | Theme | Behaviour |
 |---|---|
-| **Q6** | Manga skin with the dashboard's comfortable typography/density |
-| **Q6-L** | The same palette/skin with larger type and roomier spacing (the standard Q-L treatment) |
+| **Q4** | Manga skin with the dashboard's comfortable typography/density |
+| **Q4-L** | The same palette/skin with larger type and roomier spacing (the standard Q-L treatment) |
 
-The Theme panel row for Q6/Q6-L uses the yellow manga badge (star, yellow plate, ink text,
+The Theme panel row for Q4/Q4-L uses the yellow manga badge (star, yellow plate, ink text,
 lamp). There is no standalone MANGA button any more.
 
 ---
@@ -97,10 +97,10 @@ surface never paints one manga frame.
 | `src/manga-skin/MangaSkin.tsx` | `MangaSkinGate` (document marker only; no separate button) |
 | `src/manga-skin/manga.css` | the entire visual layer (gated by `html[data-qubit-manga="on"]`) |
 | `src/main.tsx` | mounts the gate under the router; applies the persisted marker before first paint |
-| `src/themes/presets.ts` | Q6 / Q6-L definitions and the `isMangaThemeName` helper |
+| `src/themes/presets.ts` | Q4 / Q4-L definitions and the `isMangaThemeName` helper |
 | `src/themes/context.tsx` | keeps the skin in lockstep with theme selection; remembers the return theme |
-| `src/components/ThemeSwitcher.tsx` | Q6/Q6-L rows and the yellow theme trigger |
-| `qubit_runtime/qubit_cli/web_server_dashboard.py` | Q6/Q6-L in the served built-in theme list |
+| `src/components/ThemeSwitcher.tsx` | Q4/Q4-L rows and the yellow theme trigger |
+| `qubit_runtime/qubit_cli/web_server_dashboard.py` | Q4/Q4-L in the served built-in theme list |
 | `vite.config.ts` | dev-only token scrape so `npm run dev` against a live dashboard authenticates |
 | `public/manga-ui/*.svg` | text-free ornaments: halftone, impact star, section slashes, panel corner |
 | `src/manga-skin/manga-skin.test.tsx` | route gating, persistence, excluded routes, no separate switch |
@@ -137,12 +137,12 @@ proxying the live `:8890` backend, with the real session token). Checked at 1440
 - no document-level horizontal overflow at either width
 - no new console/page errors in the verified flows (the only expected message is the existing
   typed `403 MEMORY_LOCAL_ONLY` on `/plugins`)
-- Q6/Q6-L selectable from the Theme panel; Q6-L applies the larger root type
-- the theme trigger adopts the yellow Q6 badge while active
-- Q1/Q1-L/Q5/Q5-L/Qubit Command are absent from the picker and served list
-- selecting Q2/Q3/Q4 removes the skin; Q6/Q6-L persist across reloads
-- Q6 persists across reload even against a not-yet-restarted backend (the client keeps a
-  client-known built-in and re-attempts to persist it; the served list includes Q6 after the
+- Q4/Q4-L selectable from the Theme panel; Q4-L applies the larger root type
+- the theme trigger adopts the yellow Q4 badge while active
+- the retired Q1-teal / Q1-L / Q5 / Q5-L / Qubit Command ids are absent from the picker and served list
+- selecting Q1/Q2/Q3 removes the skin; Q4/Q4-L persist across reloads
+- Q4 persists across reload even against a not-yet-restarted backend (the client keeps a
+  client-known built-in and re-attempts to persist it; the served list includes Q4 after the
   backend update)
 - dialogs, theme flyout, select panels, toasts, loading, error and disabled states exercised
 - excluded Office/HUD surfaces render with their original theme and no marker
@@ -222,7 +222,7 @@ in [`docs/manga-skin/`](../../docs/manga-skin/).
 | ![Default sessions](../../docs/manga-skin/default_sessions.jpg) | ![Manga sessions](../../docs/manga-skin/manga_sessions.jpg) |
 | ![Default chat](../../docs/manga-skin/default_qubit_chat.jpg) | ![Manga chat](../../docs/manga-skin/manga_qubit_chat.jpg) |
 
-More: `manga_theme_panel.jpg`, `manga_q6_trigger.jpg`, `manga_config.jpg`, `manga_models.jpg`,
+More: `manga_config.jpg`, `manga_models.jpg`,
 `manga_plugins.jpg`, `manga_tasks.jpg`,
 `manga_analytics.jpg`, `manga_system.jpg`, `manga_dialog_model_picker.jpg`,
 `manga_sidebar_collapsed.jpg`, `manga_mobile_sessions.jpg`, `manga_mobile_chat.jpg`,
