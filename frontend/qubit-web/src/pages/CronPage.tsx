@@ -245,10 +245,11 @@ function CronAdvancedFields({
   const models = selectedProvider?.models ?? [];
 
   return (
-    <details className="border border-border bg-background/30 p-3" open>
+    <details className="cron-advanced-fields border border-border bg-background/30 p-3">
       <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Advanced fields
+        Advanced options · Models, scripts & tools
       </summary>
+      <p className="cron-form__hint">Optional settings for experienced users. You can leave these unchanged for a standard scheduled task.</p>
       <div className="mt-3 grid gap-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
@@ -288,7 +289,7 @@ function CronAdvancedFields({
         </div>
 
         <div className="grid gap-1">
-          <Label htmlFor={`${idPrefix}-base-url`}>Base URL override</Label>
+          <Label htmlFor={`${idPrefix}-base-url`}>Custom API address</Label>
           <Input
             id={`${idPrefix}-base-url`}
             label="Base URL override"
@@ -304,7 +305,7 @@ function CronAdvancedFields({
             checked={form.no_agent}
             onChange={(checked) => update("no_agent", checked)}
           >
-            no_agent: run the script only and deliver stdout verbatim
+            Run only the script (skip the AI agent and send its output)
           </Checkbox>
           <div className="grid gap-1">
             <Label htmlFor={`${idPrefix}-script`}>Script</Label>
@@ -319,7 +320,7 @@ function CronAdvancedFields({
         </div>
 
         <div className="grid gap-1">
-          <Label htmlFor={`${idPrefix}-workdir`}>Workdir</Label>
+          <Label htmlFor={`${idPrefix}-workdir`}>Working folder</Label>
           <Input
             id={`${idPrefix}-workdir`}
             label="Workdir"
@@ -334,12 +335,12 @@ function CronAdvancedFields({
           checked={form.continuity}
           onChange={(checked) => update("continuity", checked)}
         >
-          continuity: each run sees the previous run&apos;s output (dedupe, pick up where it left off)
+          Remember the previous run (helps avoid repeated work)
         </Checkbox>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
-            <Label htmlFor={`${idPrefix}-context-from`}>context_from job IDs</Label>
+            <Label htmlFor={`${idPrefix}-context-from`}>Use context from other jobs</Label>
             <Textarea
               label=""
               id={`${idPrefix}-context-from`}
@@ -350,7 +351,7 @@ function CronAdvancedFields({
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor={`${idPrefix}-toolsets`}>enabled_toolsets</Label>
+            <Label htmlFor={`${idPrefix}-toolsets`}>Tools this job can use</Label>
             <NameCheckboxPicker
               id={`${idPrefix}-toolsets`}
               available={availableToolsets}
@@ -404,7 +405,10 @@ function CronJobFormFields({
   );
 
   return (
-    <>
+    <div className="cron-form-sections">
+      <section className="cron-form-section" aria-label="Task details">
+        <h3 className="cron-form-section__title">01 · What should Qubit do?</h3>
+        <p className="cron-form__hint">Give your task a name and tell Qubit what to do when it runs.</p>
       <div className="grid gap-2">
         <Label htmlFor={`${idPrefix}-name`}>{t.cron.nameOptional}</Label>
         <Input
@@ -428,11 +432,19 @@ function CronJobFormFields({
         />
       </div>
 
+      </section>
+      <section className="cron-form-section" aria-label="Schedule">
+        <h3 className="cron-form-section__title">02 · When should it run?</h3>
+        <p className="cron-form__hint">Choose how often the task runs. You can change it later.</p>
       <ScheduleBuilder
         value={form.scheduleState}
         onChange={(state) => update("scheduleState", state)}
       />
 
+      </section>
+      <section className="cron-form-section" aria-label="Results and delivery">
+        <h3 className="cron-form-section__title">03 · Where should results go?</h3>
+        <p className="cron-form__hint">Choose where Qubit sends the result, or keep it inside Qubit.</p>
       <div className="grid gap-2">
         <Label htmlFor={`${idPrefix}-deliver`}>{t.cron.deliverTo}</Label>
         <Select
@@ -451,7 +463,7 @@ function CronJobFormFields({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-repeat`}>{t.cron.repeat}</Label>
+        <Label htmlFor={`${idPrefix}-repeat`}>Maximum runs (optional)</Label>
         <NumberField
           label=""
           id={`${idPrefix}-repeat`}
@@ -460,11 +472,11 @@ function CronJobFormFields({
           description={t.cron.repeatPlaceholder}
           onChange={(v) => update("repeat", typeof v === "number" ? String(v) : v)}
         />
-        <p className="text-xs text-muted-foreground">{t.cron.repeatHint}</p>
+        <p className="cron-form__hint">Leave blank to keep running on the selected schedule.</p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-skills`}>Skills (optional)</Label>
+        <Label htmlFor={`${idPrefix}-skills`}>Helpful skills (optional)</Label>
         <NameCheckboxPicker
           id={`${idPrefix}-skills`}
           available={availableSkills}
@@ -478,14 +490,15 @@ function CronJobFormFields({
         </p>
       </div>
 
+      </section>
       <CronAdvancedFields
-        idPrefix={`${idPrefix}-advanced`}
+        idPrefix={`${idPrefix}-advanced`
         form={form}
         onChange={onChange}
         modelOptions={modelOptions}
         availableToolsets={availableToolsets}
       />
-    </>
+    </div>
   );
 }
 
@@ -992,7 +1005,7 @@ export default function CronPage() {
           aria-modal="true"
           aria-labelledby="create-cron-title"
         >
-          <div className={cn(themedBody, "relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
+          <div className={cn(themedBody, "cron-editor-dialog relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
             <Button
               variant="secondary"
               size="icon"
@@ -1006,15 +1019,15 @@ export default function CronPage() {
             <header className="p-5 pb-3 border-b border-border">
               <h2
                 id="create-cron-title"
-                className="font-mondwest text-display text-base tracking-wider"
+                className="cron-editor-dialog__title font-mondwest text-display text-base tracking-wider"
               >
                 {t.cron.newJob}
               </h2>
             </header>
 
-            <div className="min-h-0 overflow-y-auto p-5 grid gap-4">
+            <div className="cron-editor-dialog__body min-h-0 overflow-y-auto p-5 grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="cron-profile">Profile</Label>
+                <Label htmlFor="cron-profile">Run this task as</Label>
                 <Select
                   id="cron-profile"
                   label="Profile"
@@ -1040,7 +1053,7 @@ export default function CronPage() {
                 }}
               />
 
-              <div className="flex justify-end">
+              <div className="cron-editor-dialog__actions flex justify-end">
                 <Button
                   className="uppercase"
                   size="sm"
@@ -1085,7 +1098,7 @@ export default function CronPage() {
               </h2>
             </header>
 
-            <div className="min-h-0 overflow-y-auto p-5 grid gap-4">
+            <div className="cron-editor-dialog__body min-h-0 overflow-y-auto p-5 grid gap-4">
               <CronJobFormFields
                 idPrefix="edit-cron"
                 autoFocus
@@ -1099,7 +1112,7 @@ export default function CronPage() {
                 }}
               />
 
-              <div className="flex items-center justify-between">
+              <div className="cron-editor-dialog__actions flex items-center justify-between">
                 <span className="text-xs text-muted-foreground font-mono-ui truncate pr-4">
                   {editJob.id}
                 </span>
