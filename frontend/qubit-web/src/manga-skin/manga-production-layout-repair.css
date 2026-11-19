@@ -677,3 +677,16 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .q
   color: #120618 !important;
   border-color: #120618 !important;
 }
+
+/* The ZIP nav-default artwork draws a second inset plate around each row.
+   In the approved sidebar it reads as an empty purple container, so paint the
+   row itself and keep only its own outer keyline. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qubit-manga-zip="ready"] #app-sidebar nav .qagent-sidebar__link:not([aria-current="page"]) {
+  background: linear-gradient(100deg, #30123b, #170821 75%, #13061c) !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qubit-manga-zip="ready"] #app-sidebar nav .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  background: linear-gradient(100deg, #491147, #220a2d 78%, #170821) !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qubit-manga-zip="ready"] #app-sidebar nav .qagent-sidebar__link:focus-visible:not([aria-current="page"]) {
+  background: linear-gradient(100deg, #491147, #220a2d 78%, #170821) !important;
+}
