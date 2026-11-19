@@ -499,3 +499,21 @@ html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head {
   overflow: visible !important;
   isolation: isolate !important;
 }
+
+/* The section-title charge is the real section-slashes.svg artwork, not three
+   hand-drawn clip-path bars. Hide the decorative <i> children and paint the
+   one asset at its own aspect ratio. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells {
+  display: block !important;
+  width: 72px !important;
+  height: 21px !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: url("/manga-ui/section-slashes.svg") center / contain no-repeat !important;
+  gap: 0 !important;
+  animation: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i {
+  display: none !important;
+}
