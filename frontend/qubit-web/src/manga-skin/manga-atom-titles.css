@@ -130,24 +130,6 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
 }
 
 
-/* Reference image finishing pass. Do not stylize PTY/xterm itself; allow
-   /chat's header, sidebar, inspector and footer to receive the Manga skin. */
-html[data-qubit-manga="on"] #qubit-main-content :is(.xterm,.xterm-screen,.xterm-viewport,.xterm-cursor-layer,.xterm-text-layer) {
-  background-image:none!important;
-  box-shadow:none!important;
-  text-shadow:none!important;
-  letter-spacing:normal!important;
-  font-family:var(--terminal-font-family,monospace)!important;
-}
-html[data-qubit-manga="on"] #qubit-main-content .xterm canvas {
-  filter:none!important;
-  border:0!important;
-  box-shadow:none!important;
-}
-html[data-qubit-manga="on"] #qubit-main-content .xterm :is(.xterm-scroll-area,.xterm-helper-textarea) {
-  background:transparent!important;
-  border:0!important;
-}
 /* Crisp high contrast vector-like edges without raster blur.  Keep the
    React-owned star and charge cells fully visible above the header. */
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
