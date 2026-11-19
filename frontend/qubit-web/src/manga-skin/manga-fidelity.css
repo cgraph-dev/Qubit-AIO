@@ -1,0 +1,226 @@
+/* Reference fidelity pass: illustrated header, title plates, charging cells,
+ * cut-corner navigation, telemetry and footer. Q6/Q6-L only.
+ * Imported AFTER manga-neon-reference; no route or click logic is overridden.
+ */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) {
+  --qm-f-pink:#ff2da6;--qm-f-yellow:#ffea23;--qm-f-white:#fff1ff;
+  --qm-f-purple:#b95aff;--qm-f-ink:#0e0619;
+  width:clamp(256px,21vw,314px)!important;
+  border:3px solid #ff3fae!important;
+  border-radius:3px!important;
+  box-shadow:inset 0 0 0 2px #fff1ff,3px 0 0 #090314,5px 0 0 #fb2d9c!important;
+  background:linear-gradient(90deg,#370d3a 0%,#e32b91 3%,#e32b91 97%,#210927 100%)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__backdrop,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__backdrop-scrim {
+  opacity:0!important;display:none!important;
+}
+/* Header: preserve the real expand/minimize React button, not the generated pause symbol. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
+  min-height:94px!important;height:94px!important;gap:5px!important;
+  padding:4px 6px!important;overflow:visible!important;
+  background:
+    radial-gradient(ellipse at 31% 40%,rgba(213,38,210,.35),transparent 59%),
+    radial-gradient(circle at 12% 12%,rgba(255,255,255,.16),transparent 22%),
+    #10071b!important;
+  border:2px solid #fb329f!important;border-bottom:3px solid #fff1ff!important;
+  box-shadow:inset 0 0 0 2px #0b0412,0 3px 0 #07010d!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row > div {
+  gap:3px!important;min-width:0!important;flex:1 1 auto!important;position:relative;z-index:2;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-emblem {
+  width:91px!important;min-width:91px!important;flex:0 0 91px!important;
+  height:78px!important;overflow:visible!important;position:relative!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-emblem > svg {display:none!important}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-cat {
+  width:108%!important;height:105%!important;object-fit:contain!important;
+  transform:translate(-5px,1px)!important;
+  filter:drop-shadow(0 0 4px #ff41c8) drop-shadow(0 0 3px #3167ff)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-name {
+  margin-left:-2px!important;font-size:clamp(.95rem,1.25vw,1.12rem)!important;
+  line-height:1.1!important;font-style:italic!important;font-weight:900!important;
+  letter-spacing:-.045em!important;white-space:nowrap!important;
+  text-shadow:1px 2px #100317,0 0 8px #ff2da6!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__pulse {
+  width:8px!important;height:8px!important;min-width:8px!important;
+  margin-left:2px!important;box-shadow:0 0 5px #5bff84!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row > button {
+  position:relative;z-index:4;flex-shrink:0!important;
+  width:30px!important;min-width:30px!important;height:32px!important;
+  padding:4px!important;border:2px solid #ff43c1!important;
+  border-radius:5px!important;background:#150a25!important;
+  box-shadow:0 0 5px #ff2da6,inset 0 0 4px #a02e8d!important;
+  color:#fff2ff!important;clip-path:polygon(18% 0,82% 0,100% 18%,100% 82%,82% 100%,18% 100%,0 82%,0 18%)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row > button:hover,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row > button:focus-visible {
+  box-shadow:0 0 12px #ff51dd!important;outline:2px solid #ffed3b!important;outline-offset:2px;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row::before {
+  width:95px!important;height:10px!important;top:1px!important;right:10px!important;
+  background:repeating-linear-gradient(118deg,#ffdf13 0 11px,#18061b 11px 15px,#ff399f 15px 29px,#18061b 29px 33px)!important;
+  animation:qm-f-charge 2.2s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row::after {
+  width:96px!important;height:8px!important;bottom:2px!important;right:11px!important;left:auto!important;
+  background:repeating-linear-gradient(118deg,#fa2da3 0 14px,#17051b 14px 19px,#ffe527 19px 31px,#17051b 31px 35px)!important;
+  animation:qm-f-charge 2.2s ease-in-out -.9s infinite!important;
+}
+/* The title plate must not use clip-path: clipping was cutting off the lightning. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__nav {
+  padding:8px 6px 14px!important;scrollbar-width:thin;scrollbar-color:#ff3ab5 #1e0b2a;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section {
+  padding:7px 4px 8px!important;margin:10px 1px!important;
+  border:2px solid #ff2da6!important;background:#1a0a28!important;
+  box-shadow:inset 0 0 0 1px #fff1ff66,2px 2px 0 #090411!important;
+  overflow:visible!important;isolation:isolate;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+  position:relative!important;isolation:isolate!important;overflow:visible!important;
+  display:flex!important;align-items:center!important;
+  gap:8px!important;min-height:37px!important;
+  margin:5px 3px 8px!important;padding:7px 67px 6px 22px!important;
+  clip-path:none!important;border:2px solid #14051b!important;border-left:0!important;
+  background:linear-gradient(95deg,#ff4caf 0%,#f22c9f 69%,#9c1d75 100%)!important;
+  box-shadow:2px 2px 0 #080411,3px 3px 0 #fff1ff!important;
+  color:#fff1ff!important;font:italic 900 .81rem/1.1 var(--qm-display,system-ui)!important;
+  text-shadow:1px 2px 0 #110417!important;letter-spacing:.025em!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
+  display:block!important;content:""!important;position:absolute!important;
+  z-index:4!important;width:40px!important;height:47px!important;top:-12px!important;left:-16px!important;
+  transform:none!important;background:url("/manga-ui/neon-lightning.svg") center/contain no-repeat!important;
+  pointer-events:none!important;animation:qm-f-spark 3s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
+  content:""!important;display:block!important;position:absolute!important;z-index:1!important;
+  width:19px!important;height:calc(100% + 4px)!important;right:-10px!important;top:-2px!important;
+  transform:skewX(-25deg)!important;background:#19071f!important;border-right:2px solid #fff1ff!important;
+  clip-path:none!important;animation:none!important;pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-index {
+  font-size:.9rem!important;font-weight:900!important;letter-spacing:0!important;color:#ffe728!important;
+  -webkit-text-stroke:.4px #15061c;text-shadow:1px 2px #12051c!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells {
+  display:flex!important;position:absolute!important;z-index:2!important;
+  top:2px;right:-2px;height:calc(100% - 4px);gap:3px;
+  align-items:stretch;pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i {
+  display:block;width:13px;transform:skewX(-28deg);
+  border:1px solid #1b071a;background:#ffe629;
+  box-shadow:inset 0 0 2px #fffaa2,2px 1px 0 #10051c;
+  animation:qm-f-cell-charge 2.4s ease-in-out infinite;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(2) {animation-delay:.22s}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(3) {animation-delay:.44s}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section ul {
+  padding:0 1px!important;gap:2px!important;
+}
+/* Reuse the selected yellow row/image and its existing impact-star animation. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link {
+  min-height:38px!important;margin:2px 0!important;padding:7px 31px 7px 11px!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  background-size:100% 100%!important;background-repeat:no-repeat!important;
+  background-position:center!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:not([aria-current="page"]) {
+  background-color:transparent!important;background-image:url("/manga-ui/v3-nav-row-normal.svg")!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  background-image:url("/manga-ui/v3-nav-row-hover.svg")!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"] {
+  background-image:url("/manga-ui/v3-nav-row-selected.svg")!important;color:#0d0617!important;
+}
+/* Purple system status block is pinned and separate from scrolling navigation. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
+  margin:4px 8px 5px!important;padding:6px!important;flex-shrink:0!important;
+  border:2px solid #ff36a7!important;background:#13081f!important;
+  box-shadow:inset 0 0 0 2px #0c0414,2px 2px 0 #050309!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head {
+  margin:2px 1px 8px!important;min-height:32px!important;padding:7px 11px 7px 29px!important;
+  background:linear-gradient(94deg,#c276f0,#e4a0ff 72%,#bb66e7)!important;
+  border:2px solid #fff1ff!important;box-shadow:2px 2px #0e0617!important;
+  font-style:italic!important;color:#140b1f!important;text-shadow:1px 1px #fff1ff!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::before {
+  width:18px!important;height:18px!important;top:50%!important;left:5px!important;transform:translateY(-50%)!important;
+  background:url("/manga-ui/neon-bolt-nut.svg") center/contain no-repeat!important;animation:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::after,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qm-manga-charge-cells {display:none!important}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry {
+  background:#10071d!important;border:1px solid #b44dec!important;padding:5px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry-key {
+  color:#ffe629!important;font-size:.68rem!important;letter-spacing:.07em!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry-value {font-size:.75rem!important}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__action {
+  border:1px solid #ff33ad!important;background:#180d29!important;
+  box-shadow:0 0 3px #ff2d9a!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__action:disabled {
+  filter:grayscale(.7);opacity:.48!important;
+}
+/* Footer: three individually charging LEDs; preserve version and org text on the right. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon {
+  min-height:42px!important;position:relative!important;overflow:visible!important;
+  margin:8px 10px 10px!important;padding:8px 9px!important;
+  border:3px solid #fff1ff!important;border-radius:12px!important;
+  background:linear-gradient(110deg,#130821,#230d35 70%,#0c0618)!important;
+  box-shadow:inset 0 0 0 3px #11061d,0 0 0 3px #ff2ba2,2px 2px 0 4px #08020d!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon::before {content:none!important;display:none!important}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-footer-content {
+  display:flex!important;align-items:center!important;gap:6px!important;
+  color:#ceb4de!important;font-size:.55rem!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-footer-leds {
+  display:flex!important;gap:5px!important;align-items:center!important;flex:0 0 auto!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-footer-leds i {
+  width:10px;height:10px;display:block;border-radius:50%;
+  border:1.5px solid #fff1ff;box-shadow:0 0 0 1px #2a092e;
+  background:#ffe629;animation:qm-f-led-pulse 2.7s ease-in-out infinite;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-footer-leds i:nth-child(2){animation-delay:.45s}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-footer-leds i:nth-child(3){background:#f530a6;animation-delay:.9s}
+@keyframes qm-f-spark {
+  0%,100% {opacity:.86;filter:drop-shadow(0 0 2px #ffe629)}
+  50% {opacity:1;filter:drop-shadow(0 0 7px #fff37b) drop-shadow(0 0 3px #ff2b9e)}
+}
+@keyframes qm-f-charge {
+  0%,100% {filter:brightness(.84) drop-shadow(0 0 1px #ffe629)}
+  50% {filter:brightness(1.28) drop-shadow(0 0 6px #ffdf1b)}
+}
+@keyframes qm-f-cell-charge {
+  0%,15%,100% {filter:brightness(.76);opacity:.76;box-shadow:inset 0 0 1px #fff,0 0 1px #f9ca13}
+  40%,60% {filter:brightness(1.34);opacity:1;box-shadow:inset 0 0 5px #fffacd,0 0 10px #fff027}
+}
+@keyframes qm-f-led-pulse {
+  0%,100% {filter:brightness(.75);box-shadow:0 0 1px #ffed39}
+  50% {filter:brightness(1.25);box-shadow:0 0 8px #ffe629}
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer-leds,
+html:not([data-qubit-manga="on"]) .qm-manga-footer-leds,
+html:not([data-qubit-manga="on"]) .qm-manga-charge-cells {display:none!important}
+@media(max-width:1023px){
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]){width:min(314px,90vw)!important}
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] #app-sidebar :is(
+    .qm-manga-charge-cells i,.qm-manga-footer-leds i,
+    .qagent-sidebar__section-head::before,.qagent-sidebar__brand-row::before,
+    .qagent-sidebar__brand-row::after
+  ) {animation:none!important}
+}
