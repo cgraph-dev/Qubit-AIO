@@ -561,17 +561,28 @@ def spend_turn(cfg: Any, *, agent_id: int, day: Optional[str] = None,
             return {"state": "OK", "allowed": True, "bounded": False,
                     "turns_used": 0, "turns_cap": None}
         used, cap = int(row["turns_used"]), int(row["turns_cap"])
-        if used >= cap:
-            return {"state": "OK", "allowed": False, "bounded": True,
-                    "code": "OFFICE_TURN_BUDGET_EXHAUSTED",
-                    "turns_used": used, "turns_cap": cap,
-                    "detail": (f"seat #{agent_id} has used {used} of {cap} "
-                               f"turns today")}
-        conn.execute("UPDATE office_turn_budget SET turns_used=turns_used+1"
-                     " WHERE day=? AND agent_id=?", (key, int(agent_id)))
+        # One conditional UPDATE is the reservation: two concurrent spenders
+        # cannot both observe `used < cap` and both commit a turn. SQLite
+        # serialises the writes; the loser sees rowcount 0 and reports the
+        # exhausted budget from a fresh read.
+        cur = conn.execute(
+            "UPDATE office_turn_budget SET turns_used=turns_used+1"
+            " WHERE day=? AND agent_id=? AND turns_used < turns_cap",
+            (key, int(agent_id)))
         conn.commit()
-        return {"state": "OK", "allowed": True, "bounded": True,
-                "turns_used": used + 1, "turns_cap": cap}
+        if cur.rowcount == 1:
+            return {"state": "OK", "allowed": True, "bounded": True,
+                    "turns_used": used + 1, "turns_cap": cap}
+        fresh = conn.execute(
+            "SELECT turns_used, turns_cap FROM office_turn_budget"
+            " WHERE day=? AND agent_id=?", (key, int(agent_id))).fetchone()
+        used_now = int(fresh["turns_used"]) if fresh else used
+        cap_now = int(fresh["turns_cap"]) if fresh else cap
+        return {"state": "OK", "allowed": False, "bounded": True,
+                "code": "OFFICE_TURN_BUDGET_EXHAUSTED",
+                "turns_used": used_now, "turns_cap": cap_now,
+                "detail": (f"seat #{agent_id} has used {used_now} of {cap_now} "
+                           f"turns today")}
     finally:
         conn.close()
 
