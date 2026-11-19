@@ -19,7 +19,10 @@ describe("approved Manga artwork alignment contract", () => {
   it("uses one star-free high-resolution plate and a replaceable independent star", () => {
     expect(css).toContain("05_section_titlebar_starless.webp");
     expect(css).toContain("13_star_only.webp");
-    expect(css).toContain("aspect-ratio:5.45");
+    expect(css).toContain("aspect-ratio:2104 / 380");
+    expect(css).toContain("manga-sidebar-outer-frame.svg");
+    expect(css).toContain("manga-tooltip-precision.svg");
+    expect(css).toContain("manga-system-title-precision.svg");
     expect(css).toContain(".qm-studio-title-corner__star");
     expect(installer).toContain('"13_star_only.webp"');
     expect(installer).toContain('"05_section_titlebar_starless.webp"');
@@ -31,15 +34,23 @@ describe("approved Manga artwork alignment contract", () => {
     expect(css).toContain(".qagent-sidebar__link-label::before");
     expect(css).toContain("text-overflow:ellipsis");
     expect(css).toContain(".qagent-sidebar__section::after");
+    expect(css).toContain("content:none!important");
+    expect(css).toContain("overflow-y:auto!important");
   });
 
   it("corrects frame and header sizing without modifying a terminal", () => {
-    expect(css).toContain("height:145px");
-    expect(css).toContain("height:161px");
+    expect(css).toContain("height:130px");
+    expect(css).toContain("height:165px");
+    expect(css).toContain("filter:brightness(.65) saturate(.85)");
     expect(css).toContain("01_sidebar_header.webp");
     expect(css).toContain("02_system_panel_frame.webp");
     expect(css).not.toContain("xterm");
     expect(css).not.toContain("/workbench");
+    const tooltip = read("../../public/manga-ui/manga-tooltip-precision.svg");
+    expect(tooltip).toContain('<circle cx="267" cy="30" r="27"');
+    expect(tooltip).toContain("viewBox=\"0 0 320 170\"");
+    const frame = read("../../public/manga-ui/manga-sidebar-outer-frame.svg");
+    expect(frame).toContain("viewBox=\"0 0 320 1000\"");
   });
 
   it("prefers repaired assets and never blindly reapplies the old ZIP", () => {
