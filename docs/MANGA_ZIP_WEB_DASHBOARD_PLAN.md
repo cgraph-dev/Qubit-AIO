@@ -63,3 +63,13 @@
 - Keyframe colors were suppressed by `!important` declarations: **fixed** and contract tested.
 - Earlier code imported only a handful of the 89 ZIP families: **requires import/deployment of all remaining original files** before completion can be declared.
 - ZIP has an old `MangaSkinToggle` implementation; replacing the current gate would be a regression: **do not copy it over**.
+
+## Integration implementation status (PR #16, 2026-11-19)
+
+- **Phase 0 — Source asset import: implemented.** The exact uploaded ZIP is kept in ten under-500-KiB text parts at `frontend/qubit-web/scripts/manga-original-zip-parts/`. SHA-256 `e385c8c5c5b928c84ea8fe88d975e41b65ba903b8ad58f44878f5982feaf68d0`; the npm pre-hooks reconstruct every original SVG and PNG (89 of each) into `public/manga-ui/zip/`.
+- **Phase 1 — Shared rail/system: implemented in source.** The non-deformed yellow anime atom is `public/manga-ui/manga-anime-atom.svg`; `manga-atom-titles.css` is the final layer for hot-pink title plates and staggered yellow cells. The System panel uses the original ZIP gateway frame and live React telemetry. Native collapse and selected-route behavior are untouched.
+- **Phase 2 — Shared controls: implemented in source.** `manga-zip-controls.css`, `manga-zip-surfaces.css`, and `manga-zip-registry.css` expose all 89 families and apply relevant page and interaction styles only when the Manga gate is enabled and the extracted manifest exists.
+- **Phase 3 — Page-specific integration: implemented in source for existing React surfaces.** `manga-zip-routes.css` attaches route-scoped frames, and real Chat/Files/Analytics/Models/Plugins/Profiles React nodes carry relevant `data-qm-zip-asset` markers. Other route classes use shared settings, chat, table, status, forms, dialogs and right-rail layers. Asset variants without a matching live component remain available in the 89-family registry; they do not generate fake features.
+- **Phase 4 — Verification: source asset checks passed; CI and live screenshot acceptance remain required.** The original ZIP can be reconstructed byte-for-byte, all 178 art files exist, all CSS URL references map to source asset names, and CSS brace balance checks passed. Do not claim browser pixel fidelity until CI/e2e and a running-dashboard screenshot comparison have been reviewed.
+
+The ZIP's legacy `MangaSkinToggle` and top-level installer CSS were deliberately **not** blindly copied into the new theme architecture; doing so would break Q6/Q6-L gating and the current user navigation.
