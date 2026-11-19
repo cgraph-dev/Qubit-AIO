@@ -1,0 +1,172 @@
+/* Q6/Q6-L sidebar final reference alignment.
+ *
+ * Deliberately last in MangaSkin imports. Navigation, selection and collapse
+ * remain React-owned. The exact archive artwork is supplied by the vendored
+ * ZIP; only the heading text and small ornaments need live DOM CSS.
+ */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) {
+  --qm-plate-pink:#fa309e;
+  --qm-plate-gold:#ffed2e;
+  --qm-plate-white:#fff1ff;
+  --qm-plate-ink:#11071d;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section {
+  padding:7px 3px 8px!important;
+  margin:9px 1px 12px!important;
+  border:2px solid #f434a3!important;
+  border-radius:0!important;
+  background:linear-gradient(110deg,#200d33,#12071e)!important;
+  box-shadow:inset 0 0 0 1px #f9a4ed55,2px 2px 0 #070410!important;
+  overflow:visible!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  isolation:isolate!important;
+  position:relative!important;
+  min-height:38px!important;
+  margin:6px 5px 7px!important;
+  padding:6px 70px 6px 23px!important;
+  border:2px solid #130619!important;
+  border-left:0!important;
+  border-radius:0!important;
+  clip-path:none!important;
+  overflow:visible!important;
+  background:linear-gradient(96deg,#ff49b5 0%,#f52b9c 69%,#be287f 100%)!important;
+  box-shadow:0 2px 0 #fff1ff,2px 4px 0 #080411!important;
+  color:#fff0ff!important;
+  font:italic 900 15px/1.15 var(--qm-display, "Rajdhani",system-ui,sans-serif)!important;
+  text-transform:uppercase!important;
+  letter-spacing:.045em!important;
+  text-shadow:1px 2px 0 #100319,0 0 2px #fff8ff!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head > span:nth-child(2) {
+  position:relative;z-index:2;
+  flex:0 1 auto!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  letter-spacing:.035em!important;
+  text-transform:uppercase!important;
+  color:#fff0ff!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-index {
+  display:inline-block!important;
+  position:relative;z-index:2;
+  flex:0 0 auto!important;
+  color:#fff02b!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  font-style:italic!important;
+  letter-spacing:0!important;
+  -webkit-text-stroke:.35px #100319!important;
+  text-shadow:1px 2px 0 #100319!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  z-index:4!important;
+  width:38px!important;
+  height:38px!important;
+  aspect-ratio:1!important;
+  left:-16px!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  transform-origin:center!important;
+  background:url("/manga-ui/manga-anime-star.svg") center/contain no-repeat!important;
+  filter:drop-shadow(0 0 3px #ffdf29);
+  pointer-events:none!important;
+  animation:qm-clean-star-glow 3.1s ease-in-out infinite!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
+  content:""!important;
+  position:absolute!important;
+  z-index:1!important;
+  top:-2px!important;right:-11px!important;
+  width:20px!important;height:calc(100% + 4px)!important;
+  transform:skewX(-22deg)!important;
+  border:0!important;border-right:2px solid #fff1ff!important;
+  background:#10051b!important;
+  animation:none!important;
+  pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells {
+  display:flex!important;
+  position:absolute!important;z-index:5!important;
+  right:0!important;top:3px!important;
+  width:max-content!important;
+  height:calc(100% - 6px)!important;
+  gap:4px!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells > i {
+  display:block!important;
+  width:14px!important;
+  min-width:14px!important;
+  height:100%!important;
+  transform:skewX(-22deg)!important;
+  background-color:#dba519;
+  border:1px solid #10051b!important;
+  box-shadow:0 0 1px #c4a32c;
+  animation:qm-clean-charge 2.1s steps(1,end) infinite!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells > i:nth-child(2) {animation-delay:-.7s!important}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells > i:nth-child(3) {animation-delay:-1.4s!important}
+@keyframes qm-clean-charge {
+  0%,100% {background-color:#b78411;box-shadow:inset 0 0 2px #a66e0b,0 0 1px #c79f12;filter:brightness(.85)}
+  33% {background-color:#fff7ac;box-shadow:inset 0 0 4px #fffef4,0 0 8px 3px #ffef3d;filter:brightness(1.22)}
+  66% {background-color:#ffe52d;box-shadow:inset 0 0 3px #fff5b2,0 0 5px #ffe52d;filter:brightness(1)}
+}
+@keyframes qm-clean-star-glow {
+  0%,100% {opacity:.88;filter:drop-shadow(0 0 2px #ffe62a)}
+  48% {opacity:1;filter:drop-shadow(0 0 8px #ffed5c) drop-shadow(0 0 4px #ff3cb4)}
+}
+/* System uses its own nut ornament and violet plate, not the anime star. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head {
+  margin:0 0 5px!important;min-height:32px!important;
+  padding:5px 10px 5px 31px!important;
+  color:#13051f!important;
+  font-size:15px!important;
+  background:linear-gradient(95deg,#be77ec,#e6a4ff 76%,#b75add)!important;
+  border:2px solid #fff1ff!important;
+  box-shadow:2px 2px 0 #10051b!important;
+  text-shadow:1px 1px 0 #fff1ff!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head > span:nth-child(2) {
+  color:#16051f!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::before {
+  width:19px!important;height:19px!important;left:5px!important;top:50%!important;
+  transform:translateY(-50%)!important;
+  background:url("/manga-ui/neon-bolt-nut.svg") center/contain no-repeat!important;
+  animation:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::after {
+  display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qm-manga-charge-cells {
+  display:none!important;
+}
+/* Do not change the yellow selected row, the impact animation or collapse. */
+@media(max-width:1023px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+    min-height:39px!important;font-size:14px!important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head > span:nth-child(2) {
+    font-size:14px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head::before,
+  html[data-qubit-manga="on"] #app-sidebar .qm-manga-charge-cells > i {
+    animation:none!important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar .qm-manga-charge-cells > i {
+    background-color:#ffe72a!important;
+    box-shadow:inset 0 0 3px #fff8bd,0 0 2px #ffe62a!important;
+  }
+}
