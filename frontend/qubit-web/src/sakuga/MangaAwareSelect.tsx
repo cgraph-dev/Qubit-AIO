@@ -27,6 +27,7 @@ function MangaSelect({
   const panel = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   const menuId = useId();
+  const listId = `${menuId}-listbox`;
   const current = controlled ? value : internal;
   const chosen = options.find((opt) => opt.value === current);
   const shown = options.filter((opt) => opt.label.toLocaleLowerCase().includes(filter.trim().toLocaleLowerCase()));
@@ -110,7 +111,7 @@ function MangaSelect({
         aria-label={label}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
+        aria-controls={open ? listId : undefined}
         disabled={disabled}
         onClick={() => { if (!open) reposition(); setOpen((v) => !v); }}
       >
@@ -143,7 +144,12 @@ function MangaSelect({
               }}
             />
           </div>
-          <div className="qm-select-popover__options" role="listbox" aria-label={label}>
+          <div
+            id={listId}
+            className="qm-select-popover__options"
+            role="listbox"
+            aria-label={label}
+          >
             {shown.length === 0 && <div className="qm-select-empty">No matches</div>}
             {shown.map((option) => (
               <button
