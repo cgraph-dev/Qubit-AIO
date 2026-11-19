@@ -18,6 +18,14 @@
 
     /* Path aliases */
     "paths": {
+      /*
+       * The app typechecks shared TSX source directly. Resolving React from
+       * both sibling node_modules creates two incompatible CSSProperties
+       * (csstype) graphs. Type-only redirect: Vite still dedupes runtime React.
+       */
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
+      "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"],
       "@/*": ["./src/*"],
       "@qubit/shared": ["../qubit-shared/src/index.ts"],
       "@qubit/shared/*": ["../qubit-shared/src/*"]
