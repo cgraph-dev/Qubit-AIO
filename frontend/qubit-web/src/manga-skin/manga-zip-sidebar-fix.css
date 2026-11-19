@@ -39,9 +39,9 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i {
   display:block!important;position:relative!important;width:15px!important;min-width:15px!important;
   height:100%!important;transform:skewX(-24deg)!important;
-  background:#ffcf17!important;
+  background:#ffcf17;
   border:1.5px solid #1b071d!important;
-  box-shadow:inset 0 0 2px #fff8af,0 0 1px #ffe629!important;
+  box-shadow:inset 0 0 2px #fff8af,0 0 1px #ffe629;
   filter:none!important;opacity:1!important;
   animation:qm-zip-charge-cell 2.1s steps(1,end) infinite!important;
   will-change:auto;
