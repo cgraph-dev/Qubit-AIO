@@ -1,6 +1,7 @@
 /* Manga reference repair — crisp corners, black cat mascot and no random
  * micro-stripes. Scoped to Q6/Q6-L eligible routes; never edits Sakuga engine.
  */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::after,
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::before,
 html[data-qubit-manga="on"] header[role="banner"]::after,
 html[data-qubit-manga="on"] .qchat__header::after,
