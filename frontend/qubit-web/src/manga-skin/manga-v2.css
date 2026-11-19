@@ -1,0 +1,359 @@
+/* Manga V2: a cohesive graphic layer on top of the Q6 skin.
+   Never applies to /chat, Workbench, HUD or Office (route gate handles it).
+   No images are rasterized: the corners and impact marks are SVG/CSS.
+*/
+html[data-qubit-manga="on"] {
+  --qm-display: var(--theme-font-display, "Rajdhani", "Arial Narrow", system-ui, sans-serif);
+  --qm-ui: var(--theme-font-sans, "Inter", system-ui, sans-serif);
+  --qm-space-xs: 5px;
+  --qm-space-sm: 9px;
+  --qm-space-md: 14px;
+  --qm-space-lg: 20px;
+  --qm-frame-outer: #f8edff;
+  --qm-frame-mid: #ff269a;
+  --qm-frame-shadow: #05030f;
+  --qm-impact: #ffe500;
+  --qm-layer-menu: 2147482600;
+  --qm-border-shadow: 2px 2px 0 #05030f, 4px 4px 0 rgba(255, 240, 255, .67);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
+  position: relative;
+  min-height: 64px;
+  border-top: 3px solid var(--qm-magenta);
+  border-bottom: 3px double var(--qm-frame-outer) !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 36px;
+  bottom: 3px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--qm-yellow) 0 18%, var(--qm-magenta) 18% 72%, transparent);
+  pointer-events: none;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+  font-family: var(--qm-display);
+  font-size: 1.13rem;
+  font-weight: 700;
+  letter-spacing: .055em;
+  text-shadow: 1px 2px 0 var(--qm-black), 0 0 10px rgba(255,38,154,.32);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__nav {
+  padding-inline: 6px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+  position: relative;
+  min-height: 24px;
+  padding: 4px 53px 4px 9px;
+  margin: 12px 4px 5px;
+  background-image:
+    url("/manga-ui/section-slashes.svg"),
+    linear-gradient(115deg,#ff269a,#951e86 58%,#291341);
+  background-position: right 7px center, center;
+  background-size: 42px 13px, cover;
+  border-left: 3px solid var(--qm-yellow) !important;
+  border-bottom: 2px solid #05030f;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+  font-family: var(--qm-display);
+  font-weight: 700;
+  font-size: .78rem;
+  letter-spacing: .095em;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+  min-height: 34px;
+  margin-block: 2px;
+  padding-inline: 10px 12px;
+  font-family: var(--qm-ui);
+  font-size: .79rem;
+  font-weight: 600;
+  letter-spacing: .007em;
+  border: 1px solid rgba(185,101,255,.35)!important;
+  transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease, filter 130ms ease;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  transform: none;
+  border-left: 3px solid var(--qm-yellow)!important;
+  filter: brightness(1.13);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+  position: relative;
+  padding-right: 32px;
+  box-shadow: 3px 3px 0 #05030f, 5px 5px 0 #ff269a !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::after {
+  display: block;
+  position: absolute;
+  content: "";
+  top: 50%;
+  right: 6px;
+  left: auto;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  background: url("/manga-ui/manga-impact-star.svg") center/contain no-repeat;
+  border: none;
+  filter: drop-shadow(1px 1px 0 #080615);
+  pointer-events: none;
+  animation: qm-star-enter 230ms cubic-bezier(.2,1.65,.45,1) both;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested[aria-current="page"]::after {
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  right: 7px;
+  left: auto;
+  margin-top: -8px;
+  background: url("/manga-ui/manga-impact-star.svg") center/contain no-repeat;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry {
+  position: relative;
+  border: 2px solid var(--qm-magenta)!important;
+  box-shadow: inset 0 0 0 1px rgba(255,240,255,.16);
+  padding: 11px;
+  background: linear-gradient(150deg,#140b25,#070416)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 10px;
+  background: var(--qm-yellow);
+  clip-path: polygon(0 0,100% 0,100% 100%,9px 100%);
+  pointer-events: none;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system {
+  margin: 6px 6px 0;
+  padding: 8px;
+  border: 2px solid var(--qm-magenta)!important;
+  border-radius: 3px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility {
+  gap: 7px;
+  margin: 7px 8px;
+  padding: 5px;
+  border: 1px solid rgba(185,101,255,.6)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
+  font-family: var(--qm-mono);
+  font-size: .63rem;
+  letter-spacing: .08em;
+}
+html[data-qubit-manga="on"] header[role="banner"],
+html[data-qubit-manga="on"] .qchat__header {
+  position: relative;
+  border-top: 3px solid var(--qm-magenta)!important;
+  border-bottom: 2px solid var(--qm-magenta)!important;
+  background:
+    linear-gradient(120deg,rgba(255,38,154,.24),transparent 42%),
+    linear-gradient(95deg,#200c30,#0b071b 80%)!important;
+}
+html[data-qubit-manga="on"] header[role="banner"]::after,
+html[data-qubit-manga="on"] .qchat__header::after {
+  position: absolute;
+  content: "";
+  top: 0;
+  right: 58px;
+  width: 72px;
+  height: 10px;
+  background: repeating-linear-gradient(115deg,var(--qm-yellow) 0 10px,var(--qm-black) 10px 14px,var(--qm-magenta) 14px 24px);
+  clip-path: polygon(8px 0,100% 0,100% 100%,0 100%);
+  pointer-events: none;
+}
+html[data-qubit-manga="on"] header[role="banner"] h1,
+html[data-qubit-manga="on"] #qubit-main-content h1,
+html[data-qubit-manga="on"] #qubit-main-content h2 {
+  font-family: var(--qm-display)!important;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: .045em;
+}
+html[data-qubit-manga="on"] :is(.settings-section,.settings-group,[data-slot="card"],.qchat__message,.qmodel-picker) {
+  --qm-plate-shine: linear-gradient(115deg,rgba(255,38,154,.12),transparent 45%);
+}
+html[data-qubit-manga="on"] :is(.settings-group,[data-slot="card"],.settings-section > .settings-group) {
+  border: 2px solid var(--qm-magenta)!important;
+  border-radius: 3px!important;
+  background-color: var(--qm-panel)!important;
+  background-image: var(--qm-plate-shine);
+  box-shadow: 2px 2px 0 #05030f, 4px 4px 0 rgba(255,240,255,.6)!important;
+}
+html[data-qubit-manga="on"] :is(.settings-group,[data-slot="card"])::before {
+  position:absolute;
+  z-index:1;
+  top: 0;left: 0;
+  width: 46px;height: 46px;
+  content: "";
+  background: url("/manga-ui/manga-corner-top-left.svg") top left/contain no-repeat;
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] .settings-group::before {
+  width: 35px;height: 35px;
+}
+html[data-qubit-manga="on"] :is(.settings-group,[data-slot="card"]) > :first-child {
+  position: relative;
+}
+html[data-qubit-manga="on"] .settings-section__heading,
+html[data-qubit-manga="on"] .qplate-module__head {
+  min-height: 27px;
+  font-family: var(--qm-display)!important;
+  font-size: .83rem;
+  font-weight: 700!important;
+  letter-spacing: .07em;
+}
+html[data-qubit-manga="on"] .settings-page,
+html[data-qubit-manga="on"] .settings-section,
+html[data-qubit-manga="on"] #qubit-main-content {
+  font-family: var(--qm-ui);
+  line-height: 1.48;
+}
+html[data-qubit-manga="on"] .settings-row {
+  min-height: 37px;
+  padding-block: 9px;
+}
+html[data-qubit-manga="on"] :is(.settings-row__desc,.settings-section__desc,.settings-page__desc) {
+  line-height: 1.45;
+}
+html[data-qubit-manga="on"] :is(.btn,sakuga-button)::part(button) {
+  transition: transform 120ms cubic-bezier(.2,1,.3,1), filter 120ms ease, box-shadow 120ms ease;
+}
+html[data-qubit-manga="on"] sakuga-button:not(:disabled)::part(button):hover {
+  filter: saturate(1.15) brightness(1.09);
+}
+html[data-qubit-manga="on"] .qchat__side {
+  border-left: 3px solid var(--qm-magenta)!important;
+  background-color:#130b24!important;
+}
+html[data-qubit-manga="on"] .qchat__side-head {
+  font-size: .82rem;
+  font-family: var(--qm-display)!important;
+  letter-spacing: .1em;
+  line-height: 1.25;
+}
+html[data-qubit-manga="on"] .qchat__model-panel,
+html[data-qubit-manga="on"] .qchat__sessions {
+  min-width: 0;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate,.qchat__model-panel) {
+  border-color:var(--qm-line-soft);
+}
+html[data-qubit-manga="on"] .qchat__composer {
+  border: 2px solid var(--qm-magenta)!important;
+  border-top-width:3px!important;
+  background: linear-gradient(160deg,rgba(255,38,154,.06),var(--qm-panel))!important;
+  padding: 11px;
+}
+html[data-qubit-manga="on"] .qchat__composer :is(button,input,select) {
+  min-height: 31px;
+}
+html[data-qubit-manga="on"] .qmodel-picker {
+  border: 3px solid var(--qm-magenta)!important;
+  box-shadow: var(--qm-border-shadow), 0 24px 90px #05030f!important;
+}
+html[data-qubit-manga="on"] .qmodel-picker__header {
+  border-bottom: 3px solid var(--qm-magenta)!important;
+  background-image: linear-gradient(110deg,rgba(255,38,154,.3),var(--qm-panel))!important;
+}
+html[data-qubit-manga="on"] .qmodel-picker__title {
+  font-family:var(--qm-display)!important;font-size:1.25rem;font-weight:700;
+}
+html[data-qubit-manga="on"] .qrail-flyout {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  max-height:min(570px,calc(100dvh - 24px))!important;
+  border:3px solid var(--qm-magenta)!important;
+  box-shadow:var(--qm-border-shadow)!important;
+  isolation:isolate;
+}
+html[data-qubit-manga="on"] .qrail-flyout__head {flex:0 0 auto}
+html[data-qubit-manga="on"] .qrail-flyout__body {
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+html[data-qubit-manga="on"] .qm-select-root {display:inline-flex;vertical-align:middle;min-width:0;max-width:100%}
+html[data-qubit-manga="on"] .qm-select-trigger {
+  display:flex;align-items:center;justify-content:space-between;gap:7px;
+  min-height:34px;min-width:0;max-width:100%;
+  padding:6px 11px;width:var(--sk-input-width,230px);
+  background:#0c071c;color:var(--qm-ink);
+  border:2px solid var(--qm-violet);
+  box-shadow:3px 3px 0 rgba(255,38,154,.48);
+  font:600 .82rem/1.25 var(--qm-ui);
+  text-align:left;cursor:pointer;
+}
+html[data-qubit-manga="on"] .qm-select-trigger:hover {border-color:var(--qm-magenta)}
+html[data-qubit-manga="on"] .qm-select-trigger:focus-visible {
+  outline:2px solid var(--qm-yellow);outline-offset:2px;
+}
+html[data-qubit-manga="on"] .qm-select-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+html[data-qubit-manga="on"] .qm-select-chevron {margin-left:auto;flex:none;transition:transform 140ms ease}
+html[data-qubit-manga="on"] .qm-select-chevron--open {transform:rotate(180deg)}
+/* Popover is in document.body: it intentionally has no descendant selector tied
+   to main/aside because the portal is outside those clipping containers. */
+.qm-select-popover {
+  display:flex;flex-direction:column;
+  z-index:2147482600;
+  overflow:hidden;
+  border:3px solid #ff269a;
+  background:#150e27;color:#fff2ff;
+  box-shadow:3px 3px 0 #05030f,5px 5px 0 #fff0ff;
+  font:500 14px/1.35 "Inter",system-ui,sans-serif;
+  animation:qm-popover-in 150ms cubic-bezier(.2,1.1,.4,1) both;
+}
+.qm-select-popover__top {
+  display:flex;gap:7px;align-items:center;
+  padding:9px;border-bottom:2px solid #ff269a;
+  background:linear-gradient(90deg,#3a1540,#150e27);
+}
+.qm-select-popover__spark {color:#ffe500;font-size:19px;line-height:1}
+.qm-select-filter {
+  min-width:0;flex:1 1 auto;height:33px;
+  padding:6px 9px;background:#0b071b;color:#fff2ff;
+  border:2px solid #b965ff;border-radius:2px;
+  font:500 14px/1.3 "Inter",system-ui,sans-serif;
+}
+.qm-select-filter:focus-visible {outline:2px solid #ffe500;outline-offset:1px}
+.qm-select-popover__options {min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px}
+.qm-select-option {
+  display:flex;align-items:center;gap:10px;width:100%;min-height:37px;
+  padding:7px 8px;border:1px solid transparent;background:transparent;
+  color:#fff2ff;text-align:left;font:500 14px/1.3 "Inter",system-ui,sans-serif;
+  cursor:pointer;overflow-wrap:anywhere;
+}
+.qm-select-option:hover,.qm-select-option:focus-visible {
+  background:#421647;border-color:#ff269a;outline:none;
+}
+.qm-select-option[aria-selected="true"] {background:#61224d;color:#ffffff;border-left:4px solid #ffe500}
+.qm-select-option:disabled {opacity:.5;cursor:not-allowed}
+.qm-select-radio {
+  display:grid;place-items:center;flex:none;
+  width:18px;height:18px;border:2px solid #fff2ff;border-radius:50%;
+  color:#ff269a;background:#0c071c;font-size:11px;
+}
+.qm-select-option[aria-selected="true"] .qm-select-radio {border-color:#ffe500;background:#ff269a;color:#fff}
+.qm-select-empty {padding:12px;color:#d9bbf3}
+@keyframes qm-star-enter {from {opacity:0;transform:translateY(-50%) rotate(-38deg) scale(.5)} to {opacity:1;transform:translateY(0) rotate(0) scale(1)}}
+@keyframes qm-popover-in {from {opacity:0;transform:translateY(-5px) scale(.98)} to {opacity:1;transform:translateY(0) scale(1)}}
+@media(min-width:1024px) {
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section-head {padding-right:5px}
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"] {
+    padding-inline:2px;
+  }
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"]::after {display:none}
+}
+@media(max-width:720px) {
+  html[data-qubit-manga="on"] header[role="banner"]::after,
+  html[data-qubit-manga="on"] .qchat__header::after {width:45px;right:12px}
+  html[data-qubit-manga="on"] .qchat__composer {padding:8px}
+  html[data-qubit-manga="on"] .settings-section__heading {font-size:.75rem}
+}
+@media(prefers-reduced-motion:reduce) {
+  .qm-select-popover {animation:none}
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::after {animation:none}
+  html[data-qubit-manga="on"] .qm-select-chevron {transition:none}
+}
