@@ -568,7 +568,7 @@ export default function SkillsPage() {
                       : t.skills.noSkillsMatch}
                   </p>
                 ) : (
-                  <div className="grid gap-1">
+                  <div className="qm-skill-list grid gap-1">
                     {activeSkills.map((skill) => (
                       <SkillRow
                         key={skill.name}
@@ -757,7 +757,7 @@ function SkillRow({
   noDescriptionLabel,
 }: SkillRowProps) {
   return (
-    <div className="group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40">
+    <div className="qm-skill-row group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40">
       <div className="pt-0.5 shrink-0">
         <Toggle
           label={`Enable ${skill.name}`}
@@ -769,6 +769,7 @@ function SkillRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span
+            title={skill.name}
             className={`font-mono-ui text-sm ${
               skill.enabled ? "text-foreground" : "text-muted-foreground"
             }`}
@@ -782,7 +783,7 @@ function SkillRow({
       </div>
       <Button
         variant="secondary"
-        className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground"
+        className="qm-skill-edit shrink-0 text-muted-foreground transition-opacity hover:text-foreground"
         title="Edit SKILL.md"
         aria-label={`Edit ${skill.name}`}
         onClick={onEdit}
