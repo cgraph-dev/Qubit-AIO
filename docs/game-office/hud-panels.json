@@ -300,7 +300,6 @@
     ]
   },
   "backend_gaps": [
-    {"id": "N1", "wanted": "Character display name (e.g. 'Alice') over figures and in the inspector", "needs": "a name on the character/seat object; only slug and seat_type exist today", "status": "needs a backend field"},
     {"id": "N2", "wanted": "Per-character memory / relationship / goal lines (aphae's richest panel content)", "needs": "any per-agent memory, relationship or goal data in the payload", "status": "needs a backend field"},
     {"id": "N3", "wanted": "Per-character task or current feature", "needs": "the character's current office_task id/title", "status": "needs a backend field"},
     {"id": "N4", "wanted": "Per-character spend / balance", "needs": "metered spend attributed to the seat; may not be derivable (README notes provider spend is cap-attested, not measured)", "status": "needs a backend field"},

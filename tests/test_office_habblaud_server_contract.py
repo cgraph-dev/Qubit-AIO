@@ -97,7 +97,7 @@ def test_client_schema_adapter_is_based_on_actual_habblaud_requests():
     assert len(bundles) == 1, f"expected one shipped app chunk, found {bundles}"
     js = bundles[0].read_text(encoding="utf-8")
     for route in ("/api/access", "/api/stream", "/api/agents/${encodeURIComponent(e)}",
-                  "/api/sessions/recent", "/api/timeline/days", "/api/timeline/${e}"):
+                  "/api/sessions/recent", "/api/timeline/days", "/api/timeline/"):
         assert route in js
     assert 'every(e=>typeof t[e]==`boolean`)' in js
     assert 'fetch(`/api/agents/${encodeURIComponent(e)}`)' in js

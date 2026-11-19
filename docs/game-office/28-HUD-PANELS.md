@@ -386,7 +386,7 @@ Each row is a desired readout whose data is **absent from `/api/office/tower`**.
 
 | # | Wanted readout | Would need | Status |
 |---|---|---|---|
-| **N1** | Character **display name** (e.g. "Alice") over a figure / in the inspector | a name on the character or seat object; today only `slug` and `seat_type` exist | needs a backend field |
+| **N1** | Character **display name** (e.g. "Alice") over a figure / in the inspector | `characters[].display_name` is carried since the 2026-11-16 character customization | **closed** |
 | **N2** | Per-character **memory / relationship / goal** lines (aphae's richest panel) | any per-agent memory, relationship or goal data in the payload | needs a backend field |
 | **N3** | Per-character **task** or current feature | the character's current `office_task` id/title | needs a backend field |
 | **N4** | Per-character **spend** / balance | metered spend attributed to the seat | needs a backend field (the brief's README notes provider spend is cap-attested, not measured, so this may not be derivable at all) |

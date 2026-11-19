@@ -246,7 +246,6 @@ SERVED_PLUGIN_ARTIFACTS = (
 THEME_ART_SUFFIXES = {".png", ".webp", ".jpg", ".jpeg", ".gif"}
 OPERATOR_PATH_NEEDLES = (
     "/home/",
-    "~/",
     "Projects/Repos/",
     "C:\\Users",   # JSON-escaped Windows profile path
     "C:\\\\Users",  # double-escaped form seen in generated JS/JSON

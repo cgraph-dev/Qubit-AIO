@@ -130,7 +130,8 @@ def main() -> int:
     stage.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
         [node, str(tsc), "--module", "es2020", "--target", "es2020",
-         "--moduleResolution", "node", "--ignoreDeprecations", "6.0",
+         "--moduleResolution", "node", "--jsx", "react-jsx",
+         "--ignoreDeprecations", "6.0", "--rootDir", str(APP_DIR),
          "--outDir", str(stage), "--skipLibCheck", "--noEmitOnError", "false",
          str(APP_DIR / "agents-panel.ts"), str(APP_DIR / "AgentsPanel.tsx"),
          str(APP_DIR / "office-theme.ts"), str(APP_DIR / "office-app.ts")],
@@ -151,10 +152,26 @@ def main() -> int:
     tsx = (stage / "AgentsPanel.mjs").read_text()
     tsx = tsx.replace('from "./agents-panel"', 'from "./agents-panel.mjs"')
     tsx = tsx.replace('from "./office-theme"', 'from "./office-theme.mjs"')
+    tsx = tsx.replace('from "./sakuga"', 'from "./sakuga-stub.mjs"')
     (stage / "AgentsPanel.mjs").write_text(tsx)
     theme = (stage / "office-theme.mjs").read_text()
     theme = theme.replace('from "./office-app"', 'from "./office-app.mjs"')
     (stage / "office-theme.mjs").write_text(theme)
+    # The DOM check mounts the loading and loaded states; it does not need the
+    # Sakuga custom element bundle. Stub the one React-free helper the panel
+    # imports so the probe does not pull the whole host media layer into tsc.
+    (stage / "sakuga-stub.mjs").write_text(
+        "export function sakugaProgress(R, props) {\n"
+        "  return R.createElement('div', props, props && props.label);\n"
+        "}\n"
+    )
+
+    (stage / "sakuga-stub.mjs").write_text(
+        "export function sakugaProgress(R, props) {\n"
+        "  return R.createElement('div', props, props && props.label);\n"
+        "}\n"
+    )
+
     # A package.json makes `createRequire` resolve react/jsdom from the web
     # package (its node_modules is the repo's only React).
     (stage / "package.json").write_text(json.dumps({"type": "module"}))

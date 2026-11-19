@@ -330,8 +330,19 @@ sandbox.Image = function () {};
  * second argument AS the component type — so what is registered must be a
  * function, never an object literal. */
 sandbox.__QUBIT_PLUGIN_SDK__ = {
-  React: { createElement: function (t, p) {
-    return {type: t, props: p || {}, children: Array.prototype.slice.call(arguments, 2)}; } },
+  React: {
+    createElement: function (t, p) {
+      return {type: t, props: p || {}, children: Array.prototype.slice.call(arguments, 2)};
+    },
+    forwardRef: function (f) { return f; },
+    memo: function (f) { return f; },
+    createContext: function (v) { return {Provider: function (p) { return p.children; }, Consumer: function () { return null; }, _value: v}; },
+    useContext: function (c) { return c && c._value; },
+    useMemo: function (f) { return f(); },
+    useLayoutEffect: function () {},
+    useImperativeHandle: function () {},
+    Fragment: "Fragment",
+  },
   hooks: {
     useState: function (init) { return [init, function () {}]; },
     useEffect: function () {}, useRef: function (v) { return {current: v}; },

@@ -222,8 +222,13 @@ def test_theme_query_returns_the_active_payload(monkeypatch, tmp_path):
     assert out["assetBase"] == f"/plugins/qubit-office/themes/{THEME_ID}"
     assert out["atlas"].startswith(ASSET_PREFIX + "portraits/atlas32.png")
     assert out["index"].startswith(ASSET_PREFIX + "portraits/index.json")
-    assert out["bodies"]["atlas"].startswith(ASSET_PREFIX + "bodies/atlas32.png")
-    assert out["bodies"]["index"].startswith(ASSET_PREFIX + "bodies/index.json")
+    # Owner decision 2026-11-16: `bodies` is an art catalog, not an implicit
+    # character definition. Without an explicit `characters` block the payload
+    # must keep the body URLs null so a pack cannot silently replace Habblaud's
+    # procedural bodies. The pack still carries the files; the contract is
+    # explicit, not inferred from `bodies`.
+    assert out["bodies"] == {"atlas": None, "index": None,
+                             "size": None, "frame": None}
     assert "?v=1.0.0" in out["atlas"]
     assert out["tokens"] and out["slices"] == {}
     # The payload is URLs + tokens, never a file/hash map or a filesystem path.

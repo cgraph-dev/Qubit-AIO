@@ -251,7 +251,6 @@ def test_the_org_small_and_conditional_misses_are_proven_not_assumed(
 # deliberate exception: it was a DROP (the field was computed and discarded),
 # now fixed — it is verified present-and-correct by assertion 5, not here.
 GAP_FIELDS = {
-    "N1": ["display_name", "person_name", "employee_name"],
     # N2 — PARTIALLY FILLED (A5, L2). `memory`/`memories` are now REAL payload
     # fields (tower.state()'s per-character `memory` block + `dossier`), so they
     # are removed from the absent list and asserted PRESENT below. The rest of
@@ -325,6 +324,12 @@ def test_no_documented_gap_field_is_present_in_the_payload(
     # field"; it now does. Asserted PRESENT so a future removal fails loudly.
     assert "memory" in keys and "dossier" in keys, (
         "A5 landed the per-seat memory + dossier fields; they are gone")
+    assert "display_name" in keys, (
+        "N1 closed: characters[].display_name must stay in the payload")
+    # N1 closed: the owner's character customization made display_name a real
+    # payload field, so it is asserted PRESENT rather than left in the gap list.
+    assert "display_name" in keys, (
+        "N1 closed: characters[].display_name must stay in the payload")
 
 
 # ===================================================================== #

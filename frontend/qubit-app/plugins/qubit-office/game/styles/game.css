@@ -2361,10 +2361,13 @@
   line-height: 1.2;
   cursor: pointer;
 }
-.office-game__campusFloorLabel:hover,
+.office-game__campusFloorLabel:hover {
+  border-color: var(--office-accent);
+}
 .office-game__campusFloorLabel:focus-visible {
   border-color: var(--office-accent);
-  outline: none;
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
 }
 .office-game__campusFloorLabel[aria-pressed="true"] {
   border-color: var(--office-accent);
@@ -2954,10 +2957,13 @@
 .outside-scene__floor[data-kind="stairs"] {
   border-color: #e08fb0;
 }
-.outside-scene__floor:hover,
+.outside-scene__floor:hover {
+  background: rgba(143, 211, 232, 0.22);
+}
 .outside-scene__floor:focus-visible {
   background: rgba(143, 211, 232, 0.22);
-  outline: none;
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
 }
 .outside-scene__caption,
 .outside-scene__counts,

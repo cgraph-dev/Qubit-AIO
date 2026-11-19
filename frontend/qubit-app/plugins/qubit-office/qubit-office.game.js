@@ -191919,7 +191919,7 @@ create: function(game) {
 			"data-office-scale": String(values.textScale)
 		};
 	}
-	// ../qubit-shared/src/sakuga/loader.ts
+	// ../qubit-shared/src/sakuga/loader.js
 	var TAGS = {
 		button: "sakuga-button",
 		toggle: "sakuga-toggle",
@@ -191980,7 +191980,7 @@ create: function(game) {
 			if (!window.customElements.get(TAGS[name])) throw new Error(`SAKUGA_ELEMENT_NOT_REGISTERED ${TAGS[name]}`);
 		});
 	}
-	// ../qubit-shared/src/sakuga/fx.ts
+	// ../qubit-shared/src/sakuga/fx.js
 	var listeners = /* @__PURE__ */ new Set();
 	function viewportCentre() {
 		if (typeof window === "undefined") return {

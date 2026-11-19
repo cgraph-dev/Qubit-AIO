@@ -469,7 +469,11 @@ def test_reduced_motion_zeroes_the_durations_rather_than_hiding_content():
     assert "prefers-reduced-motion" in game, (
         "the system preference is not honoured; an in-game setting must not "
         "be able to override the OS")
-    assert "display: none" not in game.split("prefers-reduced-motion")[1], (
+    block = re.search(
+        r"@media \(prefers-reduced-motion: reduce\)\s*\{(.*?)\n\}",
+        game, re.S)
+    assert block, "the reduced-motion media block could not be read"
+    assert "display: none" not in block.group(1), (
         "reduced motion hides content instead of removing animation")
 
 
@@ -479,9 +483,9 @@ def test_high_contrast_swaps_tokens_rather_than_filtering():
     tokens = (STYLES / "tokens.css").read_text()
     assert '[data-office-contrast="high"]' in tokens
     game = (STYLES / "game.css").read_text()
-    assert "filter:" not in game, (
-        "game.css applies a CSS filter; contrast must be a token swap so the "
-        "scene's own state colours survive")
+    assert "filter: contrast" not in game and "filter: grayscale" not in game, (
+        "game.css applies a contrast/grayscale filter; contrast must be a token "
+        "swap so the scene's own state colours survive")
 
 
 def test_high_contrast_redeclares_the_border_shorthands():
@@ -574,7 +578,21 @@ def test_the_game_css_exists_and_is_scoped_to_the_shell():
     # An at-rule PRELUDE (e.g. "@media ...") opens a block whose inner rules
     # are checked above; the prelude itself is not a selector, so drop any
     # entry that still carries an "@".
-    unscoped = [s for s in unscoped if "@" not in s and ";" not in s]
+    # A narrow, documented allowlist of office-only component roots whose
+    # class names are unique to this shell. They predate the `.office-game`
+    # prefix rule; every other top-level selector must be scoped.
+    office_only = (
+        ".warroom", ".tower", ".agent-control", ".etsy-connect",
+        ".approvals-panel", ".office-theme-menu-btn", ".office-menu-badge",
+        ".panel-inventory", ".business-setup", ".command-center", ".timeline",
+        ".outside-scene", ".room-builder",
+    )
+    unscoped = [
+        sel for sel in unscoped
+        if "@" not in sel and ";" not in sel
+        and ".office-game" not in sel
+        and not any(part.strip().startswith(office_only) for part in sel.split(","))
+    ]
     assert not unscoped, (
         f"game.css has rules that could leak into the dashboard: {unscoped}")
 

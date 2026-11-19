@@ -23,7 +23,24 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
-import type { OfficeGameShellProps } from "../OfficeGameShell";
+type AgentsHostReact = {
+  createElement: (...args: unknown[]) => unknown;
+};
+type AgentsHostHooks = {
+  useState: <T>(v: T) => [T, (next: T | ((prev: T) => T)) => void];
+  useEffect: (fn: () => void | (() => void), deps?: unknown[]) => void;
+  useRef: <T>(v: T) => { current: T };
+};
+
+type AgentsHostReact = {
+  createElement: (...args: unknown[]) => unknown;
+};
+type AgentsHostHooks = {
+  useState: <T>(v: T) => [T, (next: T | ((prev: T) => T)) => void];
+  useEffect: (fn: () => void | (() => void), deps?: unknown[]) => void;
+  useRef: <T>(v: T) => { current: T };
+};
+
 import {
   type AgentDivision,
   type AgentPanelState,
@@ -100,7 +117,7 @@ function seatMeta(seat: AgentSeat): string[] {
  * therefore degrades to the same truthful fallback instead of an empty box.
  */
 function seatAvatar(
-  R: OfficeGameShellProps["React"],
+  R: AgentsHostReact,
   seat: AgentSeat,
   theme: OfficeTheme | null | undefined,
   ready: boolean,
@@ -150,7 +167,7 @@ function seatAvatar(
 
 /** One seat row: portrait, persona name, type, room, supervisor. */
 function seatRow(
-  R: OfficeGameShellProps["React"],
+  R: AgentsHostReact,
   seat: AgentSeat,
   index: number,
   theme: OfficeTheme | null | undefined,
@@ -200,7 +217,7 @@ function seatRow(
  * moving the pointer down 283 rows cannot reflow the list under it.
  */
 function agentCard(
-  R: OfficeGameShellProps["React"],
+  R: AgentsHostReact,
   seat: AgentSeat,
   theme: OfficeTheme | null | undefined,
   ready: boolean,
@@ -263,7 +280,7 @@ function agentCard(
 
 /** One division: a heading with its REAL headcount, then its seats. */
 function divisionGroup(
-  R: OfficeGameShellProps["React"],
+  R: AgentsHostReact,
   division: AgentDivision,
   open: boolean,
   theme: OfficeTheme | null | undefined,
@@ -311,8 +328,8 @@ function divisionGroup(
 }
 
 export function createAgentsPanel(
-  R: OfficeGameShellProps["React"],
-  hooks: OfficeGameShellProps["hooks"],
+  R: AgentsHostReact,
+  hooks: AgentsHostHooks,
 ) {
   const { useState, useEffect } = hooks;
 

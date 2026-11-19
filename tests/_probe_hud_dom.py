@@ -108,6 +108,7 @@ def main() -> int:
         "hudBundle": str(REPO / "frontend/qubit-app/plugins/qubit-hud/qubit-hud.js"),
     }
     specp = Path("/tmp/hudcheck/spec.json")
+    specp.parent.mkdir(parents=True, exist_ok=True)
     specp.write_text(json.dumps(spec))
 
     sys.path.insert(0, str(REPO / "tests"))
