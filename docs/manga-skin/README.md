@@ -1,7 +1,7 @@
 > **Historical captures:** these screenshots predate the owner-requested removal of the
 > standalone MANGA switch and the Q1/Q1-L/Q5/Q5-L/Qubit Command entries. The current UI selects
-> the manga theme from the Theme panel, now presented as Q4/Q4-L (internal id q6) in normal
-> order; there is no separate switch.
+> the manga theme from the Theme panel, now presented as the default Q1/Q1-L (internal id q6)
+> in normal order; there is no separate switch.
 
 # Manga skin — visual evidence
 
@@ -10,7 +10,7 @@ opt-in skin was active. No image here is a mockup.
 
 | File | Shows |
 |---|---|
-| `default_sessions.jpg` | Sessions with the skin **off** (pre-existing midnight theme) |
+| `default_sessions.jpg` | Sessions with the skin **off** (pre-existing midnight theme, now Q4) |
 | `manga_sessions.jpg` | Sessions with the skin **on** |
 | `default_qubit_chat.jpg` | Qubit Chat with the skin **off** |
 | `manga_qubit_chat.jpg` | Qubit Chat with the skin **on** |

@@ -8,10 +8,11 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * corner-radius all shift to match the theme's personality.
  *
  * Theme ids are Qubit-owned (`q2`..`q6`); the picker presents them in normal
- * order as Q1..Q4. Q1, Q1-L, Q5 and Q5-L were retired at owner request (the
- * Q1/Q5 definitions remain only as internal fallbacks, never as picker
- * entries). Every remaining theme ships a "-L" large variant (Q1-L .. Q4-L)
- * that keeps the same look with a bigger root size and roomier spacing. Theme names must stay in sync
+ * order as Q1..Q4, with the manga theme first as Q1 (the default). The old
+ * Q1-teal/Q1-L/Q5/Q5-L ids were retired at owner request; those definitions
+ * remain only as internal fallbacks, never as picker entries. Every remaining
+ * theme ships a "-L" large variant (Q1-L .. Q4-L) that keeps the same look
+ * with a bigger root size and roomier spacing. Theme names must stay in sync
  * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
  * `qubit_cli/web_server_dashboard.py`.
  *
@@ -75,8 +76,8 @@ export const defaultTheme: DashboardTheme = {
 /** Q2 — deep blue-violet night canvas. */
 export const midnightTheme: DashboardTheme = {
   name: "q2",
-  label: "Q1",
-  description: "Q1 — near-black navy canvas with a lilac tint and violet glow",
+  label: "Q4",
+  description: "Q4 — near-black navy canvas with a lilac tint and violet glow",
   palette: {
     background: { hex: "#0a0a1f", alpha: 1 },
     midground: { hex: "#d4c8ff", alpha: 1 },
@@ -186,9 +187,9 @@ export const contrastTheme: DashboardTheme = {
  *  the brief frame before the layer applies and for the theme-picker swatch. */
 export const mangaTheme: DashboardTheme = {
   name: "q6",
-  label: "Q4",
+  label: "Q1",
   description:
-    "Q4 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
+    "Q1 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
   palette: {
     background: { hex: "#08061a", alpha: 1 },
     midground: { hex: "#f7e9ff", alpha: 1 },
@@ -259,18 +260,19 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
   };
 }
 
-export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 1);
+export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 4);
 export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 2);
 export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 3);
-export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 4);
+export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 1);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
-  q2: midnightTheme,
-  "q2-l": bigMidnightTheme,
+  // Q1 first: the manga theme is the default.
+  q6: mangaTheme,
+  "q6-l": bigMangaTheme,
   q3: monoTheme,
   "q3-l": bigMonoTheme,
   q4: cyberpunkTheme,
   "q4-l": bigCyberpunkTheme,
-  q6: mangaTheme,
-  "q6-l": bigMangaTheme,
+  q2: midnightTheme,
+  "q2-l": bigMidnightTheme,
 };

@@ -27,14 +27,14 @@ describe("built-in theme ids", () => {
 
   it("labels every theme with its Q-number", () => {
     for (const [id, label] of [
-      ["q2", "Q1"],
+      ["q6", "Q1"],
       ["q3", "Q2"],
       ["q4", "Q3"],
-      ["q6", "Q4"],
-      ["q2-l", "Q1-L"],
+      ["q2", "Q4"],
+      ["q6-l", "Q1-L"],
       ["q3-l", "Q2-L"],
       ["q4-l", "Q3-L"],
-      ["q6-l", "Q4-L"],
+      ["q2-l", "Q4-L"],
     ]) {
       expect(BUILTIN_THEMES[id].label).toBe(label);
     }
@@ -96,14 +96,14 @@ describe("large variants", () => {
 
 describe("read-old theme name migration", () => {
   it("maps every retired built-in id onto a surviving theme", () => {
-    expect(migrateThemeName("default")).toBe("q2");
-    expect(migrateThemeName("q1")).toBe("q2");
-    expect(migrateThemeName("q1-l")).toBe("q2-l");
-    expect(migrateThemeName("q5")).toBe("q2");
-    expect(migrateThemeName("q5-l")).toBe("q2-l");
-    expect(migrateThemeName("qubit")).toBe("q2");
-    expect(migrateThemeName("qubit-contrast")).toBe("q2");
-    expect(migrateThemeName("default-large")).toBe("q2-l");
+    expect(migrateThemeName("default")).toBe("q6");
+    expect(migrateThemeName("q1")).toBe("q6");
+    expect(migrateThemeName("q1-l")).toBe("q6-l");
+    expect(migrateThemeName("q5")).toBe("q6");
+    expect(migrateThemeName("q5-l")).toBe("q6-l");
+    expect(migrateThemeName("qubit")).toBe("q6");
+    expect(migrateThemeName("qubit-contrast")).toBe("q6");
+    expect(migrateThemeName("default-large")).toBe("q6-l");
     expect(migrateThemeName("midnight")).toBe("q2");
     expect(migrateThemeName("mono")).toBe("q3");
     expect(migrateThemeName("cyberpunk")).toBe("q4");

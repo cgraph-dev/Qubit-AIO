@@ -125,7 +125,7 @@ def test_qubit_api_auth_and_status(tmp_path):
         status, _, body = _http(port, "GET", "/agent/api/dashboard/themes",
                                 qubit_token=True)
         assert status == 200
-        assert json.loads(body)["active"] == "q2"
+        assert json.loads(body)["active"] == "q6"
     finally:
         ui.stop()
 

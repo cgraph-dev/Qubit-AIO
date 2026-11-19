@@ -20853,14 +20853,14 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
     # Read-old: a preference persisted under a retired id resolves to a
     # surviving theme. Must mirror `web_server_dashboard._THEME_NAME_ALIASES`.
     stored = {"nous-blue": "q3", "lens-5i": "q3", "qubit-blue": "q3",
-              "default": "q2", "q1": "q2", "q1-l": "q2-l", "q5": "q2", "q5-l": "q2-l",
-              "qubit": "q2", "default-large": "q2-l", "midnight": "q2",
+              "default": "q6", "q1": "q6", "q1-l": "q6-l", "q5": "q6", "q5-l": "q6-l",
+              "qubit": "q6", "default-large": "q6-l", "midnight": "q2",
               "mono": "q3", "cyberpunk": "q4",
-              "qubit-contrast": "q2"}.get(stored, stored)
+              "qubit-contrast": "q6"}.get(stored, stored)
     if stored in names:
         active = stored
     else:
-        active = themes[0]["name"] if themes else "q2"
+        active = themes[0]["name"] if themes else "q6"
     return {"active": active, "themes": themes}
 
 

@@ -85,22 +85,22 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Qubit Agent — Qubit DS with the Q2 (midnight) palette applied
-   statically as the boot default. Q1 was retired at owner request; the
-   ThemeProvider still applies the user's persisted theme. */
+/* Qubit Agent — Qubit DS with the Q1 (manga) palette applied statically as
+   the boot default. The old Q1 teal was retired; the ThemeProvider still
+   applies the user's persisted theme. */
 /* ------------------------------------------------------------------ */
 
 :root {
-  /* Q2 — the surviving first theme. These are the boot defaults; the
+  /* Q1 manga — the default theme. These are the boot defaults; the
      ThemeProvider rewrites them as inline styles when a user switches themes. */
   --foreground: color-mix(in srgb, #ffffff 0%, transparent);
   --foreground-base: #ffffff;
   --foreground-alpha: 0;
-  --midground: color-mix(in srgb, #d4c8ff 100%, transparent);
-  --midground-base: #d4c8ff;
+  --midground: color-mix(in srgb, #f7e9ff 100%, transparent);
+  --midground-base: #f7e9ff;
   --midground-alpha: 1;
-  --background: color-mix(in srgb, #0a0a1f 100%, transparent);
-  --background-base: #0a0a1f;
+  --background: color-mix(in srgb, #08061a 100%, transparent);
+  --background-base: #08061a;
   --background-alpha: 1;
 
   /* Typography tokens — rewritten by ThemeProvider. Defaults match the
@@ -122,10 +122,10 @@
 
   /* Data-series accents — consumed by Analytics + Models pages for the
      input-vs-output token visualisations (chart bars, table values,
-     legend swatches). Defaults are tuned for the Q2 midnight look:
+     legend swatches). Defaults are tuned for the Q1 manga look:
      lilac input + emerald-400 output. Themes override via ThemeProvider,
      which emits these as `--series-input-token` / `--series-output-token`. */
-  --series-input-token: #d4c8ff;
+  --series-input-token: #f7e9ff;
   --series-output-token: #34d399;
 }
 

@@ -19,14 +19,14 @@ export const THEME_NAME_ALIASES: Record<string, string> = {
   // Q1/Q1-L/Q5/Q5-L/Qubit Command were retired at owner request. Existing
   // stored ids move to the closest surviving theme; no hidden id is ever
   // re-listed in the picker.
-  default: "q2",
-  q1: "q2",
-  "q1-l": "q2-l",
-  q5: "q2",
-  "q5-l": "q2-l",
-  qubit: "q2",
-  "qubit-contrast": "q2",
-  "default-large": "q2-l",
+  default: "q6",
+  q1: "q6",
+  "q1-l": "q6-l",
+  q5: "q6",
+  "q5-l": "q6-l",
+  qubit: "q6",
+  "qubit-contrast": "q6",
+  "default-large": "q6-l",
   midnight: "q2",
   mono: "q3",
   cyberpunk: "q4",

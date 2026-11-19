@@ -513,7 +513,7 @@ def test_compat_status_and_themes(tmp_path):
     code, out = HC.dispatch(cfg, "GET", "/api/status", {}, {})
     assert code == 200 and out.get("ok"), out
     code, out = HC.dispatch(cfg, "GET", "/api/dashboard/themes", {}, {})
-    assert code == 200 and out.get("active") == "q2", out
+    assert code == 200 and out.get("active") == "q6", out
     # The old Qubit Command overlay is retired from the served theme list at
     # owner request; the surviving built-ins are Q2..Q6 (the qubit-theme.json
     # asset remains on disk for plugin/legacy use but is not a picker theme).

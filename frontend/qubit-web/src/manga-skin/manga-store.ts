@@ -134,7 +134,8 @@ export function bootstrapMangaSkin(pathname?: string): void {
     pathname ??
     (typeof window.location !== "undefined" ? window.location.pathname : "/");
   const theme = savedThemeName();
-  const wanted = theme ? isMangaThemeName(theme) : readMangaPreference();
+  // Q1 (id q6) is the manga default. With no saved theme yet, start in it.
+  const wanted = theme ? isMangaThemeName(theme) : true;
   // Align the standalone preference with the theme before React reads it, so
   // the gate cannot flash a legacy ON state on a non-Q6 route for one frame.
   setMangaEnabled(wanted);

@@ -329,14 +329,15 @@ def mount_spa(application: FastAPI):
 # retired at owner request; `default` and those ids are read-old aliases only.
 # Keep in sync with BUILTIN_THEMES in presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "q2",      "label": "Q1",   "description": "Q1 — near-black navy canvas with a lilac tint and violet glow"},
-    {"name": "q2-l",    "label": "Q1-L", "description": "Q1-L — the Q1 look with larger type and roomier spacing"},
+    # Q1 first: the manga theme is the default.
+    {"name": "q6",      "label": "Q1",   "description": "Q1 — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
+    {"name": "q6-l",    "label": "Q1-L", "description": "Q1-L — the Q1 look with larger type and roomier spacing"},
     {"name": "q3",      "label": "Q2",   "description": "Q2 — neutral greyscale canvas with square corners and no accent hue"},
     {"name": "q3-l",    "label": "Q2-L", "description": "Q2-L — the Q2 look with larger type and roomier spacing"},
     {"name": "q4",      "label": "Q3",   "description": "Q3 — black canvas, monospace throughout, bright mint signal colour"},
     {"name": "q4-l",    "label": "Q3-L", "description": "Q3-L — the Q3 look with larger type and roomier spacing"},
-    {"name": "q6",      "label": "Q4",   "description": "Q4 — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
-    {"name": "q6-l",    "label": "Q4-L", "description": "Q4-L — the Q4 look with larger type and roomier spacing"},
+    {"name": "q2",      "label": "Q4",   "description": "Q4 — near-black navy canvas with a lilac tint and violet glow"},
+    {"name": "q2-l",    "label": "Q4-L", "description": "Q4-L — the Q4 look with larger type and roomier spacing"},
 ]
 
 # Theme ids a preference may still carry from before the normal-order set.
@@ -347,17 +348,17 @@ _THEME_NAME_ALIASES: Dict[str, str] = {
     "nous-blue": "q3",
     "lens-5i": "q3",
     "qubit-blue": "q3",
-    "default": "q2",
-    "q1": "q2",
-    "q1-l": "q2-l",
-    "q5": "q2",
-    "q5-l": "q2-l",
-    "qubit": "q2",
-    "default-large": "q2-l",
+    "default": "q6",
+    "q1": "q6",
+    "q1-l": "q6-l",
+    "q5": "q6",
+    "q5-l": "q6-l",
+    "qubit": "q6",
+    "default-large": "q6-l",
     "midnight": "q2",
     "mono": "q3",
     "cyberpunk": "q4",
-    "qubit-contrast": "q2",
+    "qubit-contrast": "q6",
 }
 
 
