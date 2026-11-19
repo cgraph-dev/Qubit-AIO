@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { useLocation } from "react-router";
+import { emitFxAt } from "@/sakuga/ui";
 import {
   applyMangaAttribute,
   currentMangaEnabled,
@@ -36,6 +37,7 @@ import "./manga-component-contract.css";
 import "./manga-studio-art.css";
 import "./manga-approved-production.css";
 import "./manga-production-layout-repair.css";
+import "./manga-panel-integrity.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {
@@ -157,6 +159,33 @@ export function MangaSkinGate(): null {
       delete document.documentElement.dataset.qmMotion;
     };
   }, []);
+
+  // Restore restrained Sakuga feedback to native page actions. Sakuga web
+  // components already animate themselves; do not emit a second effect there.
+  // One cue per 280ms, only when the user explicitly clicks an enabled action.
+  useEffect(() => {
+    if (!enabled || !mangaRouteEligible(pathname) || pathname === "/chat") return;
+    let lastCue = 0;
+    const onAction = (event: MouseEvent) => {
+      if (document.hidden ||
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const action = target.closest<HTMLElement>("button, a[href], [role='button']");
+      if (!action || !action.closest("[data-qm-route]") ||
+          action.closest("sakuga-button, sakuga-toggle, sakuga-checkbox") ||
+          action.matches(":disabled, [aria-disabled='true']") ||
+          action.closest("[role='dialog'],[data-chat-active='true']")) return;
+      const now = performance.now();
+      if (now - lastCue < 280) return;
+      lastCue = now;
+      // The existing, supported Sakuga pop cue adds transient response to
+      // native actions. It does NOT animate the whole panel or cause relayout.
+      void emitFxAt("pop", action, { scale: 0.18 });
+    };
+    document.addEventListener("click", onAction, true);
+    return () => document.removeEventListener("click", onAction, true);
+  }, [enabled, pathname]);
 
   useEffect(() => () => {
     applyMangaAttribute(false);
