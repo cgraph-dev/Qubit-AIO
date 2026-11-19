@@ -7,7 +7,17 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { BUILTIN_THEMES, defaultTheme } from "./presets";
+import {
+  BUILTIN_THEMES,
+  isMangaThemeName,
+  isRetiredThemeName,
+  midnightTheme,
+} from "./presets";
+import {
+  applyMangaAttribute,
+  mangaRouteEligible,
+  setMangaEnabled,
+} from "@/manga-skin/manga-store";
 import { migrateThemeName } from "./themeAliases";
 import {
   FONT_CHOICES,
@@ -446,7 +456,7 @@ function applyTheme(theme: DashboardTheme) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Name of the currently active theme (built-in id or user YAML name). */
   const [themeName, setThemeName] = useState<string>(() => {
-    if (typeof window === "undefined") return "default";
+    if (typeof window === "undefined") return "q2";
     // The server injects the persisted active theme into the HTML; trust it
     // first so the initial render (and first paint) is already correct and
     // there is no flash while the async theme list loads.
@@ -457,7 +467,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored =
       injected ||
       readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ||
-      "default";
+      "q2";
     const migrated = migrateThemeName(stored);
     // Write the migrated name back so future reads converge on the new
     // key and we eventually retire the alias entry.
@@ -510,7 +520,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       return (
         BUILTIN_THEMES[name] ??
         userThemeDefs[name] ??
-        defaultTheme
+        midnightTheme
       );
     },
     [userThemeDefs],
@@ -525,6 +535,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyTheme(resolveTheme(themeName));
   }, [themeName, resolveTheme, fontId]);
 
+  // Q6/Q6-L is the manga theme. Keep the scoped skin layer in lockstep with
+  // the theme selection: choosing Q6 enables it, choosing any other theme
+  // disables it, and the last non-manga theme is remembered for the sidebar
+  // switch's OFF action.
+  useEffect(() => {
+    const manga = isMangaThemeName(themeName);
+    if (manga) {
+      setMangaEnabled(true);
+      const path =
+        typeof window !== "undefined" ? window.location.pathname : "/";
+      applyMangaAttribute(mangaRouteEligible(path));
+    } else {
+      setMangaEnabled(false);
+    }
+  }, [themeName]);
+
   // Load server-side themes (built-ins + user YAMLs) once on mount.
   useEffect(() => {
     let cancelled = false;
@@ -532,15 +558,37 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .getThemes()
       .then((resp) => {
         if (cancelled) return;
+        const servedNames = new Set<string>(
+          (resp.themes ?? []).map((t) => t.name),
+        );
         if (resp.themes?.length) {
-          setAvailableThemes(
-            resp.themes.map((t) => ({
+          const served = resp.themes
+            .filter((t) => !isRetiredThemeName(t.name))
+            .map((t) => {
+              // The client owns the built-in labels/descriptions (normal-order
+              // naming). A rolling/stale backend may still return the old
+              // Q2..Q6 labels, so never let it overwrite a client built-in.
+              const builtin = BUILTIN_THEMES[t.name];
+              return {
+                name: t.name,
+                label: builtin?.label ?? t.label,
+                description: builtin?.description ?? t.description,
+                definition: t.definition,
+              };
+            });
+          // Keep built-ins that this client knows about but a not-yet-restarted
+          // server does not list (e.g. a newly shipped Q6). A built-in is
+          // client-owned; the server list is authoritative only for user YAMLs
+          // and for the exact metadata it does serve.
+          const servedNames = new Set(served.map((t) => t.name));
+          const missingBuiltins = Object.values(BUILTIN_THEMES)
+            .filter((t) => !servedNames.has(t.name))
+            .map((t) => ({
               name: t.name,
               label: t.label,
               description: t.description,
-              definition: t.definition,
-            })),
-          );
+            }));
+          setAvailableThemes([...served, ...missingBuiltins]);
           // Index any definitions the server shipped (user themes).
           const defs: Record<string, DashboardTheme> = {};
           for (const entry of resp.themes) {
@@ -552,15 +600,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
         if (resp.active) {
           const migratedActive = migrateThemeName(resp.active);
-          if (migratedActive !== themeName) {
-            setThemeName(migratedActive);
-            window.localStorage.setItem(STORAGE_KEY, migratedActive);
-          }
-          // If the server is still persisting the stale key, push the
-          // migrated value back so it converges too — otherwise every
-          // future page load would re-trigger this branch.
-          if (migratedActive !== resp.active) {
-            api.setTheme(migratedActive).catch(() => {});
+          // Forward compatibility: a new client can ship a built-in theme
+          // before the running server's list contains it. Do not let the
+          // older server's active value clobber that local choice; keep it
+          // and try to persist it (a stale server may 400 harmlessly).
+          const localBuiltinAheadOfServer =
+            Boolean(BUILTIN_THEMES[themeName]) &&
+            !servedNames.has(themeName);
+          if (localBuiltinAheadOfServer) {
+            api.setTheme(themeName).catch(() => {});
+          } else {
+            if (migratedActive !== themeName) {
+              setThemeName(migratedActive);
+              window.localStorage.setItem(STORAGE_KEY, migratedActive);
+            }
+            // If the server is still persisting the stale key, push the
+            // migrated value back so it converges too — otherwise every
+            // future page load would re-trigger this branch.
+            if (migratedActive !== resp.active) {
+              api.setTheme(migratedActive).catch(() => {});
+            }
           }
         }
       })
@@ -603,7 +662,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         ...availableThemes.map((t) => t.name),
         ...Object.keys(userThemeDefs),
       ]);
-      const next = knownNames.has(name) ? name : "default";
+      const next = knownNames.has(name) ? name : "q2";
       setThemeName(next);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(STORAGE_KEY, next);
@@ -643,7 +702,7 @@ export function useTheme(): ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: defaultTheme,
+  theme: midnightTheme,
   themeName: "default",
   availableThemes: Object.values(BUILTIN_THEMES).map((t) => ({
     name: t.name,

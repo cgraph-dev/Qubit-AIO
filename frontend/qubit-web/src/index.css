@@ -85,22 +85,22 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Qubit Agent — Qubit DS with the LENS_0 (Qubit teal) palette applied
-   statically as the default dashboard theme. */
+/* Qubit Agent — Qubit DS with the Q2 (midnight) palette applied
+   statically as the boot default. Q1 was retired at owner request; the
+   ThemeProvider still applies the user's persisted theme. */
 /* ------------------------------------------------------------------ */
 
 :root {
-  /* LENS_0 — from design-language/src/ui/components/overlays/index.tsx.
-     These are the defaults for the `default` (Qubit Teal) dashboard theme;
+  /* Q2 — the surviving first theme. These are the boot defaults; the
      ThemeProvider rewrites them as inline styles when a user switches themes. */
   --foreground: color-mix(in srgb, #ffffff 0%, transparent);
   --foreground-base: #ffffff;
   --foreground-alpha: 0;
-  --midground: color-mix(in srgb, #ffe6cb 100%, transparent);
-  --midground-base: #ffe6cb;
+  --midground: color-mix(in srgb, #d4c8ff 100%, transparent);
+  --midground-base: #d4c8ff;
   --midground-alpha: 1;
-  --background: color-mix(in srgb, #041c1c 100%, transparent);
-  --background-base: #041c1c;
+  --background: color-mix(in srgb, #0a0a1f 100%, transparent);
+  --background-base: #0a0a1f;
   --background-alpha: 1;
 
   /* Typography tokens — rewritten by ThemeProvider. Defaults match the
@@ -122,11 +122,10 @@
 
   /* Data-series accents — consumed by Analytics + Models pages for the
      input-vs-output token visualisations (chart bars, table values,
-     legend swatches). Defaults are tuned for the Qubit-teal LENS_0
-     look: cream input + emerald-400 output read as warm/cool against
-     the dark canvas. Themes override via ThemeProvider, which emits
-     these as `--series-input-token` / `--series-output-token`. */
-  --series-input-token: #ffe6cb;
+     legend swatches). Defaults are tuned for the Q2 midnight look:
+     lilac input + emerald-400 output. Themes override via ThemeProvider,
+     which emits these as `--series-input-token` / `--series-output-token`. */
+  --series-input-token: #d4c8ff;
   --series-output-token: #34d399;
 }
 

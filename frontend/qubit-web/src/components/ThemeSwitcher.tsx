@@ -6,6 +6,7 @@ import { BottomSheet } from "@nous-research/ui/ui/components/bottom-sheet";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
 import { BUILTIN_THEMES, THEME_DEFAULT_FONT_ID, useTheme } from "@/themes";
+import { isMangaThemeName } from "@/themes/presets";
 import type { DashboardTheme, FontChoice, ThemeListEntry } from "@/themes";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
   const { themeName, availableThemes, setTheme, fontId, fontChoices, setFont } = useTheme();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [, setFlyoutLayoutVersion] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const narrowViewport = useBelowBreakpoint(640);
@@ -55,8 +57,25 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open, close, useMobileSheet]);
 
+  // A portal is not clipped by the rail, but it still needs to follow its
+  // trigger and stay inside the visible viewport during resize/scroll.
+  useEffect(() => {
+    if (!open || useMobileSheet) return;
+    const refresh = (event?: Event) => {
+      if (dropdownRef.current?.contains(event?.target as Node)) return;
+      setFlyoutLayoutVersion((v) => v + 1);
+    };
+    window.addEventListener("resize", refresh);
+    window.addEventListener("scroll", refresh, true);
+    return () => {
+      window.removeEventListener("resize", refresh);
+      window.removeEventListener("scroll", refresh, true);
+    };
+  }, [open, useMobileSheet]);
+
   const current = availableThemes.find((th) => th.name === themeName);
   const label = current?.label ?? themeName;
+  const mangaActive = isMangaThemeName(themeName);
   const sheetTitle = t.theme?.title ?? "Theme";
 
   return (
@@ -65,24 +84,36 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
         variant="secondary"
         onClick={() => setOpen((o) => !o)}
         className={cn(
+          "qm-theme-trigger",
           collapsed
             ? "text-text-secondary hover:text-foreground hover:bg-transparent"
             : "px-2 py-1 normal-case tracking-normal font-normal text-xs text-text-secondary hover:text-foreground",
         )}
+        data-manga-theme={mangaActive ? "true" : undefined}
         title={`${t.theme?.switchTheme ?? "Switch theme"}: ${label}`}
         aria-label={t.theme?.switchTheme ?? "Switch theme"}
         {...{ "aria-expanded": String(open) }}
         {...{ "aria-haspopup": "listbox" }}
       >
         <span className="inline-flex items-center gap-1.5">
-          <Palette className="h-3.5 w-3.5" />
+          {mangaActive ? (
+            <span aria-hidden className="qm-theme-trigger__spark">
+              ✦
+            </span>
+          ) : (
+            <Palette className="h-3.5 w-3.5" />
+          )}
 
           {!collapsed && (
             <Typography
-              className="hidden sm:inline text-display tracking-wide text-xs"
+              className="qm-theme-trigger__label hidden sm:inline text-display tracking-wide text-xs"
             >
               {label}
             </Typography>
+          )}
+
+          {mangaActive && (
+            <span aria-hidden className="qm-theme-trigger__lamp" />
           )}
         </span>
       </Button>
@@ -124,6 +155,10 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             ? sidebarRight + 8
             : (rect?.right ?? 0) + 8
           : undefined;
+        const flyoutHeight = Math.min(570, Math.max(220, window.innerHeight - 24));
+        const flyoutWidth = Math.min(366, Math.max(260, window.innerWidth - 24));
+        const boundedLeft = Math.max(12, Math.min(flyoutLeft ?? 12, window.innerWidth - flyoutWidth - 12));
+        const boundedTop = Math.max(12, Math.min((rect?.bottom ?? 0) - flyoutHeight, window.innerHeight - flyoutHeight - 12));
         const dropdown = (
           <div
             ref={dropdownRef}
@@ -137,8 +172,11 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             style={
               dropUp && rect
                 ? {
-                    bottom: window.innerHeight - rect.top + 4,
-                    left: flyoutLeft,
+                    top: boundedTop,
+                    left: boundedLeft,
+                    width: flyoutWidth,
+                    maxHeight: flyoutHeight,
+                    bottom: "auto",
                   }
                 : undefined
             }
@@ -180,12 +218,14 @@ function ThemeSwitcherOptions({
       {availableThemes.map((th) => {
         const isActive = th.name === themeName;
         const paletteTheme = BUILTIN_THEMES[th.name] ?? th.definition;
+        const mangaRow = isMangaThemeName(th.name);
 
         return (
           <ListItem
             active={isActive}
             aria-selected={isActive}
-            className="gap-3"
+            className={cn("gap-3", mangaRow && "qm-theme-row qm-theme-row--manga")}
+            data-manga-theme={mangaRow ? "true" : undefined}
             key={th.name}
             onClick={() => {
               setTheme(th.name);
@@ -193,7 +233,11 @@ function ThemeSwitcherOptions({
             }}
             role="option"
           >
-            {paletteTheme ? (
+            {mangaRow ? (
+              <span aria-hidden className="qm-theme-row__spark">
+                ✦
+              </span>
+            ) : paletteTheme ? (
               <ThemeSwatch theme={paletteTheme} />
             ) : (
               <PlaceholderSwatch />
@@ -212,12 +256,22 @@ function ThemeSwitcherOptions({
               )}
             </div>
 
-            <Check
-              className={cn(
-                "h-3 w-3 shrink-0 text-midground",
-                isActive ? "opacity-100" : "opacity-0",
-              )}
-            />
+            {mangaRow ? (
+              <span
+                aria-hidden
+                className={cn(
+                  "qm-theme-row__lamp",
+                  isActive && "qm-theme-row__lamp--on",
+                )}
+              />
+            ) : (
+              <Check
+                className={cn(
+                  "h-3 w-3 shrink-0 text-midground",
+                  isActive ? "opacity-100" : "opacity-0",
+                )}
+              />
+            )}
           </ListItem>
         );
       })}

@@ -20825,14 +20825,13 @@ def plugins_response() -> Dict[str, Any]:
 
 
 def themes_response(cfg: Any) -> Dict[str, Any]:
-    """GET /api/dashboard/themes -> the real vendored built-ins + Qubit overlay.
+    """GET /api/dashboard/themes -> the served Q2..Q6 theme list.
 
-    1:1 with the reference: the vendored ``_BUILTIN_DASHBOARD_THEMES`` (the
-    same set Hermes serves) with the Qubit-owned ``qubit`` overlay appended.
-    The frontend owns every definition (``frontend/qubit-web/src/themes/
-    presets.ts`` for the built-ins, ``qubit-theme.json`` for the overlay);
-    the backend lists the names and persists the selection, never invents a
-    theme. A fork miss still serves the overlay instead of an empty list.
+    The vendored ``_BUILTIN_DASHBOARD_THEMES`` is the source of names; the
+    frontend owns every definition (``frontend/qubit-web/src/themes/
+    presets.ts``) and the backend only lists names and persists the choice.
+    Q1/Q1-L/Q5/Q5-L and the old Qubit Command overlay were retired at owner
+    request; stored ids are read-old to a surviving theme (Q2/Q2-L).
     """
     themes: List[Dict[str, Any]] = []
     try:
@@ -20844,34 +20843,24 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
                 themes.append({"name": str(t["name"]),
                                "label": str(t.get("label") or t["name"]),
                                "description": str(t.get("description") or "")})
-    except Exception:  # noqa: BLE001 - overlay theme must survive a fork miss
+    except Exception:  # noqa: BLE001 - a fork miss must not crash the request
         pass
-    theme_path = OVERLAY_DIR / "qubit-theme.json"
-    try:
-        definition = json.loads(theme_path.read_text())
-    except (OSError, ValueError):
-        definition = {}
-    if definition:
-        themes.append({"name": "qubit", "label": "Qubit Command",
-                       "description": "Qubit graphite/navy with signal-lime accents",
-                       "definition": definition})
     names = {t.get("name") for t in themes}
     try:
         stored = str(_prefs(cfg).get("theme", "") or "").strip()
-    except Exception:  # noqa: BLE001 - prefs miss falls back to default
+    except Exception:  # noqa: BLE001 - prefs miss falls back to Q2
         stored = ""
-    # Read-old: a preference persisted under any pre-Q1..Q6 theme id resolves
-    # to the Qubit theme it looks like, instead of falling back to the
-    # overlay. Must mirror `web_server_dashboard._THEME_NAME_ALIASES`.
+    # Read-old: a preference persisted under a retired id resolves to a
+    # surviving theme. Must mirror `web_server_dashboard._THEME_NAME_ALIASES`.
     stored = {"nous-blue": "q3", "lens-5i": "q3", "qubit-blue": "q3",
-              "default-large": "q1-l", "midnight": "q2", "mono": "q3",
-              "cyberpunk": "q4", "qubit-contrast": "q5"}.get(stored, stored)
+              "default": "q2", "q1": "q2", "q1-l": "q2-l", "q5": "q2", "q5-l": "q2-l",
+              "qubit": "q2", "default-large": "q2-l", "midnight": "q2",
+              "mono": "q3", "cyberpunk": "q4",
+              "qubit-contrast": "q2"}.get(stored, stored)
     if stored in names:
         active = stored
-    elif "qubit" in names:
-        active = "qubit"
     else:
-        active = themes[0]["name"] if themes else "default"
+        active = themes[0]["name"] if themes else "q2"
     return {"active": active, "themes": themes}
 
 

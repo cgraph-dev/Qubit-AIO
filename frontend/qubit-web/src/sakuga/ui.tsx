@@ -17,7 +17,6 @@ export {
   SakugaProgress as Progress,
   SakugaRadio as Radio,
   SakugaRating as Rating,
-  SakugaSelect as Select,
   SakugaSlider as Slider,
   SakugaTabs as Tabs,
   SakugaTextarea as Textarea,
@@ -59,6 +58,8 @@ export {
   type SakugaToggleProps,
   type SakugaTooltipProps,
 } from '@qubit/shared/sakuga';
+
+export { MangaAwareSelect as Select } from './MangaAwareSelect';
 
 /* Backwards-compatible Button.
  *

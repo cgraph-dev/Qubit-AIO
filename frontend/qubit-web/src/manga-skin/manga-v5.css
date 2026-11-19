@@ -1,0 +1,197 @@
+/* Manga V5 — page families and non-shared controls.
+ * Additions only, no changes to excluded routes or to default themes.
+ * Tones, spacing and corner logic match V3/V4.
+ */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .sessions-toolbar,.cron-toolbar,.workboard-toolbar,.workboard-heading,
+  .sessions-transcript-search,.cron-overview-header
+) {
+  position:relative;min-width:0;
+  gap:12px;
+  padding:12px;
+  border:2px solid rgba(255,38,154,.68)!important;
+  border-left:5px solid #ffe500!important;
+  background:linear-gradient(110deg,rgba(255,38,154,.12),#140c27 72%)!important;
+  box-shadow:2px 2px 0 #05030f,4px 4px 0 rgba(185,101,255,.25);
+}
+html[data-qubit-manga="on"] :is(
+ .cron-toolbar__primary,.cron-toolbar__filters,.cron-toolbar__actions,
+ .sessions-toolbar__search,.workboard-toolbar__tools,.workboard-toolbar__filters
+) {
+  min-width:0;gap:8px;align-items:center;
+}
+html[data-qubit-manga="on"] :is(
+ .sessions-table,.cron-table,.workboard-board,.workboard-modal
+) {
+  position:relative;
+  border:2px solid #ff269a!important;border-radius:3px!important;
+  background:linear-gradient(145deg,rgba(255,38,154,.045),#110a23)!important;
+  box-shadow:2px 2px 0 #05030f,4px 4px 0 rgba(255,240,255,.44);
+}
+html[data-qubit-manga="on"] :is(.cron-table__head,.sessions-table thead,.workboard-heading) {
+  background:linear-gradient(100deg,#5e1b56,#240d39)!important;
+  border-bottom:3px solid #ff269a!important;
+  color:#fff0ff!important;
+  font-family:var(--qm-typography-display)!important;
+  letter-spacing:.055em;
+}
+html[data-qubit-manga="on"] :is(
+ .cron-table__row,.sessions-table tbody tr,.session-data-row
+) {
+  border-bottom:1px solid rgba(185,101,255,.3)!important;
+  transition:background-color 130ms ease,box-shadow 130ms ease;
+}
+html[data-qubit-manga="on"] :is(
+ .cron-table__row,.sessions-table tbody tr,.session-data-row
+):hover {
+  background:rgba(255,38,154,.1)!important;
+  box-shadow:inset 4px 0 0 #ffe500;
+}
+html[data-qubit-manga="on"] :is(
+ .session-data-row--expanded,.session-data-row--menu-open,
+ .cron-table__row--paused
+) {
+  background-color:rgba(185,101,255,.09)!important;
+}
+html[data-qubit-manga="on"] :is(
+ .cron-table__name-text,.sessions-table strong,.session-key-cell
+) {font-weight:700;color:#fff0ff}
+html[data-qubit-manga="on"] :is(
+ .cron-table__description,.cron-table__name-meta,
+ .sessions-heading-fact,.session-data-row small
+) {color:var(--qm-muted);line-height:1.42}
+html[data-qubit-manga="on"] :is(
+ .cron-new-task,.workboard-create,.workboard-search-trigger
+) {
+  border:2px solid #05030f!important;
+  background:#ff269a!important;color:#05030f!important;
+  box-shadow:3px 3px 0 #05030f,5px 5px 0 #ffe500!important;
+  font-weight:800;
+}
+html[data-qubit-manga="on"] :is(.workboard-card,.workboard-draft) {
+  position:relative;isolation:isolate;
+  border:2px solid #ff269a!important;
+  background:linear-gradient(145deg,#211239,#100821)!important;
+  box-shadow:3px 3px 0 #05030f,5px 5px 0 rgba(255,240,255,.45)!important;
+  transition:transform 140ms cubic-bezier(.2,1.2,.4,1),filter 140ms ease;
+}
+html[data-qubit-manga="on"] :is(.workboard-card,.workboard-draft):hover {
+  transform:translateY(-2px);filter:brightness(1.07);
+}
+html[data-qubit-manga="on"] :is(.workboard-card,.workboard-draft)::before {
+  content:"";position:absolute;top:-2px;left:-2px;
+  width:35px;height:35px;pointer-events:none;
+  background:url("/manga-ui/manga-corner-top-left.svg") top left/contain no-repeat;
+}
+html[data-qubit-manga="on"] :is(.workboard-card,.workboard-draft)::after {
+  content:"";position:absolute;bottom:-2px;right:-2px;
+  width:30px;height:30px;pointer-events:none;
+  background:url("/manga-ui/manga-corner-bottom-right.svg") bottom right/contain no-repeat;
+}
+html[data-qubit-manga="on"] :is(
+ .workboard-filter-chip,.workboard-status-tabs,[role="tablist"],.session-filter-toggle-group
+) {
+  border-color:rgba(185,101,255,.6)!important;
+  background-color:rgba(15,8,30,.85)!important;
+}
+html[data-qubit-manga="on"] :is(
+ .workboard-status-tabs [aria-selected="true"],
+ .session-filter-toggle-group [aria-pressed="true"],
+ .workboard-filter-chip--active
+) {
+  background:#ffe500!important;color:#05030f!important;
+  border-color:#05030f!important;box-shadow:2px 2px 0 #ff269a!important;
+}
+html[data-qubit-manga="on"] :is(
+ .sessions-filter-popover__panel,.cron-filter-popover__panel,
+ .session-actions,[role="menu"],[role="listbox"]
+) {
+  border-color:#ff269a;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-input,.settings-select,.session-filter-input,
+ .cron-search-box input,.sessions-transcript-search__input,
+ .workboard-search input
+) {
+  min-height:35px;max-width:100%;
+  border:2px solid #b965ff!important;
+  border-radius:2px!important;
+  color:#fff0ff!important;background:#0d071c!important;
+  box-shadow:2px 2px 0 rgba(255,38,154,.45);
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-input,.settings-select,.session-filter-input,
+ .cron-search-box input,.sessions-transcript-search__input,
+ .workboard-search input
+):focus-visible {
+  border-color:#ffe500!important;
+  outline:2px solid #ffe500!important;outline-offset:2px;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row__control,.qsk-field,.cron-search-box,
+ .session-filter-field,.workboard-search-control
+) {min-width:0;max-width:100%}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row,.settings-section__header,.workboard-toolbar,
+ .cron-toolbar,.sessions-toolbar
+) :is(.btn,button,[role="combobox"]) {max-width:100%}
+html[data-qubit-manga="on"] :is(.analytics,.models) :is(
+ .font-mondwest,.font-compressed,.font-expanded
+) {font-family:var(--qm-typography-display)!important}
+html[data-qubit-manga="on"] :is(.analytics,.models) :is(
+ .font-mono,.font-mono-ui
+) {font-family:var(--qm-typography-data)!important}
+/* Native analytics bars remain data-driven; frame only their parent. */
+html[data-qubit-manga="on"] .analytics :is(
+ .settings-group,.settings-summary__tile,table
+) {border-color:rgba(255,38,154,.7)!important}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-group, [data-slot="card"]
+) :is(button,[role="button"]):hover:not(:disabled) {
+  filter:brightness(1.07);
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ [role="dialog"],[role="alertdialog"]
+) {
+  max-width:calc(100vw - 22px);
+  border:3px solid #ff269a!important;
+  border-top:5px solid #ffe500!important;
+  background:#160e29!important;
+  box-shadow:3px 3px 0 #05030f,6px 6px 0 #fff0ff!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-page,.settings-section,table
+) {min-width:0}
+html[data-qubit-manga="on"] #qubit-main-content table {
+  border-collapse:separate;border-spacing:0;
+  font-variant-numeric:tabular-nums;
+}
+html[data-qubit-manga="on"] #qubit-main-content th {
+  background:rgba(255,38,154,.28)!important;
+  color:#fff0ff!important;
+  font-family:var(--qm-typography-display)!important;
+  font-weight:700;letter-spacing:.06em;
+}
+html[data-qubit-manga="on"] #qubit-main-content td {
+  line-height:1.38;vertical-align:middle;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row,.workboard-card,.cron-table__row
+) :is(.settings-count,[role="status"],.badge) {
+  border-radius:2px;
+}
+/* Avoid animating charts continuously: meaningful interaction only. */
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] :is(.workboard-card,.workboard-draft) {
+  transition:none!important;transform:none!important;
+ }
+ html[data-qubit-manga="on"] :is(.cron-table__row,.session-data-row) {transition:none!important}
+}
+@media(max-width:740px) {
+ html[data-qubit-manga="on"] #qubit-main-content :is(
+ .sessions-toolbar,.cron-toolbar,.workboard-toolbar,.workboard-heading
+ ) {padding:9px;gap:8px}
+ html[data-qubit-manga="on"] .workboard-card::before {width:25px;height:25px}
+ html[data-qubit-manga="on"] .workboard-card::after {width:22px;height:22px}
+ html[data-qubit-manga="on"] #qubit-main-content table {font-size:.76rem}
+}

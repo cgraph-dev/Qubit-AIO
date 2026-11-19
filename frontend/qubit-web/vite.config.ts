@@ -13,6 +13,8 @@ function compilerPreset() {
 }
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { get as httpGet } from "node:http";
+import { get as httpsGet } from "node:https";
 
 const BACKEND = process.env.HERMES_DASHBOARD_URL ?? "http://127.0.0.1:9119";
 
@@ -45,6 +47,46 @@ function stripRepoPaths(): Plugin {
   };
 }
 
+/**
+ * Fetch the dashboard shell without the WHATWG `fetch` default
+ * `Sec-Fetch-Mode: cors`. The dashboard only injects its session token into
+ * navigation-style responses, so Vite's Node fetch used to scrape an empty
+ * token and every dev `/api` call 401'd.
+ */
+function fetchDashboardHtml(
+  url: string,
+  redirects = 3,
+): Promise<{ status: number; html: string }> {
+  return new Promise((resolve, reject) => {
+    const getFor = (target: URL) =>
+      target.protocol === "https:" ? httpsGet : httpGet;
+    const visit = (current: URL, left: number) => {
+      const request = getFor(current)(
+        current,
+        { headers: { accept: "text/html" } },
+        (response) => {
+          const status = response.statusCode ?? 0;
+          const location = response.headers.location;
+          if (status >= 300 && status < 400 && location && left > 0) {
+            response.resume();
+            visit(new URL(location, current), left - 1);
+            return;
+          }
+          let html = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk: string) => {
+            html += chunk;
+          });
+          response.on("end", () => resolve({ status, html }));
+        },
+      );
+      request.on("error", reject);
+      request.setTimeout(5000, () => request.destroy(new Error("timeout")));
+    };
+    visit(new URL(url), redirects);
+  });
+}
+
 function hermesDevToken(): Plugin {
   const TOKEN_RE = /window\.__QUBIT_SESSION_TOKEN__\s*=\s*"([^"]+)"/;
   const EMBEDDED_RE =
@@ -55,8 +97,7 @@ function hermesDevToken(): Plugin {
     apply: "serve",
     async transformIndexHtml() {
       try {
-        const res = await fetch(BACKEND, { headers: { accept: "text/html" } });
-        const html = await res.text();
+        const { html } = await fetchDashboardHtml(BACKEND);
         const match = html.match(TOKEN_RE);
         if (!match) {
           console.warn(

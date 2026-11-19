@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router";
 import { useProfileScope } from "@/contexts/useProfileScope";
+import { MangaMenuSurface } from "@/manga-skin/MangaMenuSurface";
 import {
   AlignLeft,
   Check,
@@ -71,6 +72,7 @@ function ProfileActionsMenu({
 }: ProfileActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const floatingMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +81,7 @@ function ProfileActionsMenu({
       // Close only when the click lands outside *this* menu. Matching any
       // `[data-profile-actions]` would treat another card's menu as "inside"
       // and leave several menus open at once.
-      if (target && !containerRef.current?.contains(target)) setOpen(false);
+      if (target && !containerRef.current?.contains(target) && !floatingMenuRef.current?.contains(target)) setOpen(false);
     };
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
@@ -111,8 +113,10 @@ function ProfileActionsMenu({
       </HoverTooltip>
 
       {open && (
-        <div
-          role="menu"
+        <MangaMenuSurface
+          anchorRef={containerRef}
+          menuRef={floatingMenuRef}
+          onClose={() => setOpen(false)}
           className="absolute right-0 top-full z-50 mt-1 min-w-[200px] border border-border bg-card shadow-lg"
         >
           {!isActive && (
@@ -215,7 +219,7 @@ function ProfileActionsMenu({
               {labels.delete}
             </Button>
           )}
-        </div>
+        </MangaMenuSurface>
       )}
     </div>
   );

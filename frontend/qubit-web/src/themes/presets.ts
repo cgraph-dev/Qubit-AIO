@@ -7,15 +7,16 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme ids are Qubit-owned (`q1`..`q5`); the picker shows Q1..Q5. Every
- * theme ships a "-L" large variant (Q1-L .. Q5-L) that keeps the same look
- * with a bigger root size and roomier spacing. Theme names must stay in sync
+ * Theme ids are Qubit-owned (`q2`..`q6`); the picker presents them in normal
+ * order as Q1..Q4. Q1, Q1-L, Q5 and Q5-L were retired at owner request (the
+ * Q1/Q5 definitions remain only as internal fallbacks, never as picker
+ * entries). Every remaining theme ships a "-L" large variant (Q1-L .. Q4-L)
+ * that keeps the same look with a bigger root size and roomier spacing. Theme names must stay in sync
  * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
  * `qubit_cli/web_server_dashboard.py`.
  *
- * `default` is the canonical first theme and keeps its id (it is the
- * fallback in `resolveTheme`, the boot splash, and the persisted default);
- * it is presented as Q1.
+ * `defaultTheme` (Q1) is no longer selectable; it remains a definition for
+ * legacy fallbacks only. The live fallback is Q2 (`midnightTheme`).
  */
 
 // ---------------------------------------------------------------------------
@@ -74,8 +75,8 @@ export const defaultTheme: DashboardTheme = {
 /** Q2 — deep blue-violet night canvas. */
 export const midnightTheme: DashboardTheme = {
   name: "q2",
-  label: "Q2",
-  description: "Q2 — near-black navy canvas with a lilac tint and violet glow",
+  label: "Q1",
+  description: "Q1 — near-black navy canvas with a lilac tint and violet glow",
   palette: {
     background: { hex: "#0a0a1f", alpha: 1 },
     midground: { hex: "#d4c8ff", alpha: 1 },
@@ -100,8 +101,8 @@ export const midnightTheme: DashboardTheme = {
 /** Q3 — grayscale, square corners. */
 export const monoTheme: DashboardTheme = {
   name: "q3",
-  label: "Q3",
-  description: "Q3 — neutral greyscale canvas with square corners and no accent hue",
+  label: "Q2",
+  description: "Q2 — neutral greyscale canvas with square corners and no accent hue",
   palette: {
     background: { hex: "#0e0e0e", alpha: 1 },
     midground: { hex: "#eaeaea", alpha: 1 },
@@ -125,8 +126,8 @@ export const monoTheme: DashboardTheme = {
 /** Q4 — high-chroma terminal look, monospace throughout. */
 export const cyberpunkTheme: DashboardTheme = {
   name: "q4",
-  label: "Q4",
-  description: "Q4 — black canvas, monospace throughout, bright mint signal colour",
+  label: "Q3",
+  description: "Q3 — black canvas, monospace throughout, bright mint signal colour",
   palette: {
     background: { hex: "#040608", alpha: 1 },
     midground: { hex: "#9bffcf", alpha: 1 },
@@ -179,6 +180,68 @@ export const contrastTheme: DashboardTheme = {
   },
 };
 
+/** Q6 — the opt-in manga skin as a first-class theme. Selecting Q6 (or
+ *  Q6-L) enables the scoped `html[data-qubit-manga]` visual layer; selecting
+ *  any other theme turns it back off. The palette below is the fallback for
+ *  the brief frame before the layer applies and for the theme-picker swatch. */
+export const mangaTheme: DashboardTheme = {
+  name: "q6",
+  label: "Q4",
+  description:
+    "Q4 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
+  palette: {
+    background: { hex: "#08061a", alpha: 1 },
+    midground: { hex: "#f7e9ff", alpha: 1 },
+    foreground: { hex: "#ffffff", alpha: 0 },
+    warmGlow: "rgba(255, 38, 154, 0.42)",
+    noiseOpacity: 1,
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontSans: `"Inter", ${SYSTEM_SANS}`,
+    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
+    fontDisplay: '"Rajdhani", "Arial Narrow", "Segoe UI", system-ui, sans-serif',
+    fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap",
+    letterSpacing: "0.002em",
+  },
+  layout: {
+    ...DEFAULT_LAYOUT,
+    radius: "3px",
+    density: "comfortable",
+  },
+  colorOverrides: {
+    success: "#4ade80",
+    warning: "#ffe500",
+    destructive: "#ff4d80",
+  },
+  swatchColors: ["#08061a", "#ff269a", "#ffe500"],
+  terminalBackground: "#08061a",
+  terminalForeground: "#f7e9ff",
+};
+
+export const MANGA_THEME_NAME = "q6";
+export const MANGA_THEME_LARGE_NAME = "q6-l";
+
+/** Theme ids retired at owner request. They are filtered out of a served
+ *  list even if an older/rolling backend still returns them. */
+export const RETIRED_THEME_IDS: ReadonlySet<string> = new Set([
+  "default",
+  "q1",
+  "q1-l",
+  "q5",
+  "q5-l",
+  "qubit",
+]);
+
+export function isRetiredThemeName(name: string | null | undefined): boolean {
+  return Boolean(name && RETIRED_THEME_IDS.has(name));
+}
+
+/** True for the manga base and large theme ids. */
+export function isMangaThemeName(name: string | null | undefined): boolean {
+  return name === MANGA_THEME_NAME || name === MANGA_THEME_LARGE_NAME;
+}
+
 // ---------------------------------------------------------------------------
 // Large variants — same look, bigger type and roomier spacing
 // ---------------------------------------------------------------------------
@@ -199,21 +262,18 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
   };
 }
 
-export const bigDefaultTheme = largeVariant(defaultTheme, "q1-l", 1);
-export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 2);
-export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 3);
-export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 4);
-export const bigContrastTheme = largeVariant(contrastTheme, "q5-l", 5);
+export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 1);
+export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 2);
+export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 3);
+export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 4);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
-  default: defaultTheme,
-  "q1-l": bigDefaultTheme,
   q2: midnightTheme,
   "q2-l": bigMidnightTheme,
   q3: monoTheme,
   "q3-l": bigMonoTheme,
   q4: cyberpunkTheme,
   "q4-l": bigCyberpunkTheme,
-  q5: contrastTheme,
-  "q5-l": bigContrastTheme,
+  q6: mangaTheme,
+  "q6-l": bigMangaTheme,
 };

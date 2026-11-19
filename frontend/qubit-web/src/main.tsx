@@ -3,6 +3,8 @@ import { BrowserRouter } from "react-router";
 import "./index.css";
 import "./sakuga/sakuga.css";
 import App from "./App";
+import { MangaSkinGate } from "./manga-skin/MangaSkin";
+import { bootstrapMangaSkin } from "./manga-skin/manga-store";
 import { SystemActionsProvider } from "./contexts/SystemActions";
 import {
   I18nProvider,
@@ -44,6 +46,11 @@ if (typeof window !== "undefined" && "requestIdleCallback" in window) {
   setTimeout(warmSakuga, 1200);
 }
 
+// Apply the persisted manga preference before first paint so the skin never
+// flashes for users who left it on. No-op when the preference is off or the
+// first route is an excluded surface.
+bootstrapMangaSkin();
+
 async function mount(): Promise<void> {
   // Load the saved dictionary before the first paint. English (the default)
   // is already in this chunk, so the common path resolves without a network
@@ -66,6 +73,7 @@ async function mount(): Promise<void> {
       >
         <ThemeProvider>
           <SystemActionsProvider>
+            <MangaSkinGate />
             <App />
           </SystemActionsProvider>
         </ThemeProvider>
