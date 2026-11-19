@@ -1,0 +1,94 @@
+/* Manga responsive guardrails for compact footer, right inspector and inputs.
+ * Source-safe: all selectors require active Manga route gating.
+ * Interaction and Sakuga VFX code is unchanged. */
+@media(min-width:1024px) {
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] {
+  display:flex; flex-direction:column;max-height:100dvh;overflow:hidden;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__nav {
+  flex:1 1 auto;min-height:44px;overflow-y:auto;overscroll-behavior:contain;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system {
+  flex:0 1 auto;min-height:0;max-height:24dvh;
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility {
+  flex:0 1 auto;min-height:0;max-height:26dvh;
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility > * {
+  min-width:0;max-width:100%;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__action {
+  min-width:0;max-width:100%;flex-shrink:0;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .language-switcher {
+  max-width:100%!important;overflow:hidden;
+ }
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-page__copy,.settings-section__copy,.settings-row__text
+) {min-width:0;overflow-wrap:anywhere}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row,.settings-section__header,.cron-form-section
+) {max-width:100%;min-width:0}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row__control,.cron-interval-grid,.cron-schedule-builder
+) {min-width:0;max-width:100%}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ input:not([type=checkbox]):not([type=radio]),textarea,select
+) {box-sizing:border-box;max-width:100%}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ input,textarea,select,[role=combobox]
+):focus-visible {outline:2px solid #ffe525!important;outline-offset:2px}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row__desc,.cron-form__hint,.settings-section__desc
+) {line-height:1.5;letter-spacing:normal;overflow-wrap:anywhere}
+html[data-qubit-manga="on"] .qchat__side {
+  min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;
+  scrollbar-width:thin;overscroll-behavior:contain;
+}
+html[data-qubit-manga="on"] .qchat__side > .qchat__tools {
+  flex:0 1 auto;min-height:0;
+}
+html[data-qubit-manga="on"] .qchat__side > .qchat__sessions {
+  flex:1 0 150px;min-height:150px;
+}
+@media(max-width:760px) {
+ html[data-qubit-manga="on"] #qubit-main-content .settings-page__header,
+ html[data-qubit-manga="on"] #qubit-main-content .settings-section__header {
+  flex-wrap:wrap;
+ }
+ html[data-qubit-manga="on"] #qubit-main-content .settings-page__actions,
+ html[data-qubit-manga="on"] #qubit-main-content .settings-section__actions {
+  max-width:100%;flex-wrap:wrap;gap:8px;
+ }
+ html[data-qubit-manga="on"] .qchat__side {
+  max-height:55dvh;
+ }
+}
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] #app-sidebar * {scroll-behavior:auto}
+}
+
+
+/* The older sidebar has a looping video and fine engineer-grid ruling.
+   These compete with the manga plates and the reference's solid dark ink. */
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar::before {
+  content:none!important;display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop video {
+  display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop {
+  mask-image:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop-scrim {
+  background:#10091f!important;opacity:1!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+  backdrop-filter:none!important;
+}

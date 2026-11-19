@@ -17,6 +17,7 @@ const LEGACY_THEME_STORAGE_KEY = "hermes-dashboard-theme";
 export const MANGA_EXCLUDED_PATHS = [
   "/chat", // The terminal TUI is a separate surface; never skin its route.
   "/qubit-workbench",
+  "/workbench", // Explicitly preserve the standalone Workbench route and descendants.
   "/qubit-hud",
   "/qubit-office",
   "/qubit-office2",

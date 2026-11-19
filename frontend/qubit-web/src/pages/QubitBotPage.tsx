@@ -27,7 +27,7 @@ import { Button, Checkbox, Input, Select, Textarea, emitFx, showSakugaToast } fr
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 import {
   DISABLED_BOT_ACTIONS,
@@ -676,7 +676,7 @@ export default function QubitBotPage() {
   );
 
   return (
-    <div className="qb-chat qb-chat-page" data-testid="qubit-bot-page">
+    <div className="qb-chat qb-chat-page qm-bot-page" data-testid="qubit-bot-page">
       <div className="qb-chat-scroll" ref={scrollRef} onScroll={(e) => onThreadScroll(e.currentTarget)}>
         {/* History-load error (distinct retry) */}
         {historyError ? (

@@ -31,6 +31,8 @@ try {
  console.error("Playwright is required for the browser audit. Install it in the local QA environment; do not modify the Qubit production dependencies.");
  process.exit(2);
 }
+// Sensitive routes still receive layout checks, but never screenshot their data.
+const screenshotRestricted = ["/env", "/admin/users"];
 const checks = [];
 const problems = [];
 await mkdir(output, { recursive:true });
@@ -41,6 +43,7 @@ function safeName(r) { return r.replace(/[^a-z0-9]/gi,"_").slice(0,96); }
 try {
  for (const width of widths) {
   const context = await browser.newContext({viewport:{width,height:900},deviceScaleFactor:1,storageState});
+  await context.addInitScript(() => { localStorage.setItem("qubit-dashboard-theme","q6"); });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -48,16 +51,12 @@ try {
    const record = {width,route,status:"unknown",screenshot:null,scrollOverflow:false,collapsedFooterOverlap:false,errors:[]};
    try {
     const response = await page.goto(base + route, { waitUntil:"domcontentloaded",timeout:30000 });
-    await page.waitForTimeout(400);
-    // Enable Manga from the actual Q6 preference to exercise route gating.
-    // This affects only the disposable audit browser context.
-    await page.evaluate(() => {
-      localStorage.setItem("qubit-dashboard-theme","q6");
-      localStorage.setItem("qubit-manga-skin-enabled","true");
-    });
-    await page.reload({waitUntil:"domcontentloaded",timeout:30000});
-    await page.waitForTimeout(450);
+    await page.waitForTimeout(650);
     record.status = String(response?.status() ?? "unknown");
+    record.requestedUrl = base + route;
+    record.finalUrl = page.url();
+    if (new URL(record.finalUrl).pathname !== route) problems.push({width,route,kind:"redirect",finalUrl:record.finalUrl});
+    if (response && !response.ok()) problems.push({width,route,kind:"http-error",status:response.status()});
     const metrics = await page.evaluate(() => {
       const root = document.documentElement;
       const main = document.querySelector("#qubit-main-content");
@@ -78,9 +77,12 @@ try {
     record.scrollOverflow = metrics.docWidth > metrics.viewWidth + 3;
     record.clippedInputs = metrics.clippedElements;
     record.marked = metrics.marked;
+    if (metrics.marked !== "on") problems.push({width,route,kind:"manga-theme-not-activated",detail:"Q6 may be overridden by persisted server theme or auth redirect"});
+    if (!metrics.main) problems.push({width,route,kind:"main-content-missing"});
     if(width>=1024) {
      const ctl=page.locator('#app-sidebar button[aria-label*="Collapse"], #app-sidebar button[aria-label*="collapse"]');
-     if(await ctl.count()) {await ctl.first().click().catch(()=>{});await page.waitForTimeout(300);}
+     const isCollapsed=await page.locator('#app-sidebar[data-collapsed="true"]').count();
+     if(!isCollapsed && await ctl.count()) {await ctl.first().click().catch(()=>{});await page.waitForTimeout(300);}
      const overlap=await page.evaluate(()=>{
        const rail=document.querySelector('#app-sidebar[data-collapsed="true"]');
        if(!rail) return false;
@@ -95,9 +97,13 @@ try {
     if(record.scrollOverflow)problems.push({width,route,kind:"document-horizontal-overflow"});
     if(record.clippedInputs.length)problems.push({width,route,kind:"offscreen-control",count:record.clippedInputs.length});
     if(errors.length)problems.push({width,route,kind:"browser-errors",errors:errors.slice()});
-    const file=width+"_"+safeName(route)+".png";
-    await page.screenshot({path:resolve(output,file),fullPage:false,animations:"disabled"});
-    record.screenshot=file;
+    if (screenshotRestricted.some((p) => route === p || route.startsWith(p + "/"))) {
+      record.screenshot = "SKIPPED_SENSITIVE_ROUTE";
+    } else {
+      const file=width+"_"+safeName(route)+".png";
+      await page.screenshot({path:resolve(output,file),fullPage:false,animations:"disabled"});
+      record.screenshot=file;
+    }
     record.errors=errors.splice(0);
    }catch(error){
     record.status="ERROR";

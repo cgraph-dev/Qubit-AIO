@@ -73,7 +73,7 @@ import { Button, SakugaLoading, SakugaToastHost } from "@/sakuga/ui";
 import { SelectionSwitcher } from "@nous-research/ui/ui/components/selection-switcher";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
-import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { QubitMark } from "@/components/QubitMark";
@@ -1071,7 +1071,7 @@ export default function App() {
                 )}
               >
                 <PluginSlot name="header-left" />
-                <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /></span>
+                <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><img className="qm-brand-cat" src="/manga-ui/qubit-cat-atom.svg" alt="" draggable={false} /></span>
                 <span
                   className="qagent-sidebar__brand-name"
                   data-brand={t.app.brand}

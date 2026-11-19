@@ -1,0 +1,445 @@
+/* Manga repair: shared dialogs, notifications, branding and actual page
+ * components. Every rule is behind the Q6/Q6-L route gate. Do not restyle
+ * Sakuga internals or overlay static mock screenshots on live content.
+ */
+html[data-qubit-manga="on"] {
+ --qm-page-ink:#080615;
+ --qm-page-pink:#ff269a;
+ --qm-page-purple:#b965ff;
+ --qm-page-yellow:#ffe525;
+ --qm-page-text:#fff0ff;
+ --qm-page-muted:#e6cfea;
+ --qm-page-body:"Inter",system-ui,sans-serif;
+ --qm-page-heading:"Rajdhani","Arial Narrow",system-ui,sans-serif;
+}
+/* The original mascot must actually render as an <img>, not rely on hiding
+ * an SVG and hoping a background image survives the old brand CSS. */
+#app-sidebar .qm-brand-cat {display:none}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
+ gap:6px!important;padding:5px 7px!important;min-width:0;
+ background:linear-gradient(105deg,#38133d,#10091f 77%)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > div:first-child {
+ flex:1 1 auto;min-width:0;max-width:calc(100% - 35px);
+ gap:6px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem {
+ position:relative;display:grid!important;place-items:center;
+ width:49px!important;height:49px!important;
+ flex:0 0 49px!important;min-width:49px;
+ background:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem > svg {
+ display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-cat {
+ display:block!important;position:absolute;inset:0;
+ width:100%;height:100%;object-fit:contain;
+ filter:drop-shadow(0 0 3px rgba(42,190,255,.55));
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+ flex:1 1 auto;min-width:0;max-width:115px;
+ letter-spacing:.025em!important;font:800 1.04rem/1.15 var(--qm-page-heading)!important;
+ white-space:nowrap;text-shadow:1px 1px 0 var(--qm-page-ink);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name .qbrand-sparks {
+ display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qbrand-label {display:block;overflow:hidden;text-overflow:ellipsis}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > button {
+ flex:0 0 31px!important;min-width:30px;max-width:31px;
+ padding:4px!important;
+}
+/* Shared confirmation dialogs: portal-safe, readable and themed, with real
+ * buttons, real focus handling, and a non-interactive ornament layer. */
+html[data-qubit-manga="on"] .qm-confirm-dialog {
+ position:relative;isolation:isolate;overflow:visible;
+ width:min(520px,calc(100vw - 26px))!important;
+ max-height:calc(100dvh - 36px);
+ border:3px solid var(--qm-page-pink)!important;
+ border-top:5px solid var(--qm-page-yellow)!important;
+ border-radius:3px!important;
+ background:linear-gradient(135deg,#261037,#10081c 78%)!important;
+ box-shadow:3px 3px 0 var(--qm-page-ink),6px 6px 0 #fff0ff!important;
+ color:var(--qm-page-text);
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog::before {
+ content:"";position:absolute;z-index:2;pointer-events:none;
+ width:37px;height:37px;left:-13px;top:-13px;
+ background:url("/manga-ui/manga-impact-star.svg") center/contain no-repeat;
+ animation:qm-confirm-impact 380ms cubic-bezier(.2,1.5,.4,1) both;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog::after {
+ content:"";position:absolute;z-index:2;pointer-events:none;
+ width:34px;height:34px;bottom:-5px;right:-5px;
+ background:url("/manga-ui/manga-corner-bottom-right.svg") center/contain no-repeat;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__header {
+ position:relative;min-width:0;padding:18px 19px 16px!important;
+ border-bottom:2px solid var(--qm-page-pink)!important;
+ background:linear-gradient(90deg,rgba(255,38,154,.19),transparent)!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__title {
+ margin:0;overflow-wrap:anywhere;
+ font:800 clamp(1.12rem,2vw,1.42rem)/1.2 var(--qm-page-heading)!important;
+ letter-spacing:.055em!important;color:var(--qm-page-text)!important;
+ text-transform:uppercase;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__description {
+ color:var(--qm-page-muted)!important;
+ font:500 .88rem/1.55 var(--qm-page-body)!important;
+ max-width:57ch;overflow-wrap:anywhere;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__actions {
+ min-height:70px;display:flex;flex-wrap:wrap;gap:10px!important;
+ padding:13px 16px!important;
+ background:#11091f!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__actions button {
+ flex:0 1 auto;min-height:40px;max-width:100%;
+ padding:8px 14px!important;white-space:normal;
+ font:800 .87rem/1.2 var(--qm-page-body)!important;
+ letter-spacing:.04em;box-shadow:2px 2px 0 #070411!important;
+ border-radius:2px!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__cancel {
+ border:2px solid #b965ff!important;color:#fff0ff!important;background:#1d1130!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__confirm {
+ border:2px solid #070411!important;
+ background:var(--qm-page-yellow)!important;
+ color:#090513!important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__actions button:focus-visible {
+ outline:3px solid var(--qm-page-yellow)!important;outline-offset:3px;
+}
+@keyframes qm-confirm-impact {
+ 0%{opacity:.25;transform:scale(.6) rotate(-22deg)}
+ 65%{opacity:1;transform:scale(1.18) rotate(8deg)}
+ 100%{opacity:1;transform:scale(1) rotate(0)}
+}
+/* The build banner is injected directly into body with inline styles.
+ * Override only this exact notice in Q6, never the general toast system. */
+html[data-qubit-manga="on"] #qubit-build-notice.qm-build-notice {
+ right:clamp(10px,2vw,28px)!important;bottom:clamp(10px,2vw,28px)!important;
+ max-width:min(92vw,460px)!important;gap:12px!important;
+ padding:13px 15px!important;
+ border:3px solid var(--qm-page-pink)!important;
+ border-left:6px solid var(--qm-page-yellow)!important;
+ border-radius:3px!important;
+ background:linear-gradient(105deg,#281239,#11091f)!important;
+ color:var(--qm-page-text)!important;
+ font:600 .84rem/1.4 var(--qm-page-body)!important;
+ box-shadow:3px 3px 0 #080615,5px 5px 0 #fff0ff!important;
+}
+html[data-qubit-manga="on"] #qubit-build-notice .qm-build-notice__reload {
+ min-height:34px!important;padding:6px 11px!important;
+ border:2px solid #080615!important;border-radius:2px!important;
+ background:var(--qm-page-yellow)!important;color:#080615!important;
+ font:800 .85rem/1.2 var(--qm-page-body)!important;
+}
+html[data-qubit-manga="on"] #qubit-build-notice .qm-build-notice__close {
+ min-width:26px!important;min-height:28px!important;
+ color:#fff0ff!important;opacity:1!important;font-size:22px!important;
+}
+html[data-qubit-manga="on"] #qubit-build-notice :is(button):focus-visible {
+ outline:2px solid var(--qm-page-yellow)!important;outline-offset:2px;
+}
+/* Config sidebar: avoid tiny buttons and settings squeezed into the filter
+ * column. Category navigation is its own readable plate. */
+html[data-qubit-manga="on"] .qm-config-page {
+ min-width:0;gap:17px!important;
+ font-family:var(--qm-page-body);
+}
+html[data-qubit-manga="on"] .qm-config-categories {
+ min-width:0;
+}
+html[data-qubit-manga="on"] .qm-config-categories > div > div {
+ border:2px solid var(--qm-page-pink)!important;
+ background:linear-gradient(130deg,#211031,#10091f)!important;
+ box-shadow:2px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-config-category {
+ width:100%;min-height:36px;min-width:0;
+ padding:8px 10px!important;
+ color:#fff0ff!important;
+ font:700 .82rem/1.25 var(--qm-page-body)!important;
+ border-bottom:1px solid rgba(185,101,255,.32)!important;
+}
+html[data-qubit-manga="on"] .qm-config-category[data-active="true"],
+html[data-qubit-manga="on"] .qm-config-category.is-active {
+ background:var(--qm-page-yellow)!important;color:#080615!important;
+}
+html[data-qubit-manga="on"] .qm-config-actions {
+ min-width:0;padding:11px 13px;gap:12px!important;
+ border:2px solid rgba(255,38,154,.7);
+ border-left:5px solid var(--qm-page-yellow);
+ background:linear-gradient(115deg,#20102e,#10091f);
+}
+html[data-qubit-manga="on"] .qm-config-actions > div {
+ min-width:0;max-width:100%;
+}
+html[data-qubit-manga="on"] .qm-config-page :is(
+ input,select,textarea,[role="combobox"],.qsk-field
+) {
+ min-width:0;max-width:100%;font-family:var(--qm-page-body)!important;
+}
+html[data-qubit-manga="on"] .qm-config-page :is(
+ [data-slot="card"],.settings-section,.settings-group
+) {
+ min-width:0;max-width:100%;
+}
+/* Skills list: dense, aligned, clearly actionable in a 578-item view. */
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-list {
+ gap:4px!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row {
+ position:relative;display:grid!important;
+ grid-template-columns:minmax(52px,74px) minmax(0,1fr) 40px;
+ align-items:center!important;gap:12px!important;
+ min-width:0;min-height:66px;
+ padding:10px 12px!important;
+ border:1px solid rgba(185,101,255,.65)!important;
+ border-left:4px solid var(--qm-page-pink)!important;
+ background:linear-gradient(105deg,#200f30,#110921 75%)!important;
+ box-shadow:2px 2px 0 #080615;
+ transition:border-color 150ms ease,filter 150ms ease;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row:hover {
+ border-left-color:var(--qm-page-yellow)!important;
+ filter:brightness(1.1);
+}
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row > * {
+ min-width:0;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row .font-mono-ui {
+ font:700 .86rem/1.3 var(--qm-page-body)!important;
+ overflow-wrap:anywhere;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row p {
+ font:500 .76rem/1.43 var(--qm-page-body)!important;
+ color:var(--qm-page-muted)!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-edit {
+ opacity:1!important;visibility:visible!important;min-height:34px;
+ justify-self:end;min-width:34px;max-width:40px;padding:6px!important;
+}
+/* Kitchen: make a guided intake form that occupies a reasonable width. */
+html[data-qubit-manga="on"] .kitchen-page {
+ gap:15px!important;max-width:100%;font-family:var(--qm-page-body);
+}
+html[data-qubit-manga="on"] .kitchen-intro {
+ padding:17px 18px;border:2px solid var(--qm-page-pink);
+ border-left:6px solid var(--qm-page-yellow);
+ background:linear-gradient(110deg,#251034,#12091f);
+ box-shadow:3px 3px 0 #080615;
+}
+html[data-qubit-manga="on"] .kitchen-intro h2 {
+ color:#fff0ff!important;font:800 1.48rem/1.2 var(--qm-page-heading)!important;
+ letter-spacing:.04em;
+}
+html[data-qubit-manga="on"] .kitchen-intro p {
+ max-width:78ch;font:500 .88rem/1.55 var(--qm-page-body)!important;
+}
+html[data-qubit-manga="on"] .kitchen-panel {
+ position:relative;isolation:isolate;min-width:0;
+ padding:clamp(13px,1.4vw,21px)!important;
+ gap:14px!important;
+ border:2px solid var(--qm-page-pink)!important;
+ border-left:5px solid #b965ff!important;
+ border-radius:3px!important;
+ background:linear-gradient(145deg,#1b0e2b,#10091f 80%)!important;
+ box-shadow:2px 2px 0 #080615,4px 4px 0 rgba(255,240,255,.4)!important;
+}
+html[data-qubit-manga="on"] .kitchen-panel::after {
+ content:"";pointer-events:none;position:absolute;z-index:1;
+ bottom:-2px;right:-2px;width:32px;height:32px;
+ background:url("/manga-ui/manga-corner-bottom-right.svg") center/contain no-repeat;
+}
+html[data-qubit-manga="on"] .kitchen-panel__title {
+ font:800 1.12rem/1.25 var(--qm-page-heading)!important;
+ letter-spacing:.04em!important;color:#fff0ff!important;
+}
+html[data-qubit-manga="on"] .kitchen-form {
+ max-width:min(100%,780px);gap:14px!important;
+}
+html[data-qubit-manga="on"] .kitchen-field {
+ max-width:min(100%,690px);
+}
+html[data-qubit-manga="on"] .kitchen-field :is(input,.qsk-field,sakuga-input) {
+ max-width:100%;min-height:40px;width:100%;
+}
+html[data-qubit-manga="on"] .kitchen-actions {gap:10px;flex-wrap:wrap}
+html[data-qubit-manga="on"] .kitchen-actions button {
+ min-height:39px;padding-inline:17px!important;
+ border:2px solid var(--qm-page-pink)!important;
+}
+html[data-qubit-manga="on"] .kitchen-modes {
+ flex-wrap:wrap;gap:9px;
+}
+html[data-qubit-manga="on"] .kitchen-mode.is-active {
+ border-color:#080615!important;
+ background:var(--qm-page-yellow)!important;color:#080615!important;
+}
+html[data-qubit-manga="on"] .kitchen-note {
+ border-left:4px solid var(--qm-page-yellow)!important;
+ padding:11px 13px!important;
+ color:var(--qm-page-muted)!important;background:rgba(255,229,37,.08)!important;
+}
+/* Qubit Bot — preserve transcript + composer scrolling, but align cards and
+ * all visible interactions to the same plates as the rest of the dashboard. */
+html[data-qubit-manga="on"] .qm-bot-page {
+ min-width:0;max-width:100%;font-family:var(--qm-page-body);
+}
+html[data-qubit-manga="on"] .qm-bot-page :is(
+ .qb-hero,.qb-queue,.qb-picker,.qb-recent-results,.qb-composer,.qb-tool-card,
+ .qb-below-body,[data-slot="card"]
+) {
+ min-width:0;max-width:100%;
+}
+html[data-qubit-manga="on"] .qm-bot-page :is(
+ .qb-composer,.qb-picker,.qb-tool-card,.qb-recent-results,.qb-queue
+) {
+ border:2px solid var(--qm-page-pink)!important;
+ border-radius:4px!important;
+ background:linear-gradient(120deg,#231033,#10091f)!important;
+ box-shadow:2px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-bot-page :is(.qb-hero-title,.qb-thread-bar h2,.qb-picker-heading) {
+ color:#fff0ff!important;font-family:var(--qm-page-heading)!important;
+ font-weight:800!important;letter-spacing:.02em;
+}
+html[data-qubit-manga="on"] .qm-bot-page :is(
+ .qb-starter-btn,.qb-send-btn,.qb-plus-btn,.qb-below-toggle
+) {
+ min-height:38px;
+ border:2px solid #b965ff!important;
+ box-shadow:2px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-bot-page .qb-composer-row {
+ display:flex;align-items:end;gap:9px;min-width:0;
+}
+html[data-qubit-manga="on"] .qm-bot-page .qb-composer-input {
+ min-width:0;flex:1 1 auto;line-height:1.5!important;
+ font:500 .91rem/1.5 var(--qm-page-body)!important;
+}
+html[data-qubit-manga="on"] .qm-bot-page .qb-bubble-user {
+ background:#7422a5!important;border:2px solid #e47bff!important;
+ color:#fff0ff!important;border-radius:4px 13px 4px 13px!important;
+}
+html[data-qubit-manga="on"] .qm-bot-page .qb-bubble-assistant {
+ background:#1f1036!important;border:2px solid var(--qm-page-pink)!important;
+ color:#fff0ff!important;border-radius:13px 4px 13px 4px!important;
+}
+html[data-qubit-manga="on"] .qm-bot-page .qb-below-body {
+ overflow-x:hidden;
+}
+html[data-qubit-manga="on"] .qm-bot-page .qb-below-body :is(
+ input,textarea,select,[role="combobox"],button
+) {max-width:100%;}
+@media(max-width:680px) {
+ html[data-qubit-manga="on"] .qm-confirm-dialog__actions button {flex:1 1 auto}
+ html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row {
+  grid-template-columns:55px minmax(0,1fr) 36px;gap:8px!important;padding:9px!important;
+ }
+ html[data-qubit-manga="on"] .kitchen-panel {padding:12px!important}
+ html[data-qubit-manga="on"] .qm-config-category {min-height:40px}
+ html[data-qubit-manga="on"] .qm-bot-page .qb-hero {padding-inline:12px}
+}
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] .qm-confirm-dialog::before {animation:none!important}
+ html[data-qubit-manga="on"] .qm-skill-row,
+ html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem {
+  transition:none!important;transform:none!important;
+ }
+}
+
+
+/* Skills popup templates retain library focus trap and keyboard management.
+ * The outer class is on the actual portaled dialog surface. */
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) {
+ width:min(96vw,760px);min-width:0;
+ max-height:min(90dvh,900px);overflow-y:auto;overflow-x:hidden;
+ padding:clamp(14px,1.8vw,23px)!important;
+ border:3px solid var(--qm-page-pink)!important;
+ border-top:5px solid var(--qm-page-yellow)!important;
+ border-radius:3px!important;
+ background:linear-gradient(128deg,#271239,#11091e 72%)!important;
+ box-shadow:3px 3px 0 #080615,6px 6px 0 #fff0ff!important;
+}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ h2,[class*="dialog-title"],[data-slot="dialog-title"]
+) {
+ color:#fff0ff!important;
+ font:800 clamp(1.15rem,1.8vw,1.42rem)/1.25 var(--qm-page-heading)!important;
+ letter-spacing:.045em!important;
+}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ [class*="dialog-description"],[data-slot="dialog-description"],p
+) {
+ color:var(--qm-page-muted);line-height:1.5;
+}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ sakuga-input,sakuga-textarea,input,textarea
+) {min-width:0;max-width:100%;width:100%}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ sakuga-button,button
+) {min-height:38px;max-width:100%}
+html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog) :is(
+ sakuga-button,button
+):focus-visible {outline:2px solid var(--qm-page-yellow)!important;outline-offset:3px}
+
+
+/* Skills browse/filter/card family: apply the same readable plate hierarchy
+ * to the screen that often shows 578+ user skills. No cards are remounted. */
+html[data-qubit-manga="on"] .qm-skills-page {
+ min-width:0;gap:16px!important;
+ color:var(--qm-page-text);
+ font-family:var(--qm-page-body);
+}
+html[data-qubit-manga="on"] .qm-skills-filters {
+ min-width:0;
+}
+html[data-qubit-manga="on"] .qm-skills-filters > div > div {
+ border:2px solid var(--qm-page-pink)!important;
+ border-radius:3px!important;
+ background:linear-gradient(145deg,#231033,#10081c)!important;
+ box-shadow:2px 2px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-skills-filters :is(.qsk-list-item,[role="button"]) {
+ min-height:36px;max-width:100%;
+ font:700 .8rem/1.35 var(--qm-page-body)!important;
+}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card {
+ min-width:0;max-width:100%;
+ border:2px solid var(--qm-page-pink)!important;
+ border-radius:3px!important;
+ background:linear-gradient(140deg,#1c0d30,#10081d 78%)!important;
+ box-shadow:2px 2px 0 #080615,4px 4px 0 rgba(255,240,255,.35)!important;
+}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ h2,h3,[data-slot="card-title"]
+) {font:800 1.03rem/1.3 var(--qm-page-heading)!important;color:#fff0ff!important}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ [data-slot="card-header"],.card-header
+) {
+ min-width:0;gap:10px;flex-wrap:wrap;
+ border-bottom:2px solid rgba(255,38,154,.55);
+}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ [data-slot="card-header"],.card-header
+) > div {flex-wrap:wrap;gap:9px;min-width:0}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ sakuga-button,button,sakuga-input,input
+) {max-width:100%}
+html[data-qubit-manga="on"] .qm-skills-page .qm-skills-card :is(
+ sakuga-button,button
+) {min-height:34px;white-space:normal}
+@media(max-width:700px) {
+ html[data-qubit-manga="on"] .qm-skills-page > div:nth-child(2) {
+  flex-wrap:wrap;gap:11px;
+ }
+ html[data-qubit-manga="on"] .qm-skills-filters {
+  width:100%!important;
+ }
+}

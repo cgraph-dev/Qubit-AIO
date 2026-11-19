@@ -99,7 +99,7 @@ jobs:
           files = sorted(Path("tests/e2e").rglob("test_*.py"))
           shard = int(os.environ["SHARD"]) - 1
           shards = int(os.environ["SHARDS"])
-          selected = [str(p) for i, p in enumerate(files) if i % shards == shard]
+          selected = [str(Path("qubit_runtime") / p) for i, p in enumerate(files) if i % shards == shard]
           Path("/tmp/e2e-shard.txt").write_text("\n".join(selected) + "\n", encoding="utf-8")
           print(f"shard {shard + 1}/{shards}: {len(selected)} of {len(files)} files")
           if not selected:

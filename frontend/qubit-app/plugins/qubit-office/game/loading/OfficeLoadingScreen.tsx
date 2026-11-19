@@ -26,6 +26,7 @@ import { officeFx, sakugaButton, sakugaProgress } from "../app/sakuga";
 // The stylesheet travels with this component; Vite emits it into the plugin's
 // one CSS file. No other shell stylesheet is edited.
 import "./loading.css";
+import "./office-manga.css";
 
 export type LoadingPhase = "boot" | "loading" | "error";
 
@@ -154,7 +155,9 @@ export function createOfficeLoadingScreen(
         setWeather(config.weather);
         return;
       }
-      if (!config.location) {
+      // No weather artwork in the default Manga loading view: avoid a
+      // network request and canvas initialization for invisible decoration.
+      if (!config.effects || !config.location) {
         setWeather(fallbackWeather("no-location"));
         return;
       }

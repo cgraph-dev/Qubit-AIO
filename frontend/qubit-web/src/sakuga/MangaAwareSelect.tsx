@@ -1,8 +1,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { SakugaSelect as OriginalSelect, type SakugaSelectProps } from "@qubit/shared/sakuga";
-import { currentMangaEnabled, mangaRouteEligible, subscribeManga } from "@/manga-skin/manga-store";
-import { useSyncExternalStore } from "react";
+import { useMangaLayerActive } from "@/manga-skin/useMangaLayerActive";
 
 /**
  * Web-only replacement for SakugaSelect when Q6/Q6-L is enabled.
@@ -11,9 +10,8 @@ import { useSyncExternalStore } from "react";
  * narrow inspector; viewport clamping keeps every option accessible.
  */
 export function MangaAwareSelect(props: SakugaSelectProps) {
-  const mangaEnabled = useSyncExternalStore(subscribeManga, currentMangaEnabled, () => false);
-  const eligible = typeof window !== "undefined" && mangaRouteEligible(window.location.pathname);
-  return mangaEnabled && eligible
+  const layerActive = useMangaLayerActive();
+  return layerActive
     ? <MangaSelect {...props} />
     : <OriginalSelect {...props} />;
 }
@@ -104,7 +102,7 @@ function MangaSelect({
   };
 
   return (
-    <span className={["qm-select-root", className].filter(Boolean).join(" ")} id={id} style={style} data-testid={testId}>
+    <span className={["qm-select-root", className].filter(Boolean).join(" ")} id={id} style={style as unknown as CSSProperties} data-testid={testId}>
       {name && <input type="hidden" name={name} value={current ?? ""} />}
       <button
         ref={trigger}
