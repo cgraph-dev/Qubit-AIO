@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 220" role="img" aria-label="Three polished golden anime stars"><defs>
+<linearGradient id="gold" x1=".1" y1="0" x2=".9" y2="1"><stop stop-color="#fffefa"/><stop offset=".16" stop-color="#fff9bc"/><stop offset=".36" stop-color="#ffe76c"/><stop offset=".58" stop-color="#ffc52b"/><stop offset=".77" stop-color="#c97913"/><stop offset=".92" stop-color="#fff1a6"/><stop offset="1" stop-color="#9f4e10"/></linearGradient>
+<linearGradient id="bevel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffff8"/><stop offset=".17" stop-color="#fdd762"/><stop offset=".48" stop-color="#b66c20"/><stop offset=".61" stop-color="#fff6bd"/><stop offset=".86" stop-color="#7d3f16"/><stop offset="1" stop-color="#edc065"/></linearGradient>
+<linearGradient id="glint" x1=".3" y1=".15" x2=".8" y2=".95"><stop stop-color="#fffefa"/><stop offset=".55" stop-color="#fffddd"/><stop offset="1" stop-color="#ffc74e"/></linearGradient>
+</defs>
+<g stroke-linejoin="miter">
+<!-- main star: one controlled clean silhouette, no scribbled auxiliary spikes -->
+<path d="M146 8 L148 72 L221 75 L167 106 L180 150 L132 123 L64 167 L92 111 L30 91 L107 84 Z" fill="#09050c" stroke="#080407" stroke-width="13"/>
+<path d="M146 8 L148 72 L221 75 L167 106 L180 150 L132 123 L64 167 L92 111 L30 91 L107 84 Z" fill="url(#bevel)" stroke="#d59020" stroke-width="5"/>
+<path d="M143 24 L144 78 L196 79 L156 103 L169 137 L130 116 L83 147 L101 107 L49 92 L114 90 Z" fill="url(#gold)" stroke="#fff5aa" stroke-width="2.6"/>
+<path d="M143 24 L144 78 L196 79 L156 103 L130 116 L113 97 Z" fill="url(#glint)" opacity=".96"/>
+<path d="M143 24 L114 90 L101 107 L83 147 L130 116 L113 97Z" fill="#fff8de" opacity=".83"/>
+<path d="M130 116 L169 137 L156 103 L196 79Z" fill="#b87721" opacity=".56"/>
+<!-- lower-left star -->
+<path d="M93 127 L96 156 L142 156 L109 176 L117 204 L86 186 L41 214 L60 181 L17 170 L72 165 Z" fill="#080508" stroke="#080508" stroke-width="11"/>
+<path d="M93 127 L96 156 L142 156 L109 176 L117 204 L86 186 L41 214 L60 181 L17 170 L72 165 Z" fill="url(#bevel)" stroke="#c47b20" stroke-width="4"/>
+<path d="M90 138 L91 161 L125 161 L104 176 L108 192 L86 179 L53 201 L67 179 L30 169 L77 169 Z" fill="url(#gold)" stroke="#fff0a1" stroke-width="2"/>
+<path d="M90 138 L91 161 L125 161 L104 176 L86 179 L77 169 Z" fill="url(#glint)" opacity=".86"/>
+<!-- lower-right star -->
+<path d="M197 116 L194 153 L248 153 L205 176 L209 204 L177 186 L132 211 L156 179 L127 165 L178 158 Z" fill="#090508" stroke="#080507" stroke-width="10"/>
+<path d="M197 116 L194 153 L248 153 L205 176 L209 204 L177 186 L132 211 L156 179 L127 165 L178 158 Z" fill="url(#bevel)" stroke="#bf7420" stroke-width="4"/>
+<path d="M194 129 L190 160 L230 159 L197 176 L200 191 L178 180 L147 199 L165 176 L143 167 L182 164 Z" fill="url(#gold)" stroke="#ffef9f" stroke-width="2"/>
+<path d="M194 129 L190 160 L230 159 L197 176 L178 180 L182 164 Z" fill="url(#glint)" opacity=".9"/>
+</g></svg>
