@@ -75,7 +75,9 @@ export function MangaPageGuide() {
   const mangaOn = useSyncExternalStore(subscribeManga, currentMangaEnabled, () => false);
   // These optional tips are currently English copy. Avoid introducing an
   // untranslated strip into Qubit\u0027s other supported languages.
-  const message = locale === "en" && mangaOn && mangaRouteEligible(pathname)
+  // Full-height chat surfaces need all the vertical space for their own UI.
+  const fullHeightChat = pathname === "/qubit-chat" || pathname === "/webchat";
+  const message = locale === "en" && mangaOn && !fullHeightChat && mangaRouteEligible(pathname)
     ? mangaGuideForPath(pathname)
     : undefined;
   if (!message) return null;
