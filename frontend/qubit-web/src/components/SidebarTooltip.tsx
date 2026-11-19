@@ -56,7 +56,8 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
   const detail = rest.length > 0 ? rest.join(" — ") : undefined;
 
   // Clamp vertically: the card is ~2 lines tall at most.
-  const EDGE = 40;
+  const manga = document.documentElement.dataset.qubitManga === "on";
+  const EDGE = manga ? 62 : 40;
   const centreY = rect.top + rect.height / 2;
   const top = Math.min(Math.max(centreY, EDGE), window.innerHeight - EDGE);
 
@@ -74,21 +75,23 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
       style={{
         top,
         transform: "translateY(-50%)",
-        background: "var(--sk-card, #fff)",
-        color: "var(--sk-ink, #1d1a4a)",
-        border: "2.5px solid var(--sk-ink, #1d1a4a)",
-        borderRadius: 12,
-        boxShadow: "5px 6px 0 var(--sk-soft, #b8b3ff)",
-        padding: "9px 13px",
-        font: "600 13px/1.35 -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif",
+        ...(manga ? {} : {
+          background: "var(--sk-card, #fff)",
+          color: "var(--sk-ink, #1d1a4a)",
+          border: "2.5px solid var(--sk-ink, #1d1a4a)",
+          borderRadius: 12,
+          boxShadow: "5px 6px 0 var(--sk-soft, #b8b3ff)",
+          padding: "9px 13px",
+          font: "600 13px/1.35 -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif",
+        }),
         ...(placement === "right"
           ? { left: railRight + gap }
           : { right: window.innerWidth - railLeft + gap }),
         animation: isWarm ? "none" : undefined,
       }}
     >
-      <span className="qagent-sidebar__tooltip-title" style={{ color: "var(--sk-ink, #1d1a4a)" }}>{title}</span>
-      {detail && <span className="qagent-sidebar__tooltip-detail" style={{ color: "var(--sk-dim, #8580b0)", fontWeight: 500 }}>{detail}</span>}
+      <span className="qagent-sidebar__tooltip-title" style={manga ? undefined : { color: "var(--sk-ink, #1d1a4a)" }}>{title}</span>
+      {detail && <span className="qagent-sidebar__tooltip-detail" style={manga ? undefined : { color: "var(--sk-dim, #8580b0)", fontWeight: 500 }}>{detail}</span>}
     </div>,
     document.body,
   );

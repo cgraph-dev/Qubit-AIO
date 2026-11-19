@@ -1143,6 +1143,7 @@ export default function App() {
                         <>
                           <span aria-hidden className="qagent-sidebar__section-rule" />
                           <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
+                          {useMangaNavigation && <img className="qm-manga-section-star hidden" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
                         </>
                       )}
                     </span>
@@ -1195,6 +1196,7 @@ export default function App() {
                       <>
                         <span aria-hidden className="qagent-sidebar__section-rule" />
                         <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
+                          {useMangaNavigation && <img className="qm-manga-section-star hidden" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
                       </>
                     )}
                   </span>
@@ -1774,9 +1776,9 @@ function SidebarSystemActions({
 
   return (
     <>
-    <div className="qagent-sidebar__system">
+    <div className="qagent-sidebar__system qm-manga-gateway-shell">
       {!collapsed && (
-        <div className="qagent-sidebar__telemetry" role="group" aria-label={t.app.system}>
+        <div className="qagent-sidebar__telemetry qm-manga-gateway-plate" role="group" aria-label={t.app.system}>
           <span className="qagent-sidebar__section-head" style={{ margin: "0 0 .2rem", borderTop: 0 }}>
             <span>{t.app.system}</span>
             <span aria-hidden className="qagent-sidebar__section-rule" />

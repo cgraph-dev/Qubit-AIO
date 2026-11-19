@@ -115,9 +115,10 @@ export function ChatWorkspacePicker({
           disabled={loading}
           aria-label={t.sessions.workspaceRescan}
           title={t.sessions.workspaceRescan}
+          aria-busy={loading}
           className="ml-auto text-text-secondary hover:text-foreground"
         >
-          <RefreshCw className={cn(loading && "animate-spin")} />
+          <RefreshCw aria-hidden="true" className={cn("qm-refresh-icon", loading && "qm-refresh-icon--spinning")} />
         </Button>
       </div>
       <Select
