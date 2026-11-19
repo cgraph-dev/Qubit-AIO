@@ -52,7 +52,7 @@ try {
     // Enable Manga from the actual Q6 preference to exercise route gating.
     // This affects only the disposable audit browser context.
     await page.evaluate(() => {
-      localStorage.setItem("qubit-dashboard-theme","Q6");
+      localStorage.setItem("qubit-dashboard-theme","q6");
       localStorage.setItem("qubit-manga-skin-enabled","true");
     });
     await page.reload({waitUntil:"domcontentloaded",timeout:30000});
