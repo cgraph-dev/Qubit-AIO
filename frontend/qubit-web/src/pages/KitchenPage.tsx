@@ -311,10 +311,11 @@ export default function KitchenPage() {
             </div>
             <div className="kitchen-actions">
               <Button
-                type="submit"
+                type="button"
                 size="sm"
                 className="uppercase"
                 disabled={!repoUrl.trim()}
+                onClick={stageRepo}
               >
                 <GitBranch className="h-4 w-4" /> Stage repo
               </Button>
