@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 1000" preserveAspectRatio="none"><defs>
+<linearGradient id="rail" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#230725"/><stop offset=".12" stop-color="#fff3ff"/><stop offset=".24" stop-color="#ff80e0"/><stop offset=".36" stop-color="#fe28a3"/><stop offset=".56" stop-color="#661c60"/><stop offset=".78" stop-color="#ff80d5"/><stop offset=".89" stop-color="#f5d9ff"/><stop offset="1" stop-color="#090413"/></linearGradient>
+<linearGradient id="top" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fbedff"/><stop offset=".23" stop-color="#fd50bd"/><stop offset=".48" stop-color="#4b164d"/><stop offset=".68" stop-color="#ff39a7"/><stop offset=".85" stop-color="#e8b6f0"/><stop offset="1" stop-color="#0e0619"/></linearGradient>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffbea"/><stop offset=".4" stop-color="#ffb72e"/><stop offset=".75" stop-color="#aa4d0b"/><stop offset="1" stop-color="#ffe965"/></linearGradient>
+</defs>
+<!-- A fully hollow, nine-slice outer rail: nothing paints over React content. -->
+<path d="M5 21V979L20 994H300L315 979V21L300 6H20Z" fill="none" stroke="#07020f" stroke-width="10"/>
+<path d="M6 22V978L21 993H299L314 978V22L299 7H21Z" fill="none" stroke="url(#rail)" stroke-width="6"/>
+<path d="M12 26V974L25 986H295L308 974V26L295 14H25Z" fill="none" stroke="#ff33b1" stroke-width="3.2"/>
+<path d="M17 28V971L29 981H291L303 971V28L291 19H29Z" fill="none" stroke="#e8a5e4" stroke-width="1.5" opacity=".7"/>
+<path d="M24 6H295L314 24" fill="none" stroke="url(#top)" stroke-width="5"/>
+<path d="M24 994H296L314 976" fill="none" stroke="url(#top)" stroke-width="5"/>
+<path d="M11 97V385 M11 495V896 M309 105V360 M309 440V912" stroke="#ffd9fa" stroke-width="1.7" opacity=".72"/>
+<path d="M12 23L25 10H61L47 19H30L21 28V56L12 72Z M308 23L295 10H262L276 19H290L299 28V56L308 72Z M12 978L25 989H61L47 981H30L21 972V941L12 930Z M308 978L295 989H262L276 981H290L299 972V941L308 930Z" fill="url(#g)" stroke="#6b290b" stroke-width="1.5"/>
+</svg>
