@@ -7,7 +7,7 @@ import { mangaRouteEligible } from "./manga-store";
 describe("manga human-first UX", () => {
   it("shows plain-language interval schedules without changing backend syntax", () => {
     expect(describeScheduleChoice(DEFAULT_SCHEDULE_STATE)).toBe("Run every 30 minutes");
-    expect(describeScheduleChoice({ ...DEFAULT_SCHEDULE_STATE, intervalValue: 1, intervalUnit: "hour" + "s" as "hours" }))
+    expect(describeScheduleChoice({ ...DEFAULT_SCHEDULE_STATE, intervalValue: 1, intervalUnit: "hours" }))
       .toBe("Run every 1 hour");
   });
 
