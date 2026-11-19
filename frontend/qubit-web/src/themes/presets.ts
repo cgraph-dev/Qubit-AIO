@@ -191,7 +191,7 @@ export const mangaTheme: DashboardTheme = {
   palette: {
     background: { hex: "#08061a", alpha: 1 },
     midground: { hex: "#f7e9ff", alpha: 1 },
-    foreground: { hex: "#ffe500", alpha: 1 },
+    foreground: { hex: "#ffffff", alpha: 0 },
     warmGlow: "rgba(255, 38, 154, 0.42)",
     noiseOpacity: 1,
   },
