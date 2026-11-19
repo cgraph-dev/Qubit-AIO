@@ -411,3 +411,16 @@ html[data-qubit-manga="on"] .qm-refresh-icon--spinning {
     filter: none !important;
   }
 }
+
+
+/* Prior to the manifest check the original asset exists at the legacy
+ * public URL. Never show a blank fixed gateway during the first paint. */
+html[data-qubit-manga="on"]:not([data-qubit-manga-zip="ready"]) #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate {
+  background-image: url("/manga-ui/sidebar-gateway.svg") !important;
+}
+html[data-qubit-manga="on"]:not([data-qubit-manga-zip="ready"]) .qagent-sidebar__tooltip {
+  border: 2px solid #f5e4ff !important;
+  background: #20112f !important;
+  box-shadow: 3px 3px 0 #05040f !important;
+  color: #fff5ff !important;
+}
