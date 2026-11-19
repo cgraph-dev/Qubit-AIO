@@ -155,7 +155,9 @@ export function createOfficeLoadingScreen(
         setWeather(config.weather);
         return;
       }
-      if (!config.location) {
+      // No weather artwork in the default Manga loading view: avoid a
+      // network request and canvas initialization for invisible decoration.
+      if (!config.effects || !config.location) {
         setWeather(fallbackWeather("no-location"));
         return;
       }
