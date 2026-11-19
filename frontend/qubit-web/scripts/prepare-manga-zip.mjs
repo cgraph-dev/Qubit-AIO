@@ -8,6 +8,10 @@
  * shipped. All 89 original SVGs + 89 PNGs are reconstructed automatically.
  */
 import { installOriginalMangaAssets } from "./install-manga-svg.mjs";
+import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const installed = installOriginalMangaAssets();
 if (installed !== 178) throw new Error("Incomplete Manga archive extraction");
@@ -16,10 +20,6 @@ if (installed !== 178) throw new Error("Incomplete Manga archive extraction");
  * installs automatically on dev/build/test when the archive is present.
  * It contains 14 standalone assets, including a STAR-FREE titleplate and
  * its separately replaceable star. Never synthesize or stretch substitutes. */
-import { existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
