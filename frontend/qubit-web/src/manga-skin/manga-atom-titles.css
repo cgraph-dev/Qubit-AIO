@@ -128,3 +128,58 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
     box-shadow:inset 0 0 2px #fff6b5,0 0 2px #ffcb18!important;
   }
 }
+
+
+/* Reference image finishing pass. Do not stylize PTY/xterm itself; allow
+   /chat's header, sidebar, inspector and footer to receive the Manga skin. */
+html[data-qubit-manga="on"] #qubit-main-content :is(.xterm,.xterm-screen,.xterm-viewport,.xterm-cursor-layer,.xterm-text-layer) {
+  background-image:none!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+  letter-spacing:normal!important;
+  font-family:var(--terminal-font-family,monospace)!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .xterm canvas {
+  filter:none!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .xterm :is(.xterm-scroll-area,.xterm-helper-textarea) {
+  background:transparent!important;
+  border:0!important;
+}
+/* Crisp high contrast vector-like edges without raster blur.  Keep the
+   React-owned star and charge cells fully visible above the header. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+  overflow:visible!important;
+  background-clip:padding-box!important;
+  filter:none!important;
+  outline:1px solid #080411;
+  outline-offset:0;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
+  image-rendering:auto;
+  overflow:visible!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
+  min-width:0;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(h1,h2,h3) {
+  max-width:100%;
+  overflow-wrap:break-word;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is([data-slot="card"],.settings-section,.settings-group) {
+  min-width:0;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(th,td,[role="cell"],[role="columnheader"]) {
+  line-height:1.45;
+  vertical-align:middle;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(button,[role="button"],a,input,textarea,select):focus-visible {
+  outline:2px solid #ffe500!important;
+  outline-offset:2px!important;
+}
+@media(max-width:760px){
+  html[data-qubit-manga="on"] #qubit-main-content :is(.grid,.flex) > * {min-width:0}
+}
