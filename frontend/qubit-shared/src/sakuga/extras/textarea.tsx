@@ -22,8 +22,8 @@ import {
 import {
   ExtraField,
   FIELD_STYLE,
+  useCaretTypeFx,
   useFocusFx,
-  useTypeFx,
 } from './common';
 
 export interface SakugaTextareaProps
@@ -47,7 +47,7 @@ export const SakugaTextarea = forwardRef<HTMLTextAreaElement, SakugaTextareaProp
     } = props;
     const autoId = useId();
     const fieldId = rest.id ?? `qsk-textarea-${autoId}`;
-    const typeFx = useTypeFx();
+    const typeFx = useCaretTypeFx();
     const focusFx = useFocusFx();
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -95,7 +95,11 @@ export const SakugaTextarea = forwardRef<HTMLTextAreaElement, SakugaTextareaProp
           onInput?.(event);
         },
         onFocus: (event: FocusEvent<HTMLTextAreaElement>) => {
-          focusFx(event.currentTarget);
+          const box = event.currentTarget.getBoundingClientRect();
+          focusFx(event.currentTarget, {
+            x: box.right + window.scrollX - 6,
+            y: box.top + window.scrollY + 6,
+          });
           rest.onFocus?.(event);
         },
       }),

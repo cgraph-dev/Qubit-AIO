@@ -8,11 +8,10 @@ const gate = read("./MangaSkin.tsx");
 const store = read("./manga-store.ts");
 
 describe("Manga studio styling contract", () => {
-  it("is opt-in and never loads for /chat or /qubit-workbench", () => {
+  it("is opt-in and never loads for Workbench", () => {
     expect(gate).toContain('import "./manga-studio-pass.css";');
     expect(css).not.toMatch(/(^|\n)\s*(?:body|:root|#app-sidebar)\s*\{/);
     expect(css).toContain('html[data-qubit-manga="on"]');
-    expect(store).toContain('"/chat"');
     expect(store).toContain('"/qubit-workbench"');
     expect(store).toContain('"/workbench"');
     expect(store).toContain('pathname.startsWith(path + "/")');

@@ -280,7 +280,16 @@ export const SakugaButton = forwardRef<HTMLElement, SakugaButtonProps>(function 
   }, [done]);
 
   const handleClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    if (fx) void emitFxAt(fx, event.currentTarget);
+    if (fx) {
+      const hasPointer = event.clientX !== 0 || event.clientY !== 0;
+      const point = hasPointer
+        ? {
+            x: event.clientX + (typeof window !== 'undefined' ? window.scrollX : 0),
+            y: event.clientY + (typeof window !== 'undefined' ? window.scrollY : 0),
+          }
+        : undefined;
+      void emitFxAt(fx, event.currentTarget, point);
+    }
     onClick?.(event);
   }, [fx, onClick]);
 

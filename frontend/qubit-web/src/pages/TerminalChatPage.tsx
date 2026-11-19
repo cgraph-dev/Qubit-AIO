@@ -227,6 +227,27 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const resumeRef = useRef(resumeParam);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XtermTerminal | null>(null);
+  const terminalFxAtRef = useRef(0);
+
+  // A small Sakuga smoke on real terminal keystrokes. The xterm canvas has no
+  // DOM text to decorate, so anchor the cue to its cursor textarea (the hidden
+  // helper that follows the cursor) and never to the page centre. Escape
+  // sequences, control bytes and pastes are ignored; typing is coalesced.
+  const emitTerminalTypeFx = useCallback((term: XtermTerminal, data: string) => {
+    if (!data || data.length > 32) return;
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(data)) return;
+    if (typeof document === 'undefined' || document.documentElement.dataset.qubitManga !== 'on') return;
+    const now = Date.now();
+    if (now - terminalFxAtRef.current < 70) return;
+    terminalFxAtRef.current = now;
+    const helper = term.element?.querySelector('.xterm-helper-textarea') as HTMLElement | null;
+    const cursor = helper?.getBoundingClientRect();
+    const screen = term.element?.getBoundingClientRect();
+    if (!cursor && !screen) return;
+    const x = (cursor?.left ?? (screen ? screen.left + 24 : 0)) + window.scrollX;
+    const y = (cursor?.top ?? (screen ? screen.top + 24 : 0)) + (cursor?.height ?? 12) / 2 + window.scrollY;
+    void emitFx('type', { x, y, scale: 0.5 });
+  }, []);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const disposedRef = useRef(false);
@@ -1146,6 +1167,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
 
     const dataSub = term.onData((data) => {
       compositionForwarder.noteTerminalData(data);
+      emitTerminalTypeFx(term, data);
       forwardPtyData(data);
     });
     const resizeSub = term.onResize(({ cols, rows }) => {

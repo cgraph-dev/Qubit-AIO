@@ -827,6 +827,36 @@ html[data-qubit-manga="on"] sakuga-button.qsk-list-item::part(button) {
   border-radius: 0;
 }
 
+/* Button variants must stay visibly different in the dark Manga shell:
+   primary = magenta plate, secondary = ink plate with a magenta keyline.
+   This also keeps the outline and its offset shadow from collapsing to the
+   same colour (the /sessions import action and /qubit-chat composer). */
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not([variant="secondary"])::part(button) {
+  background: var(--qm-magenta) !important;
+  color: var(--qm-black) !important;
+  border-color: var(--qm-black) !important;
+  box-shadow: 4px 5px 0 var(--qm-yellow) !important;
+}
+
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item)[variant="secondary"]::part(button) {
+  background: var(--qm-panel-2) !important;
+  color: var(--qm-ink) !important;
+  border-color: var(--qm-magenta) !important;
+  box-shadow: 3px 4px 0 var(--qm-black) !important;
+}
+
+/* The painted toggle has a pale top highlight from its sprite. A crisp dark
+   inner keyline covers that seam and makes the switch read as one control. */
+html[data-qubit-manga="on"] sakuga-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--qm-black);
+  border-radius: 27px;
+  pointer-events: none;
+  z-index: 2;
+}
+
 /* Qubit-owned SakugaSelect: the trigger/panel are plain buttons carrying
    inline --sk-* colours, so restate the manga frame at the document level. */
 html[data-qubit-manga="on"] #qubit-main-content button[role="combobox"],

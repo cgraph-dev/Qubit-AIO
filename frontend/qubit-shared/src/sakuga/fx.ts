@@ -56,6 +56,24 @@ function viewportCentre(): { x: number; y: number } {
   return { x: window.scrollX + window.innerWidth / 2, y: window.scrollY + window.innerHeight / 2 };
 }
 
+/** Last real pointer position, in page coordinates. A cue fired by a click
+ *  belongs where the user clicked, not at the centre of a wide row/button. */
+let lastPointer: { x: number; y: number } | null = null;
+
+function trackPointer(event: PointerEvent | MouseEvent): void {
+  if (typeof window === 'undefined') return;
+  if (typeof event.clientX !== 'number' || typeof event.clientY !== 'number') return;
+  lastPointer = {
+    x: event.clientX + window.scrollX,
+    y: event.clientY + window.scrollY,
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', trackPointer, { capture: true, passive: true });
+  window.addEventListener('click', trackPointer, { capture: true, passive: true });
+}
+
 function anchor(detail: FxEventDetail): { x: number; y: number } {
   if (typeof detail.x === 'number' && typeof detail.y === 'number') {
     return { x: detail.x, y: detail.y };
@@ -67,6 +85,17 @@ function anchor(detail: FxEventDetail): { x: number; y: number } {
       x: rect.left + window.scrollX + rect.width / 2,
       y: rect.top + window.scrollY + rect.height / 2,
     };
+  }
+  if (lastPointer) return lastPointer;
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (active && active !== document.body && typeof active.getBoundingClientRect === 'function') {
+    const rect = active.getBoundingClientRect();
+    if (rect.width || rect.height) {
+      return {
+        x: rect.left + window.scrollX + rect.width / 2,
+        y: rect.top + window.scrollY + rect.height / 2,
+      };
+    }
   }
   return viewportCentre();
 }

@@ -8,7 +8,7 @@
  * `sakuga.css` applies via `::part()`; the palette variables are untouched.
  */
 import { createElement, useCallback, useRef, type CSSProperties, type ReactNode } from 'react';
-import { emitFxAt } from '../fx';
+import { emitFx, emitFxAt } from '../fx';
 
 export const LABEL_STYLE: CSSProperties = {
   color: 'var(--sk-ink, #1d1a4a)',
@@ -92,9 +92,67 @@ export function useTypeFx(): (el: Element | null) => void {
 }
 
 /** A focus cue (three wedges and a puff, the upstream input reaction). */
-export function useFocusFx(): (el: Element | null) => void {
-  return useCallback((el: Element | null) => {
-    void emitFxAt('focus', el, { scale: 0.6 });
+export function useFocusFx(): (el: Element | null, point?: { x: number; y: number }) => void {
+  return useCallback((el: Element | null, point?: { x: number; y: number }) => {
+    void emitFxAt('focus', el, point ? { ...point, scale: 0.6 } : { scale: 0.6 });
+  }, []);
+}
+
+/** Page-coordinate caret point for a native textarea. */
+export function caretPoint(el: HTMLTextAreaElement): { x: number; y: number } | null {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  const mirror = document.createElement('div');
+  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) || 16;
+  Object.assign(mirror.style, {
+    position: 'absolute',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    left: '-9999px',
+    top: '0',
+    width: `${el.offsetWidth}px`,
+    height: 'auto',
+    overflow: 'hidden',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'break-word',
+    wordWrap: 'break-word',
+    boxSizing: 'border-box',
+    fontFamily: style.fontFamily,
+    fontSize: style.fontSize,
+    fontWeight: style.fontWeight,
+    fontStyle: style.fontStyle,
+    letterSpacing: style.letterSpacing,
+    lineHeight: style.lineHeight,
+    padding: style.padding,
+    border: style.border,
+  });
+  mirror.textContent = el.value.slice(0, el.selectionStart ?? 0);
+  const marker = document.createElement('span');
+  marker.textContent = '\u200b';
+  mirror.append(marker);
+  document.body.append(mirror);
+  const mirrorRect = mirror.getBoundingClientRect();
+  const markerRect = marker.getBoundingClientRect();
+  mirror.remove();
+  if (!markerRect.width && !markerRect.height) return null;
+  return {
+    x: rect.left + (markerRect.left - mirrorRect.left) + window.scrollX,
+    y: rect.top + (markerRect.top - mirrorRect.top) + lineHeight / 2 + window.scrollY,
+  };
+}
+
+/** A caret-anchored typing cue, coalesced like the upstream input. */
+export function useCaretTypeFx(): (el: HTMLTextAreaElement | null) => void {
+  const last = useRef(0);
+  return useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    const now = Date.now();
+    if (now - last.current < 70) return;
+    last.current = now;
+    const point = caretPoint(el);
+    if (point) void emitFx('type', { ...point, scale: 0.5 });
+    else void emitFxAt('type', el, { scale: 0.5 });
   }, []);
 }
 

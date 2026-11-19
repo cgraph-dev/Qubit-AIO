@@ -70,7 +70,6 @@ sakuga-button::part(button) {
   line-height: 1.2;
   border-width: 2.5px;
   border-radius: 10px;
-  box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
 }
 
 sakuga-input::part(input) {
