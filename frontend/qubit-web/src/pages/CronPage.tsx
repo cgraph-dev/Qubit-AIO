@@ -1052,17 +1052,15 @@ export default function CronPage() {
                 }}
               />
 
-              <div className="cron-editor-dialog__actions flex justify-end">
-                <Button
-                  className="uppercase"
-                  size="sm"
-                  onClick={handleCreate}
-                  disabled={creating}
-                >
-                  {creating ? <><Spinner /> {t.common.creating}</> : t.common.create}
-                </Button>
-              </div>
             </div>
+            <footer className="cron-editor-dialog__actions flex items-center justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setCreateModalOpen(false)} disabled={creating}>
+                Cancel
+              </Button>
+              <Button className="uppercase" size="sm" onClick={handleCreate} disabled={creating}>
+                {creating ? <><Spinner /> {t.common.creating}</> : t.common.create}
+              </Button>
+            </footer>
           </div>
         </div>
       )}
@@ -1111,20 +1109,20 @@ export default function CronPage() {
                 }}
               />
 
-              <div className="cron-editor-dialog__actions flex items-center justify-between">
-                <span className="text-xs text-muted-foreground font-mono-ui truncate pr-4">
-                  {editJob.id}
-                </span>
-                <Button
-                  className="uppercase"
-                  size="sm"
-                  onClick={handleEdit}
-                  disabled={saving}
-                >
+            </div>
+            <footer className="cron-editor-dialog__actions flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-mono-ui truncate pr-4" title={editJob.id}>
+                Job: {editJob.id}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setEditJob(null)} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button className="uppercase" size="sm" onClick={handleEdit} disabled={saving}>
                   {saving ? <><Spinner /> {t.common.loading}</> : "Save changes"}
                 </Button>
               </div>
-            </div>
+            </footer>
           </div>
         </div>
       )}
