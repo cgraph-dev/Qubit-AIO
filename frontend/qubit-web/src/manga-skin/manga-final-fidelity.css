@@ -395,11 +395,7 @@ html[data-qubit-manga="on"] :is(button,a,[role="button"],input,select,textarea):
   outline-offset:2px;
 }
 
-/* Terminal exclusion: no terminal widget font, screen, glyph, color,
-   selection, cursor, scroll, WebGL or Canvas styling in this layer. */
-html[data-qubit-manga="on"] #qubit-main-content .xterm canvas {
-  filter:none!important; /* negate generic dashboard canvas saturation */
-}
+/* /chat terminal internals are intentionally not selected by this layer. */
 @media(max-width:900px) {
   html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
     padding-right:65px!important;
