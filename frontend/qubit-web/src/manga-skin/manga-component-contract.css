@@ -517,3 +517,68 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-ma
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i {
   display: none !important;
 }
+
+
+/*
+ * Reference corner + star, attached to EACH TITLE PLATE, not the section box.
+ * The corner geometry comes from the user-provided manga-corner-reflection.svg;
+ * the star is a separate real <img> in App.tsx, above the metal corner.
+ * The scrollable rail keeps both INSIDE its content bounds.
+ */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section::before,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section::after {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+  padding-left: 42px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  z-index: 8 !important;
+  left: 1px !important;
+  top: -1px !important;
+  width: 43px !important;
+  height: 43px !important;
+  border: 0 !important;
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  animation: none !important;
+  background: url("/manga-ui/manga-corner-reflection.svg") top left / contain no-repeat !important;
+  pointer-events: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > .qm-manga-section-star {
+  display: block !important;
+  position: absolute !important;
+  z-index: 12 !important;
+  left: 3px !important;
+  top: -5px !important;
+  width: 32px !important;
+  height: 32px !important;
+  transform: none !important;
+  object-fit: contain !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+/* Prevent visual collisions between the corner, gold number and title.
+   The star overlays only the corner, not the heading text. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qagent-sidebar__section-index {
+  margin-left: 0 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > span:nth-child(2) {
+  position: relative !important;
+  z-index: 10 !important;
+}
+@media (max-width:420px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+    padding-left: 42px !important;
+  }
+}
