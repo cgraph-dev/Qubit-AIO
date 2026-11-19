@@ -14,7 +14,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar {
   --qm-rail-gold:#ffe43a;
   --qm-rail-pink:#fa4ab3;
   --qm-rail-deep:#150821;
-  position:relative!important;
+  /* Preserve the original fixed-mobile / sticky-desktop position modes. */
   display:flex!important;
   flex-direction:column!important;
   height:100dvh!important;
@@ -125,6 +125,9 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
   color:var(--qm-rail-ink)!important;
   font:800 12px/17px system-ui,sans-serif!important;
   text-shadow:none!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-name .qbrand-sparks {
+  display:none!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row > button {
   position:relative!important;
