@@ -1,0 +1,181 @@
+/* Qubit Manga UX — shared surfaces and Cron editor
+   Reference: pink/violet/black layered ink frames, yellow impact corners,
+   clear typography and humane form spacing.
+   Sakuga primitives are preserved (no remounts or animation replacement).
+ */
+html[data-qubit-manga="on"] {
+  --qm-ux-body:var(--theme-font-sans,"Inter",system-ui,sans-serif);
+  --qm-ux-display:var(--theme-font-display,"Rajdhani",system-ui,sans-serif);
+  --qm-ux-dim:#e9d4f4;
+  --qm-ux-pink:#ff269a;
+  --qm-ux-yellow:#ffe525;
+  --qm-ux-shadow:2px 2px 0 #070411,4px 4px 0 #fff1ff;
+}
+html[data-qubit-manga="on"] #qubit-main-content {
+  font-family:var(--qm-ux-body);
+  font-size:var(--theme-base-size,15px);
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .font-mondwest,.font-compressed,.font-expanded,.text-display,
+ .settings-page__title,.settings-section__heading,.cron-editor-dialog__title
+) {font-family:var(--qm-ux-display)!important}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ label,legend,.settings-row__title,.settings-row__desc,
+ .settings-page__desc,.settings-section__desc,.btn,.settings-input,.settings-select
+) {font-family:var(--qm-ux-body)!important}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ label,legend,.settings-row__title
+) {color:#fff2ff;font-size:clamp(.79rem,.9vw,.95rem);font-weight:700;line-height:1.36;letter-spacing:.008em}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-row__desc,.settings-page__desc,.settings-section__desc,.cron-form__hint
+) {font-family:var(--qm-ux-body);color:var(--qm-ux-dim)!important;line-height:1.5;font-size:.82rem;max-width:78ch;overflow-wrap:anywhere}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-page,.settings-section,.settings-group,.settings-row,
+ .settings-row__text,.settings-row__control
+) {min-width:0;max-width:100%}
+html[data-qubit-manga="on"] #qubit-main-content .settings-row {
+ padding-block:11px;gap:clamp(8px,1vw,16px);
+}
+html[data-qubit-manga="on"] #qubit-main-content .settings-page__header {
+ padding:13px 15px;margin-bottom:13px;
+ border:2px solid var(--qm-ux-pink);border-left:6px solid var(--qm-ux-yellow);
+ background:linear-gradient(105deg,#35133b,#150b26);
+ box-shadow:var(--qm-ux-shadow);
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+ textarea,select,.settings-input,.settings-select
+) {
+ min-width:0;max-width:100%;
+ border:2px solid #ae5bff;border-radius:3px;
+ background:#10091f;color:#fff2ff;
+ font-family:var(--qm-ux-body);
+ font-size:.9rem;line-height:1.35;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+ textarea,select,.settings-input,.settings-select
+):focus-visible {
+ outline:2px solid var(--qm-ux-yellow)!important;outline-offset:2px;
+ border-color:var(--qm-ux-yellow)!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content textarea {min-height:85px;resize:vertical;line-height:1.5}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ sakuga-input,sakuga-number,sakuga-textarea,sakuga-date,sakuga-time,
+ sakuga-select,sakuga-checkbox,sakuga-radio,sakuga-toggle
+) {min-width:0;max-width:100%;font-family:var(--qm-ux-body)}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ sakuga-input,sakuga-number,sakuga-textarea,sakuga-date,sakuga-time
+)::part(input) {font-family:var(--qm-ux-body);font-size:.9rem;min-width:0}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ button,[role="button"],[role="combobox"],.btn
+):focus-visible {outline:2px solid var(--qm-ux-yellow);outline-offset:3px}
+html[data-qubit-manga="on"] #qubit-main-content :is(.qsk-field,.qm-select-root,.qm-select-trigger) {min-width:0;max-width:100%}
+html[data-qubit-manga="on"] #qubit-main-content .qm-select-trigger {min-height:38px;font-family:var(--qm-ux-body);font-size:.9rem;width:min(100%,360px)}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ .settings-empty,.settings-summary,.settings-group
+) {overflow-wrap:anywhere}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+ [data-slot="card"],.settings-group
+) :is(button,input,textarea,select) {max-width:100%}
+/* CRON modal has to use one vertical scrollbar rather than horizontal clipping. */
+html[data-qubit-manga="on"] .cron-editor-dialog {
+ width:min(760px,calc(100vw - 24px));
+ min-width:0;max-height:min(92dvh,950px);
+ overflow:visible;border:3px solid var(--qm-ux-pink)!important;
+ border-top:5px solid var(--qm-ux-yellow)!important;
+ border-radius:3px!important;
+ background:linear-gradient(140deg,#27113a,#10091f 64%)!important;
+ box-shadow:3px 3px 0 #070411,6px 6px 0 #fff1ff!important;
+}
+html[data-qubit-manga="on"] .cron-editor-dialog > header {
+ position:relative;flex:none;min-height:67px;
+ padding:17px 55px 13px 20px;
+ border-bottom:3px solid var(--qm-ux-pink)!important;
+ background:linear-gradient(110deg,rgba(255,38,154,.3),transparent)!important;
+}
+html[data-qubit-manga="on"] .cron-editor-dialog > header::before {
+ content:"";position:absolute;left:0;top:0;width:40px;height:40px;pointer-events:none;
+ background:url("/manga-ui/manga-corner-top-left.svg") top left/contain no-repeat;
+}
+html[data-qubit-manga="on"] .cron-editor-dialog__title {
+ font:700 1.35rem/1.16 var(--qm-ux-display)!important;
+ text-transform:uppercase;letter-spacing:.08em;color:#fff2ff!important;
+}
+html[data-qubit-manga="on"] .cron-editor-dialog__body {
+ min-width:0;min-height:0;flex:1 1 auto;
+ padding:clamp(12px,2vw,23px);
+ display:grid;align-content:start;gap:15px;
+ overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+ scrollbar-gutter:stable;
+}
+html[data-qubit-manga="on"] .cron-form-sections {
+ display:grid;grid-template-columns:minmax(0,1fr);gap:15px;
+}
+html[data-qubit-manga="on"] .cron-form-section {
+ min-width:0;display:grid;gap:12px;
+ padding:15px 16px;
+ border:2px solid var(--qm-ux-pink);
+ border-left:5px solid var(--qm-ux-yellow);
+ background:linear-gradient(135deg,rgba(255,38,154,.1),#130a24 55%);
+ box-shadow:2px 2px 0 #070411;
+}
+html[data-qubit-manga="on"] .cron-form-section__title {
+ font:700 1.04rem/1.3 var(--qm-ux-display)!important;
+ letter-spacing:.055em;text-transform:uppercase;
+ color:#fff0ff;
+}
+html[data-qubit-manga="on"] .cron-form-section > :is(.grid,.cron-schedule-builder) {min-width:0}
+html[data-qubit-manga="on"] .cron-schedule-builder {
+ min-width:0;display:grid;gap:12px;
+}
+html[data-qubit-manga="on"] .cron-interval-grid {
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+}
+html[data-qubit-manga="on"] .cron-interval-grid > div {min-width:0}
+html[data-qubit-manga="on"] .cron-schedule-preview {
+ display:grid;gap:4px;padding:11px 13px;
+ border:2px solid #b965ff;border-left:5px solid var(--qm-ux-yellow);
+ background:rgba(255,229,37,.075);color:#fff4ff;
+}
+html[data-qubit-manga="on"] .cron-schedule-preview__title {
+ font:.75rem/1.2 var(--qm-ux-body);font-weight:700;
+ text-transform:uppercase;letter-spacing:.09em;color:#ffe525;
+}
+html[data-qubit-manga="on"] .cron-schedule-preview strong {font-size:.98rem;line-height:1.4}
+html[data-qubit-manga="on"] .cron-advanced-fields {
+ min-width:0;padding:12px 15px;
+ border:2px solid rgba(185,101,255,.7);
+ background:#0d071e;
+}
+html[data-qubit-manga="on"] .cron-advanced-fields > summary {
+ font:700 .93rem/1.3 var(--qm-ux-display);
+ color:#fff2ff;letter-spacing:.05em;
+}
+html[data-qubit-manga="on"] .cron-advanced-fields[open] {
+ border-color:var(--qm-ux-pink);
+}
+html[data-qubit-manga="on"] .cron-editor-dialog__actions {
+ position:sticky;bottom:-1px;z-index:2;
+ gap:10px;padding:12px 8px;
+ border-top:2px solid var(--qm-ux-pink);
+ background:linear-gradient(105deg,#31133b,#110821);
+}
+html[data-qubit-manga="on"] .cron-editor-dialog__actions button {
+ min-height:38px;max-width:100%;
+}
+html[data-qubit-manga="on"] .cron-editor-dialog :is(.grid,[role="group"]) {min-width:0;max-width:100%}
+html[data-qubit-manga="on"] .cron-editor-dialog :is(
+ input,textarea,select,.qm-select-trigger,sakuga-number,sakuga-input
+) {max-width:100%;min-width:0}
+@media(max-width:620px) {
+ html[data-qubit-manga="on"] .cron-editor-dialog {width:calc(100vw - 16px)}
+ html[data-qubit-manga="on"] .cron-editor-dialog__body {padding:9px}
+ html[data-qubit-manga="on"] .cron-form-section {padding:12px 10px}
+ html[data-qubit-manga="on"] .cron-interval-grid {grid-template-columns:minmax(0,1fr)}
+}
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] #qubit-main-content :is(
+ input,textarea,select,.settings-input,.settings-select
+) {transition:none!important}
+}
