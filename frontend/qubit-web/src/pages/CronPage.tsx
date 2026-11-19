@@ -253,7 +253,7 @@ function CronAdvancedFields({
       <div className="mt-3 grid gap-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
-            <Label htmlFor={`${idPrefix}-provider`}>Provider</Label>
+            <Label htmlFor={`${idPrefix}-provider`}>AI service (optional)</Label>
             <Select
               id={`${idPrefix}-provider`}
               label="Provider"
@@ -271,7 +271,7 @@ function CronAdvancedFields({
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor={`${idPrefix}-model`}>Model</Label>
+            <Label htmlFor={`${idPrefix}-model`}>AI model (optional)</Label>
             <Select
               id={`${idPrefix}-model`}
               label="Model"
@@ -308,7 +308,7 @@ function CronAdvancedFields({
             Run only the script (skip the AI agent and send its output)
           </Checkbox>
           <div className="grid gap-1">
-            <Label htmlFor={`${idPrefix}-script`}>Script</Label>
+            <Label htmlFor={`${idPrefix}-script`}>Script to run</Label>
             <Input
               id={`${idPrefix}-script`}
               label="Script"
@@ -485,8 +485,7 @@ function CronJobFormFields({
           emptyLabel="No skills installed for this profile."
         />
         <p className="text-xs text-muted-foreground">
-          Selected skills are loaded before the prompt runs — the cron
-          sets when, the skill sets how.
+          Qubit loads these skills before running your task. Leave empty to use your usual settings.
         </p>
       </div>
 
@@ -559,7 +558,7 @@ function getRepeatDisplay(job: CronJob): string {
 }
 
 function getJobMode(job: CronJob): string {
-  if (job.no_agent) return "no_agent";
+  if (job.no_agent) return "Script only";
   if (job.script) return "script+agent";
   return "agent";
 }
@@ -775,11 +774,11 @@ export default function CronPage() {
       !payload.schedule ||
       (!payload.no_agent && !cronJobHasExecutionContent(payload))
     ) {
-      showToast(`${t.cron.prompt} & ${t.cron.schedule} required`, "error");
+      showToast("Add instructions and choose when this task should run.", "error");
       return;
     }
     if (payload.no_agent && !payload.script) {
-      showToast("no_agent jobs require a script", "error");
+      showToast("Choose a script to run this task without an AI assistant.", "error");
       return;
     }
     setCreating(true);
@@ -807,11 +806,11 @@ export default function CronPage() {
       !payload.schedule ||
       (!payload.no_agent && !cronJobHasExecutionContent(payload))
     ) {
-      showToast(`${t.cron.prompt} & ${t.cron.schedule} required`, "error");
+      showToast("Add instructions and choose when this task should run.", "error");
       return;
     }
     if (payload.no_agent && !payload.script) {
-      showToast("no_agent jobs require a script", "error");
+      showToast("Choose a script to run this task without an AI assistant.", "error");
       return;
     }
     setSaving(true);
@@ -1248,7 +1247,7 @@ export default function CronPage() {
                     <span className="font-mono-ui">
                       {getJobScheduleDisplay(job, scheduleDescribeStrings)}
                     </span>
-                    <span>repeat: {getRepeatDisplay(job)}</span>
+                    <span>Runs: {getRepeatDisplay(job)}</span>
                     <span>
                       {t.cron.last}: {formatTime(job.last_run_at)}
                     </span>
