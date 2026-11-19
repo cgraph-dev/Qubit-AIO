@@ -7,6 +7,8 @@ opt-in skin was toggled through the sidebar control. No image here is a mockup.
 |---|---|
 | `default_sessions.jpg` | Sessions with the skin **off** (pre-existing Q2 theme) |
 | `manga_sessions.jpg` | Sessions with the skin **on** |
+| `manga_theme_panel.jpg` | Theme panel with the yellow Q6 / Q6-L entries |
+| `manga_q6_trigger.jpg` | Theme trigger as the yellow Q6 badge beside the MANGA switch |
 | `default_qubit_chat.jpg` | Qubit Chat with the skin **off** |
 | `manga_qubit_chat.jpg` | Qubit Chat with the skin **on** |
 | `manga_config.jpg` | Config rail, panels, fields, steppers, toggle |
