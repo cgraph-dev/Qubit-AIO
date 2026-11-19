@@ -93,6 +93,8 @@ export function showBuildNotice(
   doc: Document = document,
   reload: () => void = () => window.location.reload(),
 ): void {
+  // Manga uses its own approved shell; the fixed build banner is legacy chrome.
+  if (doc.documentElement.dataset.qubitManga === "on") return;
   if (doc.getElementById("qubit-build-notice")) return;
   try {
     if (doc.defaultView?.sessionStorage.getItem(DISMISS_KEY) === bundle) return;

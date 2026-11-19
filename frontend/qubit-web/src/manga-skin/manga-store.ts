@@ -139,7 +139,18 @@ export function bootstrapMangaSkin(pathname?: string): void {
   // Align the standalone preference with the theme before React reads it, so
   // the gate cannot flash a legacy ON state on a non-Q6 route for one frame.
   setMangaEnabled(wanted);
-  applyMangaAttribute(wanted && mangaRouteEligible(path));
+  const eligible = wanted && mangaRouteEligible(path);
+  applyMangaAttribute(eligible);
+  // The approved pack is verified by the gate on first load. Cache that fact
+  // so a normal refresh paints the approved shell before React mounts instead
+  // of flashing the pre-approved skeleton for one network round-trip.
+  try {
+    if (eligible && window.localStorage.getItem("qubit.manga.approved.ready.v2") === "1") {
+      document.documentElement.dataset.qmApprovedAssets = "ready";
+    }
+  } catch {
+    /* storage blocked */
+  }
 }
 
 /** Convenience for tests and external callers. */

@@ -103,6 +103,12 @@ export function MangaSkinGate(): null {
     const root = document.documentElement;
     delete root.dataset.qmApprovedAssets;
     if (!active) return;
+    // A previously verified install paints immediately on refresh instead of
+    // flashing the pre-approved skeleton for one network round-trip.
+    const approvedCacheKey = "qubit.manga.approved.ready.v2";
+    let cached = false;
+    try { cached = window.localStorage.getItem(approvedCacheKey) === "1"; } catch { /* storage blocked */ }
+    if (cached) root.dataset.qmApprovedAssets = "ready";
     const controller = new AbortController();
     const required = [
       "01_sidebar_header.webp", "02_system_panel_frame.webp",
@@ -135,10 +141,16 @@ export function MangaSkinGate(): null {
         image.onerror = () => reject(new Error(`Missing ${asset}`));
         image.src = `/manga-ui/approved/${asset}`;
       }))).then(() => {
-        if (!controller.signal.aborted) root.dataset.qmApprovedAssets = "ready";
+        if (!controller.signal.aborted) {
+          root.dataset.qmApprovedAssets = "ready";
+          try { window.localStorage.setItem(approvedCacheKey, "1"); } catch { /* storage blocked */ }
+        }
       });
     }).catch(() => {
-      if (!controller.signal.aborted) delete root.dataset.qmApprovedAssets;
+      if (!controller.signal.aborted) {
+        delete root.dataset.qmApprovedAssets;
+        try { window.localStorage.removeItem(approvedCacheKey); } catch { /* storage blocked */ }
+      }
     });
     return () => {
       controller.abort();

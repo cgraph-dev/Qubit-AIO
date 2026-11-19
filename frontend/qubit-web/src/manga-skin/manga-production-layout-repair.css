@@ -690,3 +690,27 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qubit-manga-zi
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qubit-manga-zip="ready"] #app-sidebar nav .qagent-sidebar__link:focus-visible:not([aria-current="page"]) {
   background: linear-gradient(100deg, #491147, #220a2d 78%, #170821) !important;
 }
+
+/* Keep the approved rail footer visible as its own compact status strip. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__colophon {
+  display: flex !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
+  min-height: 41px !important;
+  padding: 7px 11px !important;
+  border: 0 !important;
+  border-top: 2px solid #ff269a !important;
+  background: linear-gradient(105deg, #2a1038, #10081e) !important;
+  color: #fff0ff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: hidden !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-footer-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: 8px !important;
+}

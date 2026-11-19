@@ -1,0 +1,31 @@
+.qubit-sidebar-title {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: center;
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: clamp(44px, 5vw, 56px);
+}
+
+.qubit-sidebar-title__art {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.qubit-sidebar-title__label {
+  display: block;
+  min-inline-size: 0;
+  margin-inline: 7% 38%;
+  overflow: hidden;
+  color: #fff5fc;
+  font: 800 14px/1.2 system-ui, sans-serif;
+  letter-spacing: .08em;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px #39001f;
+  white-space: nowrap;
+}

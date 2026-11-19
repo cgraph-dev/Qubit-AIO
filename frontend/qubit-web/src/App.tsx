@@ -78,6 +78,7 @@ import { cn } from "@/lib/utils";
 import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { QubitMark } from "@/components/QubitMark";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
+import { QubitSidebarTitle } from "@/components/QubitSidebarTitle";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
@@ -1042,26 +1043,43 @@ export default function App() {
             >
               <div
                 className={cn(
-                  "flex min-w-0 items-center gap-2.5",
+                  "flex min-w-0 flex-1 items-center gap-2.5",
                   collapsed && "lg:hidden",
                 )}
               >
                 <PluginSlot name="header-left" />
-                <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><MangaStudioBrandAtom /></span>
-                <span
-                  className="qagent-sidebar__brand-name"
-                  data-brand={t.app.brand}
-                >
-                  <QubitBrandSparks />
-                  <span className="qbrand-label truncate">{t.app.brand}</span>
-                </span>
-                <span
-                  aria-hidden
-                  className="qagent-sidebar__pulse ml-auto"
-                  data-tone={brandTone}
-                  role="status"
-                  aria-label={brandLabel}
-                />
+                {useMangaNavigation ? (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <QubitSidebarTitle />
+                    </div>
+                    <span
+                      aria-hidden
+                      className="qagent-sidebar__pulse ml-1 shrink-0"
+                      data-tone={brandTone}
+                      role="status"
+                      aria-label={brandLabel}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><MangaStudioBrandAtom /></span>
+                    <span
+                      className="qagent-sidebar__brand-name"
+                      data-brand={t.app.brand}
+                    >
+                      <QubitBrandSparks />
+                      <span className="qbrand-label truncate">{t.app.brand}</span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className="qagent-sidebar__pulse ml-auto"
+                      data-tone={brandTone}
+                      role="status"
+                      aria-label={brandLabel}
+                    />
+                  </>
+                )}
               </div>
 
               <Button
