@@ -1,0 +1,132 @@
+/*
+ * Route-targeted original Manga ZIP surfaces.
+ * Requires all original ZIP assets and the active Manga theme. Never targets
+ * Workbench/HUD/Office or server-served pages. Decorative layers only:
+ * text, clicks, ARIA states, focus, chart pixels and actions stay live DOM.
+ */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] {
+  --qmz-frame:#ff269a;
+  --qmz-detail:#b965ff;
+  --qmz-paper:#fff0ff;
+}
+/* Every route-mounted decorative card inherits a tiny asset corner,
+ * rather than a distorted screenshot covering its content. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-group,.settings-section,[data-slot="card"],.qplate-module
+) {
+  isolation:isolate;
+  position:relative;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-group,.settings-section,[data-slot="card"],.qplate-module
+)::after {
+  content:"";position:absolute;right:-3px;bottom:-3px;
+  width:27px;height:27px;pointer-events:none;
+  background:url("/manga-ui/zip/corner-violet.svg") right bottom/contain no-repeat;
+}
+
+/* Chat conversations and composer. The message and model surfaces are
+ * actual React nodes, not fake screenshots with text baked into SVG. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-chat"] :is(
+  .qchat__message--user,.qchat__message--assistant,.qchat__message--tool
+) {position:relative;isolation:isolate;border-color:var(--qmz-detail)}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-chat"] .qchat__message--user {
+  background-image:url("/manga-ui/zip/chat-user-bubble.svg");
+  background-position:center;background-size:100% 100%;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-chat"] .qchat__message--assistant {
+  background-image:url("/manga-ui/zip/chat-agent-bubble.svg");
+  background-position:center;background-size:100% 100%;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-chat"] .qchat__message--tool {
+  border:2px solid var(--qmz-detail);
+  box-shadow:3px 3px 0 #080615;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-chat"] :is(
+  .qchat__model-panel,.qchat__tools,.qchat__sessions
+) {position:relative;isolation:isolate}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-chat"] .qchat__model-panel {
+  border-image:none!important;box-shadow:3px 3px #080615!important;
+}
+
+/* File browser: maintain scroll and drag/drop affordances. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/files"] {
+  --qmz-file-tree:url("/manga-ui/zip/file-tree.svg");
+  --qmz-file-grid:url("/manga-ui/zip/file-grid.svg");
+  --qmz-upload:url("/manga-ui/zip/upload-dropzone.svg");
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/files"] :is(
+  [data-slot="card"],.qplate-module
+) {border:2px solid var(--qmz-detail)!important;background-color:#10091f}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/files"] :is(
+  input[type="file"],[data-testid="file-dropzone"]
+) {outline-offset:3px}
+
+/* Analytics: frame the metric cards without painting on top of charts. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/analytics"] .settings-group {
+  background-color:#171027!important;
+  border:2px solid #b965ff!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/analytics"] .analytics-page :is(
+  svg,canvas
+) {position:relative;z-index:1}
+
+/* Settings, task boards, jobs, scheduler, models and plugin cards. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/models"] :is(
+  .model-profile,[data-slot="card"]
+),
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/plugins"] :is(
+  .plugin-catalog-section,.plugin-pinned-index-section,[data-slot="card"]
+),
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/profiles"] :is(
+  .profile-list,[data-slot="card"]
+) {
+  position:relative;isolation:isolate;
+  border:2px solid #b965ff!important;
+  background-color:#171027!important;
+  box-shadow:3px 3px 0 #080615!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/cron"] :is(
+  .cron-form-section,.cron-editor-dialog
+) {border:2px solid #ff269a!important;box-shadow:3px 3px #080615!important}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/qubit-tasks"] :is(
+  .settings-group,.settings-section
+) {border:2px solid #b965ff!important}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route="/voice-edit"] .voice-edit-page :is(
+  .qsk-field,.settings-group
+) {border-color:#b965ff!important}
+
+/* Page-independent form, table and dialog skins, constrained to the current
+ * route stage; radio/checkbox inputs keep their native interaction states. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-page,.qplate-module
+) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
+  outline-offset:2px;
+  border-color:#b965ff!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .settings-page,.qplate-module
+) :is(input,select,textarea):focus-visible {
+  outline:3px solid #ffe500!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+  .sessions-table,.cron-table,.workboard-table
+) {border:2px solid #ff269a;box-shadow:3px 3px #080615}
+
+/* Explicit opt-in asset attachment for targeted components. Each registered
+ * original name can be used via live DOM data-qm-zip-asset, while the manifest
+ * handles unused assets without creating phantom user-visible features. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset="calendar"] {
+  background:url("/manga-ui/zip/calendar.svg") center/100% 100% no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset="kanban-column"] {
+  background:url("/manga-ui/zip/kanban-column.svg") center/100% 100% no-repeat;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-qm-zip-asset="code-block"] {
+  background:url("/manga-ui/zip/code-block.svg") center/100% 100% no-repeat;
+}
+@media(max-width:720px) {
+  html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] :is(
+    .settings-group,.settings-section,.qplate-module
+  ) {min-width:0;max-width:100%}
+}
