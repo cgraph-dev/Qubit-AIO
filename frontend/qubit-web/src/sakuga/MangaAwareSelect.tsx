@@ -89,9 +89,9 @@ function MangaSelect({
     };
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
-    const focusFrame = requestAnimationFrame(() => filterRef.current?.focus());
+    const focusFrame = window.setTimeout(() => filterRef.current?.focus(), 0);
     return () => {
-      cancelAnimationFrame(focusFrame);
+      window.clearTimeout(focusFrame);
       document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
@@ -149,7 +149,7 @@ function MangaSelect({
           </div>
           <div className="qm-select-popover__options" role="listbox" aria-label={label}>
             {shown.length === 0 && <div className="qm-select-empty">No matches</div>}
-            {shown.map((option, index) => (
+            {shown.map((option) => (
               <button
                 type="button"
                 className="qm-select-option"
