@@ -7,6 +7,8 @@ const css = read("./manga-production-layout-repair.css");
 const skin = read("./MangaSkin.tsx");
 const installer = read("../../scripts/install-manga-approved.mjs");
 const prepare = read("../../scripts/prepare-manga-zip.mjs");
+const app = read("../App.tsx");
+const tipComponent = read("../components/SidebarTooltip.tsx");
 
 describe("approved Manga artwork alignment contract", () => {
   it("loads geometry repair after every older Manga stylesheet", () => {
@@ -52,6 +54,20 @@ describe("approved Manga artwork alignment contract", () => {
     expect(tooltip).toContain("viewBox=\"0 0 320 170\"");
     const frame = read("../../public/manga-ui/manga-sidebar-outer-frame.svg");
     expect(frame).toContain("viewBox=\"0 0 320 1000\"");
+  });
+
+  it("mounts exactly one decorative full-height frame without intercepting interactions", () => {
+    expect((app.match(/className="qm-manga-outer-frame"/g) ?? []).length).toBe(1);
+    expect(css).toContain("pointer-events:none!important");
+    expect(css).toContain("border-image-source:url");
+    expect(css).toContain("manga-sidebar-outer-frame.svg");
+  });
+
+  it("positions and clips the precision tooltip at its true vector aspect ratio", () => {
+    expect(css).toContain("aspect-ratio:320 / 170");
+    expect(css).toContain("padding:25px 71px 29px 24px");
+    expect(tipComponent).toContain("const CARD_WIDTH = manga ? 260 : 232");
+    expect(tipComponent).toContain("const EDGE = manga ? 73 : 40");
   });
 
   it("prefers repaired assets and never blindly reapplies the old ZIP", () => {
