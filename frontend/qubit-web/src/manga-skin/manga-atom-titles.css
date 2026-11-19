@@ -37,7 +37,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
   content:""!important;display:block!important;position:absolute!important;
   z-index:6!important;width:43px!important;height:43px!important;
-  top:50%!important;left:-25px!important;
+  top:50%!important;left:-17px!important;
   transform:translateY(-50%)!important;transform-origin:50% 50%!important;
   background:url("/manga-ui/manga-anime-atom.svg") center/contain no-repeat!important;
   pointer-events:none!important;opacity:1!important;
@@ -117,7 +117,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
     padding-left:25px!important;padding-right:61px!important;font-size:.82rem!important;
   }
   html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
-    left:-22px!important;width:40px!important;height:40px!important;
+    left:-15px!important;width:40px!important;height:40px!important;
   }
 }
 @media(prefers-reduced-motion:reduce) {
