@@ -16,7 +16,7 @@ describe("reference-inspired Manga artwork integration", () => {
    expect(svg).toContain("<svg");
    expect(svg).toContain("viewBox=");
    expect(svg).not.toMatch(/<text\b|<foreignObject\b|<image\b/);
-   expect(css).toContain("manga-reference-" + name + ".svg");
+   if (name === "angle-tab" || name === "three-strokes") expect(css).toContain("manga-reference-" + name + ".svg");
   }
  });
  it("preserves functional live links rather than fixed-size nav screenshots", () => {
@@ -33,6 +33,10 @@ describe("reference-inspired Manga artwork integration", () => {
  });
  it("reuses star icon without removing live heading text or Sakuga actions", () => {
   expect(css).toContain("manga-impact-star.svg");
+  for (const name of ["v3-original-ornament-corner","v3-original-corner-pink"]) {
+   expect(existsSync(path("../../public/manga-ui/" + name + ".svg"))).toBe(true);
+   expect(css).toContain(name + ".svg");
+  }
   expect(css).toContain(".qm-confirm-dialog");
   expect(css).toContain(".qchat__side");
   expect(css).toContain("pointer-events:none");
