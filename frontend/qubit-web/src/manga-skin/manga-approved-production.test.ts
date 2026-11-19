@@ -31,7 +31,7 @@ describe("approved production Manga dashboard", () => {
   it("prepares the verified final asset archive when present", () => {
     expect(prepare).toContain("qubit_manga_FINAL_approved_assets.zip");
     expect(prepare).toContain("install-manga-approved.mjs");
-    expect(installer).toContain('hashlib.sha256(data).hexdigest()');
+    expect(installer).toContain('createHash("sha256").update(data).digest("hex")');
     for (const asset of [
       "01_sidebar_header.webp", "02_system_panel_frame.webp",
       "03_system_titlebar.webp", "04_tooltip_plate.webp",
