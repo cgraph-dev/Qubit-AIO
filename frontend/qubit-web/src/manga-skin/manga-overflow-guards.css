@@ -72,3 +72,23 @@ html[data-qubit-manga="on"] .qchat__side > .qchat__sessions {
 @media(prefers-reduced-motion:reduce) {
  html[data-qubit-manga="on"] #app-sidebar * {scroll-behavior:auto}
 }
+
+
+/* The older sidebar has a looping video and fine engineer-grid ruling.
+   These compete with the manga plates and the reference's solid dark ink. */
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar::before {
+  content:none!important;display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop video {
+  display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop {
+  mask-image:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__backdrop-scrim {
+  background:#10091f!important;opacity:1!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+  backdrop-filter:none!important;
+}
