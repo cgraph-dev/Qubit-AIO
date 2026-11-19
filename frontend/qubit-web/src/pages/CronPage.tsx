@@ -492,7 +492,7 @@ function CronJobFormFields({
 
       </section>
       <CronAdvancedFields
-        idPrefix={`${idPrefix}-advanced`
+        idPrefix={`${idPrefix}-advanced`}
         form={form}
         onChange={onChange}
         modelOptions={modelOptions}
