@@ -26,6 +26,7 @@ import { officeFx, sakugaButton, sakugaProgress } from "../app/sakuga";
 // The stylesheet travels with this component; Vite emits it into the plugin's
 // one CSS file. No other shell stylesheet is edited.
 import "./loading.css";
+import "./office-manga.css";
 
 export type LoadingPhase = "boot" | "loading" | "error";
 
