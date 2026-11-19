@@ -17,7 +17,8 @@
     "check": "npm run typecheck && npm run test && npm run lint",
     "prebuild": "node scripts/prepare-manga-zip.mjs",
     "pretest": "node scripts/prepare-manga-zip.mjs",
-    "pretypecheck": "node scripts/prepare-manga-zip.mjs"
+    "pretypecheck": "node scripts/prepare-manga-zip.mjs",
+    "manga:install:approved": "node scripts/install-manga-approved.mjs"
   },
   "dependencies": {
     "@nous-research/ui": "0.18.2",
