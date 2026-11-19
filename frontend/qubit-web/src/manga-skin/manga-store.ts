@@ -15,6 +15,7 @@ const LEGACY_THEME_STORAGE_KEY = "hermes-dashboard-theme";
 
 /** Surfaces that must never be skinned. */
 export const MANGA_EXCLUDED_PATHS = [
+  "/chat", // The terminal TUI is a separate surface; never skin its route.
   "/qubit-workbench",
   "/qubit-hud",
   "/qubit-office",

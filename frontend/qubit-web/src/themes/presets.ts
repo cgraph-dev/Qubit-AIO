@@ -198,8 +198,11 @@ export const mangaTheme: DashboardTheme = {
   },
   typography: {
     ...DEFAULT_TYPOGRAPHY,
-    fontDisplay: '"Arial Black", "Segoe UI", system-ui, sans-serif',
-    letterSpacing: "0.005em",
+    fontSans: `"Inter", ${SYSTEM_SANS}`,
+    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
+    fontDisplay: '"Rajdhani", "Arial Narrow", "Segoe UI", system-ui, sans-serif',
+    fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap",
+    letterSpacing: "0.002em",
   },
   layout: {
     ...DEFAULT_LAYOUT,

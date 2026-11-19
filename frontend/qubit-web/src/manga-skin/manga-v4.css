@@ -1,0 +1,228 @@
+/* Manga V4 — shell, typography, navigation and inspector cohesion.
+   Stays scoped to Q6/Q6-L; /chat TUI + Workbench/HUD/Office are excluded. */
+html[data-qubit-manga="on"] {
+  --qm-typography-display:var(--theme-font-display,"Rajdhani",system-ui,sans-serif);
+  --qm-typography-body:var(--theme-font-sans,"Inter",system-ui,sans-serif);
+  --qm-typography-data:var(--theme-font-mono,ui-monospace,monospace);
+  --qm-header-height:62px;
+  --qm-rail-item:36px;
+  --qm-divider:rgba(185,101,255,.3);
+  --qm-manga-drop:2px 2px 0 #05030f,4px 4px 0 rgba(255,240,255,.6);
+}
+html[data-qubit-manga="on"] body,
+html[data-qubit-manga="on"] #qubit-main-content {
+  font-family:var(--qm-typography-body);font-size:var(--theme-base-size,15px);
+}
+/* The three-level hierarchy: page title, section title, dense data. */
+html[data-qubit-manga="on"] :is(.settings-page__title,.settings-section__heading,.qplate-module__head) {
+  font-family:var(--qm-typography-display)!important;
+  font-weight:700;letter-spacing:.065em;text-transform:uppercase;
+}
+html[data-qubit-manga="on"] :is(.settings-row__title,.settings-row__value,.qchat__side) {
+  font-family:var(--qm-typography-body);
+}
+html[data-qubit-manga="on"] :is(.settings-row__desc,.settings-section__desc,.settings-page__desc) {
+  font-size:clamp(.72rem,.78vw,.87rem);line-height:1.5;
+}
+html[data-qubit-manga="on"] :is(.qplate-readout,.qagent-sidebar__telemetry,.settings-row__value--mono) {
+  font-family:var(--qm-typography-data);font-variant-numeric:tabular-nums;
+}
+/* Brand and top navigation are a joined comic book chrome, not loose plates. */
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar {
+  border-right:4px solid #ff269a!important;
+  box-shadow:3px 0 0 #05030f,5px 0 0 #fff0ff!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
+  isolation:isolate;
+  min-height:var(--qm-header-height);
+  padding-inline:12px;
+  background:
+    linear-gradient(118deg,rgba(255,38,154,.7) 0,rgba(147,25,110,.3) 32%,rgba(5,3,15,.98) 78%),
+    url("/manga-ui/halftone.svg")!important;
+  background-size:cover,24px 24px!important;
+  border-top:4px solid #ffe500!important;
+  border-bottom:3px solid #fff0ff!important;
+  box-shadow:inset 0 -5px 0 #05030f;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::before {
+  content:"";position:absolute;right:12px;top:4px;width:42px;height:13px;
+  background:repeating-linear-gradient(120deg,#ffe500 0 9px,#05030f 9px 12px,#ff269a 12px 19px);
+  transform:skewX(-16deg);pointer-events:none;opacity:.8;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+  font-family:var(--qm-typography-display)!important;
+  font-size:1.28rem;font-weight:700;letter-spacing:.075em;
+  color:#fff0ff!important;
+  text-shadow:2px 2px 0 #05030f,0 0 9px rgba(255,38,154,.5);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row .qubit-brandmark,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row > div:first-child > svg {
+  filter:drop-shadow(2px 2px 0 #05030f) drop-shadow(0 0 5px rgba(255,229,0,.5));
+}
+/* Larger action targets and predictable labels in a narrow rail. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+  min-height:var(--qm-rail-item);
+  display:flex;align-items:center;gap:9px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link-label {
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+  min-height:26px;align-items:center;
+  border:2px solid #05030f!important;
+  border-left:5px solid #ffe500!important;
+  box-shadow:2px 2px 0 #ff269a;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+  color:#05030f!important;
+  border:2px solid #05030f!important;
+  background:linear-gradient(105deg,#fff45b 0%,#ffe500 78%,#ffba1e 100%)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::after {
+  width:22px;height:22px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system {
+  background:linear-gradient(120deg,#190b2a,#0b061a)!important;
+  border:2px solid #ff269a!important;
+  box-shadow:2px 2px 0 #05030f!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
+  min-height:35px;
+  background:linear-gradient(120deg,rgba(255,38,154,.16),transparent);
+  border-top:3px double #ff269a!important;
+}
+html[data-qubit-manga="on"] header[role="banner"] {
+  min-height:var(--qm-header-height);
+  border-top:4px solid #ffe500!important;
+  border-bottom:3px solid #ff269a!important;
+  background:
+    linear-gradient(108deg,#371038 0%,#200d34 28%,#0a071c 72%),
+    url("/manga-ui/halftone.svg")!important;
+  box-shadow:inset 0 -3px 0 #05030f,0 3px 0 #05030f,0 5px 0 rgba(185,101,255,.65)!important;
+}
+html[data-qubit-manga="on"] header[role="banner"]::before {
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(95deg,rgba(255,240,255,.05) 1px,transparent 1px);
+  background-size:22px 100%;
+  mask-image:linear-gradient(90deg,#000,transparent 85%);
+}
+html[data-qubit-manga="on"] header[role="banner"] h1 {
+  flex:none;max-width:min(52vw,370px);min-height:38px;
+  background:linear-gradient(105deg,#ff269a 0%,#951c84 65%,#2a1243)!important;
+  border-left:5px solid #ffe500!important;
+  border-bottom:2px solid #05030f!important;
+  box-shadow:3px 3px 0 #05030f;
+  font:700 clamp(1rem,1.4vw,1.24rem)/1.1 var(--qm-typography-display)!important;
+  text-transform:uppercase;letter-spacing:.09em;
+}
+html[data-qubit-manga="on"] header[role="banner"] > div > div {
+  min-width:0;gap:12px;
+}
+html[data-qubit-manga="on"] header[role="banner"] :is(button,[role="combobox"],[role="tab"]) {
+  flex-shrink:0;
+}
+html[data-qubit-manga="on"] header[role="banner"] :is(button,a):focus-visible {
+  outline:3px solid #ffe500;outline-offset:3px;
+}
+/* Inspector: equal rhythm and readable data instead of fighting frames. */
+html[data-qubit-manga="on"] .qchat__side {
+  background-color:#0e081d!important;
+  border-left:4px solid #ff269a!important;
+  box-shadow:-3px 0 0 #05030f,-5px 0 0 #fff0ff!important;
+}
+html[data-qubit-manga="on"] .qchat__side .qchat__side-head {
+  min-height:29px;display:flex;align-items:center;
+  color:#ffe500!important;letter-spacing:.085em;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__sessions) {
+  min-width:0;
+  padding-block:5px;
+  border-bottom:2px solid rgba(255,38,154,.38)!important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module__head,.qchat__side-head) {
+  padding-block:7px;
+  border-left:4px solid #ffe500!important;
+  background:linear-gradient(90deg,rgba(255,38,154,.29),transparent)!important;
+  font:700 .83rem/1.25 var(--qm-typography-display)!important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-readout__row,.qplate-row) {
+  min-width:0;min-height:35px;gap:8px;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-readout__value,.qchat__model-panel) {
+  min-width:0;overflow-wrap:anywhere;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-readout__key,.qplate-readout__value) {
+  font-size:.7rem;
+}
+html[data-qubit-manga="on"] .qchat__side button {
+  max-width:100%;white-space:normal;
+}
+html[data-qubit-manga="on"] .qchat__side .qchat__model-panel {
+  position:relative;
+  border:2px solid rgba(255,38,154,.6)!important;
+  margin:7px 6px 10px;padding:10px;
+  box-shadow:2px 2px 0 #05030f,4px 4px 0 rgba(185,101,255,.4);
+}
+html[data-qubit-manga="on"] .qchat__side .qchat__model-panel::after {
+  position:absolute;content:"";pointer-events:none;top:-2px;right:-2px;
+  width:34px;height:34px;
+  background:url("/manga-ui/manga-corner-bottom-right.svg") center/contain no-repeat;
+  transform:rotate(180deg);
+  transition:transform 240ms cubic-bezier(.15,1.6,.4,1),filter 240ms ease;
+}
+html[data-qubit-manga="on"] .qchat__side .qchat__model-panel:hover::after {
+  transform:rotate(182deg) scale(1.16);
+  filter:drop-shadow(0 0 3px #ffe500);
+}
+html[data-qubit-manga="on"] .qchat__side .qchat__sessions {
+  padding-inline:6px;
+}
+html[data-qubit-manga="on"] .qchat__side .qchat__sessions :is(button,a) {
+  text-align:left;overflow-wrap:anywhere;
+}
+html[data-qubit-manga="on"] .qchat__composer {
+  border:3px solid #ff269a!important;
+  box-shadow:0 -3px 0 #05030f,0 -5px 0 #fff0ff;
+}
+html[data-qubit-manga="on"] .qchat__composer :is(textarea,input,button) {
+  font-family:var(--qm-typography-body);
+}
+html[data-qubit-manga="on"] .qchat__composer textarea {
+  line-height:1.55;min-height:68px;
+}
+html[data-qubit-manga="on"] .qchat__composer:focus-within {
+  border-color:#ffe500!important;
+}
+/* Motion on the interface skeleton, not a perpetual flash. */
+@keyframes qm-header-draw {
+ from {clip-path:inset(0 0 100% 0);opacity:.3}
+ to {clip-path:inset(0 0 0 0);opacity:1}
+}
+@keyframes qm-rail-select {
+ 0% {transform:translateX(-4px);filter:brightness(1.3)}
+ 65% {transform:translateX(2px);filter:brightness(1.15)}
+ 100% {transform:translateX(0);filter:brightness(1)}
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+  animation:qm-rail-select 270ms cubic-bezier(.2,1.45,.4,1) both;
+}
+html[data-qubit-manga="on"] header[role="banner"] h1 {
+  animation:qm-header-draw 320ms cubic-bezier(.2,1,.4,1) both;
+}
+@media(max-width:900px) {
+ html[data-qubit-manga="on"] header[role="banner"] h1 {
+  max-width:100%;min-height:32px;font-size:.98rem!important;
+ }
+ html[data-qubit-manga="on"] .qchat__side .qchat__model-panel {margin-inline:3px}
+}
+@media(max-width:640px) {
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {min-height:57px}
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {font-size:1.08rem}
+ html[data-qubit-manga="on"] header[role="banner"] {min-height:52px}
+}
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"],
+ html[data-qubit-manga="on"] header[role="banner"] h1 {animation:none!important}
+ html[data-qubit-manga="on"] .qchat__side .qchat__model-panel::after {transition:none!important}
+}

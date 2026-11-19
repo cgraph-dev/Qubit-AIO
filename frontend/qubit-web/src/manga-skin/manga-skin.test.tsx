@@ -81,10 +81,14 @@ describe("manga route eligibility", () => {
     }
   });
 
+  it("keeps the terminal TUI unskinned", () => {
+    expect(mangaRouteEligible("/chat")).toBe(false);
+    expect(mangaRouteEligible("/chat/child")).toBe(false);
+  });
+
   it("allows ordinary dashboard routes", () => {
     for (const path of [
       "/",
-      "/chat",
       "/qubit-chat",
       "/sessions",
       "/analytics",

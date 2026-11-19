@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Brain,
@@ -44,6 +44,7 @@ import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
 import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
+import { MangaMenuSurface } from "@/manga-skin/MangaMenuSurface";
 import { Button, HoverTooltip, Input, Select, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 const PERIODS = [
@@ -220,6 +221,7 @@ function UseAsMenu({
   onAssigned(): void;
 }) {
   const [open, setOpen] = useState(false);
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<{
@@ -281,7 +283,7 @@ function UseAsMenu({
   }, [open]);
 
   return (
-    <div className={cn("relative", open && "z-20")} data-use-as-menu>
+    <div ref={menuAnchorRef} className={cn("relative", open && "z-20")} data-use-as-menu>
       <Button
         variant="secondary"
         onClick={() => setOpen((v) => !v)}
@@ -291,7 +293,12 @@ function UseAsMenu({
         Use as <ChevronDown className="h-3 w-3" />
       </Button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[220px] border border-border bg-card shadow-lg">
+        <MangaMenuSurface
+          anchorRef={menuAnchorRef}
+          dataUseAsMenu
+          onClose={() => setOpen(false)}
+          className="absolute right-0 top-full mt-1 z-50 min-w-[220px] border border-border bg-card shadow-lg"
+        >
           <Button variant="secondary"
             type="button"
             onClick={() => assign("main", "")}
@@ -344,7 +351,7 @@ function UseAsMenu({
               {error}
             </div>
           )}
-        </div>
+        </MangaMenuSurface>
       )}
       <ConfirmDialog
         open={!!pendingConfirm}

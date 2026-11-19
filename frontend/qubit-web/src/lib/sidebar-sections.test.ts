@@ -3,6 +3,7 @@ import {
   NAV_DESCRIPTIONS,
   SIDEBAR_FALLBACK_SECTION,
   SIDEBAR_SECTIONS,
+  MANGA_SIDEBAR_SECTIONS,
   navDescription,
   sectionizeNav,
 } from "./sidebar-sections";
@@ -61,5 +62,28 @@ describe("navDescription", () => {
 
   it("returns undefined when the label stands alone", () => {
     expect(navDescription("/not-a-route")).toBeUndefined();
+  });
+});
+
+describe("Manga-only sidebar information architecture", () => {
+  it("keeps every declared route reachable and avoids duplicates", () => {
+    const paths = MANGA_SIDEBAR_SECTIONS.flatMap((section) => [...section.paths]);
+    expect(new Set(paths).size).toBe(paths.length);
+    const result = sectionizeNav(paths.map(item), MANGA_SIDEBAR_SECTIONS);
+    expect(result.flatMap((section) => section.entries.map((entry) => entry.path)).sort()).toEqual(paths.slice().sort());
+  });
+
+  it("groups dashboard destinations by task with human-readable headings", () => {
+    const items = [item("/qubit-chat"), item("/cron"), item("/skills"), item("/files"), item("/system")];
+    const result = sectionizeNav(items, MANGA_SIDEBAR_SECTIONS);
+    expect(result.map((section) => section.section.label)).toEqual([
+      "Chat", "Workspace", "Automations", "AI Tools", "System",
+    ]);
+  });
+
+  it("never removes unknown plugin destinations", () => {
+    const result = sectionizeNav([item("/new-provider-plugin")], MANGA_SIDEBAR_SECTIONS);
+    expect(result[0].section.id).toBe(SIDEBAR_FALLBACK_SECTION.id);
+    expect(result[0].entries[0].path).toBe("/new-provider-plugin");
   });
 });
