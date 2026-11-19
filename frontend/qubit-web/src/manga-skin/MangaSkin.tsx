@@ -168,7 +168,8 @@ export function MangaSkinGate(): null {
     let lastCue = 0;
     const onAction = (event: MouseEvent) => {
       if (document.hidden ||
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          (typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
       const target = event.target;
       if (!(target instanceof Element)) return;
       const action = target.closest<HTMLElement>("button, a[href], [role='button']");
@@ -181,7 +182,8 @@ export function MangaSkinGate(): null {
       lastCue = now;
       // The existing, supported Sakuga pop cue adds transient response to
       // native actions. It does NOT animate the whole panel or cause relayout.
-      void emitFxAt("pop", action, { scale: 0.18 });
+      // A missing optional VFX layer must never interrupt navigation.
+      void Promise.resolve(emitFxAt("pop", action, { scale: 0.18 })).catch(() => {});
     };
     document.addEventListener("click", onAction, true);
     return () => document.removeEventListener("click", onAction, true);
