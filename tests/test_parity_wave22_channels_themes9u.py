@@ -62,13 +62,14 @@ def test_themes_serve_vendored_builtins_plus_overlay(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     out = HC.themes_response(cfg)
     names = [t["name"] for t in out["themes"]]
-    for expected in ("default", "q1-l", "q2", "q2-l", "q3", "q3-l",
-                     "q4", "q4-l", "q5", "q5-l", "q6", "q6-l", "qubit"):
+    for expected in ("q2", "q2-l", "q3", "q3-l",
+                     "q4", "q4-l", "q6", "q6-l"):
         assert expected in names, names
     # The retired themes are gone from the served list, and the legacy ids are
     # only ever read-old.
     for retired in ("rose", "ember", "qubit-blue", "nous-blue", "midnight",
-                    "mono", "cyberpunk", "default-large"):
+                    "mono", "cyberpunk", "default-large", "default", "q1-l",
+                    "q5", "q5-l", "qubit"):
         assert retired not in names, names
     code, res = HC.dispatch(cfg, "PUT", "/api/dashboard/theme",
                             {}, {"theme": "q2"})
@@ -81,7 +82,7 @@ def test_themes_serve_vendored_builtins_plus_overlay(tmp_path, monkeypatch):
 
 
 def test_legacy_theme_id_read_old_alias():
-    """Legacy theme ids resolve onto their Q1..Q6 successors."""
+    """Legacy theme ids resolve onto their Q2..Q6 successors."""
     from voicebridge import qubit_runtime as QR
 
     QR.ensure_path()
@@ -92,15 +93,21 @@ def test_legacy_theme_id_read_old_alias():
     assert normalize_theme_name("nous-blue") == "q3"
     assert normalize_theme_name("qubit-blue") == "q3"
     assert normalize_theme_name("midnight") == "q2"
-    assert normalize_theme_name("default-large") == "q1-l"
+    assert normalize_theme_name("default-large") == "q2-l"
+    assert normalize_theme_name("default") == "q2"
+    assert normalize_theme_name("q1") == "q2"
+    assert normalize_theme_name("q1-l") == "q2-l"
+    assert normalize_theme_name("q5") == "q2"
+    assert normalize_theme_name("q5-l") == "q2-l"
+    assert normalize_theme_name("qubit") == "q2"
+    assert normalize_theme_name("qubit-contrast") == "q2"
     # Canonical and unknown ids are untouched.
-    assert normalize_theme_name("default") == "default"
-    assert normalize_theme_name("q5-l") == "q5-l"
+    assert normalize_theme_name("q2") == "q2"
     assert normalize_theme_name("nope") == "nope"
-    # The served built-in list carries only the canonical Q1..Q6 ids, and every
+    # The served built-in list carries only the canonical Q2..Q6 ids, and every
     # legacy id maps onto one of them.
     served = {t["name"] for t in _BUILTIN_DASHBOARD_THEMES}
-    assert "q2" in served and "q1-l" in served and "q5" in served
+    assert "q2" in served and "q3" in served and "q4" in served
     assert "q6" in served and "q6-l" in served
     for legacy in ("nous-blue", "qubit-blue", "midnight", "mono",
                    "cyberpunk", "default-large"):

@@ -10,8 +10,6 @@ import { isMangaThemeName } from "@/themes/presets";
 
 export const MANGA_SKIN_KEY = "qubit-manga-skin-enabled";
 export const MANGA_SKIN_EVENT = "qubit-manga-change";
-/** Last theme the user had before selecting Q6/Q6-L. */
-export const MANGA_RETURN_THEME_KEY = "qubit-manga-return-theme";
 const THEME_STORAGE_KEY = "qubit-dashboard-theme";
 const LEGACY_THEME_STORAGE_KEY = "hermes-dashboard-theme";
 
@@ -101,34 +99,10 @@ export function setMangaEnabled(enabled: boolean): boolean {
   return enabled;
 }
 
-export function toggleManga(): boolean {
-  return setMangaEnabled(!currentMangaEnabled());
-}
-
 export function applyMangaAttribute(active: boolean): void {
   if (typeof document === "undefined") return;
   if (active) document.documentElement.dataset.qubitManga = "on";
   else delete document.documentElement.dataset.qubitManga;
-}
-
-/** The last non-manga theme, used by the sidebar switch to return to. */
-export function rememberMangaReturnTheme(name: string): void {
-  if (!name || isMangaThemeName(name)) return;
-  try {
-    window.localStorage.setItem(MANGA_RETURN_THEME_KEY, name);
-  } catch {
-    /* storage disabled */
-  }
-}
-
-export function mangaReturnTheme(): string {
-  if (typeof window === "undefined") return "q2";
-  try {
-    const stored = window.localStorage.getItem(MANGA_RETURN_THEME_KEY);
-    return stored && !isMangaThemeName(stored) ? stored : "q2";
-  } catch {
-    return "q2";
-  }
 }
 
 /** The theme the shell is about to paint (server-injected or persisted). */
