@@ -1,19 +1,19 @@
-# Qubit Manga Web Dashboard — Approved Studio Artwork
+# Qubit Manga Web Dashboard — Repaired Production Artwork
 
-The dashboard React/CSS uses the user's approved 14-piece studio Manga asset pack.
+The dashboard React/CSS uses the corrected 14-piece Manga asset pack. Version v2 repairs cutout halos, restores the sidebar's aspect ratios and removes duplicate menu-row overlays.
 The design only applies when the selected theme is Qubit Manga on eligible web
 routes. The Workbench, Office and chat terminal renderer remain unchanged.
 
 ## Install exact approved art
 
-Download **qubit_manga_FINAL_approved_assets.zip** from the design conversation
+Download **qubit_manga_REPAIRED_v2_assets.zip** from the design conversation
 and save it in the **repository root** (the folder containing `frontend/`).
 
 From the repository root:
 
 ```sh
 git pull origin main
-node frontend/qubit-web/scripts/install-manga-approved.mjs qubit_manga_FINAL_approved_assets.zip
+node frontend/qubit-web/scripts/install-manga-approved.mjs qubit_manga_REPAIRED_v2_assets.zip
 ```
 
 Alternatively, copying the ZIP to that location before `npm run dev` or
@@ -37,7 +37,7 @@ The complete chrome/magenta plate **without any baked-in star** lives at:
 Changing the star does not require editing JSX, CSS, section text or gold bars.
 The title number and label are live localized React text.
 
-Other independent pieces include the eye header, atom, SYSTEM frame/title,
+The v2 ZIP also contains 14 full-resolution transparent PNG reference files and the editable independent 13_star_only.svg. The installer uses the 14 lossless WebP sprites only.\n\nOther independent pieces include the eye header, atom, SYSTEM frame/title,
 tooltip, primary/disabled action frames, checkboxes and impact streaks.
 Their content and click handlers remain the existing React elements.
 
@@ -48,7 +48,7 @@ If the approved art does not appear, check that
 dev server and reload the page. The Manga skin will only set
 `data-qm-approved-assets="ready"` after the manifest and core images load.
 
-Artwork is static in this pass. Decorative glow/reflection loops have been
+The repaired title bar is 2104px wide, intended to display at an approximately 5.45:1 aspect ratio; do not stretch it to an arbitrary height. The sidebar also uses one rectangular navigation row each, not nested octagons.\n\nArtwork is static in this pass. Decorative glow/reflection loops have been
 disabled; only ordinary existing interactions remain.
 
 ## Verification
