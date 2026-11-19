@@ -5,7 +5,7 @@
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) {
   --qm-f-pink:#ff2da6;--qm-f-yellow:#ffea23;--qm-f-white:#fff1ff;
   --qm-f-purple:#b95aff;--qm-f-ink:#0e0619;
-  width:clamp(256px,21vw,314px)!important;
+  width:clamp(284px,23vw,324px)!important;
   border:3px solid #ff3fae!important;
   border-radius:3px!important;
   box-shadow:inset 0 0 0 2px #fff1ff,3px 0 0 #090314,5px 0 0 #fb2d9c!important;
@@ -17,7 +17,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
 }
 /* Header: preserve the real expand/minimize React button, not the generated pause symbol. */
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
-  min-height:94px!important;height:94px!important;gap:5px!important;
+  min-height:72px!important;height:72px!important;gap:5px!important;
   padding:4px 6px!important;overflow:visible!important;
   background:
     radial-gradient(ellipse at 31% 40%,rgba(213,38,210,.35),transparent 59%),
@@ -30,8 +30,8 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
   gap:3px!important;min-width:0!important;flex:1 1 auto!important;position:relative;z-index:2;
 }
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-emblem {
-  width:91px!important;min-width:91px!important;flex:0 0 91px!important;
-  height:78px!important;overflow:visible!important;position:relative!important;
+  width:78px!important;min-width:78px!important;flex:0 0 78px!important;
+  height:64px!important;overflow:visible!important;position:relative!important;
 }
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-emblem > svg {display:none!important}
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-cat {
@@ -40,7 +40,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-brand-
   filter:drop-shadow(0 0 4px #ff41c8) drop-shadow(0 0 3px #3167ff)!important;
 }
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-name {
-  margin-left:-2px!important;font-size:clamp(.95rem,1.25vw,1.12rem)!important;
+  margin-left:-2px!important;font-size:clamp(.9rem,1.25vw,1.06rem)!important;
   line-height:1.1!important;font-style:italic!important;font-weight:900!important;
   letter-spacing:-.045em!important;white-space:nowrap!important;
   text-shadow:1px 2px #100317,0 0 8px #ff2da6!important;
