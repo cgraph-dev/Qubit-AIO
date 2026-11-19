@@ -218,9 +218,11 @@ html:not([data-qubit-manga="on"]) .qm-manga-charge-cells {display:none!important
   html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]){width:min(314px,90vw)!important}
 }
 @media(prefers-reduced-motion:reduce) {
-  html[data-qubit-manga="on"] #app-sidebar :is(
-    .qm-manga-charge-cells i,.qm-manga-footer-leds i,
-    .qagent-sidebar__section-head::before,.qagent-sidebar__brand-row::before,
-    .qagent-sidebar__brand-row::after
-  ) {animation:none!important}
+  html[data-qubit-manga="on"] #app-sidebar .qm-manga-charge-cells i,
+  html[data-qubit-manga="on"] #app-sidebar .qm-manga-footer-leds i,
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head::before,
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::before,
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::after {
+    animation:none!important;
+  }
 }
