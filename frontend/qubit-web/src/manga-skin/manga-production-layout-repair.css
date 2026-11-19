@@ -2,7 +2,7 @@
    Matches source aspect ratios and removes old duplicate decoration layers.
    Only Manga-enabled web sidebar; no Office/workbench/terminal selectors. */
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row {
-  position:relative!important;height:130px!important;min-height:130px!important;
+  position:relative!important;height:145px!important;min-height:145px!important;
   margin:0!important;padding:0 10px!important;overflow:visible!important;
   border:0!important;box-shadow:none!important;
   background:url("/manga-ui/approved/01_sidebar_header.webp") center 2px / calc(100% - 14px) auto no-repeat!important;
@@ -129,8 +129,8 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {
   position:relative!important;box-sizing:border-box!important;
-  width:100%!important;min-height:172px!important;height:172px!important;
-  padding:60px 20px 12px!important;margin:0!important;
+  width:100%!important;min-height:161px!important;height:161px!important;
+  padding:57px 20px 9px!important;margin:0!important;
   background:url("/manga-ui/approved/02_system_panel_frame.webp") center / 100% 100% no-repeat!important;
   border:0!important;border-image:none!important;box-shadow:none!important;
   border-radius:0!important;clip-path:none!important;overflow:visible!important;
@@ -140,7 +140,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
   content:none!important;display:none!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head {
-  position:absolute!important;top:20px!important;left:11px!important;right:11px!important;
+  position:absolute!important;top:16px!important;left:11px!important;right:11px!important;
   display:flex!important;align-items:center!important;box-sizing:border-box!important;
   width:auto!important;height:38px!important;min-height:38px!important;
   margin:0!important;padding:0 16px!important;
