@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SCHEDULE_STATE } from "@/lib/schedule";
 import { describeScheduleChoice } from "@/components/ScheduleBuilder";
