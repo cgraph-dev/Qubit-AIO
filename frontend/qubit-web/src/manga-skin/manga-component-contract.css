@@ -1,0 +1,413 @@
+/**
+ * Manga component contract (last stylesheet).
+ *
+ * The earlier CSS passes provide route skins, but repeated CSS overrides caused
+ * double frames, clipped stars and tiny low-contrast text.  This file owns only
+ * the SHARED COMPONENT chrome.  Content, routes, gateway actions and PTY are
+ * untouched.  Load after manga-precision-repair.css.
+ */
+html[data-qubit-manga="on"] {
+  --qm-ui-paper: #fff8ff;
+  --qm-ui-copy: #eedff9;
+  --qm-ui-gold: #ffeb24;
+  --qm-ui-cut: #080410;
+  --qm-ui-hot: #ff329f;
+  --qm-ui-light-metal: #faf0ff;
+  --qm-ui-dark-metal: #67596b;
+}
+html[data-qubit-manga="on"] #app-sidebar {
+  font-family: var(--theme-font-sans, system-ui, sans-serif);
+  text-rendering: optimizeLegibility;
+}
+/* The star is a live decorative SVG child (not a pseudo-element) and stays
+ * entirely INSIDE the scrolling sidebar, preventing overflow-x clipping. */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head::before {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head > .qm-manga-section-star {
+  display: block !important;
+  position: absolute !important;
+  left: 3px !important;
+  top: 1px !important;
+  z-index: 25 !important;
+  width: 34px !important;
+  height: 34px !important;
+  transform: translate(-2px, -5px) !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  object-fit: contain !important;
+  filter: none !important;
+  animation: qm-live-star-glint 3.8s ease-in-out infinite;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section {
+  isolation: isolate;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+  min-width: 0 !important;
+  min-height: 45px !important;
+  padding: 8px 80px 8px 39px !important;
+  margin: 7px 4px 9px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  clip-path: none !important;
+  box-shadow: 0 3px 0 #080410 !important;
+  background: url("/manga-ui/manga-metal-strip.svg") center/100% 100% no-repeat !important;
+  color: var(--qm-ui-paper) !important;
+  text-shadow: 1px 1px 0 #090412 !important;
+  font: italic 900 15px/1.2 var(--qm-display, system-ui, sans-serif) !important;
+  text-transform: uppercase !important;
+  letter-spacing: .015em !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > span:nth-child(2) {
+  position: relative;
+  z-index: 6;
+  color: #fffaff !important;
+  font: italic 900 15px/1.2 var(--qm-display, system-ui, sans-serif) !important;
+  letter-spacing: .01em !important;
+  text-shadow: 1px 1px 0 #080410 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head .qagent-sidebar__section-index {
+  position: relative;
+  z-index: 6;
+  color: #ffe932 !important;
+  font: 900 16px/1 var(--theme-font-mono, ui-monospace, monospace) !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: 1px 1px 0 #090412 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head::after {
+  right: 3px !important;
+  top: 5px !important;
+  width: 80px !important;
+  height: calc(100% - 10px) !important;
+  transform: none !important;
+  border: 0 !important;
+  background: linear-gradient(110deg, #faf0ff 0 4%, #a598ab 6%, #0d0719 12%, #080510 100%) !important;
+  clip-path: polygon(14% 0,100% 0,85% 100%,0 100%) !important;
+  box-shadow: none !important;
+  z-index: 3 !important;
+  pointer-events: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells {
+  position: absolute !important;
+  z-index: 10 !important;
+  display: flex !important;
+  width: auto !important;
+  height: calc(100% - 12px) !important;
+  right: 12px !important;
+  top: 6px !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  pointer-events: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i {
+  display: block !important;
+  position: relative !important;
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+  clip-path: polygon(28% 0,100% 0,72% 100%,0 100%) !important;
+  background: linear-gradient(120deg,#fffbd0 0%,#ffe62e 22%,#e5a90c 55%,#fff57c 74%,#b36c0b 100%) !important;
+  background-size: 220% 100% !important;
+  animation: qm-live-charge 2.15s ease-in-out infinite !important;
+  box-shadow: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i:nth-child(1) {
+  animation-delay: 0s !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i:nth-child(2) {
+  animation-delay: .22s !important;
+  clip-path: polygon(38% 0,100% 0,62% 100%,0 100%) !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i:nth-child(3) {
+  animation-delay: .44s !important;
+  clip-path: polygon(24% 0,100% 0,80% 100%,0 100%) !important;
+}
+@keyframes qm-live-charge {
+  0%,100% {opacity:.66;filter:brightness(.84);background-position:100% 0}
+  27%,48% {opacity:1;filter:brightness(1.48) drop-shadow(0 0 4px #ffe734);background-position:0 0}
+  72% {opacity:.87;filter:brightness(1.02);background-position:45% 0}
+}
+@keyframes qm-live-star-glint {
+  0%,76%,100% {opacity:.94;filter:brightness(.95)}
+  83% {opacity:1;filter:brightness(1.35) drop-shadow(0 0 3px #fff09b)}
+}
+/* The numbered 07 SYSTEM section is in the scrollable nav. This fixed
+ * unnumbered gateway is intentionally a SEPARATE status instrument below it. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell {
+  display: block !important;
+  flex-shrink: 0 !important;
+  min-height: 0 !important;
+  margin: 3px 6px 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate {
+  position: relative !important;
+  isolation: isolate !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-height: 165px !important;
+  margin: 0 !important;
+  padding: 23px 18px 18px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: url("/manga-ui/zip/sidebar-gateway.svg") center/100% 100% no-repeat !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  z-index: 3 !important;
+  left: 5px !important;
+  top: 4px !important;
+  width: 30px !important;
+  height: 30px !important;
+  transform: none !important;
+  background: url("/manga-ui/manga-gateway-corner.svg") left top/contain no-repeat !important;
+  pointer-events: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  z-index: 3 !important;
+  right: 5px !important;
+  bottom: 4px !important;
+  width: 24px !important;
+  height: 24px !important;
+  transform: none !important;
+  background: url("/manga-ui/manga-corner-reflection-right.svg") right bottom/contain no-repeat !important;
+  pointer-events: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate .qagent-sidebar__section-head {
+  min-height: 30px !important;
+  margin: 0 2px 11px !important;
+  padding: 6px 13px !important;
+  border: 1px solid #fff3ff !important;
+  box-shadow: 0 2px 0 #080410 !important;
+  clip-path: polygon(5% 0,95% 0,100% 50%,95% 100%,5% 100%,0 50%) !important;
+  background: linear-gradient(110deg,#dd96ff,#f8cdfd 54%,#a65ad6) !important;
+  font: italic 900 15px/1.1 var(--qm-display, system-ui, sans-serif) !important;
+  color: #230b34 !important;
+  text-shadow: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate .qagent-sidebar__section-head::after {
+  display: none !important;
+  content: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate .qagent-sidebar__telemetry-row {
+  min-height: 23px !important;
+  gap: 8px !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  white-space: normal !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-key {
+  color: var(--qm-ui-gold) !important;
+  font: 750 11px/1.36 var(--theme-font-mono, ui-monospace, monospace) !important;
+  letter-spacing: 0 !important;
+  text-shadow: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-value {
+  color: #fff9ff !important;
+  font: 600 12px/1.36 var(--theme-font-mono, ui-monospace, monospace) !important;
+  text-shadow: none !important;
+  white-space: nowrap !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell > ul {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  margin: 9px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell > ul > li {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell .qagent-sidebar__action {
+  display: block !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell .qagent-sidebar__action::part(button) {
+  width: 100% !important;
+  min-height: 38px !important;
+  padding: 7px 8px !important;
+  border: 2px solid #ff43ac !important;
+  background: linear-gradient(180deg,#351846,#150a25) !important;
+  color: #fff8ff !important;
+  box-shadow: 2px 2px 0 #070411 !important;
+  font: 700 11px/1.25 var(--theme-font-sans, system-ui, sans-serif) !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell .qagent-sidebar__action:disabled::part(button) {
+  opacity: .58 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell::before,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell::after {
+  display: none !important;
+  content: none !important;
+}
+/* No ghost input from older Sakuga search control; native input owns exactly
+ * one surface, with a single lucide search icon. */
+html[data-qubit-manga="on"] .qm-chat-session-search > input[type="search"] {
+  box-sizing: border-box !important;
+  display: block !important;
+  width: 100% !important;
+  height: 41px !important;
+  min-height: 41px !important;
+  padding: 8px 32px 8px 36px !important;
+  border: 2px solid #d5b5ed !important;
+  border-radius: 3px !important;
+  background: #1b102d !important;
+  background-image: none !important;
+  box-shadow: inset 0 0 0 1px #613974 !important;
+  color: #fff8ff !important;
+  font: 550 13px/1.45 var(--theme-font-sans, system-ui, sans-serif) !important;
+}
+html[data-qubit-manga="on"] .qm-chat-session-search > input[type="search"]::placeholder {
+  color: #d6c1e5 !important;
+  opacity: 1 !important;
+}
+html[data-qubit-manga="on"] .qm-chat-session-search > svg {
+  z-index: 5 !important;
+  left: 18px !important;
+  color: #ffe629 !important;
+}
+html[data-qubit-manga="on"] .qchat__side {
+  font-family: var(--theme-font-sans, system-ui, sans-serif) !important;
+  font-size: 13.5px !important;
+  line-height: 1.55 !important;
+  color: #f6eafa !important;
+  letter-spacing: 0 !important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module__head,.qchat__side-head) {
+  font: italic 850 15px/1.25 var(--qm-display, system-ui, sans-serif) !important;
+  letter-spacing: .015em !important;
+  color: #fff9ff !important;
+  text-shadow: 1px 1px 0 #15071e !important;
+  padding-block: 9px !important;
+  margin-bottom: 10px !important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(button,input,label) {
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts) {
+  min-width: 0 !important;
+  margin-bottom: 10px !important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts)::before {
+  background: url("/manga-ui/manga-corner-reflection.svg") top left/contain no-repeat !important;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts)::after {
+  background: url("/manga-ui/manga-corner-reflection-right.svg") bottom right/contain no-repeat !important;
+}
+/* Real ZIP assets for layered UI popups and status banners. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qagent-sidebar__tooltip {
+  box-sizing: border-box !important;
+  min-width: 170px !important;
+  min-height: 86px !important;
+  padding: 22px 24px 17px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url("/manga-ui/zip/tooltip.svg") center/100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #fff8ff !important;
+  font: 600 13px/1.4 var(--theme-font-sans, system-ui, sans-serif) !important;
+}
+html[data-qubit-manga="on"] .qagent-sidebar__tooltip-title {
+  color: #ffe72a !important;
+  font: 900 14px/1.3 var(--qm-display, system-ui, sans-serif) !important;
+}
+html[data-qubit-manga="on"] .qagent-sidebar__tooltip-detail {
+  color: #f0e6fc !important;
+  font: 500 12px/1.4 var(--theme-font-sans, system-ui, sans-serif) !important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-build-notice {
+  min-height: 76px !important;
+  padding: 16px 22px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url("/manga-ui/zip/toast-info.svg") center/100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #fff8ff !important;
+  font: 650 13px/1.4 var(--theme-font-sans, system-ui, sans-serif) !important;
+}
+html[data-qubit-manga="on"] #qubit-build-notice .qm-build-notice__reload {
+  background: #ffe82a !important;
+  color: #0b0614 !important;
+  min-height: 37px !important;
+  padding: 7px 12px !important;
+  border: 2px solid #090412 !important;
+  border-radius: 2px !important;
+  box-shadow: 2px 2px 0 #ff37a6 !important;
+  font-weight: 850 !important;
+}
+html[data-qubit-manga="on"] #qubit-build-notice .qm-build-notice__close {
+  color: #fff8ff !important;
+  opacity: 1 !important;
+  min-width: 28px;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-floating-menu,
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is([role="listbox"],[role="menu"],.dropdown-panel) {
+  padding: 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url("/manga-ui/zip/dropdown-panel.svg") center/100% 100% no-repeat !important;
+  box-shadow: 0 4px 0 #080410 !important;
+  color: #fff7ff !important;
+}
+html[data-qubit-manga="on"] .qm-refresh-icon--spinning {
+  transform-origin: 50% 50%;
+  animation: qm-refresh-rotation .82s linear infinite !important;
+}
+@media (max-width: 420px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head {
+    padding-right: 75px !important;
+    padding-left: 34px !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head > span:nth-child(2) {
+    font-size: 13px !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-shell > ul {
+    flex-wrap: wrap !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-qubit-manga="on"] .qm-manga-section-star,
+  html[data-qubit-manga="on"] .qm-manga-charge-cells > i,
+  html[data-qubit-manga="on"] .qm-refresh-icon--spinning {
+    animation: none !important;
+    filter: none !important;
+  }
+}
