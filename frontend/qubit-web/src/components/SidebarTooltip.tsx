@@ -38,7 +38,11 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
   // The rail flyout is a Sakuga bubble now: the same white card, ink border,
   // lavender shadow and a small pop from the anchor when it opens.
   useEffect(() => {
-    void emitFxAt("pop", anchor, { scale: 0.45 });
+    // The Manga plate is static and already has illustrated reflections.
+    // Pop FX is kept for other themes only; no decorative motion is injected.
+    if (document.documentElement.dataset.qubitManga !== "on") {
+      void emitFxAt("pop", anchor, { scale: 0.45 });
+    }
   }, [anchor]);
 
   const rect = anchor.getBoundingClientRect();
@@ -47,8 +51,10 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
   const railRight = sidebar && sidebar.width > 0 ? sidebar.right : rect.right;
   const railLeft = sidebar && sidebar.width > 0 ? sidebar.left : rect.left;
 
-  // Flip left when the card would leave the viewport on the right.
-  const CARD_WIDTH = 232;
+  // Use the real Manga sprite width for flip placement. The precision
+  // tooltip is 320:170, so at 260px it remains perfectly circular.
+  const manga = document.documentElement.dataset.qubitManga === "on";
+  const CARD_WIDTH = manga ? 260 : 232;
   const fitsRight = railRight + gap + CARD_WIDTH <= window.innerWidth - 8;
   const placement: "right" | "left" = fitsRight ? "right" : "left";
 
@@ -56,8 +62,7 @@ export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) 
   const detail = rest.length > 0 ? rest.join(" — ") : undefined;
 
   // Clamp vertically: the card is ~2 lines tall at most.
-  const manga = document.documentElement.dataset.qubitManga === "on";
-  const EDGE = manga ? 62 : 40;
+  const EDGE = manga ? 73 : 40;
   const centreY = rect.top + rect.height / 2;
   const top = Math.min(Math.max(centreY, EDGE), window.innerHeight - EDGE);
 
