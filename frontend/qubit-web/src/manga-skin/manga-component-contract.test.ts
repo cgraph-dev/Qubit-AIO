@@ -28,6 +28,13 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(studio).toContain("/manga-ui/studio-star.png");
     expect(studio).toContain("/manga-ui/manga-corner-reflection.svg");
     expect(studioCss).toContain(".qm-studio-title-corner__star");
+    expect(studioCss).toContain('/manga-ui/manga-titleplate-studio.svg');
+    expect(studio).toContain("/manga-ui/manga-gold-charge-bar.svg");
+    expect(studioCss).toContain(".qm-studio-charge-bars > .qm-studio-charge-bar");
+    expect(studioCss).toContain("@keyframes qm-studio-gold-charge");
+    expect(studioCss).toContain("nav .qagent-sidebar__section-head::after");
+    expect(read("../../public/manga-ui/manga-titleplate-studio.svg")).toContain('viewBox="0 0 900 150"');
+    expect(read("../../public/manga-ui/manga-gold-charge-bar.svg")).toContain('viewBox="0 0 48 110"');
     expect(css).toContain("nav .qagent-sidebar__section-head::before");
     expect(skin.trimEnd().indexOf('import "./manga-precision-repair.css";')).toBeLessThan(
       skin.trimEnd().indexOf('import "./manga-component-contract.css";')
