@@ -11,6 +11,7 @@ import { resolvePageTitle } from "@/lib/resolve-page-title";
 import { isChatPath } from "@/lib/chat-routes";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { MangaPageGuide } from "@/manga-skin/MangaPageGuide";
 
 export function PageHeaderProvider({
   children,
@@ -151,6 +152,8 @@ export function PageHeaderProvider({
             ) : null}
           </div>
         </header>
+
+        <MangaPageGuide />
 
         <main
           id="qubit-main-content"
