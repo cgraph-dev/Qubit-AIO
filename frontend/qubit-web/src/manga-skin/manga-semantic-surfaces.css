@@ -1,0 +1,123 @@
+/* Manga semantic surfaces — a stable styling seam shared by the dashboard.
+ * Applied only behind the route gate; upstream Sakuga VFX remains untouched.
+ */
+html[data-qubit-manga="on"] [data-qm-surface] {
+ --qm-surface-ink:#fff0ff;
+ --qm-surface-pink:#ff269a;
+ --qm-surface-violet:#b965ff;
+ --qm-surface-yellow:#ffe525;
+ min-width:0;
+}
+html[data-qubit-manga="on"] [data-qm-surface="page-header"] {
+ position:relative;
+ padding:clamp(12px,1.5vw,22px);
+ gap:clamp(10px,1.2vw,16px);
+ border:2px solid var(--qm-surface-pink)!important;
+ border-left:5px solid var(--qm-surface-yellow)!important;
+ background:linear-gradient(107deg,#29123e,#140b27 75%)!important;
+ box-shadow:2px 2px 0 #080615,4px 4px 0 rgba(255,240,255,.54)!important;
+}
+html[data-qubit-manga="on"] [data-qm-surface="page-header"] .settings-page__copy {
+ min-width:0;max-width:100%;
+}
+html[data-qubit-manga="on"] [data-qm-surface="page-header"] .settings-page__actions {
+ min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+}
+html[data-qubit-manga="on"] [data-qm-surface="settings-section"] {
+ display:flex;flex-direction:column;min-width:0;
+ gap:clamp(9px,1vw,15px);
+ margin-block:clamp(12px,1.5vw,20px);
+}
+html[data-qubit-manga="on"] [data-qm-surface="settings-section"] .settings-section__header {
+ display:flex;flex-wrap:wrap;
+ min-width:0;gap:12px;align-items:center;
+}
+html[data-qubit-manga="on"] [data-qm-surface="settings-section"] .settings-section__copy {
+ flex:1 1 240px;min-width:0;
+}
+html[data-qubit-manga="on"] [data-qm-surface="settings-section"] .settings-section__actions {
+ flex:0 1 auto;min-width:0;
+ display:flex;flex-wrap:wrap;gap:8px;
+}
+html[data-qubit-manga="on"] [data-qm-surface="panel"] {
+ position:relative;isolation:isolate;
+ padding:clamp(12px,1.2vw,20px);
+ border:2px solid var(--qm-surface-pink)!important;
+ border-radius:2px!important;
+ background:linear-gradient(150deg,#211133 0%,#10091e 82%)!important;
+ box-shadow:2px 2px 0 #080615,4px 4px 0 rgba(255,240,255,.55)!important;
+}
+html[data-qubit-manga="on"] [data-qm-surface="panel"]::before {
+ z-index:2;pointer-events:none;content:"";
+ position:absolute;top:-2px;left:-2px;width:42px;height:42px;
+ background:url("/manga-ui/v3-corner-yellow.svg") top left/contain no-repeat;
+ transform-origin:top left;
+ transition:transform 180ms cubic-bezier(.16,1.5,.4,1),filter 180ms ease;
+}
+html[data-qubit-manga="on"] [data-qm-surface="panel"]::after {
+ z-index:2;pointer-events:none;content:"";
+ position:absolute;bottom:-2px;right:-2px;width:34px;height:34px;
+ background:url("/manga-ui/manga-corner-bottom-right.svg") bottom right/contain no-repeat;
+ transform-origin:bottom right;
+ transition:transform 180ms cubic-bezier(.16,1.5,.4,1),filter 180ms ease;
+}
+html[data-qubit-manga="on"] [data-qm-surface="panel"]:hover::before {
+ transform:scale(1.09) rotate(-3deg);filter:drop-shadow(0 0 3px rgba(255,229,37,.55));
+}
+html[data-qubit-manga="on"] [data-qm-surface="panel"]:hover::after {
+ transform:scale(1.09) rotate(3deg);filter:drop-shadow(0 0 3px rgba(255,38,154,.55));
+}
+/* Single meaningful border for each level; no frame-on-frame clutter. */
+html[data-qubit-manga="on"] [data-qm-surface="panel"] > [data-qm-surface="panel"] {
+ box-shadow:inset 2px 0 0 rgba(255,229,37,.4)!important;
+ border-color:rgba(185,101,255,.7)!important;
+}
+html[data-qubit-manga="on"] [data-qm-surface="row"] {
+ display:flex;align-items:center;justify-content:space-between;
+ gap:clamp(9px,1vw,16px);min-width:0;
+ border-bottom:1px solid rgba(185,101,255,.25);
+ padding:clamp(9px,.9vw,13px) 4px;
+}
+html[data-qubit-manga="on"] [data-qm-surface="row"]:last-child {
+ border-bottom:0;
+}
+html[data-qubit-manga="on"] [data-qm-surface="row"] .settings-row__text {
+ min-width:0;flex:1 1 260px;overflow-wrap:anywhere;
+}
+html[data-qubit-manga="on"] [data-qm-surface="row"] .settings-row__control {
+ min-width:0;max-width:100%;flex:0 1 auto;
+}
+html[data-qubit-manga="on"] [data-qm-surface="empty"] {
+ display:flex;flex-direction:column;gap:7px;
+ border:2px dashed rgba(185,101,255,.72)!important;
+ padding:clamp(15px,2vw,24px);
+ background:linear-gradient(110deg,rgba(255,38,154,.09),transparent)!important;
+ color:var(--qm-surface-ink);
+}
+html[data-qubit-manga="on"] [data-qm-surface="loading"] {
+ min-height:72px;padding:12px;
+ border:1px solid rgba(185,101,255,.55);
+}
+html[data-qubit-manga="on"] [data-qm-surface="panel"] :is(input,textarea,select,button) {
+ max-width:100%;
+}
+@media(max-width:800px) {
+ html[data-qubit-manga="on"] [data-qm-surface="row"] {
+  flex-wrap:wrap;align-items:flex-start;
+ }
+ html[data-qubit-manga="on"] [data-qm-surface="row"] .settings-row__control {
+  flex:1 1 auto;width:100%;
+ }
+}
+@media(max-width:480px) {
+ html[data-qubit-manga="on"] [data-qm-surface="panel"] {padding:12px 10px}
+ html[data-qubit-manga="on"] [data-qm-surface="page-header"] {padding:11px}
+ html[data-qubit-manga="on"] [data-qm-surface="panel"]::before {width:29px;height:29px}
+ html[data-qubit-manga="on"] [data-qm-surface="panel"]::after {width:25px;height:25px}
+}
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] [data-qm-surface="panel"]::before,
+ html[data-qubit-manga="on"] [data-qm-surface="panel"]::after {
+  transition:none!important;transform:none!important;
+ }
+}

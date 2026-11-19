@@ -188,7 +188,7 @@ export const mangaTheme: DashboardTheme = {
   name: "q6",
   label: "Q4",
   description:
-    "Q4 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
+    "Q6 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
   palette: {
     background: { hex: "#08061a", alpha: 1 },
     midground: { hex: "#f7e9ff", alpha: 1 },
