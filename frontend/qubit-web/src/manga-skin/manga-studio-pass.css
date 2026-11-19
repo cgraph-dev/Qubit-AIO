@@ -1,3 +1,16 @@
+/* Local WOFF2, no network font load or layout-blocking third-party requests. */
+@font-face {
+  font-family:"Qubit Manga Condensed";font-style:normal;font-weight:400;
+  font-display:swap;src:url("/fonts/RulesCompressed-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family:"Qubit Manga Condensed";font-style:normal;font-weight:700 900;
+  font-display:swap;src:url("/fonts/RulesCompressed-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family:"Qubit Manga Display";font-style:normal;font-weight:700 900;
+  font-display:swap;src:url("/fonts/Collapse-Bold.woff2") format("woff2");
+}
 /* Q6 Manga studio pass. Source: supplied Manga reference plates + palette.json.
  * Single opt-in component contract. No /chat TUI, Workbench, HUD, Office, desktop
  * or Sakuga internals. All flourish is pointer-transparent; text stays live.
@@ -13,7 +26,7 @@ html[data-qubit-manga="on"] {
   --qm-page-pink:var(--qm-magenta); --qm-page-purple:var(--qm-violet);
   --qm-page-yellow:var(--qm-yellow); --qm-page-ink:var(--qm-black);
   --qm-page-text:var(--qm-ink); --qm-page-muted:var(--qm-muted);
-  --qm-display:"Rajdhani","Barlow Condensed","Arial Narrow","Arial Black",system-ui,sans-serif;
+  --qm-display:"Qubit Manga Condensed","Rajdhani","Arial Narrow",system-ui,sans-serif;
   --qm-body:"Inter","IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --qm-page-heading:var(--qm-display); --qm-page-body:var(--qm-body);
   --qm-motion-snap:cubic-bezier(.2,.85,.28,1);
