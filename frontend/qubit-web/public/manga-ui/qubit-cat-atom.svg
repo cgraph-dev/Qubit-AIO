@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Cat with orbiting atom">
+<defs><linearGradient id="fur" x2="1" y2="1"><stop stop-color="#3b1749"/><stop offset="1" stop-color="#120a24"/></linearGradient><linearGradient id="orbit" x2="1" y2="1"><stop stop-color="#ff269a"/><stop offset=".5" stop-color="#ffe500"/><stop offset="1" stop-color="#b965ff"/></linearGradient></defs>
+<path d="M10 30 28 5 43 20Q64 14 86 20L103 4 116 37Q122 54 115 76 109 98 91 106Q65 120 38 109Q14 102 10 77Z" fill="#080615" stroke="#fff0ff" stroke-width="5" stroke-linejoin="round"/>
+<path d="M20 34 30 15 43 28Q64 21 85 28L99 14 108 38Q114 72 95 92Q64 115 36 94Q16 79 20 34Z" fill="url(#fur)" stroke="#ff269a" stroke-width="4" stroke-linejoin="round"/>
+<path d="M24 33 31 22 39 34ZM89 33 98 21 103 36Z" fill="#ff70c1"/>
+<path d="M28 61Q43 44 54 61Q47 81 33 75Q28 71 28 61ZM73 61Q86 44 100 61Q97 79 81 77Q73 72 73 61Z" fill="#fff0ff" stroke="#080615" stroke-width="2"/>
+<ellipse cx="43" cy="65" rx="6" ry="11" fill="#ffe500"/><ellipse cx="88" cy="65" rx="6" ry="11" fill="#ffe500"/>
+<path d="M58 82 70 82 64 89Z" fill="#ff269a"/><path d="M64 89Q58 98 51 92M64 89Q70 98 77 92" fill="none" stroke="#fff0ff" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M28 87 8 82M29 93 8 97M99 87 120 83M98 94 121 99" stroke="#fff0ff" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(-34 64 62)" fill="none" stroke="#080615" stroke-width="7"/>
+<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(-34 64 62)" fill="none" stroke="url(#orbit)" stroke-width="4.5"/>
+<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(35 64 62)" fill="none" stroke="#080615" stroke-width="7"/>
+<ellipse cx="64" cy="62" rx="57" ry="20" transform="rotate(35 64 62)" fill="none" stroke="#b965ff" stroke-width="4.5"/>
+<circle cx="64" cy="62" r="8" fill="#ffe500" stroke="#080615" stroke-width="3"/>
+<circle cx="20" cy="32" r="6" fill="#ffe500" stroke="#080615" stroke-width="2"/>
+<circle cx="106" cy="29" r="6" fill="#ff269a" stroke="#080615" stroke-width="2"/>
+<path d="m112 8 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="#ffe500" stroke="#080615" stroke-width="1.5"/>
+</svg>
