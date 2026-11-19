@@ -1,0 +1,426 @@
+/*
+ * Qubit Manga UI — finishing layer for the user-supplied asset pack.
+ * Loaded AFTER all earlier manga CSS to prevent rule-order regressions.
+ * - This is an opt-in visual layer; all live React controls retain behavior.
+ * - The original ZIP is checksum-installed by scripts/prepare-manga-zip.mjs.
+ * - /workbench, /qubit-workbench, /qubit-hud and Qubit Office are route-gated.
+ * - /chat shell and inspector are styled, but the PTY/xterm itself is not.
+ */
+html[data-qubit-manga="on"] {
+  --qmf-ink:#fff4ff;
+  --qmf-ink-muted:#e6d5f9;
+  --qmf-paper:#fff0ff;
+  --qmf-black:#080411;
+  --qmf-background:#090615;
+  --qmf-panel:#170d28;
+  --qmf-panel-raised:#271538;
+  --qmf-magenta:#ff269a;
+  --qmf-yellow:#ffe500;
+  --qmf-violet:#b965ff;
+  --qmf-cyan:#27e9f3;
+  --qmf-rule:rgba(222,186,249,.52);
+  --qmf-display:var(--qm-display,"Arial Black",system-ui,sans-serif);
+}
+
+/* Keep the very top brand controls visible and avoid painting over collapse. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
+  min-height:76px!important;
+  border:2px solid var(--qmf-paper)!important;
+  border-top:3px solid var(--qmf-magenta)!important;
+  box-shadow:inset 0 0 0 2px var(--qmf-black),0 3px 0 var(--qmf-black)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row > sakuga-button {
+  position:relative;
+  z-index:7;
+  flex-shrink:0;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name,
+html[data-qubit-manga="on"] #app-sidebar .qbrand-label {
+  overflow-wrap:normal;
+  text-overflow:ellipsis;
+}
+
+/* Seven numbered navigation plates: crisp outline, live labels, genuine
+   separate charging cells and the un-clipped vector star at upper left. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section {
+  overflow:visible!important;
+  min-width:0!important;
+  margin:8px 2px 12px!important;
+  padding:5px 3px 8px!important;
+  border:2px solid var(--qmf-magenta)!important;
+  box-shadow:inset 0 0 0 1px rgba(255,240,255,.32),3px 3px 0 var(--qmf-black)!important;
+  background:linear-gradient(155deg,#201132,#10081e 76%)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+  isolation:isolate!important;
+  overflow:visible!important;
+  clip-path:none!important;
+  min-height:40px!important;
+  margin:5px 8px 9px!important;
+  padding:7px 75px 7px 25px!important;
+  border:2px solid var(--qmf-black)!important;
+  border-bottom:3px solid var(--qmf-paper)!important;
+  border-left:3px solid var(--qmf-paper)!important;
+  outline:0!important;
+  box-shadow:2px 3px 0 #080411,3px 4px 0 rgba(255,240,255,.65)!important;
+  background:
+    linear-gradient(155deg,rgba(255,255,255,.21) 0%,transparent 42%),
+    linear-gradient(100deg,#ff4bb5 0%,#f62e9e 62%,#b41c7b 87%,#401336 100%)!important;
+  color:var(--qmf-paper)!important;
+  font:italic 900 clamp(13px, .85rem, 15px)/1.12 var(--qmf-display)!important;
+  text-shadow:1px 2px 0 #11051c!important;
+  letter-spacing:.035em!important;
+  filter:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head > span:nth-child(2) {
+  z-index:3!important;
+  white-space:nowrap!important;
+  text-overflow:clip!important;
+  overflow:visible!important;
+  font-size:clamp(12px,.85rem,15px)!important;
+  letter-spacing:.025em!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head .qagent-sidebar__section-index {
+  color:var(--qmf-yellow)!important;
+  flex:0 0 auto!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  -webkit-text-stroke:.25px #080411;
+  text-shadow:1px 2px 0 #080411,0 0 5px rgba(255,229,0,.55)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  z-index:8!important;
+  width:42px!important;
+  height:42px!important;
+  top:-13px!important;
+  left:-16px!important;
+  transform:none!important;
+  background:url("/manga-ui/manga-anime-star.svg") center/contain no-repeat!important;
+  opacity:1!important;
+  pointer-events:none!important;
+  animation:none!important;
+  filter:drop-shadow(0 0 3px rgba(255,229,0,.8))!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
+  z-index:2!important;
+  width:73px!important;
+  right:-10px!important;
+  top:-2px!important;
+  height:calc(100% + 4px)!important;
+  border:2px solid var(--qmf-black)!important;
+  background:linear-gradient(107deg,#fff0ff 0 9%,#10071e 10% 100%)!important;
+  box-shadow:2px 2px 0 #080411!important;
+  transform:skewX(-16deg)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells {
+  display:flex!important;
+  gap:4px!important;
+  right:1px!important;
+  top:3px!important;
+  height:calc(100% - 7px)!important;
+  z-index:9!important;
+  pointer-events:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells > i {
+  flex:0 0 15px!important;
+  width:15px!important;
+  min-width:15px!important;
+  height:100%!important;
+  transform:skewX(-16deg)!important;
+  background:#ffdb26;
+  border:1.5px solid #130619!important;
+  box-shadow:inset 0 0 3px #fffab1,0 0 5px rgba(255,223,49,.7)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section > ul {
+  min-width:0;
+  padding:0 3px 2px;
+  background:linear-gradient(180deg,#160b25,#10081e);
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link {
+  min-width:0;
+  min-height:37px!important;
+  margin:2px 1px!important;
+  padding-block:7px!important;
+  border-radius:2px!important;
+  line-height:1.3!important;
+  font-size:12.5px;
+  letter-spacing:.005em;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"] {
+  background:#ffe500!important;
+  color:#070411!important;
+  border:2px solid #090412!important;
+  box-shadow:2px 2px 0 #ff269a!important;
+}
+
+/* The fixed system instrument has its own violet header and 07 badge. */
+.qm-manga-system-index {display:none}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
+  min-width:0!important;
+  flex:0 0 auto;
+  padding:8px 7px!important;
+  border:2px solid var(--qmf-magenta)!important;
+  background:linear-gradient(155deg,#df258c 0%,#c8238c 14%,#1c102b 14.3%,#0e091c 100%)!important;
+  box-shadow:inset 0 0 0 2px var(--qmf-black),2px 2px 0 var(--qmf-black)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head {
+  min-height:34px!important;
+  margin:0 0 8px!important;
+  padding:5px 9px 5px 25px!important;
+  color:#190923!important;
+  background:linear-gradient(110deg,#cc81f5,#f3c6ff 64%,#a65ad6)!important;
+  border:2px solid #fdf0ff!important;
+  box-shadow:2px 2px 0 #080411!important;
+  font:italic 900 14px/1.1 var(--qmf-display)!important;
+  text-shadow:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qm-manga-system-index {
+  display:inline-block!important;
+  z-index:3;
+  color:#250b34!important;
+  font-size:13px!important;
+  font-variant-numeric:tabular-nums;
+  font-weight:900!important;
+  letter-spacing:0;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head > span:nth-child(2) {
+  color:#250b34!important;
+  font-size:14px!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::before {
+  left:3px!important;
+  top:50%!important;
+  width:17px!important;
+  height:17px!important;
+  transform:translateY(-50%)!important;
+  background:url("/manga-ui/neon-bolt-nut.svg") center/contain no-repeat!important;
+  filter:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::after,
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qm-manga-charge-cells {
+  display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry {
+  padding:7px!important;
+  background:#080616!important;
+  border:1px solid rgba(255,229,0,.5)!important;
+  box-shadow:inset 3px 0 0 var(--qmf-yellow)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry-row {
+  display:flex;
+  align-items:baseline;
+  min-width:0;
+  gap:6px;
+  justify-content:space-between;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry-key {
+  color:var(--qmf-yellow)!important;
+  font:700 10px/1.35 var(--qm-mono,ui-monospace,monospace);
+  letter-spacing:.025em;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry-value {
+  white-space:nowrap;
+  color:var(--qmf-paper)!important;
+  font:500 11px/1.35 var(--qm-mono,ui-monospace,monospace);
+  font-variant-numeric:tabular-nums;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system > ul {
+  display:flex;
+  align-items:stretch;
+  gap:6px!important;
+  min-width:0;
+  margin-top:7px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system > ul > li {
+  flex:1 1 0;
+  min-width:0;
+}
+
+/* Footer controls and visible status/version rail. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility {
+  flex:0 0 auto;
+  min-width:0;
+  padding:7px!important;
+  border:2px solid var(--qmf-magenta)!important;
+  background:#140b24!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
+  min-height:48px!important;
+  flex:0 0 auto;
+  min-width:0;
+  padding:10px 13px!important;
+  border:2px solid #fff0ff!important;
+  background:linear-gradient(105deg,#30133e,#0a0719)!important;
+  box-shadow:inset 0 3px 0 #ff269a,2px 2px 0 #080411!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-footer-content {
+  min-width:0;
+  gap:6px;
+  align-items:center;
+  flex-wrap:wrap;
+  font-variant-numeric:tabular-nums;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar .qagent-sidebar__colophon {
+  background-image:linear-gradient(100deg,rgba(17,6,28,.48),rgba(17,6,28,.32)),url("/manga-ui/zip/sidebar-footer-plate.svg")!important;
+  background-size:100% 100%,100% 100%!important;
+  background-repeat:no-repeat!important;
+}
+
+/* Original asset pack: use perimeter pieces, not rasterized text panels.
+   This preserves readable DOM content and keeps crisp corners at all sizes. */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts) {
+  border:2px solid #f2e4fb!important;
+  background-color:#140a22!important;
+  box-shadow:3px 3px 0 #080411,5px 5px 0 #ff269a!important;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts)::before {
+  content:"";
+  display:block;
+  position:absolute;
+  z-index:1;
+  top:-3px;
+  left:-3px;
+  width:25px;
+  height:25px;
+  background:url("/manga-ui/zip/corner-yellow.svg") top left/contain no-repeat;
+  pointer-events:none;
+}
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side :is(.qplate-module,.qchat__model-panel,.qchat__tools,.qchat__sessions,.qchat__artifacts)::after {
+  content:"";
+  position:absolute;
+  z-index:1;
+  right:-3px;
+  bottom:-3px;
+  width:25px;
+  height:25px;
+  background:url("/manga-ui/zip/corner-magenta.svg") bottom right/contain no-repeat;
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat__side :is(.qplate-module__head,.qchat__side-head) {
+  font-family:var(--qmf-display)!important;
+  font-weight:900!important;
+  font-style:italic;
+  font-size:13px!important;
+  line-height:1.25!important;
+  letter-spacing:.035em!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+}
+
+/* Primary page typography: keep narrative content easy to read even with
+   expressive headers. Don't impose display-font italics on body text. */
+html[data-qubit-manga="on"] #qubit-main-content {
+  color:var(--qmf-ink);
+  font-family:var(--theme-font-sans,system-ui,sans-serif);
+  font-size:clamp(13px,.84rem,15px);
+  line-height:1.52;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(h1,h2,h3) {
+  color:#fff4ff;
+  max-width:100%;
+  line-height:1.23!important;
+  overflow-wrap:break-word;
+  text-wrap:balance;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(p,li,dd,dt,td,th,label) {
+  line-height:1.48;
+  overflow-wrap:anywhere;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section,.settings-group,.qplate-module,[data-slot="card"]) {
+  min-width:0;
+  max-width:100%;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section,.settings-group,[data-slot="card"]) {
+  padding-inline:clamp(10px,1.3vw,20px);
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(input,textarea,select,[role="combobox"]) {
+  min-width:0;
+  max-width:100%;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(th,[role="columnheader"]) {
+  font-weight:850!important;
+  color:#fff4ff;
+  letter-spacing:.025em;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(table,[role="table"]) {
+  font-variant-numeric:tabular-nums;
+}
+/* ZIP controls and overlays */
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
+  [role="menu"],[role="listbox"],[data-radix-popper-content-wrapper] > *,
+  .dropdown-panel
+) {
+  max-width:calc(100vw - 16px);
+  border:2px solid #e8d5fb!important;
+  border-radius:3px!important;
+  background-color:#1a0e2b!important;
+  color:#fff0ff!important;
+  box-shadow:3px 4px 0 #080411,5px 6px 0 #ff269a!important;
+}
+html[data-qubit-manga="on"] :is([role="menuitem"],[role="option"]) {
+  min-height:32px;
+  line-height:1.35;
+}
+html[data-qubit-manga="on"] :is([role="menuitem"],[role="option"]):is(:hover,[data-highlighted],[aria-selected="true"]) {
+  background:rgba(255,229,0,.2)!important;
+  color:#fff4ff!important;
+}
+html[data-qubit-manga="on"] :is([role="dialog"],[role="alertdialog"]) {
+  max-width:min(94vw,800px);
+  border:2px solid #fff0ff!important;
+  box-shadow:4px 4px 0 #080411,7px 7px 0 #ff269a!important;
+}
+html[data-qubit-manga="on"] :is([role="tooltip"],.qagent-sidebar__tooltip) {
+  border:2px solid #f8ebff!important;
+  border-radius:3px!important;
+  background:#1b1030!important;
+  box-shadow:3px 4px 0 #080411,5px 6px 0 #ff269a!important;
+  color:#fff0ff!important;
+}
+html[data-qubit-manga="on"] .qagent-sidebar__tooltip-title {
+  color:#ffe500!important;
+}
+html[data-qubit-manga="on"] .qagent-sidebar__tooltip-detail {
+  color:#e6d5f9!important;
+}
+/* Distinguishable semantic feedback */
+html[data-qubit-manga="on"] :is([role="alert"],[data-sonner-toast]) {
+  border-inline-start-width:4px!important;
+}
+html[data-qubit-manga="on"] :is(button,a,[role="button"],input,select,textarea):focus-visible {
+  outline:2px solid #ffe500!important;
+  outline-offset:2px;
+}
+
+/* Terminal exclusion: no terminal widget font, screen, glyph, color,
+   selection, cursor, scroll, WebGL or Canvas styling in this layer. */
+html[data-qubit-manga="on"] #qubit-main-content .xterm canvas {
+  filter:none!important; /* negate generic dashboard canvas saturation */
+}
+@media(max-width:900px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+    padding-right:65px!important;
+  }
+  html[data-qubit-manga="on"] #qubit-main-content {
+    font-size:13px;
+  }
+}
+@media(max-width:620px) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head {
+    margin-inline:6px!important;
+    font-size:13px!important;
+  }
+  html[data-qubit-manga="on"] #qubit-main-content :is(.settings-section,.settings-group,[data-slot="card"]) {
+    padding-inline:10px;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] #app-sidebar .qm-manga-charge-cells > i,
+  html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head::before {
+    animation:none!important;
+    transition:none!important;
+  }
+}
