@@ -23,6 +23,8 @@ import "./manga-reference-match.css";
 import "./manga-overflow-guards.css";
 import "./manga-neon-reference.css";
 import "./manga-fidelity.css";
+import "./manga-zip-sidebar-fix.css";
+import "./manga-zip-surfaces.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {
@@ -48,7 +50,41 @@ export function MangaSkinGate(): null {
     applyMangaAttribute(enabled && mangaRouteEligible(pathname));
   }, [enabled, pathname]);
 
-  useEffect(() => () => applyMangaAttribute(false), []);
+  // Enable the optional ZIP asset layer only when all original assets have
+  // actually been installed. Missing files must never blank existing UI.
+  useEffect(() => {
+    const root = document.documentElement;
+    const active = enabled && mangaRouteEligible(pathname);
+    if (!active) {
+      delete root.dataset.qubitMangaZip;
+      return;
+    }
+    const controller = new AbortController();
+    fetch("/manga-ui/zip/manifest.json", { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Manga ZIP assets not installed");
+        return response.json();
+      })
+      .then((manifest: unknown) => {
+        if (!controller.signal.aborted && Array.isArray(manifest) && manifest.length === 89) {
+          root.dataset.qubitMangaZip = "ready";
+        } else if (!controller.signal.aborted) {
+          delete root.dataset.qubitMangaZip;
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) delete root.dataset.qubitMangaZip;
+      });
+    return () => {
+      controller.abort();
+      delete root.dataset.qubitMangaZip;
+    };
+  }, [enabled, pathname]);
+
+  useEffect(() => () => {
+    applyMangaAttribute(false);
+    delete document.documentElement.dataset.qubitMangaZip;
+  }, []);
 
   return null;
 }
