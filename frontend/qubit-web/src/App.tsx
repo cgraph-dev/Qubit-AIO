@@ -1141,6 +1141,7 @@ export default function App() {
                       </span>
                       {!collapsed && (
                         <span aria-hidden className="qagent-sidebar__section-rule" />
+                        <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
                       )}
                     </span>
                   )}
@@ -1190,6 +1191,7 @@ export default function App() {
                     </span>
                     {!collapsed && (
                       <span aria-hidden className="qagent-sidebar__section-rule" />
+                      <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
                     )}
                   </span>
 
