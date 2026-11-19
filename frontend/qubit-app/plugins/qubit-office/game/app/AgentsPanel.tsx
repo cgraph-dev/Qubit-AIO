@@ -32,15 +32,6 @@ type AgentsHostHooks = {
   useRef: <T>(v: T) => { current: T };
 };
 
-type AgentsHostReact = {
-  createElement: (...args: unknown[]) => unknown;
-};
-type AgentsHostHooks = {
-  useState: <T>(v: T) => [T, (next: T | ((prev: T) => T)) => void];
-  useEffect: (fn: () => void | (() => void), deps?: unknown[]) => void;
-  useRef: <T>(v: T) => { current: T };
-};
-
 import {
   type AgentDivision,
   type AgentPanelState,
