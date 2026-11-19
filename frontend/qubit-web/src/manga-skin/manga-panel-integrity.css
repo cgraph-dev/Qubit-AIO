@@ -8,7 +8,7 @@
  * This contract does not touch the existing Sidebar star, header, frame, or
  * terminal content, and does not alter Office/Workbench (route-gated).
  */
-html[data-qubit-manga="on"] {
+html:root[data-qubit-manga="on"] {
   --qm-content-text:#f6ecfc;
   --qm-content-muted:#d8c6e7;
   --qm-content-heading:#fff9ff;
@@ -18,7 +18,7 @@ html[data-qubit-manga="on"] {
 /* 1. Stop four copies of the ZIP module-header from being painted in one
    long row. Small, stable, single title plate; never repeat or 100%-stretch
    the legacy multi-plate graphic. The number and title remain live text. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page__title,.settings-section__heading,.qplate-module__head
 ) {
   box-sizing:border-box!important;
@@ -58,7 +58,7 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
 }
 /* Older implementations had different ::before and ::after corner symbols
    at once; limit page titles to one controlled gold sparkle and three slashes. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page__title,.settings-section__heading,.qplate-module__head
 )::before {
   content:""!important;
@@ -79,7 +79,7 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
   filter:none!important;
   animation:none!important;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page__title,.settings-section__heading,.qplate-module__head
 )::after {
   content:""!important;
@@ -102,11 +102,11 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
 }
 /* 2. Kill orphaned duplicate corners and cropped plates on nested cards.
    Let the component's actual border be the SINGLE perimeter. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-section,.settings-group,.qplate-module,.kitchen-panel,
   [data-slot="card"],[data-qm-surface="panel"]
 )::before,
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-section,.settings-group,.qplate-module,.kitchen-panel,
   [data-slot="card"],[data-qm-surface="panel"]
 )::after {
@@ -118,7 +118,7 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
 }
 /* Double-framing occurs when the settings section and its inner group both
    have decorative chrome. The section is a layout container, not a frame. */
-html[data-qubit-manga="on"] #qubit-main-content .settings-section:has(.settings-group) {
+html:root[data-qubit-manga="on"] #qubit-main-content .settings-section:has(.settings-group) {
   border-image:none!important;
   background-image:none!important;
   background-color:transparent!important;
@@ -126,7 +126,7 @@ html[data-qubit-manga="on"] #qubit-main-content .settings-section:has(.settings-
   box-shadow:none!important;
   border-color:transparent!important;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-group,.qplate-module,[data-slot="card"],[data-qm-surface="panel"]
 ) {
   box-sizing:border-box!important;
@@ -138,28 +138,28 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
 }
 /* Never permit an old module-header sprite, tiled or otherwise, to appear
    behind card content: panel BODY is not a titleplate. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-group,.qplate-module,[data-slot="card"],[data-qm-surface="panel"]
 ) {
   background-image:none!important;
 }
 /* Tables, datasets, lists and forms keep real layout/scroll. Avoid decorative
    transforms and shadows blurring already-small text on dark plum panels. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page,.settings-section,.settings-group,.qplate-module,
   [data-slot="card"],table,td,th,label,p,small
 ) {
   text-rendering:optimizeLegibility;
   -webkit-font-smoothing:antialiased;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page,.settings-section,.settings-group,.qplate-module
 ) :is(p,small,label,td,th,dd,dt,li,[data-slot="card-description"]) {
   line-height:1.48!important;
   letter-spacing:normal!important;
   text-shadow:none!important;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page,.settings-section,.settings-group,.qplate-module
 ) :is(h3,h4,[data-slot="card-title"]) {
   line-height:1.3!important;
@@ -168,14 +168,14 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
   text-shadow:none!important;
 }
 /* Preserve the original typography hierarchy while lifting overly dim copy. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page,.settings-group,.qplate-module,[data-slot="card"]
 ) :is(p,li,dt,dd,[data-slot="card-description"]) {
   color:var(--qm-content-text);
   min-width:0!important;
   overflow-wrap:break-word!important;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   input,select,textarea,button,[role="button"],sakuga-button,sakuga-input,sakuga-select
 ) {
   font-family:var(--qm-content-font)!important;
@@ -183,11 +183,11 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
 }
 /* 3. Existing gateway and button artworks are correct — suppress ONLY older
    pseudo-panels which show up underneath the update controls. */
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
+html:root[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
   .qm-manga-gateway-shell,.qagent-sidebar__system,
   .qagent-sidebar__utility,.qagent-sidebar__colophon
 )::before,
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
+html:root[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
   .qm-manga-gateway-shell,.qagent-sidebar__system,
   .qagent-sidebar__utility,.qagent-sidebar__colophon
 )::after {
@@ -196,7 +196,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
 }
 /* 4. Interaction polish; Sakuga owns clicks. No infinite glints, blur filters
    or scale jumps; these transitions are compositor-friendly and short. */
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   button:not(:disabled),[role="button"]:not([aria-disabled="true"]),
   a[href],sakuga-button
 ) {
@@ -204,24 +204,24 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
   transition-duration:150ms!important;
   transition-timing-function:ease-out!important;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   button,[role="button"],a[href],sakuga-button
 ):focus-visible {
   outline:2px solid #ffe75d!important;
   outline-offset:3px!important;
 }
-html[data-qubit-manga="on"] #qubit-main-content :is(
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
   button:not(:disabled),[role="button"]:not([aria-disabled="true"]),a[href]
 ):hover {
   border-color:#ffb5e9;
 }
 @media(max-width:720px) {
-  html[data-qubit-manga="on"] #qubit-main-content :is(
+  html:root[data-qubit-manga="on"] #qubit-main-content :is(
     .settings-page__title,.settings-section__heading,.qplate-module__head
   ) {min-height:32px!important;padding:6px 37px 6px 21px!important;font-size:13px!important}
 }
 @media(prefers-reduced-motion:reduce) {
-  html[data-qubit-manga="on"] #qubit-main-content :is(button,a[href],[role="button"],sakuga-button) {
+  html:root[data-qubit-manga="on"] #qubit-main-content :is(button,a[href],[role="button"],sakuga-button) {
     animation:none!important;transition:none!important;
   }
 }
