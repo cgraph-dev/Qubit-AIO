@@ -18,7 +18,7 @@
  * keeps the chat context focused on switching conversations quickly.
  */
 
-import { ListItem, Button, Input } from "@/sakuga/ui";
+import { ListItem, Button } from "@/sakuga/ui";
 import {
   AlertCircle,
   MessageSquarePlus,
@@ -488,9 +488,10 @@ export function ChatSessionList({
           onClick={reload}
           aria-label={t.common.refresh}
           title={t.common.refresh}
-          className="text-text-secondary hover:text-foreground"
+          className="qm-sessions-refresh text-text-secondary hover:text-foreground"
+          aria-busy={loading}
         >
-          <RefreshCw className={cn(loading && "animate-spin")} />
+          <RefreshCw className={cn("qm-refresh-icon", loading && "qm-refresh-icon--spinning")} />
         </Button>
       </div>
 
@@ -502,18 +503,18 @@ export function ChatSessionList({
         />
       )}
 
-      <div className="relative px-2 pb-2">
+      <div className="qm-chat-session-search relative px-2 pb-2">
         <Search
           className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
           aria-hidden="true"
         />
-        <Input
+        <input
           type="search"
-          label="Search chat sessions"
+          aria-label="Search chat sessions"
           value={searchInput}
-          onChange={setSearchInput}
+          onChange={(event) => setSearchInput(event.currentTarget.value)}
           placeholder={t.common.search ?? "Search sessions"}
-          className="qsk-field w-full rounded border border-midground/20 bg-transparent pl-5 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
+          className="qm-chat-session-search-field w-full rounded-sm border px-9 py-2 pr-8 text-xs text-foreground outline-none placeholder:text-text-tertiary"
         />
         {searchInput ? (
           <Button
