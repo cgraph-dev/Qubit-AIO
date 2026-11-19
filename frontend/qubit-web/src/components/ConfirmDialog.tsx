@@ -53,10 +53,10 @@ export function ConfirmDialog({
         ref={dialogRef}
         className={cn(
           themedBody,
-          "relative w-full max-w-md border border-border bg-card shadow-2xl",
+          "qm-confirm-dialog relative w-full max-w-md border border-border bg-card shadow-2xl",
         )}
       >
-        <div className="flex items-start gap-3 p-4 border-b border-border">
+        <div className="qm-confirm-dialog__header flex items-start gap-3 p-4 border-b border-border">
           {destructive && (
             <div aria-hidden className="mt-0.5 shrink-0 text-destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -66,7 +66,7 @@ export function ConfirmDialog({
           <div className="flex-1 min-w-0 flex flex-col gap-1">
             <h2
               id={titleId}
-              className="font-mondwest text-display text-base tracking-wider"
+              className="qm-confirm-dialog__title font-mondwest text-display text-base tracking-wider"
             >
               {title}
             </h2>
@@ -74,7 +74,7 @@ export function ConfirmDialog({
             {description && (
               <p
                 id={descriptionId}
-                className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line"
+                className="qm-confirm-dialog__description text-xs text-muted-foreground leading-relaxed whitespace-pre-line"
               >
                 {description}
               </p>
@@ -82,12 +82,13 @@ export function ConfirmDialog({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 p-3">
-          <Button variant="secondary" type="button" onClick={onCancel} disabled={loading}>
+        <div className="qm-confirm-dialog__actions flex items-center justify-end gap-2 p-3">
+          <Button className="qm-confirm-dialog__cancel" variant="secondary" type="button" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>
           <Button
             data-confirm
+            className="qm-confirm-dialog__confirm"
             type="button"
             variant="primary"
             onClick={onConfirm}
