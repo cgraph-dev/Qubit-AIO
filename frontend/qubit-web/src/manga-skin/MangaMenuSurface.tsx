@@ -4,12 +4,11 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
   type RefObject,
 } from "react";
-import { currentMangaEnabled, mangaRouteEligible, subscribeManga } from "@/manga-skin/manga-store";
+import { useMangaLayerActive } from "@/manga-skin/useMangaLayerActive";
 
 type MangaMenuSurfaceProps = {
   anchorRef: RefObject<HTMLElement | null>;
@@ -33,8 +32,7 @@ export function MangaMenuSurface({
   anchorRef, children, className = "", role = "menu", label,
   onClose, menuRef, dataUseAsMenu = false,
 }: MangaMenuSurfaceProps) {
-  const enabled = useSyncExternalStore(subscribeManga, currentMangaEnabled, () => false);
-  const active = enabled && typeof window !== "undefined" && mangaRouteEligible(window.location.pathname);
+  const active = useMangaLayerActive();
   const ownRef = useRef<HTMLDivElement>(null);
   const target = menuRef ?? ownRef;
   const [position, setPosition] = useState<CSSProperties>({});
