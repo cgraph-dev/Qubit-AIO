@@ -100,3 +100,36 @@ html[data-qubit-manga="on"] .qm-studio-impact-strokes {
     animation: none !important;
   }
 }
+
+/* Remove the obsolete cat that older styles painted BEHIND the new atom.
+   Keep one atom image only; the logo mark and brand text remain functional. */
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem {
+  background-image: none !important;
+  background-color: transparent !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem::before,
+html[data-qubit-manga="on"] #app-sidebar .qm-brand-emblem::after {
+  display: none !important;
+  content: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-studio-brand-atom {
+  position: relative !important;
+  display: block !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform: none !important;
+  filter: none !important;
+  object-fit: contain !important;
+  image-rendering: auto !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row:hover .qm-studio-brand-atom {
+  transform: none !important;
+  filter: brightness(1.12) !important;
+}
+/* No legacy 'star in a header pseudo-element': the star is one PNG child. */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head::before,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head .qm-manga-section-star {
+  content: none !important;
+  display: none !important;
+}
