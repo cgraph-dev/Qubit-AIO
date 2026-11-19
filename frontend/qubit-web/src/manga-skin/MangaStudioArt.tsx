@@ -23,7 +23,7 @@ export function MangaStudioTitleOrnaments() {
         />
         <img
           className="qm-studio-title-corner__star"
-          src="/manga-ui/studio-star.svg"
+          src="/manga-ui/studio-star.png"
           alt=""
           draggable={false}
         />
@@ -37,7 +37,7 @@ export function MangaStudioBrandAtom() {
   return (
     <img
       className="qm-brand-cat qm-studio-brand-atom"
-      src="/manga-ui/studio-atom.svg"
+      src="/manga-ui/studio-atom.png"
       alt=""
       aria-hidden="true"
       draggable={false}
@@ -50,7 +50,7 @@ export function MangaStudioImpactStrokes({ className = "" }: { className?: strin
   return (
     <img
       className={["qm-studio-impact-strokes", className].filter(Boolean).join(" ")}
-      src="/manga-ui/studio-strokes.svg"
+      src="/manga-ui/studio-strokes.png"
       alt=""
       aria-hidden="true"
       draggable={false}
