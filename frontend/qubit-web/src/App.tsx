@@ -1270,6 +1270,7 @@ export default function App() {
               <PluginSlot name="pre-main" />
               <div
                 ref={stageRef}
+                data-qm-route={pathname}
                 className={cn(
                   "w-full min-w-0",
                   !isChatRoute &&
