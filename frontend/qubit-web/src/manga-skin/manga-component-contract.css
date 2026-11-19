@@ -485,3 +485,17 @@ html[data-qubit-manga="on"] :is(.qchat__side,#app-sidebar,#qubit-main-content) :
     padding-block: 10px;
   }
 }
+
+
+/* Paint order: panel corners stay behind header ink and the real gold star.
+   Prior pseudo-corner layers used z-index:4 and obscured the star. */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section::before,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section::after {
+  z-index: 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head {
+  position: relative !important;
+  z-index: 2 !important;
+  overflow: visible !important;
+  isolation: isolate !important;
+}
