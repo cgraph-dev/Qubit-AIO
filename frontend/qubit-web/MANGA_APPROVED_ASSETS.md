@@ -68,3 +68,33 @@ Sidebar navigation rows use one straight outer outline with white-square icons
 and a halftone right gutter; no duplicate nested octagon is shown. Artwork is
 static until the optional animation pass. Replace 13_star_only.webp on its own
 to change the star without affecting the starless titleplate.
+
+## Sidebar reconstruction (single source of truth)
+
+The latest Web Dashboard repair replaces the prior stacked sidebar-specific
+override rules with one authoritative stylesheet:
+
+`src/manga-skin/manga-production-layout-repair.css`
+
+The fixed-mobile/sticky-desktop sidebar mounts one passive
+`qm-manga-outer-frame` ornament in `src/App.tsx`. It is backed by
+`public/manga-ui/manga-sidebar-outer-frame.svg`, a nine-sliced chrome rail
+that does not stretch the four corners as the sidebar gets taller.
+
+Two additional precision SVGs ship directly with the repository:
+
+- `public/manga-ui/manga-tooltip-precision.svg` — mathematically circular
+  exclamation badge and complete text-free frame, displayed at its true aspect.
+- `public/manga-ui/manga-system-title-precision.svg` — a sharp, text-free
+  lavender heading. `SYSTEM` remains real React text and is not rasterized.
+
+The title bar and gold star remain independent files in the installed v3 pack.
+The old nested menu octagon and duplicate sidebar backgrounds are disabled.
+Only the navigation list scrolls; the live gateway, action buttons and footer
+remain visible. All decorative looping animations are off.
+
+**This source change alone is not a screenshot verification of localhost.**
+After `git pull origin main`, inspect the visible sidebar and take a screenshot
+at both expanded and collapsed widths, including the SYSTEM panel and a tooltip.
+A V3 art pack previously installed is sufficient; there is no new ZIP
+requirement for these three new SVGs.
