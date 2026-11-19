@@ -292,6 +292,23 @@ def test_dashboard_shell_does_not_serve_a_cached_injection(tmp_path):
     assert "token-one" not in second
 
 
+def test_manga_ui_paths_are_dashboard_assets(tmp_path):
+    """The Manga skin and ZIP pack are static SVGs, not SPA routes."""
+    assert ui.is_dashboard_asset_path("/manga-ui/qubit-cat-atom.svg")
+    assert ui.is_dashboard_asset_path("/manga-ui/zip/sidebar-gateway.svg")
+    assert not ui.is_dashboard_asset_path("/manga-ui")
+    assert not ui.is_dashboard_asset_path("/unknown/manga-ui.svg")
+
+    asset = tmp_path / "manga-ui"
+    asset.mkdir()
+    (asset / "qubit-cat-atom.svg").write_bytes(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>")
+    handler, captured = _handler(tmp_path)
+    handler._serve_qubit_static("/manga-ui/qubit-cat-atom.svg")
+    assert captured["code"] == 200
+    assert captured["headers"]["Content-Type"].startswith("image/svg+xml")
+    assert handler.wfile.getvalue().startswith(b"<svg")
+
+
 def test_sakuga_vfx_paths_are_dashboard_assets(tmp_path):
     """The vendored engine is a root static prefix, not an SPA route.
 

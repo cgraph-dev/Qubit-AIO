@@ -73,6 +73,10 @@ DASHBOARD_ASSET_PREFIXES: tuple[str, ...] = (
     "/media/",
     "/plugins/",
     "/sakuga-vfx/",
+    # Manga skin SVGs (including the generated /manga-ui/zip pack) are root
+    # static files. Without this prefix the SPA shell answers them as HTML and
+    # every <img> in the sidebar renders as a broken image.
+    "/manga-ui/",
 )
 
 
