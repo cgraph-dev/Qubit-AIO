@@ -258,16 +258,12 @@ export default function KitchenPage() {
           <h2 className="text-lg font-bold tracking-[0.04em] text-midground">Kitchen</h2>
         </div>
         <p className="mt-2 max-w-3xl text-sm text-text-secondary">
-          Bring in another agent or app and turn it into Qubit. Paste a repo or
-          upload a folder — the Kitchen decomposes the source, maps every feature
-          it offers, and drafts a 1:1 plan for absorbing those capabilities into
-          Qubit. This is how Qubit is upgraded from other people's work.
+          Explore an app or project to learn what it can do. Add a GitHub link or
+          choose a local folder, then run an analysis to see its files and capabilities.
         </p>
         <p className="kitchen-note mt-3" role="note">
-          Stages 1-2 run locally: <strong>Analyze</strong> decomposes the source
-          and maps its capabilities through REA, the reverse-engineering engine.
-          Stages 3 (draft a 1:1 plan) and 4 (absorb) are not implemented yet, and
-          are shown as such below.
+          <strong>Available now:</strong> examine files and identify capabilities.
+          Planning and importing those capabilities into Qubit are not available yet.
         </p>
       </header>
 
@@ -296,8 +292,7 @@ export default function KitchenPage() {
               stageRepo();
             }}
           >
-            <label className="kitchen-field">
-              <span className="kitchen-field__label">Repository URL</span>
+            <div className="kitchen-field">
               <Input
                 label="Repository URL"
                 value={repoUrl}
@@ -305,23 +300,21 @@ export default function KitchenPage() {
                 placeholder="https://github.com/owner/repo"
                 className="font-courier"
               />
-            </label>
-            <label className="kitchen-field">
-              <span className="kitchen-field__label">Name (optional)</span>
+            </div>
+            <div className="kitchen-field">
               <Input
                 label="Source name"
                 value={repoName}
                 onChange={(value) => setRepoName(value)}
                 placeholder="How it should appear in the Kitchen"
               />
-            </label>
+            </div>
             <div className="kitchen-actions">
               <Button
                 type="submit"
                 size="sm"
                 className="uppercase"
                 disabled={!repoUrl.trim()}
-                onClick={() => stageRepo()}
               >
                 <GitBranch className="h-4 w-4" /> Stage repo
               </Button>
