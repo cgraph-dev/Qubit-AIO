@@ -93,7 +93,9 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import { SidebarTooltip } from "@/components/SidebarTooltip";
-import { navDescription, sectionizeNav } from "@/lib/sidebar-sections";
+import { navDescription, sectionizeNav, MANGA_SIDEBAR_SECTIONS } from "@/lib/sidebar-sections";
+import { isMangaThemeName } from "@/themes/presets";
+import { mangaRouteEligible } from "@/manga-skin/manga-store";
 import "@/styles/qplate.css";
 import "@/styles/sidebar-studio.css";
 import "@/styles/qubit-mark.css";
@@ -873,9 +875,10 @@ export default function App() {
   // Presentation grouping only — every route stays mounted and reachable; an
   // entry this module does not know about lands in the trailing "More"
   // section instead of disappearing.
+  const useMangaNavigation = isMangaThemeName(theme.name) && mangaRouteEligible(pathname);
   const sidebarSections = useMemo(
-    () => sectionizeNav(sidebarNav.coreItems),
-    [sidebarNav],
+    () => sectionizeNav(sidebarNav.coreItems, useMangaNavigation ? MANGA_SIDEBAR_SECTIONS : undefined),
+    [sidebarNav, useMangaNavigation],
   );
   // Rail brand-row status chip: the one always-visible health readout.
   const brandTone = useMemo(() => {
