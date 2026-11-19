@@ -15,7 +15,6 @@ import "./manga-rail-reference.css";
 import "./manga-ux.css";
 import "./manga-layout-repair.css";
 import "./manga-title-and-inspector.css";
-import "./manga-assets-integrated.css";
 import "./manga-semantic-surfaces.css";
 import "./manga-overflow-guards.css";
 
