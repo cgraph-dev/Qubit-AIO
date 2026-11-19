@@ -1143,7 +1143,7 @@ export default function App() {
                         <>
                           <span aria-hidden className="qagent-sidebar__section-rule" />
                           <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
-                          {useMangaNavigation && <img className="qm-manga-section-star" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
+                          {useMangaNavigation && <img className="qm-manga-section-star hidden" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
                         </>
                       )}
                     </span>
@@ -1196,7 +1196,7 @@ export default function App() {
                       <>
                         <span aria-hidden className="qagent-sidebar__section-rule" />
                         <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
-                          {useMangaNavigation && <img className="qm-manga-section-star" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
+                          {useMangaNavigation && <img className="qm-manga-section-star hidden" src="/manga-ui/manga-anime-corner-star.svg" alt="" aria-hidden="true" draggable={false} />}
                       </>
                     )}
                   </span>
