@@ -94,6 +94,7 @@ describe("showBuildNotice", () => {
     showBuildNotice("index-new.js", document, reload);
     const banner = document.getElementById("qubit-build-notice");
     expect(banner).not.toBeNull();
+    expect(banner?.classList.contains("qm-build-notice")).toBe(true);
     const btn = Array.from(banner!.querySelectorAll("button")).find(
       (b) => b.textContent === "Reload",
     )!;

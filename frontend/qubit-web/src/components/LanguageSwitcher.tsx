@@ -1,5 +1,4 @@
-import type { CSSProperties } from "react";
-import { Select } from "@/sakuga/ui";
+import { Select, type SakugaSelectProps } from "@/sakuga/ui";
 import { useI18n } from "@/i18n/context";
 import { LOCALE_META } from "@/i18n";
 import type { Locale } from "@/i18n";
@@ -25,7 +24,7 @@ export function LanguageSwitcher({ collapsed = false, dropUp: _dropUp }: Languag
       options={options}
       onChange={(next) => setLocale(next as Locale)}
       className="language-switcher qsk-select--compact"
-      style={{ "--sk-input-width": collapsed ? "100%" : "10rem", width: collapsed ? "100%" : undefined, minWidth: 0, maxWidth: "100%" } as CSSProperties}
+      style={{ "--sk-input-width": collapsed ? "100%" : "10rem", width: collapsed ? "100%" : undefined, minWidth: 0, maxWidth: "100%" } as SakugaSelectProps["style"]}
     />
   );
 }

@@ -101,7 +101,7 @@ function MangaSelect({
   };
 
   return (
-    <span className={["qm-select-root", className].filter(Boolean).join(" ")} id={id} style={style} data-testid={testId}>
+    <span className={["qm-select-root", className].filter(Boolean).join(" ")} id={id} style={style as unknown as CSSProperties} data-testid={testId}>
       {name && <input type="hidden" name={name} value={current ?? ""} />}
       <button
         ref={trigger}

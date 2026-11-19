@@ -101,6 +101,7 @@ export function showBuildNotice(
   }
   const wrap = doc.createElement("div");
   wrap.id = "qubit-build-notice";
+  wrap.className = "qm-build-notice";
   wrap.setAttribute("role", "status");
   wrap.setAttribute("aria-live", "polite");
 
@@ -134,6 +135,7 @@ export function showBuildNotice(
 
   const reloadBtn = doc.createElement("button");
   reloadBtn.type = "button";
+  reloadBtn.className = "qm-build-notice__reload";
   reloadBtn.textContent = "Reload";
   const accentStyle =
     "padding:4px 10px;border:0;border-radius:calc(var(--theme-radius, 10px) - 4px);cursor:pointer;" +
@@ -143,6 +145,7 @@ export function showBuildNotice(
 
   const closeBtn = doc.createElement("button");
   closeBtn.type = "button";
+  closeBtn.className = "qm-build-notice__close";
   closeBtn.textContent = "×";
   closeBtn.setAttribute("aria-label", "Dismiss update notice");
   closeBtn.setAttribute(

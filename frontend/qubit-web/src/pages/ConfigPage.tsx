@@ -41,7 +41,7 @@ import { Toast } from "@nous-research/ui/ui/components/toast";
 import { AutoField } from "@/components/AutoField";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { ListItem, Button, Checkbox, FileField, HoverTooltip, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
-import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
@@ -523,7 +523,7 @@ export default function ConfigPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="qm-config-page flex flex-col gap-4">
       <PluginSlot name="config:top" />
       <Toast toast={toast} />
 
@@ -631,7 +631,7 @@ export default function ConfigPage() {
         </Card>
       )}
 
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="qm-config-actions flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-center gap-2 sm:flex-1">
           <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground" />
           <code className="min-w-0 flex-1 break-words text-xs text-muted-foreground bg-muted/50 px-2 py-0.5">
@@ -697,7 +697,7 @@ export default function ConfigPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
-          <aside aria-label={t.config.filters} className="sm:w-56 sm:shrink-0">
+          <aside aria-label={t.config.filters} className="qm-config-categories sm:w-56 sm:shrink-0">
             <div className="sm:sticky sm:top-4">
               <div className="flex flex-col border border-border bg-muted/20">
                 <div className="hidden sm:flex items-center gap-2 px-3 py-2 border-b border-border">
@@ -723,7 +723,7 @@ export default function ConfigPage() {
                           setSearchQuery("");
                           setActiveCategory(cat);
                         }}
-                        className="rounded-none whitespace-nowrap px-2 py-1 text-xs"
+                        className="qm-config-category rounded-none whitespace-nowrap px-2 py-1 text-xs"
                       >
                         <CategoryIcon
                           category={cat}

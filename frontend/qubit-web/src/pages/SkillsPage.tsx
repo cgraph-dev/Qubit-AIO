@@ -399,11 +399,11 @@ export default function SkillsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="qm-skills-page flex flex-col gap-4">
       <PluginSlot name="skills:top" />
 
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-        <aside aria-label={t.skills.title} className="sm:w-56 sm:shrink-0">
+        <aside aria-label={t.skills.title} className="qm-skills-filters sm:w-56 sm:shrink-0">
           <div className="sm:sticky sm:top-0">
             <div className="flex flex-col rounded-none border border-border bg-muted/20">
               <div className="hidden sm:flex items-center gap-2 px-3 py-2 border-b border-border">
@@ -492,7 +492,7 @@ export default function SkillsPage() {
 
         <div className="flex-1 min-w-0">
           {isSearching ? (
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardHeader className="py-3 px-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -532,7 +532,7 @@ export default function SkillsPage() {
             </Card>
           ) : view === "skills" ? (
             /* Skills list */
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardHeader className="py-3 px-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -568,7 +568,7 @@ export default function SkillsPage() {
                       : t.skills.noSkillsMatch}
                   </p>
                 ) : (
-                  <div className="grid gap-1">
+                  <div className="qm-skill-list grid gap-1">
                     {activeSkills.map((skill) => (
                       <SkillRow
                         key={skill.name}
@@ -587,7 +587,7 @@ export default function SkillsPage() {
             /* Toolsets grid */
             <>
               {filteredToolsets.length === 0 ? (
-                <Card className="rounded-none">
+                <Card className="qm-skills-card rounded-none">
                   <CardContent className="py-8 text-center text-sm text-muted-foreground">
                     {t.skills.noToolsetsMatch}
                   </CardContent>
@@ -683,7 +683,7 @@ export default function SkillsPage() {
         onSaved={handleEditorSaved}
       />
       <Dialog open={learnOpen} onOpenChange={setLearnOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="qm-skill-learn-dialog max-w-lg">
           <DialogHeader>
             <DialogTitle>Learn a skill</DialogTitle>
             <DialogDescription>
@@ -694,9 +694,6 @@ export default function SkillsPage() {
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Local file or directory
-              </label>
               <Input
                 label="Local file or directory"
                 placeholder="~/projects/some-sdk  (read with read_file / search_files)"
@@ -706,9 +703,6 @@ export default function SkillsPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                URL
-              </label>
               <Input
                 label="URL"
                 placeholder="https://docs.example.com/api  (fetched with web_extract)"
@@ -718,12 +712,8 @@ export default function SkillsPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Anything else — describe the workflow, paste notes, or say
-                "what we just did"
-              </label>
               <Textarea
-                label=""
+                label="Describe what you want Qubit to learn"
                 rows={4}
                 placeholder="e.g. how I file an expense report: open the portal, …"
                 value={learnText}
@@ -757,7 +747,7 @@ function SkillRow({
   noDescriptionLabel,
 }: SkillRowProps) {
   return (
-    <div className="group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40">
+    <div className="qm-skill-row group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40">
       <div className="pt-0.5 shrink-0">
         <Toggle
           label={`Enable ${skill.name}`}
@@ -769,6 +759,7 @@ function SkillRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span
+            title={skill.name}
             className={`font-mono-ui text-sm ${
               skill.enabled ? "text-foreground" : "text-muted-foreground"
             }`}
@@ -782,7 +773,7 @@ function SkillRow({
       </div>
       <Button
         variant="secondary"
-        className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground"
+        className="qm-skill-edit shrink-0 text-muted-foreground transition-opacity hover:text-foreground"
         title="Edit SKILL.md"
         aria-label={`Edit ${skill.name}`}
         onClick={onEdit}
@@ -1030,7 +1021,7 @@ function HubBrowser({
   return (
     <div className="flex flex-col gap-3">
       {/* ── Search bar ── */}
-      <Card className="rounded-none">
+      <Card className="qm-skills-card rounded-none">
         <CardContent className="py-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -1060,7 +1051,7 @@ function HubBrowser({
 
       {/* ── Install/update action log ── */}
       {action && (
-        <Card className="rounded-none">
+        <Card className="qm-skills-card rounded-none">
           <CardContent className="py-3">
             <div className="flex items-center gap-2 mb-2">
               <Download className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1117,7 +1108,7 @@ function HubBrowser({
               ))}
             </div>
           ) : (
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 Search the hub above to browse installable skills from the
                 connected sources.
@@ -1144,7 +1135,7 @@ function HubBrowser({
             ms={searchMs}
           />
           {results.length === 0 ? (
-            <Card className="rounded-none">
+            <Card className="qm-skills-card rounded-none">
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 No matching skills found in the hub.
               </CardContent>
