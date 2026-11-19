@@ -78,6 +78,8 @@ describe("KitchenPage", () => {
     ).not.toBeNull();
     // The repo name is derived from the URL's last segment.
     expect(container.textContent).toContain("widget");
+    // A single submit must stage the source only once.
+    expect(container.querySelectorAll(".kitchen-item")).toHaveLength(1);
     const pipeline = container.querySelector('[data-testid="kitchen-pipeline"]');
     expect(pipeline).not.toBeNull();
     expect(pipeline!.textContent).toContain("Decompose");
