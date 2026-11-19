@@ -40,7 +40,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
   padding:5px 30px 5px 18px!important;color:var(--qm-art-paper)!important;
   border:2px solid var(--qm-art-ink)!important;border-left:0!important;
   background:linear-gradient(100deg,#ff38ae 0%,#e6269a 63%,#46134c)!important;
-  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);
+  /* Keep outside-the-plate lightning visible: clipping the whole element also\n     clips its corner ornament. The angled plate is conveyed by the gradient. */
 }
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::before {
   content:"";display:block!important;position:absolute;pointer-events:none;
