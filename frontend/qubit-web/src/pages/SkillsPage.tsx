@@ -683,7 +683,7 @@ export default function SkillsPage() {
         onSaved={handleEditorSaved}
       />
       <Dialog open={learnOpen} onOpenChange={setLearnOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="qm-skill-learn-dialog max-w-lg">
           <DialogHeader>
             <DialogTitle>Learn a skill</DialogTitle>
             <DialogDescription>
@@ -694,9 +694,6 @@ export default function SkillsPage() {
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Local file or directory
-              </label>
               <Input
                 label="Local file or directory"
                 placeholder="~/projects/some-sdk  (read with read_file / search_files)"
@@ -706,9 +703,6 @@ export default function SkillsPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                URL
-              </label>
               <Input
                 label="URL"
                 placeholder="https://docs.example.com/api  (fetched with web_extract)"
@@ -718,12 +712,8 @@ export default function SkillsPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Anything else — describe the workflow, paste notes, or say
-                "what we just did"
-              </label>
               <Textarea
-                label=""
+                label="Describe what you want Qubit to learn"
                 rows={4}
                 placeholder="e.g. how I file an expense report: open the portal, …"
                 value={learnText}
