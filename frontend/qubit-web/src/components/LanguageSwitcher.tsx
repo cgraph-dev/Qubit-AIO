@@ -25,7 +25,7 @@ export function LanguageSwitcher({ collapsed = false, dropUp: _dropUp }: Languag
       options={options}
       onChange={(next) => setLocale(next as Locale)}
       className="language-switcher qsk-select--compact"
-      style={{ "--sk-input-width": collapsed ? "7.5rem" : "10rem" } as CSSProperties}
+      style={{ "--sk-input-width": collapsed ? "100%" : "10rem", width: collapsed ? "100%" : undefined, minWidth: 0, maxWidth: "100%" } as CSSProperties}
     />
   );
 }
