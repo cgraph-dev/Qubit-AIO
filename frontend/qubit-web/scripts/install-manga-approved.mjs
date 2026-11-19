@@ -3,11 +3,13 @@
  * One-time installer for the user-approved 14-piece production artwork pack.
  *
  * Usage from repo root:
- *   node frontend/qubit-web/scripts/install-manga-approved.mjs /path/to/qubit_manga_approved_production_assets.zip
+ *   node frontend/qubit-web/scripts/install-manga-approved.mjs /path/to/qubit_manga_FINAL_approved_assets.zip
  *
  * The installer NEVER changes React, the ZIP, the default theme or any other
  * route. It extracts only checksum-verified artwork to public/manga-ui/approved.
- * Local files are intentionally not committed as incomplete image approximations.
+ * The star is a genuinely independent replaceable 13_star_only.webp file.
+ * The 05_section_titlebar_starless.webp contains no star or ghost pixels.
+ * Asset checksums are validated before any file is installed.
  */
 import { existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
@@ -16,10 +18,10 @@ import { spawnSync } from "node:child_process";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(webRoot, "../..");
-const archive = resolve(process.argv[2] ?? join(repoRoot, "qubit_manga_approved_production_assets.zip"));
+const archive = resolve(process.argv[2] ?? join(repoRoot, "qubit_manga_FINAL_approved_assets.zip"));
 if (!existsSync(archive)) {
   console.error("Missing approved art ZIP:", archive);
-  console.error("Usage: node frontend/qubit-web/scripts/install-manga-approved.mjs /path/to/qubit_manga_approved_production_assets.zip");
+  console.error("Usage: node frontend/qubit-web/scripts/install-manga-approved.mjs /path/to/qubit_manga_FINAL_approved_assets.zip");
   process.exit(1);
 }
 
@@ -34,7 +36,7 @@ with zipfile.ZipFile(archive) as z:
     required = {
         "01_sidebar_header.webp", "02_system_panel_frame.webp",
         "03_system_titlebar.webp", "04_tooltip_plate.webp",
-        "05_section_titlebar_clean.webp", "06_primary_button.webp",
+        "05_section_titlebar_starless.webp", "06_primary_button.webp",
         "07_disabled_button.webp", "08_checkbox_idle.webp",
         "09_checkbox_active.webp", "10_impact_strokes.webp",
         "11_atom_emblem.webp", "12_anime_eye_panel.webp",
