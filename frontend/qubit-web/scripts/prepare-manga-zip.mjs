@@ -24,14 +24,17 @@ if (installed !== 178) throw new Error("Incomplete Manga archive extraction");
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
+const polishedArchive = resolve(root, "qubit_manga_POLISHED_v3_assets.zip");
 const repairedArchive = resolve(root, "qubit_manga_REPAIRED_v2_assets.zip");
 const legacyArchive = resolve(root, "qubit_manga_FINAL_approved_assets.zip");
 const installedManifest = resolve(here, "../public/manga-ui/approved/MANIFEST.json");
 const stampFile = resolve(here, "../public/manga-ui/approved/.installed-archive-sha256");
-// Prefer the corrected 2x/high-resolution pack. Never overwrite a manually
+// Prefer the polished v3 pack, then corrected v2. Never overwrite a manually
 // installed repaired pack with the old ZIP merely because predev runs again.
-const approvedArchive = existsSync(repairedArchive)
-  ? repairedArchive
+const approvedArchive = existsSync(polishedArchive)
+  ? polishedArchive
+  : existsSync(repairedArchive)
+    ? repairedArchive
   : !existsSync(installedManifest) && existsSync(legacyArchive)
     ? legacyArchive
     : null;
