@@ -39,8 +39,9 @@ describe("approved Manga artwork alignment contract", () => {
   });
 
   it("corrects frame and header sizing without modifying a terminal", () => {
-    expect(css).toContain("height:130px");
+    expect(css).toContain("aspect-ratio:742 / 351");
     expect(css).toContain("height:165px");
+    expect(css).toContain('[data-collapsed="true"]');
     expect(css).toContain("filter:brightness(.65) saturate(.85)");
     expect(css).toContain("01_sidebar_header.webp");
     expect(css).toContain("02_system_panel_frame.webp");
