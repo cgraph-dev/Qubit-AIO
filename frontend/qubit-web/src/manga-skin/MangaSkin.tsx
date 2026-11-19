@@ -11,6 +11,10 @@ import "./manga-v2.css";
 import "./manga-v3.css";
 import "./manga-v4.css";
 import "./manga-v5.css";
+import "./manga-rail-reference.css";
+import "./manga-ux.css";
+import "./manga-layout-repair.css";
+import "./manga-title-and-inspector.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {

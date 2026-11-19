@@ -1,0 +1,189 @@
+/* Manga reference-matched rail geometry. Native CSS + sharp SVG, never
+ * pixelated screenshots. Applied only when MangaSkinGate enables the theme.
+ * Frames are an overlay, not a clip-path on text or focus rings.
+ */
+html[data-qubit-manga="on"] #app-sidebar.qagent-sidebar {
+ --qm-rail-edge:#fff1ff;
+ --qm-rail-ink:#070411;
+ --qm-rail-yellow:#ffe525;
+ --qm-rail-pink:#ff2299;
+ --qm-rail-purple:#a14cff;
+ border-right:4px solid var(--qm-rail-pink)!important;
+ box-shadow:3px 0 0 var(--qm-rail-ink),6px 0 0 var(--qm-rail-edge)!important;
+ background:
+  linear-gradient(145deg,rgba(255,34,153,.09),transparent 42%),
+  #10091f!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__nav {
+ padding:9px 8px 12px;
+ overflow-x:hidden;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section {
+ position:relative;
+ margin-top:12px;
+ padding:6px 4px 7px;
+ border:2px solid rgba(255,240,255,.48);
+ border-top-color:var(--qm-rail-pink);
+ border-bottom-color:var(--qm-rail-purple);
+ background:linear-gradient(115deg,#251035 0%,#10081d 80%);
+ box-shadow:inset 2px 2px 0 #070411,2px 2px 0 #070411,4px 4px 0 rgba(255,34,153,.55);
+ clip-path:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section::before {
+ content:"";position:absolute;left:0;top:0;
+ width:31px;height:31px;z-index:1;pointer-events:none;
+ background:url("/manga-ui/manga-corner-top-left.svg") top left/contain no-repeat;
+ opacity:.9;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section::after {
+ content:"";position:absolute;right:0;bottom:0;
+ width:23px;height:23px;z-index:1;pointer-events:none;
+ background:url("/manga-ui/manga-corner-bottom-right.svg") bottom right/contain no-repeat;
+ opacity:.85;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+ display:flex;align-items:center;gap:9px;
+ margin:0 0 7px;
+ min-height:31px;
+ padding:5px 41px 5px 11px;
+ border:2px solid #070411!important;
+ border-left:5px solid var(--qm-rail-yellow)!important;
+ background:
+   url("/manga-ui/section-slashes.svg") right 7px center/32px 11px no-repeat,
+   linear-gradient(100deg,#fa2594 0%,#952c91 65%,#371247 100%)!important;
+ box-shadow:2px 2px 0 #070411,3px 3px 0 #fff1ff!important;
+ color:#fff1ff!important;
+ clip-path:polygon(0 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,0 100%)!important;
+ font:700 .84rem/1.2 var(--qm-typography-display,"Rajdhani",system-ui,sans-serif)!important;
+ letter-spacing:.095em;
+ text-shadow:1px 1px 0 #070411;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-index {
+ color:var(--qm-rail-yellow)!important;
+ font-size:.8rem!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-rule {
+ display:none!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section ul {
+ gap:3px!important;
+ padding-inline:2px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {
+ min-height:38px;
+ margin:1px 0;
+ padding:7px 30px 7px 11px!important;
+ border:2px solid #1a0e2f!important;
+ border-left:3px solid #7d398d!important;
+ border-radius:2px!important;
+ background:linear-gradient(100deg,#26143c,#170c2b 82%)!important;
+ color:#f7ecff!important;
+ box-shadow:inset 0 1px 0 rgba(255,240,255,.17),2px 2px 0 #070411!important;
+ clip-path:none!important;
+ font:600 .83rem/1.25 var(--qm-typography-body,"Inter",system-ui,sans-serif);
+ letter-spacing:.003em;
+ transition:background 140ms ease,border-color 140ms ease,filter 140ms ease,transform 140ms cubic-bezier(.2,1.2,.3,1);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link::before {
+ content:"";position:absolute;left:0;top:0;bottom:0;width:5px;height:auto;
+ background:var(--qm-rail-yellow);opacity:0;transform:none;border-radius:0;
+ transition:opacity 140ms ease;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) {
+ background:linear-gradient(92deg,#67265a,#311449)!important;
+ border-color:var(--qm-rail-pink)!important;
+ border-left-color:var(--qm-rail-yellow)!important;
+ filter:brightness(1.08);
+ transform:translateX(1px);
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:hover::before {
+ opacity:1;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] {
+ background:linear-gradient(100deg,#fff86a,#ffe525 76%,#ffbc27)!important;
+ color:#090513!important;
+ border:2px solid #070411!important;
+ border-left:6px solid #070411!important;
+ box-shadow:2px 2px 0 #070411,4px 4px 0 var(--qm-rail-pink)!important;
+ padding-left:9px!important;
+ padding-right:37px!important;
+ font-weight:800!important;
+ letter-spacing:.015em;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::before {
+ opacity:1;width:3px;background:#ff2299;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"] :is(
+ .qagent-sidebar__link-label,svg,.qagent-sidebar__chevron
+) {color:#090513!important;stroke:#090513}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::after {
+ content:"";position:absolute;left:auto;right:5px;top:50%;
+ margin:0!important;width:27px;height:27px;
+ transform:translateY(-50%);
+ border:none;border-radius:0;
+ background:url("/manga-ui/manga-impact-star.svg") center/contain no-repeat!important;
+ filter:drop-shadow(1px 1px 0 #070411);
+ pointer-events:none;
+ animation:qm-rail-star-pop 360ms cubic-bezier(.16,1.7,.35,1) both;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested {
+ margin-left:12px!important;min-height:35px;font-size:.79rem;
+ border-left-color:var(--qm-rail-purple)!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested[aria-current="page"]::after {
+ left:auto;right:5px;top:50%;width:21px;height:21px;
+ transform:translateY(-50%);
+ background:url("/manga-ui/manga-impact-star.svg") center/contain no-repeat!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link svg {
+ width:18px;height:18px;opacity:1;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:focus-visible {
+ z-index:3;outline:3px solid #ffe525!important;outline-offset:2px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
+ min-height:71px;
+ border-top:5px solid #ffe525!important;
+ border-bottom:4px solid #ff2299!important;
+ box-shadow:inset 0 -2px 0 #fff1ff,0 3px 0 #070411!important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
+ font-size:1.31rem;font-weight:700;
+ letter-spacing:.09em;text-transform:uppercase;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry {
+ border:2px solid var(--qm-rail-pink)!important;
+ box-shadow:inset 0 0 0 1px rgba(255,240,255,.4),2px 2px 0 #070411!important;
+}
+@keyframes qm-rail-star-pop {
+ 0%{opacity:.35;transform:translateY(-50%) scale(.5) rotate(-36deg)}
+ 60%{opacity:1;transform:translateY(-50%) scale(1.24) rotate(12deg)}
+ 100%{opacity:1;transform:translateY(-50%) scale(1) rotate(0)}
+}
+@media(min-width:1024px) {
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section {
+  margin:8px 0 0;padding:4px 1px;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section::before,
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section::after,
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"]::after {display:none}
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link {
+  min-height:38px;padding:5px!important;justify-content:center;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section-head {
+  justify-content:center;min-height:27px;padding:3px!important;
+  background:#79226f!important;clip-path:none!important;
+ }
+ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested {margin-left:0!important}
+}
+@media(max-width:720px) {
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section {margin-top:9px}
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {min-height:42px}
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {min-height:30px}
+}
+@media(prefers-reduced-motion:reduce) {
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link[aria-current="page"]::after {animation:none!important}
+ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link {transition:none!important;transform:none!important}
+}
