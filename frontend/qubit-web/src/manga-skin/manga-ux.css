@@ -179,3 +179,24 @@ html[data-qubit-manga="on"] .cron-editor-dialog :is(
  input,textarea,select,.settings-input,.settings-select
 ) {transition:none!important}
 }
+
+
+/* Short helpful descriptions follow the header, not the scrollable page.
+   Keep the style subtle so dense work areas remain readable. */
+html[data-qubit-manga="on"] .qm-page-guide {
+ display:flex;align-items:center;gap:9px;flex:0 0 auto;
+ min-height:34px;padding:7px clamp(12px,2vw,25px);
+ border-bottom:2px solid rgba(255,38,154,.55);
+ border-left:5px solid #ffe525;
+ background:linear-gradient(95deg,#251035,#100a20 75%);
+ color:#f5e3ff;font:500 .8rem/1.35 var(--qm-ux-body);
+ letter-spacing:.003em;
+}
+html[data-qubit-manga="on"] .qm-page-guide__star {
+ display:grid;place-items:center;flex:none;
+ height:18px;width:18px;color:#ffe525;
+ font-size:18px;text-shadow:1px 1px 0 #070411;
+}
+@media(max-width:650px) {
+ html[data-qubit-manga="on"] .qm-page-guide {font-size:.74rem;line-height:1.35;padding:6px 9px}
+}
