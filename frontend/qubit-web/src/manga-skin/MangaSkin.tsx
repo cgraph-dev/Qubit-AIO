@@ -22,6 +22,7 @@ import "./manga-studio-pass.css";
 import "./manga-reference-match.css";
 import "./manga-overflow-guards.css";
 import "./manga-neon-reference.css";
+import "./manga-fidelity.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {
