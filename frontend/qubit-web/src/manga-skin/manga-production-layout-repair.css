@@ -659,3 +659,21 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar[data-c
   background:none!important;
   border:0!important;
 }
+
+/* Restore the Manga active-row yellow hit. The approved frame keeps its dark
+   ink, while the current route is the gold plate with black type. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link[aria-current="page"] {
+  background: var(--qm-approved-yellow, #ffe72b) !important;
+  color: #120618 !important;
+  border-color: #120618 !important;
+  box-shadow: inset 3px 0 #ff269a, 2px 2px 0 #120618 !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link[aria-current="page"] > svg,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link[aria-current="page"] .qagent-sidebar__link-label {
+  color: #120618 !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link[aria-current="page"]:is(:hover, :focus-visible) {
+  background: var(--qm-approved-yellow, #ffe72b) !important;
+  color: #120618 !important;
+  border-color: #120618 !important;
+}

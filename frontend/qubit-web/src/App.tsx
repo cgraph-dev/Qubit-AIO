@@ -69,7 +69,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { Button, SakugaLoading, SakugaToastHost } from "@/sakuga/ui";
+import { Button, SakugaLoading, SakugaToastHost, emitFxAt } from "@/sakuga/ui";
 import { SelectionSwitcher } from "@nous-research/ui/ui/components/selection-switcher";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
@@ -1445,7 +1445,21 @@ function SidebarNavLink({
         to={path}
         end={item.exactEnd ?? path === "/sessions"}
         data-stage-row="nav"
-        onClick={() => {
+        onClick={(event) => {
+          if (document.documentElement.dataset.qubitManga === "on") {
+            const hasPointer = event.clientX !== 0 || event.clientY !== 0;
+            void emitFxAt(
+              "impact",
+              event.currentTarget,
+              hasPointer
+                ? {
+                    x: event.clientX + window.scrollX,
+                    y: event.clientY + window.scrollY,
+                    scale: 0.45,
+                  }
+                : { scale: 0.45 },
+            );
+          }
           closeMobile();
           onNavigate?.();
         }}
