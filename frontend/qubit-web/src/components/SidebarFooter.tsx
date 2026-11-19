@@ -11,7 +11,7 @@ export function SidebarFooter({ status }: SidebarFooterProps) {
   const { t } = useI18n();
 
   return (
-    <div className="flex w-full items-center justify-between gap-2">
+    <div className="flex w-full items-center justify-between gap-2 qm-manga-footer-content">\n      <span className="qm-manga-footer-leds" aria-hidden="true"><i /><i /><i /></span>
       <span className="tabular-nums">
         {formatProductVersion(status?.version)}
       </span>
