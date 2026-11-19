@@ -103,7 +103,7 @@ export function MangaSkinGate(): null {
     const required = [
       "01_sidebar_header.webp", "02_system_panel_frame.webp",
       "03_system_titlebar.webp", "04_tooltip_plate.webp",
-      "05_section_titlebar_clean.webp", "06_primary_button.webp",
+      "05_section_titlebar_starless.webp", "06_primary_button.webp",
       "07_disabled_button.webp", "11_atom_emblem.webp",
       "12_anime_eye_panel.webp", "13_star_only.webp",
       "14_three_gold_bars.webp",
@@ -123,7 +123,7 @@ export function MangaSkinGate(): null {
       // visible. Other assets remain available on demand.
       return Promise.all([
         "02_system_panel_frame.webp",
-        "05_section_titlebar_clean.webp",
+        "05_section_titlebar_starless.webp",
         "13_star_only.webp",
       ].map((asset) => new Promise<void>((resolve, reject) => {
         const image = new Image();
