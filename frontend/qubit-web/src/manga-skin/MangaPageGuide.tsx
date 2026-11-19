@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { useLocation } from "react-router";
+import { useI18n } from "@/i18n";
 import { currentMangaEnabled, mangaRouteEligible, subscribeManga } from "./manga-store";
 
 /** A single sentence answering "what can I do here?" — no backend jargon. */
@@ -70,8 +71,13 @@ export function mangaGuideForPath(pathname: string): string | undefined {
 /** Only visible in eligible Manga dashboard routes, never in /chat TUI. */
 export function MangaPageGuide() {
   const { pathname } = useLocation();
+  const { locale } = useI18n();
   const mangaOn = useSyncExternalStore(subscribeManga, currentMangaEnabled, () => false);
-  const message = mangaOn && mangaRouteEligible(pathname) ? mangaGuideForPath(pathname) : undefined;
+  // These optional tips are currently English copy. Avoid introducing an
+  // untranslated strip into Qubit\u0027s other supported languages.
+  const message = locale === "en" && mangaOn && mangaRouteEligible(pathname)
+    ? mangaGuideForPath(pathname)
+    : undefined;
   if (!message) return null;
   return (
     <div className="qm-page-guide" role="note" aria-label="About this page">
