@@ -14,10 +14,12 @@ const EXPECTED_IDS = [
   "q4-l",
   "q5",
   "q5-l",
+  "q6",
+  "q6-l",
 ];
 
 describe("built-in theme ids", () => {
-  it("serves exactly Q1..Q5 plus one large variant each", () => {
+  it("serves exactly Q1..Q6 plus one large variant each", () => {
     expect(Object.keys(BUILTIN_THEMES).sort()).toEqual([...EXPECTED_IDS].sort());
   });
 
@@ -37,13 +39,15 @@ describe("built-in theme ids", () => {
       ["q3-l", "Q3-L"],
       ["q4-l", "Q4-L"],
       ["q5-l", "Q5-L"],
+      ["q6", "Q6"],
+      ["q6-l", "Q6-L"],
     ]) {
       expect(BUILTIN_THEMES[id].label).toBe(label);
     }
   });
 
   it("no longer ships the retired themes", () => {
-    for (const gone of ["rose", "ember", "qubit-blue", "default-large", "midnight", "mono", "cyberpunk", "q6", "q6-l"]) {
+    for (const gone of ["rose", "ember", "qubit-blue", "default-large", "midnight", "mono", "cyberpunk"]) {
       expect(BUILTIN_THEMES[gone]).toBeUndefined();
     }
   });
@@ -56,6 +60,7 @@ describe("large variants", () => {
     ["q3", "q3-l"],
     ["q4", "q4-l"],
     ["q5", "q5-l"],
+    ["q6", "q6-l"],
   ];
 
   it("every base theme has a large variant that keeps its palette", () => {

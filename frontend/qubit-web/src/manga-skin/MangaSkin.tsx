@@ -10,12 +10,19 @@ import {
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
 import { emitFx } from "@/sakuga/ui";
+import { useTheme } from "@/themes";
+import {
+  MANGA_THEME_LARGE_NAME,
+  MANGA_THEME_NAME,
+  isMangaThemeName,
+} from "@/themes/presets";
 import {
   applyMangaAttribute,
   currentMangaEnabled,
+  mangaReturnTheme,
   mangaRouteEligible,
+  setMangaEnabled,
   subscribeManga,
-  toggleManga,
 } from "./manga-store";
 import "./manga.css";
 
@@ -93,20 +100,32 @@ function useUtilityHost(active: boolean): HTMLElement | null {
  */
 export function MangaSkinToggle(): ReactElement | null {
   const { pathname } = useLocation();
+  const { themeName, setTheme } = useTheme();
   const enabled = useMangaPreference();
   const eligible = mangaRouteEligible(pathname);
   const host = useUtilityHost(eligible);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const onClick = useCallback(() => {
-    const next = toggleManga();
+    if (enabled) {
+      // Q6/Q6-L is a real theme: return to the previous non-manga theme so
+      // the palette and the skin switch off together.
+      if (isMangaThemeName(themeName)) setTheme(mangaReturnTheme());
+      setMangaEnabled(false);
+    } else {
+      const next = themeName.endsWith("-l")
+        ? MANGA_THEME_LARGE_NAME
+        : MANGA_THEME_NAME;
+      setTheme(next);
+      setMangaEnabled(true);
+    }
     // Presentation only; the engine swallows a missing WebGL context.
-    void emitFx(next ? "celebrate" : "pop", {
+    void emitFx(enabled ? "pop" : "celebrate", {
       target: buttonRef.current,
       scale: 0.8,
       silent: true,
     }).catch(() => {});
-  }, []);
+  }, [enabled, setTheme, themeName]);
 
   if (!eligible || !host) return null;
 

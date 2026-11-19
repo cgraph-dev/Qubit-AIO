@@ -324,7 +324,7 @@ def mount_spa(application: FastAPI):
 # ---------------------------------------------------------------------------
 
 # Built-in themes — label + description only; colors live in web/src/themes/presets.ts.
-# Qubit-owned ids (Q1..Q5, each with a `-L` large variant); `default` stays the
+# Qubit-owned ids (Q1..Q6, each with a `-L` large variant); `default` stays the
 # canonical first theme and is presented as Q1. Keep in sync with
 # BUILTIN_THEMES in presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
@@ -338,6 +338,8 @@ _BUILTIN_DASHBOARD_THEMES = [
     {"name": "q4-l",    "label": "Q4-L", "description": "Q4-L — the Q4 look with larger type and roomier spacing"},
     {"name": "q5",      "label": "Q5",   "description": "Q5 — pure black canvas, pure white ink, maximum contrast"},
     {"name": "q5-l",    "label": "Q5-L", "description": "Q5-L — the Q5 look with larger type and roomier spacing"},
+    {"name": "q6",      "label": "Q6",   "description": "Q6 — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
+    {"name": "q6-l",    "label": "Q6-L", "description": "Q6-L — the Q6 look with larger type and roomier spacing"},
 ]
 
 # Theme ids a preference may still carry from before the Q1..Q5 renaming.

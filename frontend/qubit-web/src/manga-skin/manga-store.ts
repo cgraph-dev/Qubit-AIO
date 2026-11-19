@@ -6,8 +6,14 @@
  * truth. No backend, route or component behaviour lives here.
  */
 
+import { isMangaThemeName } from "@/themes/presets";
+
 export const MANGA_SKIN_KEY = "qubit-manga-skin-enabled";
 export const MANGA_SKIN_EVENT = "qubit-manga-change";
+/** Last theme the user had before selecting Q6/Q6-L. */
+export const MANGA_RETURN_THEME_KEY = "qubit-manga-return-theme";
+const THEME_STORAGE_KEY = "qubit-dashboard-theme";
+const LEGACY_THEME_STORAGE_KEY = "hermes-dashboard-theme";
 
 /** Surfaces that must never be skinned. */
 export const MANGA_EXCLUDED_PATHS = [
@@ -105,16 +111,60 @@ export function applyMangaAttribute(active: boolean): void {
   else delete document.documentElement.dataset.qubitManga;
 }
 
+/** The last non-manga theme, used by the sidebar switch to return to. */
+export function rememberMangaReturnTheme(name: string): void {
+  if (!name || isMangaThemeName(name)) return;
+  try {
+    window.localStorage.setItem(MANGA_RETURN_THEME_KEY, name);
+  } catch {
+    /* storage disabled */
+  }
+}
+
+export function mangaReturnTheme(): string {
+  if (typeof window === "undefined") return "q2";
+  try {
+    const stored = window.localStorage.getItem(MANGA_RETURN_THEME_KEY);
+    return stored && !isMangaThemeName(stored) ? stored : "q2";
+  } catch {
+    return "q2";
+  }
+}
+
+/** The theme the shell is about to paint (server-injected or persisted). */
+export function savedThemeName(): string {
+  if (typeof window === "undefined") return "";
+  const injected = (window as Window & { __QUBIT_THEME__?: unknown })
+    .__QUBIT_THEME__;
+  if (typeof injected === "string" && injected) return injected;
+  try {
+    return (
+      window.localStorage.getItem(THEME_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY) ??
+      ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Apply the persisted preference before React paints, so an enabled skin
- * does not flash the default theme on first load. Safe to call repeatedly.
+ * does not flash the default theme on first load. Q6/Q6-L is the source of
+ * truth; the old standalone preference is only a fallback when no theme is
+ * known yet. Safe to call repeatedly.
  */
 export function bootstrapMangaSkin(pathname?: string): void {
   if (typeof window === "undefined") return;
   const path =
     pathname ??
     (typeof window.location !== "undefined" ? window.location.pathname : "/");
-  applyMangaAttribute(readMangaPreference() && mangaRouteEligible(path));
+  const theme = savedThemeName();
+  const wanted = theme ? isMangaThemeName(theme) : readMangaPreference();
+  // Align the standalone preference with the theme before React reads it, so
+  // the gate cannot flash a legacy ON state on a non-Q6 route for one frame.
+  setMangaEnabled(wanted);
+  applyMangaAttribute(wanted && mangaRouteEligible(path));
 }
 
 /** Convenience for tests and external callers. */

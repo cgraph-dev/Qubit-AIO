@@ -591,6 +591,90 @@ html[data-qubit-manga="on"] .qchat__side * {
   max-width: 100%;
 }
 
+/* Theme picker: Q6 / Q6-L look like the sidebar MANGA switch. These rules are
+   deliberately unscoped — the row must already look like the manga button
+   while another theme is active and the picker is open. */
+.qm-theme-trigger[data-manga-theme="true"]::part(button) {
+  background: #ffe500 !important;
+  color: #080615 !important;
+  border-color: #05030f !important;
+  box-shadow: 3px 4px 0 #ff269a !important;
+  font-style: italic;
+  font-weight: 900;
+}
+
+.qm-theme-trigger__spark {
+  color: #080615;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.qm-theme-trigger__label {
+  color: #080615 !important;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.qm-theme-trigger__lamp {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #28d577;
+  box-shadow:
+    0 0 0 1px #05030f,
+    0 0 7px 1px rgba(40, 213, 119, 0.8);
+}
+
+sakuga-button.qm-theme-row--manga::part(button) {
+  min-height: 2.45rem;
+  background: #ffe500 !important;
+  color: #080615 !important;
+  border-color: #05030f !important;
+  box-shadow: 3px 4px 0 #ff269a !important;
+  font-style: italic;
+  font-weight: 900;
+}
+
+sakuga-button.qm-theme-row--manga::part(button):hover {
+  background: #fff45c !important;
+}
+
+sakuga-button.qm-theme-row--manga .text-display {
+  color: #080615 !important;
+  font-weight: 900;
+}
+
+sakuga-button.qm-theme-row--manga .text-text-tertiary {
+  color: rgba(8, 6, 21, 0.72) !important;
+}
+
+.qm-theme-row__spark {
+  display: inline-flex;
+  width: 1.15rem;
+  flex: 0 0 auto;
+  justify-content: center;
+  color: #080615;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.qm-theme-row__lamp {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #6b5a80;
+  box-shadow: 0 0 0 1px #05030f;
+}
+
+.qm-theme-row__lamp--on {
+  background: #28d577;
+  box-shadow:
+    0 0 0 1px #05030f,
+    0 0 7px 1px rgba(40, 213, 119, 0.8);
+}
+
 @media (max-width: 1023px) {
   .qm-skin-switch {
     min-height: 34px;
