@@ -13,7 +13,7 @@ describe("PR11 reference matching contract", () => {
   expect(css).toContain('html[data-qubit-manga="on"]');
  });
  it("does not target excluded routes or their components", () => {
-  for (const path of ['"/chat"','"/qubit-workbench"']) expect(store).toContain(path);
+  for (const path of ['"/chat"','"/qubit-workbench"','"/workbench"']) expect(store).toContain(path);
   expect(store).toContain('pathname.startsWith(path + "/")');
   expect(css).not.toContain("qubit-workbench");
   expect(css).not.toContain("qubit-office");
