@@ -45,7 +45,7 @@ with zipfile.ZipFile(archive) as z:
     # Verify EVERY blob before writing ANY file.
     contents = {}
     for name, metadata in manifest.items():
-        if "/" in name or "\\\" in name or name.startswith("."):
+        if "/" in name or chr(92) in name or name.startswith("."):
             raise SystemExit("Disallowed filename: " + name)
         data = z.read(prefix + name)
         if hashlib.sha256(data).hexdigest() != metadata["sha256"]:
