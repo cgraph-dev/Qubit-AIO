@@ -101,6 +101,72 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
   },
 ];
 
+/**
+ * A friendlier navigation hierarchy used only by Q6/Q6-L.
+ * Presentation-only: sectionizeNav retains all routes, including unknown
+ * plugin destinations, and leaves the default theme hierarchy untouched.
+ */
+export const MANGA_SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
+  {
+    id: "primary",
+    label: "Chat",
+    index: "01",
+    paths: ["/chat", "/qubit-chat", "/sessions", "/webchat"],
+  },
+  {
+    id: "workspace",
+    label: "Workspace",
+    index: "02",
+    paths: [
+      "/qubit-workbench", "/files", "/agent-workspace", "/analytics",
+      "/models", "/logs", "/canvas", "/open-viking",
+    ],
+  },
+  {
+    id: "automations",
+    label: "Automations",
+    index: "03",
+    paths: [
+      "/cron", "/qubit-scheduler", "/qubit-tasks", "/qubit-taskflows",
+      "/qubit-task-inbox", "/qubit-board-admin",
+    ],
+  },
+  {
+    id: "ai-tools",
+    label: "AI Tools",
+    index: "04",
+    paths: [
+      "/skills", "/plugins", "/mcp", "/qubit-bot", "/qubit-memory",
+      "/qubit-harness-router", "/agent-cards", "/kitchen",
+    ],
+  },
+  {
+    id: "connections",
+    label: "Connections",
+    index: "05",
+    paths: [
+      "/channels", "/webhooks", "/pairing", "/devices", "/omniroute",
+    ],
+  },
+  {
+    id: "studio",
+    label: "Voice & Media",
+    index: "06",
+    paths: ["/qubit-talk", "/qubit-tv", "/qubit-office", "/voice-edit"],
+  },
+  {
+    id: "system",
+    label: "System",
+    index: "07",
+    paths: [
+      "/system", "/qubit-hud", "/config", "/env", "/profiles",
+      "/agents", "/computer", "/guide", "/admin/skills-review",
+      "/admin/mcp-calls", "/admin/users", "/docs", "/nodes",
+      "/session-ops", "/worktrees", "/checkpoints",
+    ],
+  },
+];
+
 /** Anything the nav supplies that no section claims lands here, last. */
 export const SIDEBAR_FALLBACK_SECTION: SidebarSectionSpec = {
   id: "more",
