@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170" role="img" aria-label="Manga chrome tooltip frame with exclamation badge"><defs>
+<linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffedff"/><stop offset=".13" stop-color="#db9bde"/><stop offset=".26" stop-color="#fff6ff"/><stop offset=".48" stop-color="#ae5cb8"/><stop offset=".72" stop-color="#531c63"/><stop offset=".86" stop-color="#ff9cdb"/><stop offset="1" stop-color="#f8dcff"/></linearGradient>
+<linearGradient id="pink" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff74ce"/><stop offset=".5" stop-color="#fa249d"/><stop offset="1" stop-color="#a61d7a"/></linearGradient>
+<linearGradient id="inside" x1=".1" y1="0" x2=".9" y2="1"><stop stop-color="#11071f"/><stop offset=".65" stop-color="#2c0b31"/><stop offset="1" stop-color="#5a0c45"/></linearGradient>
+<radialGradient id="badge"><stop stop-color="#8c1e5e"/><stop offset=".78" stop-color="#5a103d"/><stop offset="1" stop-color="#280720"/></radialGradient>
+</defs>
+<!-- Exact straight corner geometry, pointed V tail, and separate concentric circular badge. -->
+<path d="M20 17H266L291 38V119L273 139H178L158 159L137 139H22L8 123V32Z" fill="#090211" stroke="#060310" stroke-width="9" stroke-linejoin="miter"/>
+<path d="M20 17H266L291 38V119L273 139H178L158 159L137 139H22L8 123V32Z" fill="url(#metal)" stroke="#fff4ff" stroke-width="2.4" stroke-linejoin="miter"/>
+<path d="M23 25H262L283 42V115L270 131H173L158 145L141 131H24L17 120V37Z" fill="#3b1239" stroke="#fa32a6" stroke-width="3"/>
+<path d="M30 32H259L275 45V111L265 123H170L158 134L145 123H30L25 116V42Z" fill="url(#inside)" stroke="#cf4e9f" stroke-width="1.5"/>
+<path d="M26 20H251 M29 133H135 M182 133H261" stroke="#ffb7ef" stroke-width="2" opacity=".7"/>
+<path d="M29 34L60 34L29 66Z M271 95L271 123L240 123Z" fill="#ffbf2a" stroke="#fff5b8" stroke-width="1.3"/>
+<!-- Mathematically circular badge, no warped concentric rings or cutout edges. -->
+<circle cx="267" cy="30" r="29" fill="#090213" stroke="#07020b" stroke-width="4"/>
+<circle cx="267" cy="30" r="27" fill="url(#metal)" stroke="#fff1fd" stroke-width="1.5"/>
+<circle cx="267" cy="30" r="22" fill="#7c1a61" stroke="#f83bba" stroke-width="2.2"/>
+<circle cx="267" cy="30" r="18.2" fill="url(#badge)" stroke="#ff92da" stroke-width="1"/>
+<path d="M264 15H271L268.5 34H266Z" fill="#fff8ff"/><circle cx="267.1" cy="40" r="3.2" fill="#fff8ff"/>
+<path d="M250 15A26 26 0 0 1 273 5" fill="none" stroke="#fffaff" stroke-width="2.6" stroke-linecap="round" opacity=".88"/>
+</svg>
