@@ -1,6 +1,6 @@
 /* Final alignment repair for user-approved static Manga art.
    Matches source aspect ratios and removes old duplicate decoration layers.
-   Only Manga-enabled web sidebar; no Office/workbench/terminal selectors. */
+   Only Manga-enabled web sidebar; no Office, workbench or terminal selectors. */
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row {
   position:relative!important;height:145px!important;min-height:145px!important;
   margin:0!important;padding:0 10px!important;overflow:visible!important;
