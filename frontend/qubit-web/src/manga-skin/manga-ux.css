@@ -200,3 +200,69 @@ html[data-qubit-manga="on"] .qm-page-guide__star {
 @media(max-width:650px) {
  html[data-qubit-manga="on"] .qm-page-guide {font-size:.74rem;line-height:1.35;padding:6px 9px}
 }
+
+
+/* Sakuga ExtraField supplies inline label colors and input styles. Use
+   specificity + !important on public DOM chrome only; preserve the internal
+   Sakuga events/FX, shadow DOM and canvas footprint. */
+html[data-qubit-manga="on"] #qubit-main-content .qsk-extra {
+  --sk-ink:#fff0ff;
+  --sk-card:#120920;
+  --sk-soft:#ff269a;
+  --sk-dim:#ead9fa;
+  --sk-acc:#ffe525;
+  min-width:0;
+  max-width:100%;
+  font-family:var(--qm-ux-body);
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-extra > label {
+  color:#fff0ff!important;
+  font-family:var(--qm-ux-body)!important;
+  font-size:.85rem!important;
+  line-height:1.35!important;
+  font-weight:700!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-extra > span {
+  color:#e9d4f4!important;
+  font-family:var(--qm-ux-body)!important;
+  font-size:.79rem!important;
+  line-height:1.45!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-extra__control {
+  color:#fff0ff!important;
+  background:#10091f!important;
+  border:2px solid #ae5bff!important;
+  border-radius:3px!important;
+  box-shadow:2px 3px 0 #ff269a!important;
+  font-family:var(--qm-ux-body)!important;
+  max-width:100%!important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-number__input {
+  width:clamp(58px,7vw,105px)!important;
+  min-width:0!important;
+  max-width:100%;
+  flex:1 1 66px;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-number__input:focus-visible {
+  outline:2px solid #ffe525!important;
+  outline-offset:3px;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-extra .qsk-stepper {
+  flex:0 0 auto;
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-stepper::part(button) {
+  min-width:31px;
+  min-height:31px;
+  padding:4px 7px;
+  background:#9d40d8;
+  color:#fff0ff;
+  border:2px solid #fff0ff;
+  border-radius:3px;
+  box-shadow:2px 2px 0 #05030f;
+  font-family:var(--qm-ux-body);
+}
+html[data-qubit-manga="on"] #qubit-main-content .qsk-stepper::part(button):hover {
+  background:#ff269a;color:#05030f;
+}
