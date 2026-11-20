@@ -95,9 +95,11 @@ export function PageHeaderProvider({
               "flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2",
               isEnvRoute && "items-start",
             )}>
-              <h1 className="min-w-0 max-w-full font-expanded text-sm font-bold tracking-[0.08em] text-midground [overflow-wrap:anywhere]">
-                {displayTitle}
-              </h1>
+              <div className="qubit-module-header">
+                <h1 className="min-w-0 max-w-full font-expanded text-sm font-bold tracking-[0.08em] text-midground [overflow-wrap:anywhere]">
+                  {displayTitle}
+                </h1>
+              </div>
               {afterTitle ? (
                 <div
                   data-page-header-actions=""

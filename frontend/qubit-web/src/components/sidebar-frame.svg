@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 320 1000">
+  <defs>
+<linearGradient id="rail" x1="0" x2="100%" y1="0" y2="0">
+      <stop stop-color="#230725"/>
+      <stop offset=".12" stop-color="#fff3ff"/>
+      <stop offset=".24" stop-color="#ff80e0"/>
+      <stop offset=".36" stop-color="#fe28a3"/>
+      <stop offset=".56" stop-color="#661c60"/>
+      <stop offset=".78" stop-color="#ff80d5"/>
+      <stop offset=".89" stop-color="#f5d9ff"/>
+      <stop offset="1" stop-color="#090413"/>
+    </linearGradient>
+<linearGradient id="top" x1="0" x2="0" y1="0" y2="100%">
+      <stop stop-color="#fbedff"/>
+      <stop offset=".23" stop-color="#fd50bd"/>
+      <stop offset=".48" stop-color="#4b164d"/>
+      <stop offset=".68" stop-color="#ff39a7"/>
+      <stop offset=".85" stop-color="#e8b6f0"/>
+      <stop offset="1" stop-color="#0e0619"/>
+    </linearGradient>
+<linearGradient id="g" x1="0" x2="100%" y1="0" y2="100%">
+      <stop stop-color="#fffbea"/>
+      <stop offset=".4" stop-color="#ffb72e"/>
+      <stop offset=".75" stop-color="#aa4d0b"/>
+      <stop offset="1" stop-color="#ffe965"/>
+    </linearGradient>
+<radialGradient id="corner-pink">
+      <stop stop-color="#ff65c6" stop-opacity=".68"/>
+      <stop offset=".42" stop-color="#ff329f" stop-opacity=".27"/>
+      <stop offset="1" stop-color="#ff329f" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="corner-gold">
+      <stop stop-color="#fff6ce" stop-opacity=".85"/>
+      <stop offset=".38" stop-color="#ffb34c" stop-opacity=".4"/>
+      <stop offset="1" stop-color="#ff9c36" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g id="corner-glow">
+    <ellipse cx="17" cy="19" fill="url(#corner-pink)" rx="22" ry="21"/>
+    <ellipse cx="17" cy="19" fill="url(#corner-gold)" rx="13" ry="13"/>
+    <ellipse cx="303" cy="19" fill="url(#corner-pink)" rx="22" ry="21"/>
+    <ellipse cx="303" cy="19" fill="url(#corner-gold)" rx="13" ry="13"/>
+    <ellipse cx="17" cy="981" fill="url(#corner-pink)" rx="22" ry="21"/>
+    <ellipse cx="17" cy="981" fill="url(#corner-gold)" rx="13" ry="13"/>
+    <ellipse cx="303" cy="981" fill="url(#corner-pink)" rx="22" ry="21"/>
+    <ellipse cx="303" cy="981" fill="url(#corner-gold)" rx="13" ry="13"/>
+  </g>
+
+<path d="M5 21V979L20 994H300L315 979V21L300 6H20Z" fill="none" stroke="#07020f" stroke-width="10"/>
+<path d="M6 22V978L21 993H299L314 978V22L299 7H21Z" fill="none" stroke="url(#rail)" stroke-width="4.6"/>
+<path d="M12 26V974L25 986H295L308 974V26L295 14H25Z" fill="none" stroke="#ff33b1" stroke-width="1.8"/>
+<path d="M17 28V971L29 981H291L303 971V28L291 19H29Z" fill="none" opacity=".7" stroke="#e8a5e4" stroke-width="1.5"/>
+<path d="M24 6H295L314 24" fill="none" stroke="url(#top)" stroke-width="5"/>
+<path d="M24 994H296L314 976" fill="none" stroke="url(#top)" stroke-width="5"/>
+<path d="M11 97V385 M11 495V896 M309 105V360 M309 440V912" opacity=".46" stroke="#ffd9fa" stroke-width="1.7"/>
+<path d="M12 23L25 10H61L47 19H30L21 28V56L12 72Z M308 23L295 10H262L276 19H290L299 28V56L308 72Z M12 978L25 989H61L47 981H30L21 972V941L12 930Z M308 978L295 989H262L276 981H290L299 972V941L308 930Z" fill="url(#g)" stroke="#6b290b" stroke-width="1.5"/>
+<g fill="none" stroke-linejoin="bevel">
+    <path d="M11 65V24L25 11H48 M271 11H295L309 24V66 M11 934V976L25 989H49 M271 989H295L309 976V934" stroke="#fff1da" stroke-width="1.15"/>
+    <path d="M31 17H102 M211 17H289 M24 982H96 M220 982H296" stroke="#ff4bb6" stroke-width="1.5"/>
+    <path d="M34 20H134 M191 20H287 M33 979H140 M188 979H288" stroke="#5e2057" stroke-width="1.15"/>
+    <path d="M9 93V270 M311 723V901" opacity=".6" stroke="#ee72b8" stroke-width="1"/>
+  </g>
+<defs><pattern id="manga-tone" width="3" height="3" patternUnits="userSpaceOnUse"><circle cx=".8" cy=".8" r=".42" fill="#ffc3ed" opacity=".45"/></pattern></defs><g transform="translate(0 0) scale(1 1)"><path d="M9 55V25L25 9H69L58 15H28L15 28V48Z" fill="#180b24" stroke="#090411" stroke-width="2"/><path d="M10 57V25L26 10H65L55 14H27L14 27V49Z" fill="url(#g)"/><path d="M12 40V25L26 12H46L35 14H27L14 27V36Z" fill="#fff5e4"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="#4d174b"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="url(#manga-tone)"/><path d="M32 19H53L47 22H34Z M17 42V31L21 27V35Z" fill="#f73eac"/><path d="M74 11H110L104 13H71Z M10 64V91L12 86V61Z" fill="#f689cb" opacity=".65"/></g><g transform="translate(320 0) scale(-1 1)"><path d="M9 55V25L25 9H69L58 15H28L15 28V48Z" fill="#180b24" stroke="#090411" stroke-width="2"/><path d="M10 57V25L26 10H65L55 14H27L14 27V49Z" fill="url(#g)"/><path d="M12 40V25L26 12H46L35 14H27L14 27V36Z" fill="#fff5e4"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="#4d174b"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="url(#manga-tone)"/><path d="M32 19H53L47 22H34Z M17 42V31L21 27V35Z" fill="#f73eac"/><path d="M74 11H110L104 13H71Z M10 64V91L12 86V61Z" fill="#f689cb" opacity=".65"/></g><g transform="translate(0 1000) scale(1 -1)"><path d="M9 55V25L25 9H69L58 15H28L15 28V48Z" fill="#180b24" stroke="#090411" stroke-width="2"/><path d="M10 57V25L26 10H65L55 14H27L14 27V49Z" fill="url(#g)"/><path d="M12 40V25L26 12H46L35 14H27L14 27V36Z" fill="#fff5e4"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="#4d174b"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="url(#manga-tone)"/><path d="M32 19H53L47 22H34Z M17 42V31L21 27V35Z" fill="#f73eac"/><path d="M74 11H110L104 13H71Z M10 64V91L12 86V61Z" fill="#f689cb" opacity=".65"/></g><g transform="translate(320 1000) scale(-1 -1)"><path d="M9 55V25L25 9H69L58 15H28L15 28V48Z" fill="#180b24" stroke="#090411" stroke-width="2"/><path d="M10 57V25L26 10H65L55 14H27L14 27V49Z" fill="url(#g)"/><path d="M12 40V25L26 12H46L35 14H27L14 27V36Z" fill="#fff5e4"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="#4d174b"/><path d="M16 50V29L29 17H57L48 23H31L21 32V43Z" fill="url(#manga-tone)"/><path d="M32 19H53L47 22H34Z M17 42V31L21 27V35Z" fill="#f73eac"/><path d="M74 11H110L104 13H71Z M10 64V91L12 86V61Z" fill="#f689cb" opacity=".65"/></g></svg>

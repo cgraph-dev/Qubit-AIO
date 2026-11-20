@@ -494,3 +494,37 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
   display: none !important;
   background: none !important;
 }
+
+/* Owner sidebar frame replaces the old CSS perimeter. */
+html[data-qubit-manga="on"] .qagent-sidebar .qm-manga-outer-frame {
+  display: none !important;
+}
+/* Owner module/page header plate. */
+html[data-qubit-manga="on"] .qubit-module-header {
+  display: flex;
+  flex: 0 1 510px;
+  max-width: 510px;
+  min-width: 0;
+  min-height: 60px;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  padding: 4px 16px 4px 24px;
+  background: url("/manga-ui/qubit-module-header.svg") center / 100% 100% no-repeat;
+  color: #fff2fa;
+}
+html[data-qubit-manga="on"] .qubit-module-header h1 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] .qubit-module-header {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-height: 52px;
+    padding: 4px 12px 4px 16px;
+  }
+}

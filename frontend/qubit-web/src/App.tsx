@@ -81,6 +81,7 @@ import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { QubitSidebarTitle } from "@/components/QubitSidebarTitle";
 import { MangaPageTitleTooltips } from "@/components/MangaPageTitleTooltips";
 import { SidebarFooter } from "@/components/SidebarFooter";
+import { SidebarFrame } from "@/components/SidebarFrame";
 import { Q5TGatewayFrame } from "@/components/Q5TGatewayFrame";
 import { Q5TPrimaryButton } from "@/components/Q5TPrimaryButton";
 import { Q5TSystemTitle } from "@/components/Q5TSystemTitle";
@@ -1019,6 +1020,7 @@ export default function App() {
           >
             {/* A single reusable nine-slice chrome frame around the entire Manga rail.
                 Pointer-events are disabled; navigation and status remain live. */}
+            {useMangaNavigation && <SidebarFrame />}
             <div className="qm-manga-outer-frame" aria-hidden="true" />
             {/* Rail backdrop clip — this rail only. Sits at z-index:-2 behind the
                 engineering ruling (::before, z-index:-1) and every nav row.
