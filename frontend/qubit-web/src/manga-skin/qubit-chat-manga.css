@@ -325,6 +325,32 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-indeterminate
 }
 @keyframes qma-loading-sweep {to{transform:translateX(330%)}}
 @keyframes qma-atom-breathe {0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.04);opacity:1}}
+/* Manga narrative typography. The old "midnight transit" layer used
+   monospace for whole messages, which is difficult to read for long replies.
+   Preserve monospace inside code blocks and inline technical spans. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__messages > .qchat__message {
+  min-width:0!important;
+  color:#f9edf9!important;
+  font:500 clamp(13px,.9rem,16px)/1.58 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+  letter-spacing:normal!important;
+  text-shadow:none!important;
+  overflow-wrap:anywhere!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__messages > .qchat__message :is(pre,code,kbd,samp) {
+  font-family:var(--qplate-font-mono,ui-monospace,monospace)!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__activity {
+  min-width:0!important;
+  font:600 13px/1.35 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+  color:#e6c7e5!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-atom-inline {
+  display:inline-block;
+  width:25px;height:25px;flex:0 0 25px;
+  object-fit:contain;vertical-align:middle;
+  filter:drop-shadow(0 0 3px rgba(255,180,38,.23));
+  animation:qma-atom-breathe 2.7s ease-in-out infinite;
+}
 /* Composer = ONE distinct frame, no ZIP background on the textarea or host.
    Controls are unchanged Sakuga FileField / Button / Select / Textarea. */
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer {
@@ -417,6 +443,7 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__session-actions > *
   }
 }
 @media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-atom-inline,
   html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-atom,
   html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-indeterminate::before {
     animation:none!important;
