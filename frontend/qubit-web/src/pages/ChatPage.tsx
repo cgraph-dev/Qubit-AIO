@@ -54,6 +54,7 @@ import {
 } from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
 import { QubitAtomLoader } from "@/components/QubitAtomLoader";
+import { MangaChatLoader } from "@/components/MangaChatLoader";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 import { Markdown } from "@/components/Markdown";
 import { firstFileFromTransfer, firstImageFromClipboard } from "@/lib/chatImagePaste";
@@ -2147,13 +2148,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     t.common?.tools || t.app.modelToolsSheetSubtitle.replace(/^&\s*/, "");
 
   return (
-    <div className="qchat qplate flex min-h-0 flex-1 flex-col gap-2">
+    <div className="qchat qplate flex min-h-0 flex-1 flex-col gap-2" data-manga-agent="">
       <PluginSlot name="chat:top" />
 
       <div className="qchat__workspace flex min-h-0 flex-1 flex-col">
         <section
           aria-label="Qubit Chat transcript"
-          data-qm-zip-asset="chat-transcript"
           className={cn(
             "qchat__conversation relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg",
             "border border-current/15 bg-background-base/60 p-2 sm:p-3",
@@ -2367,7 +2367,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             </div>
           </div>
 
-          <div
+          <details className="qchat__voice-details">
+            <summary>Voice details <span className="sr-only">(engine, microphone and connection diagnostics)</span></summary>
+            <div
             role="status"
             data-testid="voice-status"
             data-state={voiceState}
@@ -2455,7 +2457,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             {voiceNotice ? (
               <span data-testid="voice-notice">{voiceNotice}</span>
             ) : null}
-          </div>
+            </div>
+          </details>
 
           {terminalNoticeOpen && (
             <div
@@ -2555,7 +2558,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 data-state="loading"
                 className="qchat__transcript-loading"
               >
-                <QubitAtomLoader label="Loading chat…" size="sm" />
+                <MangaChatLoader label="Loading conversation…" />
               </div>
             ) : !hasMessages && !busy ? (
               <div
