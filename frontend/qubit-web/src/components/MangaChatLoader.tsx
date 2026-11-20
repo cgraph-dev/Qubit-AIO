@@ -1,4 +1,5 @@
 import { SakugaLoading } from "@/sakuga/ui";
+import { QubitAtomLoader } from "@/components/QubitAtomLoader";
 
 /**
  * Presentation-only native /qubit-chat loader. Reuses Sakuga's accessible
@@ -7,6 +8,12 @@ import { SakugaLoading } from "@/sakuga/ui";
  * a reliable loading percentage for restoring a session.
  */
 export function MangaChatLoader({ label = "Loading conversation…" }: { label?: string }) {
+  // Preserve the existing loader for non-Manga themes. The Manga gate sets
+  // this marker before the lazy native ChatPage mounts.
+  if (typeof document === "undefined" ||
+      document.documentElement.dataset.qubitManga !== "on") {
+    return <QubitAtomLoader label={label} size="sm" />;
+  }
   return (
     <div className="qchat__manga-loader" data-testid="manga-chat-loader">
       <img
