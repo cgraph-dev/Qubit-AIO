@@ -1,6 +1,6 @@
 /**
  * /qubit-chat manga agent presentation. SINGLE visual owner for the native
- * central ChatPage; absolutely no selectors for #app-sidebar, [data-chat-inspector],
+ * central ChatPage; no selectors for the outer navigation rail or inspector,
  * .qchat__side or the terminal /chat route. Existing Sakuga actions are left alone.
  *
  * 9-slice SVG frame art: corners retain native proportions, side rails stretch.
