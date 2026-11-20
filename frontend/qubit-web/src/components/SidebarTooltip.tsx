@@ -60,7 +60,7 @@ export function SidebarTooltip({ anchor, label, detail, warmRef }: {
     const previous = trigger.getAttribute("aria-describedby");
     if (detail) trigger.setAttribute("aria-describedby", [previous, `${id}-detail`].filter(Boolean).join(" "));
     const visible = tip.style.visibility === "visible";
-    if (visible && (!warmRef || Date.now() - warmRef.current >= 300)) playLocalFx("pop", tip, .35);
+    if (visible && (!warmRef || Date.now() - warmRef.current >= 300)) playLocalFx("pop", trigger, .45);
     if (visible && warmRef) warmRef.current = Date.now();
     const observer = new ResizeObserver(place);
     observer.observe(tip);

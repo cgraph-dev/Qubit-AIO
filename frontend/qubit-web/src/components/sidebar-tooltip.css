@@ -22,14 +22,28 @@
 }
 html[data-qubit-manga="on"] .manga-rail-tooltip {
   color: #fff0ff;
-  background: none;
-  border: solid transparent;
-  border-width: 29px 21px 18px 20px;
-  border-image: url("/manga-ui/sidebar-tooltip.svg") 37 33 24 123 fill / 29px 26px 18px 96px stretch;
-  padding: 1px 21px 8px 8px;
-  min-height: 92px;
+  width: 270px;
+  min-height: 105px;
+  padding: 8px 29px 21px 25px;
+  background: url("/manga-ui/sidebar-menu-tooltip.svg") center / 100% 100% no-repeat;
+  border: 0;
+  border-image: none;
 }
-html[data-qubit-manga="on"] .manga-rail-tooltip__body { color: #eedcf3; }
+html[data-qubit-manga="on"] .manga-rail-tooltip__title {
+  max-width: 100%;
+  color: #fff0ff;
+  font: 700 11px/1.25 system-ui, sans-serif;
+  text-transform: uppercase;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+html[data-qubit-manga="on"] .manga-rail-tooltip__body {
+  margin-top: 13px;
+  color: #f0dcf3;
+  font: 500 12px/1.35 system-ui, sans-serif;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 @media (forced-colors: active) {
   html[data-qubit-manga="on"] .manga-rail-tooltip {
     border: 1px solid CanvasText;

@@ -79,9 +79,9 @@ import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { QubitMark } from "@/components/QubitMark";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { QubitSidebarTitle } from "@/components/QubitSidebarTitle";
-import { MangaPageTitleTooltips } from "@/components/MangaPageTitleTooltips";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarFrame } from "@/components/SidebarFrame";
+import { ImportantTooltip } from "@/components/ImportantTooltip";
 import { Q5TGatewayFrame } from "@/components/Q5TGatewayFrame";
 import { Q5TPrimaryButton } from "@/components/Q5TPrimaryButton";
 import { Q5TSystemTitle } from "@/components/Q5TSystemTitle";
@@ -924,7 +924,6 @@ export default function App() {
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background-base text-text-primary antialiased"
     >
       <SakugaToastHost />
-      <MangaPageTitleTooltips />
       <a
         href="#qubit-main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[300] focus:border focus:border-midground focus:bg-background-base focus:px-3 focus:py-2 focus:text-sm focus:text-foreground"
@@ -1937,38 +1936,44 @@ function SystemActionButton({
       onMouseEnter={collapsed ? showTooltip : undefined}
       onMouseLeave={collapsed ? hideTooltip : undefined}
     >
-      <Button
-        variant="secondary"
-        onClick={onClick}
-        disabled={disabled}
-        {...{ "aria-busy": busy }}
-        title={item.disabledReason || undefined}
-        aria-label={displayLabel}
-        onFocus={collapsed ? showTooltip : undefined}
-        onBlur={collapsed ? hideTooltip : undefined}
-        type="button"
-        className={cn(
-          "qagent-sidebar__action group/action",
-          busy ? "text-midground" : "text-text-secondary",
-        )}
+      <ImportantTooltip
+        active={Boolean(item.disabledReason)}
+        title={displayLabel}
+        detail={item.disabledReason}
       >
-        {isPending ? (
-          <Spinner className="shrink-0 text-[0.875rem]" />
-        ) : isActionRunning && spin ? (
-          <Spinner className="shrink-0 text-[0.875rem]" />
-        ) : (
-          <Icon
-            className={cn(
-              "h-3.5 w-3.5 shrink-0",
-              isActionRunning && !spin && "animate-pulse",
-            )}
-          />
-        )}
+        <Button
+          variant="secondary"
+          onClick={onClick}
+          disabled={disabled}
+          {...{ "aria-busy": busy }}
+          title={item.disabledReason || undefined}
+          aria-label={displayLabel}
+          onFocus={collapsed ? showTooltip : undefined}
+          onBlur={collapsed ? hideTooltip : undefined}
+          type="button"
+          className={cn(
+            "qagent-sidebar__action group/action",
+            busy ? "text-midground" : "text-text-secondary",
+          )}
+        >
+          {isPending ? (
+            <Spinner className="shrink-0 text-[0.875rem]" />
+          ) : isActionRunning && spin ? (
+            <Spinner className="shrink-0 text-[0.875rem]" />
+          ) : (
+            <Icon
+              className={cn(
+                "h-3.5 w-3.5 shrink-0",
+                isActionRunning && !spin && "animate-pulse",
+              )}
+            />
+          )}
 
-        <span className={cn("truncate", collapsed && "lg:hidden")}>
-          {displayLabel}
-        </span>
-      </Button>
+          <span className={cn("truncate", collapsed && "lg:hidden")}>
+            {displayLabel}
+          </span>
+        </Button>
+      </ImportantTooltip>
 
       {collapsed && tooltipAnchor && (
         <SidebarTooltip

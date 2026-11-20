@@ -528,3 +528,24 @@ html[data-qubit-manga="on"] .qubit-module-header h1 {
     padding: 4px 12px 4px 16px;
   }
 }
+
+/* The large Q5T plate is for blocked/safety explanations, not rail menus. */
+html[data-qubit-manga="on"] .q5t-important-trigger {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+}
+html[data-qubit-manga="on"] .q5t-important-tooltip[role="tooltip"] {
+  position: fixed !important;
+  width: 300px !important;
+  min-width: 300px !important;
+  max-width: 300px !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #fff2fa !important;
+  overflow: visible !important;
+}
