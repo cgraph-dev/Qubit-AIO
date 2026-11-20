@@ -714,3 +714,22 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
   min-width: 0 !important;
   gap: 8px !important;
 }
+
+/* Owner-supplied Q5T tooltip plate. The generic Manga [role="tooltip"]
+   rules must not add another card behind the plate. */
+html[data-qubit-manga="on"] .q5t-tooltip-shell[role="tooltip"] {
+  width: 300px !important;
+  min-width: 300px !important;
+  max-width: 300px !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #fff2fa !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] .q5t-tooltip-shell .q5t-tooltip {
+  width: 300px;
+}
