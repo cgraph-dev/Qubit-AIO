@@ -1949,7 +1949,6 @@ function SystemActionButton({
           onClick={onClick}
           disabled={disabled}
           {...{ "aria-busy": busy }}
-          title={item.disabledReason || undefined}
           aria-label={displayLabel}
           onFocus={collapsed ? showTooltip : undefined}
           onBlur={collapsed ? hideTooltip : undefined}

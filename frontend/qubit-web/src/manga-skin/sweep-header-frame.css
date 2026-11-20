@@ -1,3 +1,6 @@
+
+/* Non-Manga keeps the old flex layout: the wrapper disappears from layout. */
+.qubit-module-header { display: contents; }
 /* ==========================================================================
    Sweep lane: header-frame
    Manga (Q4/Q4-L) only. This file is imported last by MangaSkin.tsx, so its

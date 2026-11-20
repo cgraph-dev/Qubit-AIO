@@ -199,3 +199,53 @@ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer
   text-overflow: ellipsis !important;
   font-size: 10px !important;
 }
+
+/* Final module-header typography and the right-side meta slot. */
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header h1 {
+  color: #ffe500 !important;
+  font-family: var(--qm-display) !important;
+  font-weight: 900 !important;
+  letter-spacing: .06em !important;
+  text-shadow: 1px 2px 0 #080615, 0 0 5px rgba(255, 173, 0, .75) !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header__meta {
+  margin-inline-start: auto !important;
+  min-width: 0 !important;
+  color: #fff0ff !important;
+  font: 700 11px/1.25 var(--qm-body, system-ui, sans-serif) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-shadow: 1px 1px 0 #12051a, 0 0 3px #3a0a24 !important;
+}
+
+/* Compact system actions in the icon-only rail. */
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system ul {
+  gap: 6px !important;
+  align-items: center !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system li {
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  min-width: 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system .qagent-sidebar__action {
+  width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system .qagent-sidebar__action > span {
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system .qagent-sidebar__action::part(button) {
+  width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system .q5t-important-trigger {
+  width: 40px !important;
+}

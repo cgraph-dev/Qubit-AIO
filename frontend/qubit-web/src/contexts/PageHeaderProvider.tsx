@@ -97,18 +97,18 @@ export function PageHeaderProvider({
                 <h1 className="min-w-0 max-w-full font-expanded text-sm font-bold tracking-[0.08em] text-midground [overflow-wrap:anywhere]">
                   {displayTitle}
                 </h1>
+                {afterTitle ? (
+                  <div
+                    data-page-header-actions=""
+                    className={cn(
+                      "qubit-module-header__meta min-w-0 max-w-full overflow-x-auto scrollbar-none",
+                      isEnvRoute && "w-full",
+                    )}
+                  >
+                    {afterTitle}
+                  </div>
+                ) : null}
               </div>
-              {afterTitle ? (
-                <div
-                  data-page-header-actions=""
-                  className={cn(
-                    "min-w-0 max-w-full overflow-x-auto scrollbar-none",
-                    isEnvRoute && "w-full",
-                  )}
-                >
-                  {afterTitle}
-                </div>
-              ) : null}
             </div>
             {end ? (
               <div data-page-header-actions="" className="flex min-w-0 max-w-full flex-wrap justify-start sm:justify-end">
