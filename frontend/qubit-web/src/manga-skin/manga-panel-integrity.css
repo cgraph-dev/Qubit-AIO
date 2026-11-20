@@ -484,12 +484,13 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] h1::before {
   left: -12px !important;
   background: url("/manga-ui/q5t-sharpened-corner.svg") center / contain no-repeat !important;
 }
+/* No slash ornament on shared page/section titles; the owner corner is the
+   only decoration there. This also suppresses the older three-stroke layer. */
 html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-page__title,.settings-section__heading,.settings-section__title,.qplate-module__head
 )::after,
 html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
-  width: 54px !important;
-  height: 35px !important;
-  right: 6px !important;
-  background: url("/manga-ui/manga-impact-slashes.svg") center / contain no-repeat !important;
+  content: none !important;
+  display: none !important;
+  background: none !important;
 }

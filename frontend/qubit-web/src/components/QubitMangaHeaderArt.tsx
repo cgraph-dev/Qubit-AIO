@@ -30,33 +30,7 @@ export function QubitMangaHeaderArt() {
         <path d="M53 8 65 4 56 14" fill="#fff5ff" />
       </svg>
 
-      <svg className="qubit-manga-header-art__slashes" viewBox="0 0 420 270" focusable="false">
-        <defs>
-          <linearGradient id="qmh-slash-pink" x1="0" y1="0" x2="1" y2="1">
-            <stop stopColor="#fff2ff" />
-            <stop offset=".11" stopColor="#ff87db" />
-            <stop offset=".28" stopColor="#ff36a9" />
-            <stop offset=".67" stopColor="#e41983" />
-            <stop offset=".88" stopColor="#821647" />
-            <stop offset="1" stopColor="#ffb8e5" />
-          </linearGradient>
-        </defs>
-        <g fill="#090510" stroke="#090510" strokeWidth="10" strokeLinejoin="miter">
-          <path d="M15 216 L217 35 L409 7 L233 68 L181 103 L209 84 L397 42 L135 232 L183 160 L78 218Z" />
-          <path d="M39 268 L207 114 L390 63 L232 144 L200 163 L255 128 L360 111 L106 259 L137 211 Z" />
-          <path d="M170 251 L294 137 L416 108 L316 163 L280 182 L342 164 L408 152 L242 258Z" />
-        </g>
-        <g fill="url(#qmh-slash-pink)" stroke="#fe5abf" strokeWidth="2">
-          <path d="M15 216 L217 35 L409 7 L233 68 L181 103 L209 84 L397 42 L135 232 L183 160 L78 218Z" />
-          <path d="M39 268 L207 114 L390 63 L232 144 L200 163 L255 128 L360 111 L106 259 L137 211 Z" />
-          <path d="M170 251 L294 137 L416 108 L316 163 L280 182 L342 164 L408 152 L242 258Z" />
-        </g>
-        <g fill="#fff2fb" opacity=".94">
-          <path d="M23 208 L218 41 L377 17 L228 65Z" />
-          <path d="M48 257 L209 121 L354 79 L216 148Z" />
-          <path d="M180 244 L297 145 L391 117 L303 168Z" />
-        </g>
-      </svg>
+
     </div>
   );
 }

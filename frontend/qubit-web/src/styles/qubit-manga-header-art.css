@@ -16,15 +16,7 @@ html[data-qubit-manga="on"] .qubit-manga-header-art__star {
   transform: translateY(-50%);
   filter: drop-shadow(0 0 3px rgba(255, 229, 0, .45));
 }
-html[data-qubit-manga="on"] .qubit-manga-header-art__slashes {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 180px;
-  height: auto;
-  transform: translateY(-50%);
-  opacity: .9;
-}
+
 html[data-qubit-manga="on"] header[role="banner"] {
   position: relative;
   isolation: isolate;
@@ -50,8 +42,5 @@ html[data-qubit-manga="on"] header[role="banner"]::after {
     left: 1px;
     width: 36px;
     height: 36px;
-  }
-  html[data-qubit-manga="on"] .qubit-manga-header-art__slashes {
-    width: 110px;
   }
 }
