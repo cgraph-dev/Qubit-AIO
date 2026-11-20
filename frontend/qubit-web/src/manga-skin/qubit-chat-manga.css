@@ -76,7 +76,12 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__conversation > .qch
   border-bottom:1px solid rgba(255,105,194,.64)!important;
   border-radius:0!important;
   box-shadow:none!important;
-  background:linear-gradient(105deg,rgba(204,29,133,.33),rgba(35,8,45,.42) 35%,rgba(10,4,21,.95))!important;
+  /* Full-resolution SVG is displayed at native ratio; the rest of the
+     header gets a matching plum fill rather than a horizontally stretched
+     illustration. Text and buttons remain independent React elements. */
+  background:
+    url("/manga-ui/qubit-chat/header.svg") left center / auto 100% no-repeat,
+    linear-gradient(105deg,#59103f,#210a2d 45%,#10071e)!important;
   overflow:visible;
 }
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::before {
@@ -134,7 +139,7 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud {
   min-height:57px;
   margin:0!important;
   padding:4px 9px!important;
-  border:1px solid rgba(255,91,181,.74)!important;
+  border:0!important;
   border-radius:3px!important;
   background:linear-gradient(100deg,#260a31,#17091d 65%,#240b32)!important;
   box-shadow:inset 0 1px rgba(255,183,235,.22)!important;
@@ -142,9 +147,16 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud {
 }
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud::before {
   content:"";
-  position:absolute;top:0;right:0;left:0;height:2px;
-  background:linear-gradient(90deg,#ff3faf,#ffe19f 14%,transparent 36%,#fb30a1 84%);
+  position:absolute;inset:0;z-index:0;
+  border:11px solid transparent;
+  border-image-source:url("/manga-ui/qubit-chat/hud.svg");
+  border-image-slice:22 fill;
+  border-image-width:9px;
+  border-image-repeat:stretch;
   pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud > * {
+  position:relative;z-index:1;
 }
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-mark {
   width:62px;min-height:46px;
@@ -291,16 +303,16 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-loader > .qch
   position:relative;
   display:block;
   width:min(300px,65vw);
-  height:8px;
-  background:#1c082e;
-  border:1px solid #ed4caf;
+  height:22px;
+  background:url("/manga-ui/qubit-chat/progress.svg") center / 100% 100% no-repeat;
+  border:0;
   border-radius:2px;
   overflow:hidden;
 }
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-indeterminate::before {
   content:"";
   display:block;
-  width:32%;height:100%;
+  width:32%;height:10px;margin:6px 0 0 7px;
   background:linear-gradient(90deg,#f2279e,#ff8cda,#ed35aa);
   transform:translateX(-105%);
   animation:qma-loading-sweep 1.8s ease-in-out infinite;
