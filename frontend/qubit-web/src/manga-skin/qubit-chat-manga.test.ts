@@ -49,7 +49,10 @@ describe("native /qubit-chat Manga agent contract", () => {
     expect(chat).toContain('<MangaChatLoader label="Loading conversation…" />');
     expect(loader).toContain("<SakugaLoading label={label} />");
     expect(loader).toContain('className="qchat__manga-indeterminate"');
-    expect(loader).not.toContain("showCat");
+    expect(loader).toContain("showCat={false}");
+    expect(loader).toContain('size?: "md" | "inline"');
+    expect(chat).toContain('<MangaChatLoader size="inline" />');
+    expect(css).toContain(".qchat__manga-atom-inline");
   });
 
   it("keeps voice diagnostics accessible and native responsive inspector layout", () => {
