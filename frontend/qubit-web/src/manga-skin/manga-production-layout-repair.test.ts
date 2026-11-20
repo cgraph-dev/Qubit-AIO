@@ -63,7 +63,7 @@ describe("approved Manga artwork alignment contract", () => {
   });
 
   it("keeps the supplied rail plate separate from the page bubble", () => {
-    expect(read("../components/sidebar-tooltip.css")).toContain("sidebar-tooltip.svg");
+    expect(read("../components/sidebar-tooltip.css")).toContain("sidebar-menu-tooltip.svg");
     expect(tipComponent).toContain("tip.offsetWidth, tip.offsetHeight");
     expect(tipComponent).toContain('data-rail-tooltip=""');
   });
