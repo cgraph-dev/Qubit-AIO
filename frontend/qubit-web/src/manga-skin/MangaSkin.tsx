@@ -41,6 +41,8 @@ import "./manga-production-layout-repair.css";
 import "./manga-panel-integrity.css";
 import "./manga-popup-panels.css";
 import "./chat-inspector.css";
+// Scope all new art to the central native /qubit-chat surface, never the rail or inspector.
+import "./qubit-chat-manga.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {
