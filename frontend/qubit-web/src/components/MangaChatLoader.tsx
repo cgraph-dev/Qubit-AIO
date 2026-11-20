@@ -7,12 +7,32 @@ import { QubitAtomLoader } from "@/components/QubitAtomLoader";
  * The track is intentionally indeterminate: the chat API does not provide
  * a reliable loading percentage for restoring a session.
  */
-export function MangaChatLoader({ label = "Loading conversation…" }: { label?: string }) {
-  // Preserve the existing loader for non-Manga themes. The Manga gate sets
-  // this marker before the lazy native ChatPage mounts.
-  if (typeof document === "undefined" ||
-      document.documentElement.dataset.qubitManga !== "on") {
-    return <QubitAtomLoader label="Loading chat…" size="sm" />;
+export function MangaChatLoader({
+  label = "Loading conversation…",
+  size = "md",
+}: { label?: string; size?: "md" | "inline" }) {
+  // Preserve existing status and visual marks in every non-Manga theme.
+  const mangaOn = typeof document !== "undefined" &&
+    document.documentElement.dataset.qubitManga === "on";
+  if (!mangaOn) {
+    return size === "inline"
+      ? <QubitAtomLoader size="inline" showLabel={false} showBar={false} showCat={false} />
+      : <QubitAtomLoader label="Loading chat…" size="sm" />;
+  }
+  // Streaming already has an aria-live message on its parent. Do not create
+  // a second live-region announcement or a large spinner in each message row.
+  if (size === "inline") {
+    return (
+      <img
+        className="qchat__manga-atom-inline"
+        src="/manga-ui/qubit-chat/atom.svg"
+        width={25}
+        height={25}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+      />
+    );
   }
   return (
     <div className="qchat__manga-loader" data-testid="manga-chat-loader">
