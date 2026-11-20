@@ -1623,6 +1623,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         {sidePanelOpen ? (
           <div
             id="chat-side-panel"
+            data-chat-inspector=""
             role="complementary"
             aria-label={modelToolsLabel}
             className="qchat__side qplate relative isolate flex max-h-[50vh] min-h-0 shrink-0 flex-col overflow-hidden lg:h-full lg:max-h-none lg:w-60"
@@ -1662,7 +1663,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 this panel and /qubit-chat's are one system, not two skins. */}
             <section
               aria-labelledby="terminal-module-model"
-              className="shrink-0"
+              className="qchat__model-panel"
             >
               <PlateModuleHead
                 id="terminal-module-model"
@@ -1715,7 +1716,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 short note and never blocks the terminal. */}
             <section
               aria-labelledby="terminal-module-tools"
-              className="shrink-0"
+              className="qchat__tools"
             >
               <PlateModuleHead
                 id="terminal-module-tools"
@@ -1728,14 +1729,15 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 session — the card /qubit-chat's panel has. A fresh chat has
                 no session id yet, so nothing is read. */}
             {!freshChat && (resumeTarget || resumeParam) ? (
-              <div className="shrink-0">
+              <div className="qchat__artifacts">
                 <ChatSessionArtifacts
                   key={resumeTarget || resumeParam}
                   sessionId={resumeTarget || resumeParam}
                 />
               </div>
             ) : null}
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <section className="qchat__sessions" aria-labelledby="terminal-module-sessions">
+              <PlateModuleHead id="terminal-module-sessions" index="03" label={t.app.nav.sessions} />
               <ChatSessionList
                 key={sessionListNonce}
                 // Highlight from the URL synchronously: `resumeTarget` only
@@ -1750,6 +1752,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 }
                 profile={scopedProfile}
                 onNewChat={handleNewChat}
+                showTerminalLink={false}
                 workspaceCwd={workspaceCwd}
                 onWorkspaceChange={setWorkspaceCwd}
                 // The panel must list the store whose every row opens with a
@@ -1762,7 +1765,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 // resumes, so its rows open with the real conversation.
                 // Omitting `source` uses that default.
               />
-            </div>
+            </section>
             <div className="shrink-0 px-2">
               <a
                 href={

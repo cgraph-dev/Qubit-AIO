@@ -1,112 +1,92 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
-import { emitFxAt } from "@/sakuga/ui";
+import { visibleViewport } from "@/manga-skin/panelPlacement";
+import { playLocalFx } from "@/sakuga/localFx";
+import "./sidebar-tooltip.css";
 
-/**
- * The rail's flyout label.
- *
- * Portalled to `document.body` with `position: fixed`, so it is never clipped
- * by the sidebar's own `overflow-y: auto` or by a transformed ancestor — the
- * whole point of a rail tooltip is that it lives OUTSIDE the rail.
- *
- * Placement rules, in order of preference:
- *   1. to the right of the rail's outer edge (`#app-sidebar`), vertically
- *      centred on the anchor row;
- *   2. flipped to the LEFT of the rail when the right side would overflow the
- *      viewport (narrow window, rail on the right half);
- *   3. clamped to the viewport vertically, so a tooltip on the first or last
- *      row never runs off the top/bottom edge.
- *
- * A "warm" ref keeps it from re-animating while the pointer travels straight
- * from one row to the next — the flicker that makes icon rails feel cheap.
- */
-export function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) {
-  const [isWarm] = useState(() => {
-    if (!warmRef) return false;
-    return Date.now() - warmRef.current < 300;
-  });
+import { railTooltipPosition } from "./railTooltipPosition";
+
+export function SidebarTooltip({ anchor, label, detail, warmRef }: {
+  anchor: HTMLElement;
+  label: string;
+  detail?: string;
+  warmRef?: RefObject<number>;
+}) {
+  const id = useId();
+  const ref = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!warmRef) return;
-    warmRef.current = Date.now();
-    return () => {
-      if (warmRef) warmRef.current = Date.now();
+    const warm = warmRef && Date.now() - warmRef.current < 300;
+    const keyFocus = anchor.matches(":focus-visible") || Boolean(anchor.querySelector(":focus-visible"));
+    const timer = window.setTimeout(() => setReady(true), warm || keyFocus ? 0 : 320);
+    const dismiss = (event: Event) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      window.clearTimeout(timer);
+      setReady(false);
     };
-  }, [warmRef]);
+    window.addEventListener("keydown", dismiss);
+    anchor.addEventListener("click", dismiss);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("keydown", dismiss);
+      anchor.removeEventListener("click", dismiss);
+    };
+  }, [anchor, warmRef]);
 
-  // The rail flyout is a Sakuga bubble now: the same white card, ink border,
-  // lavender shadow and a small pop from the anchor when it opens.
-  useEffect(() => {
-    // The Manga plate is static and already has illustrated reflections.
-    // Pop FX is kept for other themes only; no decorative motion is injected.
-    if (document.documentElement.dataset.qubitManga !== "on") {
-      void emitFxAt("pop", anchor, { scale: 0.45 });
-    }
-  }, [anchor]);
+  useLayoutEffect(() => {
+    const tip = ref.current;
+    if (!tip || !ready) return;
+    const rail = anchor.closest("#app-sidebar") ?? anchor;
+    const trigger = anchor.matches("a,button,[tabindex],sakuga-button") ? anchor
+      : anchor.querySelector<HTMLElement>("a,button,sakuga-button") ?? anchor;
+    const nav = anchor.closest("nav");
+    const place = () => {
+      const viewport = visibleViewport();
+      const rect = anchor.getBoundingClientRect();
+      const railBox = rail.getBoundingClientRect();
+      const navBox = nav?.getBoundingClientRect() ?? railBox;
+      const box = { left: railBox.left, right: railBox.right,
+        top: Math.max(railBox.top, navBox.top), bottom: Math.min(railBox.bottom, navBox.bottom) };
+      const position = railTooltipPosition(rect, box, tip.offsetWidth, tip.offsetHeight, viewport);
+      tip.style.visibility = position ? "visible" : "hidden";
+      if (position) {
+        tip.dataset.placement = position.placement;
+        tip.style.left = `${position.left}px`;
+        tip.style.top = `${position.top}px`;
+      }
+    };
+    place();
+    const previous = trigger.getAttribute("aria-describedby");
+    if (detail) trigger.setAttribute("aria-describedby", [previous, `${id}-detail`].filter(Boolean).join(" "));
+    const visible = tip.style.visibility === "visible";
+    if (visible && (!warmRef || Date.now() - warmRef.current >= 300)) playLocalFx("pop", tip, .35);
+    if (visible && warmRef) warmRef.current = Date.now();
+    const observer = new ResizeObserver(place);
+    observer.observe(tip);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    window.visualViewport?.addEventListener("scroll", place);
+    window.visualViewport?.addEventListener("resize", place);
+    return () => {
+      if (visible && warmRef) warmRef.current = Date.now();
+      if (detail) {
+        if (previous) trigger.setAttribute("aria-describedby", previous);
+        else trigger.removeAttribute("aria-describedby");
+      }
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+      window.visualViewport?.removeEventListener("scroll", place);
+      window.visualViewport?.removeEventListener("resize", place);
+    };
+  }, [anchor, ready, warmRef, detail, id]);
 
-  const rect = anchor.getBoundingClientRect();
-  const sidebar = document.getElementById("app-sidebar")?.getBoundingClientRect();
-  const gap = 10;
-  const railRight = sidebar && sidebar.width > 0 ? sidebar.right : rect.right;
-  const railLeft = sidebar && sidebar.width > 0 ? sidebar.left : rect.left;
-
-  // Use the real Manga sprite width for flip placement. The precision
-  // tooltip is 320:170, so at 260px it remains perfectly circular.
-  const manga = document.documentElement.dataset.qubitManga === "on";
-  const CARD_WIDTH = manga ? 260 : 232;
-  const fitsRight = railRight + gap + CARD_WIDTH <= window.innerWidth - 8;
-  const placement: "right" | "left" = fitsRight ? "right" : "left";
-
-  const [title, ...rest] = label.split(" — ");
-  const detail = rest.length > 0 ? rest.join(" — ") : undefined;
-
-  // Clamp vertically: the card is ~2 lines tall at most.
-  const EDGE = manga ? 73 : 40;
-  const centreY = rect.top + rect.height / 2;
-  const top = Math.min(Math.max(centreY, EDGE), window.innerHeight - EDGE);
-
-  return createPortal(
-    <div
-      className={cn(
-        "qagent-sidebar__tooltip",
-        "pointer-events-none fixed z-[100]",
-        "min-w-[7rem] max-w-[15rem]",
-        "rounded-[var(--qrail-radius,0.4rem)] border",
-      )}
-      data-placement={placement}
-      data-sakuga-tip="1"
-      role="tooltip"
-      style={{
-        top,
-        transform: "translateY(-50%)",
-        ...(manga ? {} : {
-          background: "var(--sk-card, #fff)",
-          color: "var(--sk-ink, #1d1a4a)",
-          border: "2.5px solid var(--sk-ink, #1d1a4a)",
-          borderRadius: 12,
-          boxShadow: "5px 6px 0 var(--sk-soft, #b8b3ff)",
-          padding: "9px 13px",
-          font: "600 13px/1.35 -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif",
-        }),
-        ...(placement === "right"
-          ? { left: railRight + gap }
-          : { right: window.innerWidth - railLeft + gap }),
-        animation: isWarm ? "none" : undefined,
-      }}
-    >
-      <span className="qagent-sidebar__tooltip-title" style={manga ? undefined : { color: "var(--sk-ink, #1d1a4a)" }}>{title}</span>
-      {detail && <span className="qagent-sidebar__tooltip-detail" style={manga ? undefined : { color: "var(--sk-dim, #8580b0)", fontWeight: 500 }}>{detail}</span>}
+  return ready && createPortal(
+    <div ref={ref} id={id} role="tooltip" data-rail-tooltip="" className="manga-rail-tooltip">
+      <span className="manga-rail-tooltip__title" dir="auto">{label}</span>
+      {detail && <span className="manga-rail-tooltip__body" id={`${id}-detail`} dir="auto">{detail}</span>}
     </div>,
     document.body,
   );
-}
-
-type TooltipWarmRef = React.RefObject<number>;
-
-interface SidebarTooltipProps {
-  anchor: HTMLElement;
-  /** `Label` or `Label — one-line explanation`. */
-  label: string;
-  warmRef?: TooltipWarmRef;
 }

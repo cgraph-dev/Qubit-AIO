@@ -363,12 +363,6 @@
   border: 0 !important;
   background: transparent !important;
 }
-.qchat__side .qchat__tools-card > span:first-child {
-  color: var(--qplate-faint) !important;
-  font: 600 var(--qplate-label-size)/1 var(--qplate-font-mono) !important;
-  letter-spacing: var(--qplate-label-tracking) !important;
-  text-transform: uppercase;
-}
 .qchat__tools-row { gap: .12rem !important; }
 .qchat__tools-row > span {
   display: block;

@@ -10,6 +10,7 @@ import {
   createElement,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -41,6 +42,7 @@ export function SakugaHoverTooltip({
   const [open, setOpen] = useState(false);
   const [bump, setBump] = useState(0);
   const wrap = useRef<HTMLSpanElement | null>(null);
+  const bubble = useRef<HTMLSpanElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clear = () => {
@@ -74,6 +76,36 @@ export function SakugaHoverTooltip({
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  useLayoutEffect(() => {
+    const trigger = wrap.current;
+    const tip = bubble.current;
+    if (!open || !trigger || !tip) return;
+    const place = () => {
+      const { left, right, top, bottom } = trigger.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const minX = (viewport?.offsetLeft ?? 0) + 12;
+      const maxX = (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth) - 12;
+      const minY = (viewport?.offsetTop ?? 0) + 12;
+      const maxY = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - 12;
+      const above = top - minY;
+      const below = maxY - bottom;
+      const need = tip.offsetHeight + 12;
+      const side = placement === "top" && above < need && below > above ? "bottom"
+        : placement === "bottom" && below < need && above > below ? "top" : placement;
+      const centred = (left + right - tip.offsetWidth) / 2;
+      const shift = Math.max(minX, Math.min(centred, maxX - tip.offsetWidth)) - centred;
+      tip.dataset.placement = side;
+      tip.style.setProperty("--qsk-tip-shift", `${shift}px`);
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, bump, placement]);
+
   const onClick = () => {
     if (disabled) return;
     // A click is also a tap: keep it open and play a small landing reaction.
@@ -100,6 +132,7 @@ export function SakugaHoverTooltip({
         'span',
         {
           key: bump,
+          ref: bubble,
           role: 'tooltip',
           className: 'qsk-hover-tip__bubble',
           'data-placement': placement,

@@ -40,6 +40,7 @@ import "./manga-approved-production.css";
 import "./manga-production-layout-repair.css";
 import "./manga-panel-integrity.css";
 import "./manga-popup-panels.css";
+import "./chat-inspector.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {
@@ -174,7 +175,7 @@ export function MangaSkinGate(): null {
       if (!(target instanceof Element)) return;
       const action = target.closest<HTMLElement>("button, a[href], [role='button']");
       if (!action || !action.closest("[data-qm-route]") ||
-          action.closest("sakuga-button, sakuga-toggle, sakuga-checkbox") ||
+          action.closest("sakuga-button, sakuga-toggle, sakuga-checkbox, [data-sakuga-native]") ||
           action.matches(":disabled, [aria-disabled='true']") ||
           action.closest("[role='dialog'],[data-chat-active='true']")) return;
       const now = performance.now();

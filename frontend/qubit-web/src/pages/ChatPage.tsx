@@ -3149,6 +3149,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         {sidePanelOpen && (
           <div
             id="chat-side-panel"
+            data-chat-inspector=""
             role="complementary"
             aria-label={modelToolsLabel}
             className="qchat__side flex min-h-0 shrink-0 flex-col overflow-hidden lg:h-full lg:w-60"
@@ -3209,7 +3210,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             </section>
             <section
               aria-labelledby="qchat-module-sessions"
-              className="qchat__sessions min-h-0 flex-1 overflow-hidden"
+              className="qchat__sessions"
             >
               <PlateModuleHead
                 id="qchat-module-sessions"

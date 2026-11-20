@@ -1,3 +1,4 @@
+import { playLocalFx } from "./localFx";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { SakugaSelect as OriginalSelect, type SakugaSelectProps } from "@qubit/shared/sakuga";
@@ -110,6 +111,7 @@ function MangaSelect({
           if (open) { close(); return; }
           // Keep keyboard focus inside the owning modal, even though the
           // options are painted outside its fields and scrollable body.
+          if (trigger.current) playLocalFx("impact", trigger.current, .6);
           setPortalHost(trigger.current?.closest<HTMLElement>('[aria-modal="true"]') ?? document.body);
           reposition();
           setOpen(true);

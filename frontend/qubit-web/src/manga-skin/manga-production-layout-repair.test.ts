@@ -23,7 +23,6 @@ describe("approved Manga artwork alignment contract", () => {
     expect(css).toContain("13_star_only.webp");
     expect(css).toContain("aspect-ratio:2104 / 380");
     expect(css).toContain("manga-sidebar-outer-frame.svg");
-    expect(css).toContain("manga-tooltip-precision.svg");
     expect(css).toContain("manga-system-title-precision.svg");
     expect(css).toContain(".qm-studio-title-corner__star");
     expect(installer).toContain('"13_star_only.webp"');
@@ -63,11 +62,10 @@ describe("approved Manga artwork alignment contract", () => {
     expect(css).toContain("manga-sidebar-outer-frame.svg");
   });
 
-  it("positions and clips the precision tooltip at its true vector aspect ratio", () => {
-    expect(css).toContain("aspect-ratio:320 / 170");
-    expect(css).toContain("padding:25px 71px 29px 24px");
-    expect(tipComponent).toContain("const CARD_WIDTH = manga ? 260 : 232");
-    expect(tipComponent).toContain("const EDGE = manga ? 73 : 40");
+  it("keeps the supplied rail plate separate from the page bubble", () => {
+    expect(read("../components/sidebar-tooltip.css")).toContain("sidebar-tooltip.svg");
+    expect(tipComponent).toContain("tip.offsetWidth, tip.offsetHeight");
+    expect(tipComponent).toContain('data-rail-tooltip=""');
   });
 
   it("prefers repaired assets and never blindly reapplies the old ZIP", () => {

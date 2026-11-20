@@ -18,7 +18,9 @@
  * keeps the chat context focused on switching conversations quickly.
  */
 
-import { ListItem, Button } from "@/sakuga/ui";
+import { FxButton } from "@/sakuga/FxButton";
+import { playLocalFx } from "@/sakuga/localFx";
+import { Button } from "@/sakuga/ui";
 import {
   AlertCircle,
   MessageSquarePlus,
@@ -104,6 +106,7 @@ interface ChatSessionListProps {
    * picker-noise rows, so its rows open blank.
    */
   source?: ChatSessionListSource;
+  showTerminalLink?: boolean;
 }
 
 function rowLabel(session: ChatStoreSession, untitled: string): string {
@@ -123,6 +126,7 @@ export function ChatSessionList({
   workspaceCwd,
   onWorkspaceChange,
   source = "chat",
+  showTerminalLink = true,
 }: ChatSessionListProps) {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -152,7 +156,7 @@ export function ChatSessionList({
   const reqRef = useRef(0);
   // Keep expanded history reachable across focus/interval/manual refreshes.
   const loadedLimitRef = useRef(SESSION_LIMIT);
-  const nextOffsetRef = useRef(0);
+  const [nextOffset, setNextOffset] = useState(0);
   const busyRef = useRef(false);
 
   // `profile` scopes the canonical listing; the empty-string fallback keeps
@@ -163,8 +167,8 @@ export function ChatSessionList({
   // Scope changes must not leave another profile's rows visible while loading.
   useEffect(() => {
     loadedLimitRef.current = SESSION_LIMIT;
-    nextOffsetRef.current = 0;
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNextOffset(0);
     setSessions(null);
     setTotal(null);
   }, [scopeKey, source, searchQuery]);
@@ -187,7 +191,7 @@ export function ChatSessionList({
       .then((res) => {
         if (reqRef.current !== myReq) return;
         if (!Array.isArray(res.sessions)) throw new Error("Invalid session list response");
-        nextOffsetRef.current = res.sessions.length;
+        setNextOffset(res.sessions.length);
         setSessions(res.sessions);
         setTotal("total" in res && typeof res.total === "number" ? res.total : null);
       })
@@ -211,7 +215,12 @@ export function ChatSessionList({
     // switches sessions; `reloadNonce` is the manual Refresh trigger.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-    return () => { ++reqRef.current; busyRef.current = false; };
+    return () => {
+      // Invalidate whichever request (initial load or refresh) is active.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      ++reqRef.current;
+      busyRef.current = false;
+    };
   }, [load, reloadNonce, activeSessionId]);
 
   // Live updates (best-effort, no new deps): stay fresh while the tab is open
@@ -246,7 +255,7 @@ export function ChatSessionList({
   // overlapping clicks and against a refresh landing mid-append.
   const loadMore = useCallback(() => {
     if (source !== "canonical" || loading || loadingMore || busyRef.current) return;
-    const have = nextOffsetRef.current;
+    const have = nextOffset;
     if (total !== null && have >= total) return;
     const myReq = reqRef.current;
     busyRef.current = true;
@@ -257,7 +266,7 @@ export function ChatSessionList({
         // Drop the append if a refresh/pick replaced the list under us.
         if (reqRef.current !== myReq) return;
         if (!Array.isArray(res.sessions)) throw new Error("Invalid session list response");
-        nextOffsetRef.current = have + res.sessions.length;
+        setNextOffset(have + res.sessions.length);
         setSessions((prev) => {
           const seen = new Set((prev ?? []).map((s) => s.id));
           return [...(prev ?? []), ...res.sessions.filter((s) => !seen.has(s.id))];
@@ -271,7 +280,7 @@ export function ChatSessionList({
       .finally(() => {
         if (reqRef.current === myReq) { busyRef.current = false; setLoadingMore(false); }
       });
-  }, [loading, loadingMore, scopeKey, sessions, source, total]);
+  }, [loading, loadingMore, nextOffset, scopeKey, source, total]);
 
   // The active session must always be visible and on top, even when the host's
   // resume id is a canonical/worker id the chat-store list does not contain
@@ -393,23 +402,22 @@ export function ChatSessionList({
           // folded into activeRowId as a fallback, never a second highlight.
           const isActive = s.id === activeRowId;
           return (
-            <div key={s.id} className="relative">
-              <ListItem
+            <div key={s.id} className="qm-chat-session-row">
+              <FxButton type="button"
                 data-testid="session-row"
                 onClick={() => pick(s.id)}
                 aria-current={isActive ? "true" : undefined}
                 className={cn(
-                  "flex-col items-start gap-0.5 rounded px-2 py-1.5 pr-14",
-                  "normal-case tracking-normal",
+                  "qm-chat-session-pick",
                   isActive
                     ? "qchat__session-row--active bg-primary/15 font-medium text-foreground"
                     : "text-text-secondary hover:bg-midground/5 hover:text-foreground",
                 )}
               >
-                <span className="w-full truncate text-sm font-medium">
+                <span className="qm-chat-session-name">
                   {rowLabel(s, t.sessions.untitledSession)}
                 </span>
-                <span className="flex w-full items-center gap-1.5 text-[0.6875rem] text-text-tertiary">
+                <span className="qm-chat-session-meta">
                   <span>{timeAgo(s.last_active ?? s.started_at ?? 0)}</span>
                   {(s.message_count ?? 0) > 0 && (
                     <>
@@ -424,24 +432,21 @@ export function ChatSessionList({
                     </>
                   )}
                 </span>
-              </ListItem>
-              {/* Reach the terminal session where the agent actually runs
-                  (the /chat PTY). A SIBLING of ListItem's <button>, never a
-                  child: a link inside a button is invalid and unreachable. */}
-              <a
-                href={`/chat?resume=${encodeURIComponent(s.id)}`}
+              </FxButton>
+              {showTerminalLink && <a
+                href={`/chat?${new URLSearchParams({ resume: s.id, ...(profile ? { profile } : {}) })}`}
                 aria-label={`Open session ${s.id} in the /chat terminal`}
                 title="Open in /chat"
-                className="absolute right-2 top-2 inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-midground hover:bg-midground/10"
+                className="qm-chat-session-terminal"
               >
                 <Terminal className="h-3 w-3" />
                 /chat
-              </a>
+              </a>}
             </div>
           );
         })}
         {source === "canonical" &&
-          (total === null || nextOffsetRef.current < total) && (
+          (total === null || nextOffset < total) && (
             <Button
               variant="secondary"
               onClick={loadMore}
@@ -457,14 +462,16 @@ export function ChatSessionList({
     activeRowId,
     error,
     loadMore,
-    searchInput,
+    nextOffset,
     searchQuery,
     loading,
     loadingMore,
     orderedSessions,
     sessions,
     pick,
+    profile,
     reload,
+    showTerminalLink,
     source,
     t,
     total,
@@ -475,26 +482,10 @@ export function ChatSessionList({
     // landmark (drift: /chat exposed three <aside> landmarks).
     <div
       className={cn(
-        "flex h-full w-full min-w-0 shrink-0 flex-col overflow-hidden",
+        "qm-chat-session-list flex w-full min-w-0 flex-col",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-2 pb-2">
-        <span className="text-display text-xs tracking-wider text-text-tertiary">
-          {t.sessions.title}
-        </span>
-        <Button
-          variant="secondary"
-          onClick={reload}
-          aria-label={t.common.refresh}
-          title={t.common.refresh}
-          className="qm-sessions-refresh text-text-secondary hover:text-foreground"
-          aria-busy={loading}
-        >
-          <RefreshCw className={cn("qm-refresh-icon", loading && "qm-refresh-icon--spinning")} />
-        </Button>
-      </div>
-
       {onWorkspaceChange && (
         <ChatWorkspacePicker
           profile={profile}
@@ -503,42 +494,56 @@ export function ChatSessionList({
         />
       )}
 
-      <div className="qm-chat-session-search relative px-2 pb-2">
-        <Search
-          className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
-          aria-hidden="true"
-        />
+      <div className="qm-chat-session-search">
+        <Search size={16} aria-hidden="true" />
         <input
           type="search"
           aria-label="Search chat sessions"
           value={searchInput}
-          onChange={(event) => setSearchInput(event.currentTarget.value)}
+          onFocus={(event) => playLocalFx("focus", event.currentTarget, .5)}
+          onChange={(event) => {
+            playLocalFx("type", event.currentTarget, .35);
+            setSearchInput(event.currentTarget.value);
+          }}
           placeholder={t.common.search ?? "Search sessions"}
-          className="qm-chat-session-search-field w-full rounded-sm border px-9 py-2 pr-8 text-xs text-foreground outline-none placeholder:text-text-tertiary"
+          className="qm-chat-session-search-field"
         />
-        {searchInput ? (
-          <Button
-            variant="secondary"
+        {searchInput && (
+          <FxButton
             type="button"
-            onClick={() => setSearchInput("")}
+            onClick={(event) => {
+              event.currentTarget.parentElement?.querySelector("input")?.focus();
+              setSearchInput("");
+            }}
             aria-label="Clear session search"
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-foreground"
           >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
+            <X size={16} aria-hidden="true" />
+          </FxButton>
+        )}
       </div>
 
-      <Button
-        variant="secondary"
-        onClick={startNew}
-        className="mx-2 mb-2 justify-center"
-      >
-        <MessageSquarePlus />
-        {t.sessions.newChat}
-      </Button>
+      <div className="qm-chat-session-actions">
+        <Button
+          variant="secondary"
+          onClick={reload}
+          aria-label={t.common.refresh}
+          title={t.common.refresh}
+          className="qm-sessions-refresh"
+          aria-busy={loading}
+        >
+          <RefreshCw className={cn("qm-refresh-icon", loading && "qm-refresh-icon--spinning")} />
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={startNew}
+          className="justify-center"
+        >
+          <MessageSquarePlus />
+          {t.sessions.newChat}
+        </Button>
+      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1 pb-1">
+      <div className="qm-chat-session-results">
         {content}
       </div>
     </div>

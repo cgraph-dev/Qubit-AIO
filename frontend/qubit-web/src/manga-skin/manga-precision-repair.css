@@ -208,26 +208,6 @@ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__action :is(svg,span){
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__action:disabled {
  opacity:.57!important;filter:grayscale(.48);
 }
-/* Chat session search: remove the old control's lower backdrop, icon and
-   pseudo-decoration, keep the live native input and ONE search icon. */
-html[data-qubit-manga="on"] .qm-chat-session-search {
- isolation:isolate;overflow:visible;
-}
-html[data-qubit-manga="on"] .qm-chat-session-search :is(.qsk-field,input[type="search"]){
- background-image:none!important;
- background-color:#160a26!important;
- border:2px solid #f3e6ff!important;
- border-radius:3px!important;
- box-shadow:inset 0 0 0 1px #703a8a!important;
- padding-left:34px!important;
- color:#fff6ff!important;font-size:13px!important;
- min-height:38px!important;
-}
-html[data-qubit-manga="on"] .qm-chat-session-search :is(.qsk-field,input[type="search"])::before,
-html[data-qubit-manga="on"] .qm-chat-session-search :is(.qsk-field,input[type="search"])::after{
- content:none!important;display:none!important;
-}
-html[data-qubit-manga="on"] .qm-chat-session-search > svg {left:17px!important;z-index:5;opacity:.9}
 /* Strong, legible UI typography without altering xterm. */
 html[data-qubit-manga="on"] .qchat__side {
  color:var(--qm-read)!important;
@@ -260,23 +240,6 @@ html[data-qubit-manga="on"] #qubit-main-content :is(button,[role="button"]) {
 }
 /* Sidebar tips are body-portalled with older inline styles; the actual ZIP
    tooltip artwork replaces the old white Sakuga card. */
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qagent-sidebar__tooltip {
- box-sizing:border-box!important;min-width:160px!important;
- min-height:78px!important;padding:23px 23px 17px!important;
- background:url("/manga-ui/zip/tooltip.svg") center/100% 100% no-repeat!important;
- border:0!important;border-radius:0!important;
- box-shadow:none!important;
- color:#fff6ff!important;
- font:700 13px/1.45 var(--theme-font-sans,system-ui,sans-serif)!important;
-}
-html[data-qubit-manga="on"] .qagent-sidebar__tooltip-title{
- font:900 14px/1.35 var(--qm-display,system-ui,sans-serif)!important;
- color:#ffe82d!important;
-}
-html[data-qubit-manga="on"] .qagent-sidebar__tooltip-detail{
- font:500 12px/1.45 var(--theme-font-sans,system-ui,sans-serif)!important;
- color:#fff6ff!important;
-}
 /* Plain DOM build update notice is outside React; override its inline
    legacy skin with the SVG framed manga pop-up. */
 html[data-qubit-manga="on"] #qubit-build-notice {
@@ -415,10 +378,6 @@ html[data-qubit-manga="on"] .qchat__side :is(.qchat__session-row,.settings-row) 
  min-height:39px!important;
  padding-block:8px!important;
 }
-html[data-qubit-manga="on"] .qm-chat-session-search input[type="search"]::-webkit-search-decoration,
-html[data-qubit-manga="on"] .qm-chat-session-search input[type="search"]::-webkit-search-cancel-button {
- appearance:none;display:none;
-}
 @media(max-width:400px){
  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head > span:nth-child(2){
   font-size:13px!important;
@@ -449,7 +408,7 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
  color:#fff3ff!important;
 }
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
- .qagent-sidebar__tooltip,[role="tooltip"]
+ [role="tooltip"]:not([data-rail-tooltip],.qsk-hover-tip__bubble)
 ) {
  border:0!important;border-radius:0!important;
  background:url("/manga-ui/zip/tooltip.svg") center/100% 100% no-repeat!important;

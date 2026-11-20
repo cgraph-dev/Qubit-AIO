@@ -73,7 +73,7 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="modal-warning"] {
   background-image:url("/manga-ui/zip/modal-warning.svg");
 }
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is([role="tooltip"],.qagent-sidebar__tooltip) {
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [role="tooltip"]:not([data-rail-tooltip],.qsk-hover-tip__bubble) {
   border:2px solid #ff269a!important;background:#171027!important;
   box-shadow:2px 2px 0 #080615!important;
 }

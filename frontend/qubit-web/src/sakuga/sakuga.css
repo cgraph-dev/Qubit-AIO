@@ -234,7 +234,7 @@ sakuga-input.qsk-select-filter {
 .qsk-hover-tip__bubble {
   position: absolute;
   z-index: 2147482500;
-  left: 50%;
+  left: calc(50% + var(--qsk-tip-shift, 0px));
   bottom: calc(100% + 12px);
   transform: translateX(-50%);
   display: grid;
@@ -248,7 +248,8 @@ sakuga-input.qsk-select-filter {
   color: var(--sk-ink, #1d1a4a);
   box-shadow: 5px 6px 0 var(--sk-soft, #b8b3ff);
   font: 500 13px/1.35 var(--sk-font, -apple-system, "Segoe UI", system-ui, sans-serif);
-  text-align: left;
+  text-align: start;
+  overflow-wrap: anywhere;
   pointer-events: none;
   animation: qsk-hover-tip-in 180ms cubic-bezier(.2, 1.6, .4, 1);
 }
@@ -261,7 +262,7 @@ sakuga-input.qsk-select-filter {
 .qsk-hover-tip__bubble::after {
   content: "";
   position: absolute;
-  left: 50%;
+  left: clamp(16px, calc(50% - var(--qsk-tip-shift, 0px)), calc(100% - 16px));
   top: 100%;
   width: 11px;
   height: 11px;

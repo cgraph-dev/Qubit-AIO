@@ -1,3 +1,4 @@
+import { FxButton } from "@/sakuga/FxButton";
 import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -75,7 +76,7 @@ export function UtilityPickerPanel({ id, title, closeLabel, onClose, anchor, chi
     >
       <header className="qm-utility-picker__head">
         <h2 id={`${id}-title`}>{title}</h2>
-        <button type="button" autoFocus aria-label={closeLabel} onClick={onClose}><X aria-hidden size={18} /></button>
+        <FxButton type="button" autoFocus aria-label={closeLabel} onClick={onClose}><X aria-hidden size={18} /></FxButton>
       </header>
       <div className="qm-utility-picker__body">{children}</div>
     </dialog>,

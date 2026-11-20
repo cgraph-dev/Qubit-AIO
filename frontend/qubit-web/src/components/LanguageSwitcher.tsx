@@ -1,3 +1,4 @@
+import { FxButton } from "@/sakuga/FxButton";
 import { useId, useRef, useState } from "react";
 import { Check, ChevronDown, Languages } from "lucide-react";
 import { useI18n } from "@/i18n/context";
@@ -16,22 +17,22 @@ export function LanguageSwitcher({ collapsed = false }: { collapsed?: boolean })
 
   return (
     <div ref={anchor} className="language-switcher">
-      <button type="button" className="qm-utility-trigger qm-language-trigger"
+      <FxButton type="button" className="qm-utility-trigger qm-language-trigger"
         aria-label={`${label}: ${LOCALE_META[locale].name}`} title={label} aria-expanded={open} aria-haspopup="dialog"
         aria-controls={open ? id : undefined} onClick={() => setOpen(true)}>
         <Languages size={15} aria-hidden />
         {!collapsed && <><span lang={locale} dir="auto">{LOCALE_META[locale].name}</span><ChevronDown size={13} aria-hidden /></>}
-      </button>
+      </FxButton>
       {open && (
         <UtilityPickerPanel id={id} title={label} closeLabel={t.common.close} anchor={anchor} onClose={close}>
           <div role="group" aria-label={label}>
             {locales.map((code) => (
-              <button type="button" key={code} lang={code} dir="auto"
+              <FxButton type="button" key={code} lang={code} dir="auto"
                 aria-pressed={code === locale} data-qm-picker-choice="" className="qm-picker-choice"
                 onClick={() => { setLocale(code); close(); }}>
                 <span>{LOCALE_META[code].name}</span>
                 {code === locale && <Check size={16} aria-hidden />}
-              </button>
+              </FxButton>
             ))}
           </div>
         </UtilityPickerPanel>

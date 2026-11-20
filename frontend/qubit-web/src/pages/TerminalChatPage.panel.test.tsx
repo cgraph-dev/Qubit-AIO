@@ -412,7 +412,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
         .not.toBeNull(),
     );
     await vi.waitFor(() =>
-      expect(container.textContent).toContain("Agent tools"),
+      expect(container.querySelector('section[aria-labelledby="terminal-module-tools"] #terminal-module-tools')?.textContent).toMatch(/tools/i),
     );
     // Each registry read the card performs is the real one, not a stub list.
     expect(apiMocks.getToolsets).toHaveBeenCalled();

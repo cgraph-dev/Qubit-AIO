@@ -6,7 +6,7 @@
  * dashboard pages, but it does not own chrome or pseudo-panels on this rail.
  *
  * Art: one real 9-slice outer frame, one star-free titleplate, ONE independent
- * gold-star image, one status frame and one precision tooltip. All copy is
+ * gold-star image and one status frame. All copy is
  * live React text. No Office, workbench or terminal selectors. Static pass.
  */
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar {
@@ -616,62 +616,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
   box-shadow:none!important;
   background:transparent!important;
 }
-/* Tooltips are portalled to body. Fixed-width AND natural 320:170 ratio
-   keep the concentric info badge perfectly round. The file is a crisp SVG. */
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
-  position:fixed!important;
-  display:flex!important;
-  flex-direction:column!important;
-  justify-content:center!important;
-  align-items:flex-start!important;
-  box-sizing:border-box!important;
-  width:260px!important;
-  min-width:260px!important;
-  max-width:260px!important;
-  height:138.125px!important;
-  min-height:138.125px!important;
-  max-height:138.125px!important;
-  aspect-ratio:320 / 170!important;
-  margin:0!important;
-  padding:25px 71px 29px 24px!important;
-  gap:5px!important;
-  background:url("/manga-ui/manga-tooltip-precision.svg") center / 100% 100% no-repeat!important;
-  border:0!important;
-  border-radius:0!important;
-  outline:0!important;
-  box-shadow:none!important;
-  clip-path:none!important;
-  overflow:visible!important;
-  filter:none!important;
-  color:#fff5ff!important;
-  font:500 12px/1.25 var(--theme-font-sans)!important;
-  text-shadow:none!important;
-  animation:none!important;
-  transition:none!important;
-}
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip::before,
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip::after {
-  content:none!important;display:none!important;
-}
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-title {
-  display:block!important;
-  max-width:100%!important;
-  color:#ffe779!important;
-  font:900 13px/1.18 var(--theme-font-sans)!important;
-  text-shadow:none!important;
-  overflow-wrap:anywhere!important;
-}
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-detail {
-  display:-webkit-box!important;
-  -webkit-line-clamp:3!important;
-  -webkit-box-orient:vertical!important;
-  overflow:hidden!important;
-  max-width:100%!important;
-  color:#fff5ff!important;
-  font:500 11px/1.25 var(--theme-font-sans)!important;
-  text-shadow:none!important;
-  overflow-wrap:break-word!important;
-}
 /* Keep artwork reflections and ornamental loops static until motion
    review, but DO NOT disable animations across every sidebar descendant.
    The old universal * rule suppressed Sakuga button interaction feedback. */
@@ -700,11 +644,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
  }
  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__section-head > span:nth-child(2) {
    font-size:11.5px!important;
- }
-}
-@media(prefers-reduced-motion:reduce){
- html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
-   transition:none!important;
  }
 }
 

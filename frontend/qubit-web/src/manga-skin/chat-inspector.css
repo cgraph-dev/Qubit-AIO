@@ -1,0 +1,122 @@
+/* One scroll surface shared by both chat hosts. Modules keep their headings,
+   but no longer compete with a separate card frame and scrollport each. */
+.qchat__side[data-chat-inspector] {
+  overflow: hidden auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  width: 100%;
+  max-height: 50dvh;
+}
+@media (min-width: 1024px) {
+  .qchat__side[data-chat-inspector] {
+    width: clamp(17rem, 23vw, 21rem);
+    max-height: 100%;
+  }
+}
+.qchat__side[data-chat-inspector] > :is(.qchat__model-panel,.qchat__tools,.qchat__artifacts,.qchat__sessions) {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 8px 8px 10px !important;
+  overflow: visible !important;
+}
+html:root[data-qubit-manga="on"] .qchat__side[data-chat-inspector] {
+  gap: 0;
+  padding: 0;
+  border: 1px solid #b968af !important;
+  background: #151026 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html:root[data-qubit-manga="on"] .qchat__side[data-chat-inspector] > :is(.qchat__model-panel,.qchat__tools,.qchat__artifacts,.qchat__sessions) {
+  border: 0 !important;
+  border-block-start: 1px solid #764267 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+html:root[data-qubit-manga="on"] .qchat__side[data-chat-inspector]::before,
+html:root[data-qubit-manga="on"] .qchat__side[data-chat-inspector]::after,
+html:root[data-qubit-manga="on"] .qchat__side[data-chat-inspector] > :is(.qchat__model-panel,.qchat__tools,.qchat__artifacts,.qchat__sessions)::before,
+html:root[data-qubit-manga="on"] .qchat__side[data-chat-inspector] > :is(.qchat__model-panel,.qchat__tools,.qchat__artifacts,.qchat__sessions)::after {
+  content: none !important;
+}
+html[data-qubit-manga="on"] .qchat__side[data-chat-inspector] .qchat-side__backdrop { display: none; }
+
+.qm-chat-session-list { gap: 8px; padding: 4px; }
+.qm-chat-session-search {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 0;
+  padding-inline: 10px 4px;
+  border: 1px solid var(--qplate-ink, currentColor);
+  background: var(--qplate-sunk, #171123);
+  color: var(--qplate-ink, #fff0ff);
+}
+.qm-chat-session-search:focus-within { outline: 2px solid currentColor; outline-offset: 1px; }
+#qubit-main-content #chat-side-panel[data-chat-inspector] .qm-chat-session-search > input[type="search"] {
+  min-width: 0;
+  width: 100%;
+  padding: 5px 0 !important;
+  /* The wrapper draws the only field surface. */
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  font: 500 .875rem/1.4 var(--theme-font-sans, system-ui, sans-serif) !important;
+  outline: none !important;
+}
+.qm-chat-session-search-field::placeholder { color: inherit; opacity: .82; }
+.qm-chat-session-search-field::-webkit-search-cancel-button { appearance: none; }
+.qm-chat-session-search > button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+}
+.qm-chat-session-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.qm-chat-session-results { min-width: 0; }
+html[data-qubit-manga="on"] .qm-chat-session-search { background: #211432; color: #fff3ff; border-color: #c994d9; }
+html[data-qubit-manga="on"] .qm-chat-session-search:focus-within { outline-color: #ffe75b; }
+
+.qm-chat-session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+.qm-chat-session-pick {
+  display: grid;
+  min-width: 0;
+  min-height: 42px;
+  gap: 3px;
+  padding: 6px 8px;
+  text-align: start;
+  border: 1px solid transparent;
+}
+.qm-chat-session-pick:hover,
+.qm-chat-session-pick[aria-current="true"] {
+  border-color: var(--qplate-rule);
+  background: var(--qplate-wash-strong);
+}
+.qm-chat-session-name { font-weight: 600; overflow-wrap: anywhere; }
+.qm-chat-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--qplate-muted);
+  font-size: .75rem;
+}
+.qm-chat-session-terminal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding-inline: 4px;
+}

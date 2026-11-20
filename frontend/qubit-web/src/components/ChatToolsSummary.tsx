@@ -30,10 +30,9 @@
  * it were connected.
  */
 
-import { Card } from "@nous-research/ui/ui/components/card";
 import { Button } from "@/sakuga/ui";
 import { Link } from "react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
 import type {
@@ -54,29 +53,20 @@ interface RegistryState<T> {
 const EMPTY = { data: null, failed: false } as const;
 
 function useRegistry<T>(key: string, load: () => Promise<T>): RegistryState<T> {
-  const [state, setState] = useState<RegistryState<T>>(EMPTY);
-  // The loader is a fresh closure per render; route it through a ref so the
-  // effect only re-fires when the resolved `key` (profile) actually changes.
-  const loadRef = useRef(load);
-  loadRef.current = load;
+  const [state, setState] = useState<{ key: string; result: RegistryState<T> }>();
   useEffect(() => {
     let cancelled = false;
-    // `Promise.resolve().then(...)` also converts a synchronous throw from a
-    // missing/misconfigured endpoint into a normal rejection, so this card can
-    // never take down the panel it sits in.
     Promise.resolve()
-      .then(() => loadRef.current())
+      .then(load)
       .then((data) => {
-        if (!cancelled) setState({ data, failed: false });
+        if (!cancelled) setState({ key, result: { data, failed: false } });
       })
       .catch(() => {
-        if (!cancelled) setState({ data: null, failed: true });
+        if (!cancelled) setState({ key, result: { data: null, failed: true } });
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [key]);
-  return state;
+    return () => { cancelled = true; };
+  }, [key, load]);
+  return state?.key === key ? state.result : EMPTY;
 }
 
 function CountBadge({ children }: { children: ReactNode }) {
@@ -189,21 +179,14 @@ export function ChatToolsSummary({
   profile?: string;
   onMention?: (name: string) => void;
 }) {
-  // Each loader is a stable identity for its profile so `useRegistry` fires
-  // exactly once per mount / profile switch.
-  const toolsets = useRegistry<ToolsetInfo[]>(
-    profile ?? "",
-    () => api.getToolsets(profile),
-  );
-  const skills = useRegistry<SkillInfo[]>(profile ?? "", () =>
-    api.getSkills(profile),
-  );
-  const plugins = useRegistry<PluginManifestResponse[]>("plugins", () =>
-    api.getPlugins(),
-  );
-  const mcp = useRegistry<{ servers: McpServer[] }>("mcp", () =>
-    api.getMcpServers(),
-  );
+  const loadToolsets = useCallback(() => api.getToolsets(profile), [profile]);
+  const loadSkills = useCallback(() => api.getSkills(profile), [profile]);
+  const loadPlugins = useCallback(() => api.getPlugins(), []);
+  const loadMcp = useCallback(() => api.getMcpServers(), []);
+  const toolsets = useRegistry<ToolsetInfo[]>(profile ?? "", loadToolsets);
+  const skills = useRegistry<SkillInfo[]>(profile ?? "", loadSkills);
+  const plugins = useRegistry<PluginManifestResponse[]>("plugins", loadPlugins);
+  const mcp = useRegistry<{ servers: McpServer[] }>("mcp", loadMcp);
 
   // Tools are counted across the real toolsets (the enabled ones are the
   // agent's live tool surface; disabled toolsets stay counted but are not
@@ -228,13 +211,10 @@ export function ChatToolsSummary({
   const mcpConnected = mcpRows.filter((s) => s.connected).length;
 
   return (
-    <Card
+    <div
       data-testid="chat-tools-summary"
       className="qchat__tools-card flex shrink-0 flex-col gap-2 px-3 py-2"
     >
-      <span className="text-display text-xs tracking-wider text-text-tertiary">
-        Agent tools
-      </span>
       <Row
         label="Tools"
         href="/skills"
@@ -288,6 +268,6 @@ export function ChatToolsSummary({
         </Link>{" "}
         pages.
       </span>
-    </Card>
+    </div>
   );
 }

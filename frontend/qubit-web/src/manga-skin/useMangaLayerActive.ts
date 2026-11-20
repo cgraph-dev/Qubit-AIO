@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
  *
  * Components rendered outside the route tree (portals, shared selects) must
  * follow this attribute instead of a one-time `window.location` snapshot:
- * client navigation to an excluded route (/chat, Office, Workbench, HUD)
+ * client navigation to an excluded route (Office, Workbench, HUD)
  * removes it while the manga theme stays selected.
  */
 function subscribe(onChange: () => void): () => void {

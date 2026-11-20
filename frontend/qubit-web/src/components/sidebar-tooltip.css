@@ -1,0 +1,40 @@
+/* The supplied ink plate. Scale the edges independently so a wrapping title
+   and a translated subtitle never stretch the bevels or sit under the tab. */
+.manga-rail-tooltip {
+  position: fixed;
+  z-index: 2147482400;
+  visibility: hidden;
+  pointer-events: none;
+  box-sizing: border-box;
+  display: grid;
+  gap: 4px;
+  width: min(284px, calc(100vw - 24px));
+  padding: 11px 14px;
+  background: var(--background-base, #1a132a);
+  color: var(--midground-base, #fff0ff);
+  border: 1px solid currentColor;
+  font: 500 .8125rem/1.43 var(--theme-font-sans, system-ui, sans-serif);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.manga-rail-tooltip__title {
+  font: 700 1rem/1.2 var(--theme-font-display, system-ui, sans-serif);
+}
+html[data-qubit-manga="on"] .manga-rail-tooltip {
+  color: #fff0ff;
+  background: none;
+  border: solid transparent;
+  border-width: 29px 21px 18px 20px;
+  border-image: url("/manga-ui/sidebar-tooltip.svg") 37 33 24 123 fill / 29px 26px 18px 96px stretch;
+  padding: 1px 21px 8px 8px;
+  min-height: 92px;
+}
+html[data-qubit-manga="on"] .manga-rail-tooltip__body { color: #eedcf3; }
+@media (forced-colors: active) {
+  html[data-qubit-manga="on"] .manga-rail-tooltip {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    padding: 11px 14px;
+  }
+}

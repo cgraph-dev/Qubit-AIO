@@ -1423,9 +1423,7 @@ function SidebarNavLink({
     ? ((t.app.nav as Record<string, string>)[labelKey] ?? label)
     : label;
   const description = navDescription(path);
-  // Tooltip content: `Label — what it is`. Collapsed mode only; when the rail
-  // is open the label is already visible and a card would be noise.
-  const tooltipText = description ? `${navLabel} — ${description}` : navLabel;
+  const canShowTooltip = collapsed || Boolean(description);
   const showTooltip = (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => {
     setTooltipAnchor(event.currentTarget);
   };
@@ -1439,9 +1437,9 @@ function SidebarNavLink({
         // Warm the chunk for the page this row opens. Purely a network
         // prefetch — the lazy route still owns rendering and errors.
         prefetchRoute(path, ROUTE_IMPORTERS[path]);
-        if (collapsed) showTooltip(event);
+        if (canShowTooltip && window.matchMedia?.("(min-width: 1024px) and (hover: hover)").matches) showTooltip(event);
       }}
-      onMouseLeave={collapsed ? hideTooltip : undefined}
+      onMouseLeave={canShowTooltip ? hideTooltip : undefined}
     >
       <NavLink
         to={path}
@@ -1451,13 +1449,12 @@ function SidebarNavLink({
           closeMobile();
           onNavigate?.();
         }}
-        title={collapsed ? undefined : navLabel}
         aria-label={navLabel}
         onFocus={(event) => {
           prefetchRoute(path, ROUTE_IMPORTERS[path]);
-          if (collapsed) showTooltip(event);
+          if (event.currentTarget.matches(":focus-visible") && window.matchMedia?.("(min-width: 1024px)").matches && canShowTooltip) showTooltip(event);
         }}
-        onBlur={collapsed ? hideTooltip : undefined}
+        onBlur={canShowTooltip ? hideTooltip : undefined}
         className={({ isActive }) =>
           cn(
             "qagent-sidebar__link",
@@ -1500,8 +1497,8 @@ function SidebarNavLink({
         )}
       </NavLink>
 
-      {collapsed && tooltipAnchor && (
-        <SidebarTooltip anchor={tooltipAnchor} label={tooltipText} warmRef={tooltipWarmRef} />
+      {canShowTooltip && tooltipAnchor && (
+        <SidebarTooltip anchor={tooltipAnchor} label={navLabel} detail={description} warmRef={tooltipWarmRef} />
       )}
     </li>
   );
@@ -1885,7 +1882,8 @@ function SystemActionButton({
       {collapsed && tooltipAnchor && (
         <SidebarTooltip
           anchor={tooltipAnchor}
-          label={item.disabledReason ? `${displayLabel} — unavailable: ${item.disabledReason}` : displayLabel}
+          label={displayLabel}
+          detail={item.disabledReason}
           warmRef={tooltipWarmRef}
         />
       )}
@@ -1900,7 +1898,7 @@ function SidebarIconWithTooltip({
   tooltipWarmRef,
 }: SidebarIconWithTooltipProps) {
   const [tooltipAnchor, setTooltipAnchor] = useState<HTMLElement | null>(null);
-  const showTooltip = (event: MouseEvent<HTMLDivElement>) => {
+  const showTooltip = (event: MouseEvent<HTMLDivElement> | FocusEvent<HTMLDivElement>) => {
     setTooltipAnchor(event.currentTarget);
   };
   const hideTooltip = () => {
@@ -1912,6 +1910,8 @@ function SidebarIconWithTooltip({
       className="relative w-fit"
       onMouseEnter={collapsed ? showTooltip : undefined}
       onMouseLeave={collapsed ? hideTooltip : undefined}
+      onFocus={collapsed ? (event) => { if (event.target.matches(":focus-visible")) showTooltip(event); } : undefined}
+      onBlur={collapsed ? hideTooltip : undefined}
     >
       {children}
 

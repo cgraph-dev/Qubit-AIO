@@ -254,36 +254,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
   text-shadow:0 1px 1px #080410!important;
 }
 
-/* 4. Tooltip: enough inset space for body text, and clamp to viewport.
-   CSS animates only transform/opacity during entrance. */
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
-  box-sizing:border-box!important;
-  width:232px!important;min-width:232px!important;
-  max-width:min(232px,calc(100vw - 18px))!important;
-  min-height:111px!important;
-  padding:27px 23px 26px!important;
-  display:flex!important;flex-direction:column!important;
-  align-items:flex-start!important;justify-content:center!important;
-  gap:6px!important;
-  border:0!important;border-radius:0!important;box-shadow:none!important;
-  color:#fff8ff!important;
-  background:url("/manga-ui/approved/04_tooltip_plate.webp") center/100% 100% no-repeat!important;
-  font:500 13px/1.35 var(--theme-font-sans)!important;
-  letter-spacing:0!important;text-shadow:none!important;
-}
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-title {
-  display:block!important;max-width:100%!important;
-  font:850 13.5px/1.25 var(--theme-font-sans)!important;
-  color:#ffe82b!important;text-shadow:none!important;
-  overflow-wrap:anywhere!important;
-}
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-detail {
-  display:block!important;max-width:100%!important;
-  font:520 12px/1.35 var(--theme-font-sans)!important;
-  color:#fff4ff!important;text-shadow:none!important;
-  overflow-wrap:anywhere!important;
-}
-
 /* 5. Accent reflections. Transform + opacity are cheap to composite; no
    frame-by-frame WebGL or backdrop blur. Two glints per 8–13 seconds max. */
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row::after,
@@ -382,13 +352,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] :is(#qubit-main-con
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] :is(#qubit-main-content,.qchat__side) input[type="checkbox"]:focus-visible {
   outline:2px solid #fff087!important;outline-offset:2px!important;
 }
-/* Tooltip entrance: a single small composited opacity transition. Hover
-   movement retains the existing stable anchor positioning. */
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip {
-  transition:opacity 130ms ease-out!important;
-}
-
-
 /* Approved final correction — one star-free plate with ONE replaceable star.
    The starless artwork already contains three beveled yellow charge bars,
    so do not paint a second bar layer or any earlier pseudo-star/corner. */

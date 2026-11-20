@@ -72,13 +72,11 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(css).toContain(".qm-manga-gateway-shell > ul > li");
     expect(app).not.toContain('className="qm-manga-system-index"');
   });
-  it("uses original ZIP assets for tooltip and update notification, with a solid dropdown", () => {
-    for (const asset of ["tooltip", "toast-info"]) {
-      expect(css).toContain('/manga-ui/zip/' + asset + '.svg');
-    }
+  it("uses the submitted rail plate instead of a page-tooltip ZIP skin", () => {
+    expect(css).toContain('/manga-ui/zip/toast-info.svg');
     expect(css).not.toContain('/manga-ui/zip/dropdown-panel.svg');
-    expect(tip).toContain('const manga = document.documentElement.dataset.qubitManga === "on"');
-    expect(tip).toContain('...(manga ? {} : {');
+    expect(tip).toContain('data-rail-tooltip=""');
+    expect(read("../components/sidebar-tooltip.css")).toContain("sidebar-tooltip.svg");
     expect(kit).toContain("installOriginalMangaAssets");
   });
   it("restores single native chat search and refresh animations", () => {
@@ -98,7 +96,7 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(css).not.toMatch(/\.xterm(?:-screen|-cursor-layer|-text-layer)?\s*[{,]/);
   });
   it("references available crisp SVGs, and the ZIP sprites after npm pretest", () => {
-    const assets = [...css.matchAll(/url\(["']?(\/manga-ui\/[^"'()]+\.svg)["']?\)/g)].map(x => x[1]);
+    const assets = [...(css + read("../components/sidebar-tooltip.css")).matchAll(/url\(["']?(\/manga-ui\/[^"'()]+\.svg)["']?\)/g)].map(x => x[1]);
     expect(assets.length).toBeGreaterThanOrEqual(7);
     for (const asset of new Set(assets)) {
       const absolute = fileURLToPath(new URL("../../public" + asset, import.meta.url));

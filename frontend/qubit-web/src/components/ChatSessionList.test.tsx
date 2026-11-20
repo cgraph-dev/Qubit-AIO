@@ -63,29 +63,7 @@ vi.mock("@/sakuga/ui", () => ({
       {children}
     </button>
   ),
-  ListItem: ({
-    children,
-    onClick,
-    className,
-    ...rest
-  }: {
-    children?: ReactNode;
-    onClick?: () => void;
-    className?: string;
-    "aria-current"?: "true" | undefined;
-  }) => (
-    <div
-      role="button"
-      tabIndex={0}
-      data-testid="session-row"
-      className={className}
-      onClick={onClick}
-      aria-current={rest["aria-current"]}
-    >
-      {children}
-    </div>
-  ),
-  Input: (props: Record<string, unknown>) => <input {...props} />,
+  emitFxAt: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@nous-research/ui/ui/components/spinner", () => ({

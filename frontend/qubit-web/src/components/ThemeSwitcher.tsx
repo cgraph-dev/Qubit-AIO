@@ -1,3 +1,4 @@
+import { FxButton } from "@/sakuga/FxButton";
 import { useId, useRef, useState } from "react";
 import { UtilityPickerPanel } from "@/manga-skin/UtilityPickerPanel";
 import { Palette, Check, Type } from "lucide-react";
@@ -23,7 +24,7 @@ export function ThemeSwitcher({ collapsed = false }: ThemeSwitcherProps) {
 
   return (
     <div ref={wrapperRef} className="relative">
-      <button
+      <FxButton
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
@@ -60,7 +61,7 @@ export function ThemeSwitcher({ collapsed = false }: ThemeSwitcherProps) {
             <span aria-hidden className="qm-theme-trigger__lamp" />
           )}
         </span>
-      </button>
+      </FxButton>
 
       {open && (
         <UtilityPickerPanel id={pickerId} title={pickerTitle} closeLabel={t.common.close} anchor={wrapperRef} onClose={close}>
@@ -88,7 +89,7 @@ function ThemeSwitcherOptions({
         const mangaRow = isMangaThemeName(th.name);
 
         return (
-          <button type="button"
+          <FxButton type="button"
             aria-pressed={isActive}
             data-qm-picker-choice=""
             className="qm-picker-choice"
@@ -137,7 +138,7 @@ function ThemeSwitcherOptions({
                 )}
               />
             )}
-          </button>
+          </FxButton>
         );
       })}
     </>
@@ -170,7 +171,7 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
       </div>
 
       {/* Theme-default (clears the override). */}
-      <button type="button"
+      <FxButton type="button"
         aria-pressed={fontId === THEME_DEFAULT_FONT_ID}
         className="qm-picker-choice"
         onClick={() => setFont(THEME_DEFAULT_FONT_ID)}
@@ -190,7 +191,7 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
             fontId === THEME_DEFAULT_FONT_ID ? "opacity-100" : "opacity-0",
           )}
         />
-      </button>
+      </FxButton>
 
       {order.map((cat) => {
         const fonts = fontChoices.filter((f) => f.category === cat);
@@ -206,7 +207,7 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
             {fonts.map((f) => {
               const isActive = f.id === fontId;
               return (
-                <button type="button"
+                <FxButton type="button"
                   aria-pressed={isActive}
                   className="qm-picker-choice"
                   key={f.id}
@@ -226,7 +227,7 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
                       isActive ? "opacity-100" : "opacity-0",
                     )}
                   />
-                </button>
+                </FxButton>
               );
             })}
           </div>

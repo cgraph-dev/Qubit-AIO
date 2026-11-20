@@ -368,18 +368,12 @@ html[data-qubit-manga="on"] :is([role="menuitem"],[role="option"]):is(:hover,[da
   background:rgba(255,229,0,.2)!important;
   color:#fff4ff!important;
 }
-html[data-qubit-manga="on"] :is([role="tooltip"],.qagent-sidebar__tooltip) {
+html[data-qubit-manga="on"] [role="tooltip"]:not([data-rail-tooltip],.qsk-hover-tip__bubble) {
   border:2px solid #f8ebff!important;
   border-radius:3px!important;
   background:#1b1030!important;
   box-shadow:3px 4px 0 #080411,5px 6px 0 #ff269a!important;
   color:#fff0ff!important;
-}
-html[data-qubit-manga="on"] .qagent-sidebar__tooltip-title {
-  color:#ffe500!important;
-}
-html[data-qubit-manga="on"] .qagent-sidebar__tooltip-detail {
-  color:#e6d5f9!important;
 }
 /* Distinguishable semantic feedback */
 html[data-qubit-manga="on"] :is([role="alert"],[data-sonner-toast]) {
