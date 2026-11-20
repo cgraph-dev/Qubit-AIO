@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 130" role="img" aria-label="Text-free session HUD frame"><defs>
+<linearGradient id="chrome" x1="0" y1="0" x2=".24" y2="1"><stop stop-color="#fff8ff"/><stop offset=".13" stop-color="#d9b6e5"/><stop offset=".27" stop-color="#fbf0ff"/><stop offset=".48" stop-color="#806298"/><stop offset=".66" stop-color="#3b2258"/><stop offset=".83" stop-color="#edb4ff"/><stop offset="1" stop-color="#7d438f"/></linearGradient>
+<linearGradient id="pink" x1="0" y1="0" x2="1" y2=".68"><stop stop-color="#ff8bdc"/><stop offset=".15" stop-color="#ff36b0"/><stop offset=".48" stop-color="#e71d93"/><stop offset=".78" stop-color="#951359"/><stop offset="1" stop-color="#390f40"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2=".72" y2="1"><stop stop-color="#fffbd4"/><stop offset=".16" stop-color="#ffe95a"/><stop offset=".42" stop-color="#ffab09"/><stop offset=".7" stop-color="#d36f00"/><stop offset="1" stop-color="#fff177"/></linearGradient>
+<radialGradient id="ink" cx=".43" cy=".47" r=".76"><stop stop-color="#310c3b"/><stop offset=".58" stop-color="#1a0829"/><stop offset="1" stop-color="#090516"/></radialGradient>
+<radialGradient id="lumen"><stop stop-color="#fff5c9"/><stop offset=".2" stop-color="#ffcb47"/><stop offset=".55" stop-color="#ff8b07"/><stop offset="1" stop-color="#ff3e84" stop-opacity="0"/></radialGradient>
+<pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.15" fill="#ff45b1" opacity=".74"/></pattern>
+</defs>
+<path d="M18 11H1282L1290 22V106L1281 119H18L10 106V23Z" fill="url(#ink)" stroke="#070412" stroke-width="9"/>
+<path d="M18 11H1282L1290 22V106L1281 119H18L10 106V23Z" fill="none" stroke="#f940ac" stroke-width="3"/>
+<path d="M22 15H1278" stroke="#ffb0e9" stroke-width="1.5" opacity=".55"/>
+<path d="M1200 15H1267" stroke="url(#gold)" stroke-width="4"/></svg>
