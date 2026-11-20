@@ -1,1 +1,394 @@
 /* Sweep lane: collapsed */
+
+/*
+ * Q4 / Q4-L Manga sidebar, icon-only rail.
+ *
+ * Scope is the collapsed desktop rail only:
+ *   html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"]
+ * data-collapsed is only ever true on desktop (App.tsx derives it from
+ * `collapsed && !isMobile`), and the media query below keeps these rules out of
+ * the mobile drawer. Expanded layout is untouched: every selector below is
+ * scoped to the collapsed attribute and no :not([data-collapsed]) rule is
+ * rewritten.
+ *
+ * Goal: every rail surface group (brand, profile, nav rows, group heads,
+ * system actions, gateway dot, theme/language utility, colophon) is centred in
+ * its own container on both axes, while the owner frame overlay stays a
+ * pointer-events-free paint layer.
+ */
+
+@media (min-width: 1024px) {
+  /* ---------------------------------------------------------- frame overlay */
+
+  /* The owner nine-slice frame is decoration: absolute, behind the live
+     controls, and it never intercepts a click. It must not become a flex
+     child or reserve inline space inside the 56px rail. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > img.qubit-sidebar__frame,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qm-manga-outer-frame {
+    position: absolute !important;
+    inset: 0 !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__brand-row,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__brand-row + div,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__nav,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__system,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__utility,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__colophon {
+    position: relative !important;
+    z-index: 2 !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] {
+    box-sizing: border-box !important;
+  }
+
+  /* ------------------------------------------------------------- brand row */
+
+  /* Only the collapse toggle remains visible here; the wordmark group and the
+     mobile close control are already display:none at this width. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding-inline: 0 !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row > div:first-child {
+    display: none !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row > sakuga-button {
+    flex: 0 0 auto !important;
+    margin-inline: auto !important;
+    align-self: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__brand-row > sakuga-button::part(button) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  /* Profile switcher (when more than one profile exists) sits directly under
+     the brand row. The shared icon must be centred, not left-aligned. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] > .qagent-sidebar__brand-row + div {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding-inline: 0 !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ------------------------------------------------------------------- nav */
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__nav {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-inline: 0 !important;
+    box-sizing: border-box !important;
+    /* Equal gutters keep the icon column centred even when the rail scrolls. */
+    scrollbar-gutter: stable both-edges;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__nav,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__nav ul {
+    margin: 0 !important;
+    list-style: none !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__nav ul {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Sections and group heads: one full-width, symmetric plate. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section > ul {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section {
+    padding-inline: 1px !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    /* Collapsed heads keep a 2px left ink rail and a 1px right keyline; the
+       extra right padding re-centres the index inside the asymmetric border. */
+    padding-right: 1px !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__section-head > .qagent-sidebar__section-index {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-inline: auto !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  /* Navigation links: the icon owns the row centre on both axes. The active
+     rail (::before) and state dot (::after) are absolute, so they cannot
+     shift the icon; the label/chevron are hidden while collapsed. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested::after {
+    content: none !important;
+    display: none !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link > svg {
+    display: block !important;
+    flex: 0 0 auto !important;
+    align-self: center !important;
+    margin: 0 !important;
+  }
+
+  /* ------------------------------------------------ system action controls */
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system > [role="status"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding-inline: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system ul {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system li {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* A disabled action is wrapped by ImportantTooltip; stretch that span so the
+     button still fills (and centres inside) the rail row. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system li > .q5t-important-trigger {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__action {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding-inline: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__action::part(button) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  /* ------------------------------------------- theme / language utility strip */
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    gap: 5px !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility > * {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility > * > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility .qm-theme-trigger,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility .qm-language-trigger,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility .qm-utility-trigger {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 34px !important;
+    margin-inline: auto !important;
+    padding-inline: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility .qm-theme-trigger > span,
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__utility .qm-language-trigger > span {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-inline: auto !important;
+    gap: 4px !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  /* -------------------------------------------------------------- colophon */
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__colophon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding-inline: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__colophon > * {
+    margin-inline: auto !important;
+    text-align: center !important;
+  }
+
+  /* The footer component's own row is justify-between and full-width; in the
+     collapsed rail that reads as a left/right split. Centre its surviving
+     label (the LED trio is already hidden) and drop the org text. */
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__colophon .qm-manga-footer-content {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__colophon .qm-manga-footer-content > span {
+    margin-inline: auto !important;
+    text-align: center !important;
+  }
+
+  html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__colophon .qm-manga-footer-content > span:last-child {
+    display: none !important;
+  }
+}
