@@ -1051,38 +1051,21 @@ export default function App() {
                 )}
               >
                 <PluginSlot name="header-left" />
-                {useMangaNavigation ? (
-                  <>
-                    <div className="min-w-0 flex-1">
-                      <QubitSidebarTitle />
-                    </div>
-                    <span
-                      aria-hidden
-                      className="qagent-sidebar__pulse ml-1 shrink-0"
-                      data-tone={brandTone}
-                      role="status"
-                      aria-label={brandLabel}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><MangaStudioBrandAtom /></span>
-                    <span
-                      className="qagent-sidebar__brand-name"
-                      data-brand={t.app.brand}
-                    >
-                      <QubitBrandSparks />
-                      <span className="qbrand-label truncate">{t.app.brand}</span>
-                    </span>
-                    <span
-                      aria-hidden
-                      className="qagent-sidebar__pulse ml-auto"
-                      data-tone={brandTone}
-                      role="status"
-                      aria-label={brandLabel}
-                    />
-                  </>
-                )}
+                <span className="qm-brand-emblem" aria-hidden="true"><QubitMark className="h-14 w-14 shrink-0 text-midground" /><MangaStudioBrandAtom /></span>
+                <span
+                  className="qagent-sidebar__brand-name"
+                  data-brand={t.app.brand}
+                >
+                  <QubitBrandSparks />
+                  <span className="qbrand-label truncate">{t.app.brand}</span>
+                </span>
+                <span
+                  aria-hidden
+                  className="qagent-sidebar__pulse ml-auto"
+                  data-tone={brandTone}
+                  role="status"
+                  aria-label={brandLabel}
+                />
               </div>
 
               <Button
@@ -1127,28 +1110,33 @@ export default function App() {
                 >
                   {/* The primary heading is retained for Manga; other themes hide it via CSS. */}
                   {(sectionIndex > 0 || useMangaNavigation) && (
-                    <span
-                      className={cn(
-                        "qagent-sidebar__section-head",
-                        collapsed && "lg:justify-center",
-                      )}
-                      id={`qubit-sidebar-section-${section.id}`}
-                    >
-                      <span className="qagent-sidebar__section-index">{section.index}</span>
-                      <span className={cn(collapsed && "lg:hidden")}>
-                        {useMangaNavigation ? section.label : (t.app.sections?.[section.id] ?? section.label)}
+                    useMangaNavigation && !collapsed ? (
+                      <span
+                        className="qagent-sidebar__section-head qm-section-titleplate"
+                        id={`qubit-sidebar-section-${section.id}`}
+                      >
+                        <QubitSidebarTitle label={`${section.index} ${section.label.toUpperCase()}`} />
                       </span>
-                      {!collapsed && (
-                        <>
-                          <span aria-hidden className="qagent-sidebar__section-rule" />
-                          {useMangaNavigation ? (
-                            <MangaStudioTitleOrnaments />
-                          ) : (
+                    ) : (
+                      <span
+                        className={cn(
+                          "qagent-sidebar__section-head",
+                          collapsed && "lg:justify-center",
+                        )}
+                        id={`qubit-sidebar-section-${section.id}`}
+                      >
+                        <span className="qagent-sidebar__section-index">{section.index}</span>
+                        <span className={cn(collapsed && "lg:hidden")}>
+                          {t.app.sections?.[section.id] ?? section.label}
+                        </span>
+                        {!collapsed && (
+                          <>
+                            <span aria-hidden className="qagent-sidebar__section-rule" />
                             <span className="qm-manga-charge-cells" aria-hidden="true"><i /><i /><i /></span>
-                          )}
-                        </>
-                      )}
-                    </span>
+                          </>
+                        )}
+                      </span>
+                    )
                   )}
 
                   <ul className="flex flex-col">

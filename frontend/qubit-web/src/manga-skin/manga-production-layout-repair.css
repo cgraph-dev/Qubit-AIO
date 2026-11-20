@@ -828,3 +828,35 @@ html[data-qubit-manga="on"] sakuga-toggle::after {
   content: none !important;
   display: none !important;
 }
+
+/* The owner title plate is the sidebar's 01–07 menu heading. */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  margin: 7px 0 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate::before,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate::after,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate .qagent-sidebar__section-rule,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate .qm-studio-title-corner,
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate .qm-manga-charge-cells {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qm-section-titleplate .qubit-sidebar-title {
+  block-size: 42px !important;
+  height: 42px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qm-section-titleplate .qubit-sidebar-title__label {
+  font-size: 12px !important;
+  letter-spacing: .045em !important;
+}
