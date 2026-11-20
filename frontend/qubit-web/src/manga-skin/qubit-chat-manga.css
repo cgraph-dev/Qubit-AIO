@@ -31,7 +31,7 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qcha
   min-height:0;
   min-width:0;
   overflow:hidden;
-  padding:7px clamp(8px,1.1vw,16px) 9px;
+  padding:18px clamp(12px,1.3vw,20px) 19px;
   gap:6px;
   background:linear-gradient(130deg,#210a2a 0%,#110819 58%,#160822 100%)!important;
   border:0!important;
@@ -391,7 +391,7 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__session-actions > *
 }
 @media(max-width:560px) {
   html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation {
-    padding:5px 7px 7px;
+    padding:15px 11px 16px;
   }
   html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header {
     padding:8px!important;
