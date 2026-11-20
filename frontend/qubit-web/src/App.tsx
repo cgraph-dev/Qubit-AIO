@@ -1018,9 +1018,12 @@ export default function App() {
             )}
           >
             {/* A single reusable nine-slice chrome frame around the entire Manga rail.
-                Pointer-events are disabled; navigation and status remain live. */}
+                Pointer-events are disabled; navigation and status remain live.
+                The legacy CSS perimeter frame is only for non-Manga themes: for
+                Manga it must not exist in the DOM at all, so it cannot layer
+                under/over the owner frame. */}
             {useMangaNavigation && <SidebarFrame />}
-            <div className="qm-manga-outer-frame" aria-hidden="true" />
+            {!useMangaNavigation && <div className="qm-manga-outer-frame" aria-hidden="true" />}
             {/* Rail backdrop clip — this rail only. Sits at z-index:-2 behind the
                 engineering ruling (::before, z-index:-1) and every nav row.
                 Muted at the source by the stylesheet, then scrimmed, so 13px
