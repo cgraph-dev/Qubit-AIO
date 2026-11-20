@@ -147,3 +147,10 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
   box-shadow: none !important;
   pointer-events: none !important;
 }
+
+/* The page header uses the owner module plate only; no star there. */
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header h1::before {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
