@@ -1,0 +1,57 @@
+.qubit-manga-header-art { display: none; }
+html[data-qubit-manga="on"] .qubit-manga-header-art {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+html[data-qubit-manga="on"] .qubit-manga-header-art__star {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 3px rgba(255, 229, 0, .45));
+}
+html[data-qubit-manga="on"] .qubit-manga-header-art__slashes {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 180px;
+  height: auto;
+  transform: translateY(-50%);
+  opacity: .9;
+}
+html[data-qubit-manga="on"] header[role="banner"] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+html[data-qubit-manga="on"] header[role="banner"] > div {
+  position: relative;
+  z-index: 2;
+  padding-left: 54px !important;
+  padding-right: 116px !important;
+}
+html[data-qubit-manga="on"] header[role="banner"]::before,
+html[data-qubit-manga="on"] header[role="banner"]::after {
+  content: none !important;
+  display: none !important;
+}
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] header[role="banner"] > div {
+    padding-left: 42px !important;
+    padding-right: 72px !important;
+  }
+  html[data-qubit-manga="on"] .qubit-manga-header-art__star {
+    left: 1px;
+    width: 36px;
+    height: 36px;
+  }
+  html[data-qubit-manga="on"] .qubit-manga-header-art__slashes {
+    width: 110px;
+  }
+}

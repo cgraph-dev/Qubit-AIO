@@ -12,6 +12,7 @@ import { resolvePageTitle } from "@/lib/resolve-page-title";
 import { isChatPath } from "@/lib/chat-routes";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { QubitMangaHeaderArt } from "@/components/QubitMangaHeaderArt";
 
 interface HeaderSlots {
   pathname: string;
@@ -88,6 +89,7 @@ export function PageHeaderProvider({
             isChatRoute && "hidden",
           )}
         >
+          <QubitMangaHeaderArt />
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3 sm:px-6">
             <div className={cn(
               "flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2",

@@ -80,6 +80,9 @@ import { QubitMark } from "@/components/QubitMark";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { QubitSidebarTitle } from "@/components/QubitSidebarTitle";
 import { SidebarFooter } from "@/components/SidebarFooter";
+import { Q5TGatewayFrame } from "@/components/Q5TGatewayFrame";
+import { Q5TPrimaryButton } from "@/components/Q5TPrimaryButton";
+import { Q5TSystemTitle } from "@/components/Q5TSystemTitle";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
 import { useSidebarStatus } from "@/hooks/useSidebarStatus";
@@ -238,7 +241,7 @@ import {
 } from "@/lib/policy-refusal";
 import { api } from "@/lib/api";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
-import { LatencySampler, measureLatency } from "@/lib/latency-sampler";
+import { LatencySampler, measureLatency, formatLatency } from "@/lib/latency-sampler";
 
 function RouteFallback({ label = "Loading…" }: { label?: string }) {
   return (
@@ -1221,6 +1224,7 @@ export default function App() {
 
             <SidebarSystemActions
               collapsed={isDesktopCollapsed}
+              manga={useMangaNavigation}
               onNavigate={closeMobile}
               status={sidebarStatus}
               tooltipWarmRef={tooltipWarmRef}
@@ -1594,6 +1598,7 @@ function SidebarNavGroup({
 
 function SidebarSystemActions({
   collapsed,
+  manga,
   onNavigate,
   status,
   tooltipWarmRef,
@@ -1755,6 +1760,20 @@ function SidebarSystemActions({
     });
   }
 
+  const q5t = manga && !collapsed;
+  const gatewaySummary = status ? gatewayLine(status, t) : null;
+  const stripLabel = (value: string) => value.replace(/[:：]\s*$/, "");
+  const restartItem = items.find((item) => item.action === "restart");
+  const updateItem = items.find((item) => item.action === "update");
+  const restartPending = pendingAction === "restart";
+  const restartRunning = activeAction === "restart" && isRunning && !restartPending;
+  const restartDisabled = !restartItem || !!restartItem.disabledReason || (
+    isBusy && !(restartPending || (activeAction === "restart" && isRunning))
+  );
+  const restartLabel = restartRunning
+    ? (restartItem?.runningLabel ?? t.status.restartingGateway)
+    : (restartItem?.label ?? t.status.restartGateway);
+
   const handleClick = (action: SystemAction) => {
     if (isBusy) return;
     if (action === "update" && updateBlockedReason) return;
@@ -1788,8 +1807,24 @@ function SidebarSystemActions({
 
   return (
     <>
-    <div className="qagent-sidebar__system qm-manga-gateway-shell">
-      {!collapsed && (
+    <div className={cn("qagent-sidebar__system", q5t ? "q5t-system-shell" : "qm-manga-gateway-shell")}>
+      {q5t ? (
+        <>
+          <Q5TSystemTitle>{t.app.system}</Q5TSystemTitle>
+          <Q5TGatewayFrame>
+            <NavLink to="/sessions" title={t.app.statusOverview} className="block text-left">
+              <dl>
+                <dt>{stripLabel(t.app.gatewayStatusLabel)}</dt>
+                <dd className={gatewaySummary?.tone}>{gatewaySummary?.label ?? "…"}</dd>
+                <dt>{stripLabel(t.app.activeSessionsLabel)}</dt>
+                <dd>{status?.active_sessions ?? "…"}</dd>
+                <dt>Latency</dt>
+                <dd>{latencyMs === null || latencyMs === undefined ? "—" : formatLatency(latencyMs)}</dd>
+              </dl>
+            </NavLink>
+          </Q5TGatewayFrame>
+        </>
+      ) : !collapsed ? (
         <div className="qagent-sidebar__telemetry qm-manga-gateway-plate" role="group" aria-label={t.app.system}>
           <span className="qagent-sidebar__section-head" style={{ margin: "0 0 .2rem", borderTop: 0 }}>
             <span>{t.app.system}</span>
@@ -1797,27 +1832,59 @@ function SidebarSystemActions({
           </span>
           <SidebarStatusStrip status={status} latencyMs={latencyMs} />
         </div>
+      ) : null}
+
+      {!q5t && <GatewayDot collapsed={collapsed} status={status} tooltipWarmRef={tooltipWarmRef} />}
+
+      {q5t ? (
+        <ul className="q5t-system-actions flex flex-row items-stretch gap-2">
+          {restartItem && (
+            <li className="min-w-0 flex-1">
+              <Q5TPrimaryButton
+                className="q5t-system-primary"
+                disabled={restartDisabled}
+                aria-busy={restartPending || restartRunning}
+                aria-label={restartLabel}
+                onClick={() => handleClick("restart")}
+              >
+                {restartLabel}
+              </Q5TPrimaryButton>
+            </li>
+          )}
+          {updateItem && (
+            <SystemActionButton
+              collapsed={false}
+              disabled={
+                !!updateItem.disabledReason ||
+                (isBusy && !(pendingAction === "update" || (activeAction === "update" && isRunning)))
+              }
+              tooltipWarmRef={tooltipWarmRef}
+              isPending={pendingAction === "update"}
+              isRunning={activeAction === "update" && isRunning && pendingAction !== "update"}
+              item={updateItem}
+              onClick={() => handleClick("update")}
+            />
+          )}
+        </ul>
+      ) : (
+        <ul className="flex flex-row gap-2">
+          {items.map((item) => (
+            <SystemActionButton
+              key={item.action}
+              collapsed={collapsed}
+              disabled={
+                !!item.disabledReason ||
+                (isBusy && !(pendingAction === item.action || (activeAction === item.action && isRunning)))
+              }
+              tooltipWarmRef={tooltipWarmRef}
+              isPending={pendingAction === item.action}
+              isRunning={activeAction === item.action && isRunning && pendingAction !== item.action}
+              item={item}
+              onClick={() => handleClick(item.action)}
+            />
+          ))}
+        </ul>
       )}
-
-      <GatewayDot collapsed={collapsed} status={status} tooltipWarmRef={tooltipWarmRef} />
-
-      <ul className="flex flex-row gap-2">
-        {items.map((item) => (
-          <SystemActionButton
-            key={item.action}
-            collapsed={collapsed}
-            disabled={
-              !!item.disabledReason ||
-              (isBusy && !(pendingAction === item.action || (activeAction === item.action && isRunning)))
-            }
-            tooltipWarmRef={tooltipWarmRef}
-            isPending={pendingAction === item.action}
-            isRunning={activeAction === item.action && isRunning && pendingAction !== item.action}
-            item={item}
-            onClick={() => handleClick(item.action)}
-          />
-        ))}
-      </ul>
     </div>
 
     <ConfirmDialog
@@ -2055,6 +2122,7 @@ interface SidebarNavLinkProps {
 
 interface SidebarSystemActionsProps {
   collapsed: boolean;
+  manga: boolean;
   onNavigate: () => void;
   status: StatusResponse | null;
   tooltipWarmRef: TooltipWarmRef;

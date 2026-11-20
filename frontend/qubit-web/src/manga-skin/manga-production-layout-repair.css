@@ -733,3 +733,77 @@ html[data-qubit-manga="on"] .q5t-tooltip-shell[role="tooltip"] {
 html[data-qubit-manga="on"] .q5t-tooltip-shell .q5t-tooltip {
   width: 300px;
 }
+
+/* Owner-supplied SYSTEM plate, title and primary restart button. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__system.q5t-system-shell {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  padding: 0 5px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-titlebar-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-titlebar {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 39px !important;
+  font-size: 16px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-gateway {
+  max-width: none !important;
+  width: 100% !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-gateway__content {
+  padding: 10% 12% 6% !important;
+  font-size: 11px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-gateway__content dl {
+  gap: .3em .55em !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions {
+  align-items: stretch !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions > li,
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions > .qagent-sidebar__action {
+  min-width: 0 !important;
+  flex: 1 1 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions .q5t-primary {
+  width: 100% !important;
+  min-height: 45px !important;
+  padding: 7px 8px !important;
+  font-size: 11px !important;
+  gap: 6px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions .q5t-primary__icon {
+  width: 1.1em !important;
+  height: 1.1em !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions > .qagent-sidebar__action {
+  width: 100% !important;
+  min-height: 45px !important;
+}
+
+/* The owner header art replaces the old pseudo-element star/strokes. */
+html[data-qubit-manga="on"] header[role="banner"]::before,
+html[data-qubit-manga="on"] header[role="banner"]::after {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] header[role="banner"] > div {
+  padding-left: 54px !important;
+  padding-right: 116px !important;
+}
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] header[role="banner"] > div {
+    padding-left: 42px !important;
+    padding-right: 72px !important;
+  }
+}
