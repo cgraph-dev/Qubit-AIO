@@ -1118,7 +1118,7 @@ export default function App() {
                         className="qagent-sidebar__section-head qm-section-titleplate"
                         id={`qubit-sidebar-section-${section.id}`}
                       >
-                        <QubitSidebarTitle label={`${section.index} ${section.label.toUpperCase()}`} />
+                        <QubitSidebarTitle index={section.index} label={section.label.toUpperCase()} />
                       </span>
                     ) : (
                       <span

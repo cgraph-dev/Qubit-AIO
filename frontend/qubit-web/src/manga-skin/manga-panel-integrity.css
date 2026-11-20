@@ -588,3 +588,28 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
 html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-manga-header-art {
   display: none !important;
 }
+
+/* The theme/language utility picker has a normal panel surface; the ZIP frame's
+   corner tab read as a stray pink triangle behind the title. */
+html[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel]::before {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel] {
+  background: #1b1030 !important;
+  border: 2px solid #ff269a !important;
+  border-radius: 2px !important;
+  box-shadow: 3px 4px 0 #080615, 6px 7px 0 rgba(255, 38, 154, .35) !important;
+  padding: 12px !important;
+}
+
+/* Sidebar title numbering and legibility. */
+html[data-qubit-manga="on"] #app-sidebar .qm-section-titleplate .qubit-sidebar-title__index {
+  color: #ffe500 !important;
+  text-shadow: 1px 2px 0 #080615, 0 0 5px rgba(255, 174, 0, .8) !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-section-titleplate .qubit-sidebar-title__text,
+html[data-qubit-manga="on"] #app-sidebar .qm-section-titleplate .qubit-sidebar-title__label {
+  color: #fff5fc !important;
+  text-shadow: 1px 2px 0 #17051f, 0 0 4px rgba(255, 80, 190, .55) !important;
+}

@@ -7,7 +7,7 @@ import "@/styles/qubit-sidebar-title.css";
  */
 import { useId } from "react";
 
-export function QubitSidebarTitle({ label = "QUBIT AIO", className }: { label?: string; className?: string }) {
+export function QubitSidebarTitle({ label = "QUBIT AIO", index, className }: { label?: string; index?: string; className?: string }) {
   const uid = useId();
   return (
     <div className={["qubit-sidebar-title", className].filter(Boolean).join(" ")}>
@@ -74,7 +74,7 @@ export function QubitSidebarTitle({ label = "QUBIT AIO", className }: { label?: 
         </g>
       </svg>
 
-      <span className="qubit-sidebar-title__label">{label}</span>
+      <span className="qubit-sidebar-title__label">{index ? <><span className="qubit-sidebar-title__index">{index}</span> <span className="qubit-sidebar-title__text">{label}</span></> : label}</span>
     </div>
   );
 }
