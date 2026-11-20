@@ -1,1 +1,488 @@
-/* Sweep lane: text */
+/* Sweep lane: text
+ *
+ * Manga (Q4/Q4-L) text-visibility sweep. CSS only, scoped to the active Manga
+ * attribute and loaded last so it can correct earlier paint passes without
+ * changing React markup, navigation, or Sakuga behaviour.
+ *
+ * Goals:
+ *  - long labels wrap inside their illustrated frame instead of being clipped;
+ *  - critical metadata (ids, values, job/model names) is never irrecoverably
+ *    hidden behind an ellipsis;
+ *  - chips, badges, tables and dialogs keep their text inside their border;
+ *  - contrast remains readable on the dark ink plates.
+ */
+html[data-qubit-manga="on"] {
+  --qm-sweep-shadow: 0 1px 2px #080411, 0 0 3px #3a0a24;
+}
+
+/* ------------------------------------------------------------------ rail */
+/* 01–07 plates grow with their label instead of clipping it. Normal labels
+   keep the reference height; only a long or translated label increases it. */
+html[data-qubit-manga="on"] #app-sidebar nav .qagent-sidebar__section-head.qm-section-titleplate {
+  height: auto !important;
+  min-height: 42px !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qm-section-titleplate .qubit-sidebar-title {
+  block-size: auto !important;
+  height: auto !important;
+  min-height: 42px !important;
+  max-height: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar nav .qm-section-titleplate .qubit-sidebar-title__label {
+  display: block !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  margin-inline: 7% 38% !important;
+  padding-block: 2px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.08 !important;
+  text-shadow: 1px 1px 0 #12051a, 0 0 3px #3a0a24 !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head.qm-section-titleplate {
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qm-section-titleplate .qubit-sidebar-title {
+  block-size: auto !important;
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+}
+
+/* The plain section head (System, plugin group) has the same wrapping need;
+   it is not the decorative 01–07 plate. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head > span:not(.qagent-sidebar__section-index):not(.qagent-sidebar__section-rule):not(.qm-manga-charge-cells):not(.qm-studio-title-corner) {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.16 !important;
+  text-shadow: 1px 1px 0 #12051a, 0 0 3px #3a0a24 !important;
+}
+
+/* Long nav/action labels wrap; a row grows rather than hiding its name. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link-label,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .qagent-sidebar__link-label,
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__action > span:not(.qagent-sidebar__chevron) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.22 !important;
+}
+
+/* Footer colophon: three data slots can share two lines in a narrow rail. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon {
+  height: auto !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-footer-content,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-footer-content {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  gap: 4px 8px !important;
+  white-space: normal !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-footer-content > span,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-footer-content > span {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.2 !important;
+  text-shadow: var(--qm-sweep-shadow);
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-footer-content .qm-manga-footer-leds {
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+/* Gateway status rows: labels and values share the plate and wrap in place. */
+html[data-qubit-manga="on"] #app-sidebar :is(.qm-manga-gateway-plate, .qm-manga-gateway-shell) .qagent-sidebar__telemetry-row {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 24px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 2px 7px !important;
+  white-space: normal !important;
+}
+html[data-qubit-manga="on"] #app-sidebar :is(.qm-manga-gateway-plate, .qm-manga-gateway-shell) .qagent-sidebar__telemetry-key,
+html[data-qubit-manga="on"] #app-sidebar :is(.qm-manga-gateway-plate, .qm-manga-gateway-shell) .qagent-sidebar__telemetry-value,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(.qm-manga-gateway-plate, .qm-manga-gateway-shell) .qagent-sidebar__telemetry-key,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(.qm-manga-gateway-plate, .qm-manga-gateway-shell) .qagent-sidebar__telemetry-value {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.24 !important;
+  text-shadow: var(--qm-sweep-shadow);
+}
+html[data-qubit-manga="on"] #app-sidebar :is(.qm-manga-gateway-plate, .qm-manga-gateway-shell) .qagent-sidebar__telemetry-value {
+  text-align: right !important;
+  justify-self: end !important;
+}
+
+/* ------------------------------------------------- utility / theme picker */
+html[data-qubit-manga="on"] #app-sidebar :is(.qm-theme-trigger, .qm-language-trigger, .qm-utility-trigger) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+}
+html[data-qubit-manga="on"] #app-sidebar .qm-theme-trigger__label,
+html[data-qubit-manga="on"] #app-sidebar .qm-language-trigger > span,
+html[data-qubit-manga="on"] #app-sidebar .qm-utility-trigger > span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.2 !important;
+}
+html[data-qubit-manga="on"] .qm-utility-picker .qm-utility-picker__head h2 {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+html[data-qubit-manga="on"] .qm-utility-picker .qm-picker-choice {
+  min-width: 0 !important;
+  align-items: flex-start !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+html[data-qubit-manga="on"] .qm-utility-picker .qm-picker-choice :is(div, span, p, strong, small, em) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+html[data-qubit-manga="on"] .qm-utility-picker .qm-picker-choice > :is(svg, .qm-theme-row__spark, .qm-theme-row__lamp, .qm-theme-swatch) {
+  flex: none !important;
+}
+
+/* ------------------------------------------------- page / module headers */
+html[data-qubit-manga="on"] header[role="banner"] > div,
+html[data-qubit-manga="on"] [data-dashboard-page-header] > div {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+html[data-qubit-manga="on"] header[role="banner"] .qubit-module-header,
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header {
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 60px !important;
+}
+html[data-qubit-manga="on"] header[role="banner"] .qubit-module-header h1,
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1 {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.16 !important;
+  text-wrap: balance;
+  text-shadow: var(--qm-sweep-shadow);
+}
+html[data-qubit-manga="on"] header[role="banner"] [data-page-header-actions],
+html[data-qubit-manga="on"] [data-dashboard-page-header] [data-page-header-actions] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html[data-qubit-manga="on"] header[role="banner"] [data-page-header-actions] :is(span, strong, small, em, code, time),
+html[data-qubit-manga="on"] [data-dashboard-page-header] [data-page-header-actions] :is(span, strong, small, em, code, time) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+
+/* Page/section headings keep their frame and wrap inside it. */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-page__title,
+  .settings-section__heading,
+  .settings-section__title,
+  .qplate-module__head
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  text-shadow: var(--qm-sweep-shadow);
+}
+
+/* --------------------------------------------------------- page metadata */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-page__desc,
+  .settings-section__desc,
+  .settings-row__title,
+  .settings-row__desc,
+  .settings-row__value,
+  .settings-summary dt,
+  .settings-summary dd,
+  .settings-summary__tile dt,
+  .settings-summary__tile dd,
+  .settings-kv dt,
+  .settings-kv dd,
+  .sessions-heading-facts,
+  .sessions-heading-fact,
+  .workboard-health,
+  .workboard-health__item,
+  .workboard-refresh-status,
+  .workboard-heading__automation-label,
+  .workboard-heading__automation-meta,
+  .workboard-heading__automation-meta > span,
+  .workboard-card__updated
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .settings-row {
+  flex-wrap: wrap !important;
+  row-gap: 9px !important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .settings-row__value {
+  text-overflow: clip !important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .settings-kv {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) !important;
+}
+
+/* Cards and panels: nothing may draw text over its own border. */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  [data-slot="card"],
+  .settings-section,
+  .settings-group,
+  .kitchen-panel,
+  [data-qm-surface="panel"],
+  .workboard-card,
+  .workboard-modal,
+  .qb-thread-card,
+  .qm-skills-card,
+  .ak-modal
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .workboard-card__title h3,
+  .workboard-card__labels,
+  .workboard-column__header h2,
+  .workboard-page-title > span,
+  .cron-table__name-text,
+  .cron-table__description
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* ---------------------------------------------------------------- tables */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .sessions-table,
+  .settings-table,
+  .cron-table,
+  .kitchen-table,
+  .device-token-table
+) :is(th, td, [role="columnheader"], [role="cell"]) {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .cron-table__name-text,
+  .cron-table__description,
+  .cron-table__cell,
+  .cron-table__cell-value,
+  .cron-table__schedule,
+  .cron-table__last-time,
+  .session-key-cell__primary > a,
+  .session-key-cell__primary > span:first-child,
+  .session-key-display-name,
+  .session-token-cell,
+  .session-tokens__value
+) {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+html[data-qubit-manga="on"] #qubit-main-content .sessions-table tbody tr.session-data-row > td {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* --------------------------------------------------------- chips / badges */
+html[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-count,
+  .settings-status,
+  .settings-status > span,
+  .hx-pill,
+  .hx-proj-badge,
+  .qb-chip,
+  .qb-call-badge,
+  .workboard-chip,
+  .workboard-filter-chip,
+  .workboard-filter-chip__label,
+  .session-label-chip,
+  .session-kind
+) {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.3 !important;
+  text-shadow: var(--qm-sweep-shadow);
+}
+
+/* --------------------------------------------------------------- dialogs */
+html[data-qubit-manga="on"] :is(
+  .qm-confirm-dialog__title,
+  .qm-confirm-dialog__description,
+  .cron-editor-dialog__title,
+  .qmodel-picker__title,
+  .qmodel-picker__current-name,
+  .qmodel-picker__models-heading > span:first-child,
+  .workboard-modal__header h2,
+  .workboard-modal__header p,
+  .qm-skill-editor-dialog :is(h1, h2, h3, p),
+  .qm-skill-learn-dialog :is(h1, h2, h3, p)
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+html[data-qubit-manga="on"] .qm-confirm-dialog__header,
+html[data-qubit-manga="on"] .cron-editor-dialog > header,
+html[data-qubit-manga="on"] .qmodel-picker__header {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* -------------------------------------------------------------- tooltips */
+html[data-qubit-manga="on"] [role="tooltip"]:not([data-rail-tooltip], .qsk-hover-tip__bubble) {
+  box-sizing: border-box !important;
+  max-width: calc(100vw - 16px) !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  white-space: normal !important;
+  line-height: 1.35 !important;
+}
+html[data-qubit-manga="on"] .q5t-tooltip__copy {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.3 !important;
+}
+html[data-qubit-manga="on"] .q5t-tooltip {
+  width: min(300px, calc(100vw - 16px)) !important;
+  max-width: calc(100vw - 16px) !important;
+}
+html[data-qubit-manga="on"] :is(
+  .q5t-tooltip-shell[role="tooltip"],
+  .q5t-page-tooltip[role="tooltip"],
+  .q5t-important-tooltip[role="tooltip"]
+) {
+  width: min(300px, calc(100vw - 16px)) !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 16px) !important;
+}
+
+/* ------------------------------------------------------- narrow fallback */
+@media (max-width: 760px) {
+  html[data-qubit-manga="on"] #app-sidebar nav .qm-section-titleplate .qubit-sidebar-title__label {
+    margin-inline: 6% 30% !important;
+    font-size: max(10px, .72rem) !important;
+  }
+  html[data-qubit-manga="on"] header[role="banner"] .qubit-module-header h1,
+  html[data-qubit-manga="on"] [data-dashboard-page-header] h1 {
+    font-size: .92rem !important;
+    line-height: 1.12 !important;
+  }
+  html[data-qubit-manga="on"] #qubit-main-content .settings-kv {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  html[data-qubit-manga="on"] #qubit-main-content .settings-kv dd {
+    margin-inline-start: 0 !important;
+  }
+}
+
+/* ------------------------------------------------------- forced colours */
+@media (forced-colors: active) {
+  html[data-qubit-manga="on"] #app-sidebar :is(
+    .qubit-sidebar-title__label,
+    .qagent-sidebar__section-head > span,
+    .qm-manga-footer-content > span,
+    .qagent-sidebar__telemetry-key,
+    .qagent-sidebar__telemetry-value
+  ) {
+    text-shadow: none !important;
+    color: CanvasText !important;
+  }
+}
