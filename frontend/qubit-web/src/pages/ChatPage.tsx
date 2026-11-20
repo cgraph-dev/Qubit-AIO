@@ -2826,12 +2826,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                     className="qchat__activity"
                     aria-live="polite"
                   >
-                    <QubitAtomLoader
-                      size="inline"
-                      showLabel={false}
-                      showBar={false}
-                      showCat={false}
-                    />
+                    <MangaChatLoader size="inline" />
                     <span>
                       {assistantActivity === "summarizing"
                         ? "Summarizing this session…"
