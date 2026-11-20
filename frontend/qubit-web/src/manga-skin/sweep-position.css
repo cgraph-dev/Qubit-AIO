@@ -154,3 +154,48 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header h1
   display: none !important;
   background: none !important;
 }
+
+/* Collapsed rail must remain the original compact icon rail. The text
+   containment pass was letting labels expand the rows even though the visual
+   label utility (lg:hidden) is overridden by an !important display rule. */
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] nav .qagent-sidebar__link-label,
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] nav .qagent-sidebar__chevron {
+  display: none !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] nav a.qagent-sidebar__link {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  justify-content: center !important;
+  padding-block: 0 !important;
+  padding-inline: 0 !important;
+  gap: 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] nav .qagent-sidebar__section-head {
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding-block: 0 !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__colophon {
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  padding: 0 4px !important;
+  overflow: hidden !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer-content {
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+  gap: 4px !important;
+  height: 100% !important;
+  font-size: 10px !important;
+}
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer-content > span {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 10px !important;
+}
