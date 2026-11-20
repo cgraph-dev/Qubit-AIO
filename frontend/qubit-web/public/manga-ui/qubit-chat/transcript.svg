@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800" role="img" aria-label="Nine-slice Manga conversation frame"><defs>
+<linearGradient id="chrome" x1="0" y1="0" x2=".24" y2="1"><stop stop-color="#fff8ff"/><stop offset=".13" stop-color="#d9b6e5"/><stop offset=".27" stop-color="#fbf0ff"/><stop offset=".48" stop-color="#806298"/><stop offset=".66" stop-color="#3b2258"/><stop offset=".83" stop-color="#edb4ff"/><stop offset="1" stop-color="#7d438f"/></linearGradient>
+<linearGradient id="pink" x1="0" y1="0" x2="1" y2=".68"><stop stop-color="#ff8bdc"/><stop offset=".15" stop-color="#ff36b0"/><stop offset=".48" stop-color="#e71d93"/><stop offset=".78" stop-color="#951359"/><stop offset="1" stop-color="#390f40"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2=".72" y2="1"><stop stop-color="#fffbd4"/><stop offset=".16" stop-color="#ffe95a"/><stop offset=".42" stop-color="#ffab09"/><stop offset=".7" stop-color="#d36f00"/><stop offset="1" stop-color="#fff177"/></linearGradient>
+<radialGradient id="ink" cx=".43" cy=".47" r=".76"><stop stop-color="#310c3b"/><stop offset=".58" stop-color="#1a0829"/><stop offset="1" stop-color="#090516"/></radialGradient>
+<radialGradient id="lumen"><stop stop-color="#fff5c9"/><stop offset=".2" stop-color="#ffcb47"/><stop offset=".55" stop-color="#ff8b07"/><stop offset="1" stop-color="#ff3e84" stop-opacity="0"/></radialGradient>
+<pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.15" fill="#ff45b1" opacity=".74"/></pattern>
+</defs>
+<path d="M30 15H1370L1385 31V769L1370 784H29L14 769V31Z" fill="none" stroke="#090412" stroke-width="18"/>
+<path d="M30 15H1370L1385 31V769L1370 784H29L14 769V31Z" fill="none" stroke="url(#chrome)" stroke-width="7"/>
+<path d="M30 24H1369L1376 32V766L1369 775H30L23 767V31Z" fill="none" stroke="#ff36ad" stroke-width="3"/>
+<path d="M32 31L136 31L32 148Z" fill="#c21e87" opacity=".24"/>
+<path d="M30 32H133 M31 33V131" fill="none" stroke="#ff78c9" stroke-width="3"/>
+<path d="M1368 717L1368 769L1309 769Z M31 32H49L31 51Z" fill="url(#gold)"/>
+<path d="M1210 768L1367 768L1367 615Z" fill="url(#dots)" opacity=".42"/>
+<path d="M1330 737L1360 704 M1304 750L1355 695 M1274 763L1340 685" stroke="#fa2aa1" stroke-width="4" opacity=".65"/></svg>
