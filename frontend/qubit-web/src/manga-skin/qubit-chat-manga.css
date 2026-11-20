@@ -76,12 +76,9 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__conversation > .qch
   border-bottom:1px solid rgba(255,105,194,.64)!important;
   border-radius:0!important;
   box-shadow:none!important;
-  /* Full-resolution SVG is displayed at native ratio; the rest of the
-     header gets a matching plum fill rather than a horizontally stretched
-     illustration. Text and buttons remain independent React elements. */
-  background:
-    url("/manga-ui/qubit-chat/header.svg") left center / auto 100% no-repeat,
-    linear-gradient(105deg,#59103f,#210a2d 45%,#10071e)!important;
+  /* One header frame: the corner/chip artwork uses 9-slice rather than
+     painting a smaller complete panel behind the page title. */
+  background:linear-gradient(105deg,#59103f,#210a2d 45%,#10071e)!important;
   overflow:visible;
 }
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::before {
@@ -96,11 +93,20 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::before {
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::after {
   content:"";
   position:absolute;
-  top:0;right:0;bottom:auto;left:0;
-  height:5px;
-  z-index:2;
-  background:linear-gradient(90deg,#ffc553 0 7%,#fd64c6 12%,transparent 30%,#fa2294 83%,#ffd042 96%);
+  inset:0;
+  height:auto;
+  z-index:0;
+  border:12px solid transparent;
+  border-image-source:url("/manga-ui/qubit-chat/header.svg");
+  border-image-slice:30 38 30 375 fill;
+  border-image-width:10px 12px 10px 250px;
+  border-image-repeat:stretch;
+  background:none;
   pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header > *,
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::before {
+  position:relative;z-index:1;
 }
 html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__title {
   color:#fff9ff!important;
