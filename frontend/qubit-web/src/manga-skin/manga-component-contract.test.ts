@@ -76,7 +76,7 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(css).toContain('/manga-ui/zip/toast-info.svg');
     expect(css).not.toContain('/manga-ui/zip/dropdown-panel.svg');
     expect(tip).toContain('data-rail-tooltip=""');
-    expect(read("../components/sidebar-tooltip.css")).toContain("sidebar-tooltip.svg");
+    expect(read("../components/sidebar-tooltip.css")).toContain("sidebar-menu-tooltip.svg");
     expect(kit).toContain("installOriginalMangaAssets");
   });
   it("restores single native chat search and refresh animations", () => {
