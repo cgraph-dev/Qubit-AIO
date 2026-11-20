@@ -70,12 +70,10 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat__side > .qchat_
 }
 
 /* Chat transcript, composer, tool/artifact cards and code/terminal surfaces. */
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat :is(
-  .qchat__transcript,.qchat__messages,.qchat__composer
-) {border:2px solid #b965ff;background-color:#10091e}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qchat :is(
-  .qchat__composer,.qchat__input
-) {border-image:none;background-image:url("/manga-ui/zip/chat-composer.svg");background-size:100% 100%}
+/* The original ZIP chat transcript/composer sprites were applied to the
+ * content AND its nested controls, creating overlapping frames and vertical
+ * chrome strips. Native /qubit-chat now has a single visual owner:
+ * qubit-chat-manga.css. Keep the ZIP for unrelated pages and message cards. */
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
   .qchat__tool-card,.qchat__artifact-card
 ) {border:2px solid #ff269a;box-shadow:2px 2px 0 #080615}
