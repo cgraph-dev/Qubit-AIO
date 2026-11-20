@@ -807,3 +807,24 @@ html[data-qubit-manga="on"] header[role="banner"] > div {
     padding-right: 72px !important;
   }
 }
+
+/* Skills filters: active rows are the Manga gold plate, not the default
+   white/pink foreground inversion. */
+html[data-qubit-manga="on"] .qm-skills-filters sakuga-button.qsk-list-item[data-active="true"],
+html[data-qubit-manga="on"] .qm-skills-filters sakuga-button.qsk-list-item[aria-current="true"] {
+  background: transparent !important;
+  color: #120618 !important;
+}
+html[data-qubit-manga="on"] .qm-skills-filters sakuga-button.qsk-list-item[data-active="true"]::part(button),
+html[data-qubit-manga="on"] .qm-skills-filters sakuga-button.qsk-list-item[aria-current="true"]::part(button) {
+  background: #ffe500 !important;
+  color: #120618 !important;
+  border: 2px solid #120618 !important;
+  box-shadow: 2px 2px 0 #ff269a !important;
+}
+
+/* Do not paint an extra dark ring over the real painted toggle artwork. */
+html[data-qubit-manga="on"] sakuga-toggle::after {
+  content: none !important;
+  display: none !important;
+}
