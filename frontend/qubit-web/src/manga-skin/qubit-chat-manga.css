@@ -20,14 +20,8 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] {
   font-family:var(--theme-font-sans,Inter,system-ui,sans-serif);
   font-size:clamp(13px,.86rem,16px);
 }
-html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace {
-  display:flex;
-  min-height:0;
-  min-width:0;
-  flex:1 1 auto;
-  overflow:hidden;
-  gap:0.65rem;
-}
+/* Preserve ChatPage.studio.css's responsive workspace grid and mobile
+   stacking: changing that layout would also change the protected inspector. */
 html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation {
   position:relative;
   isolation:isolate;
@@ -365,6 +359,13 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__session-actions > *
 }
 /* Keep the single conversation frame above controls; sticky placement is
    managed by existing app flex sizing, never by absolute overlay positions. */
+@media(max-width:1023px) {
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation {
+    flex:0 0 auto;
+    height:min(86dvh,52rem);
+    min-height:min(86dvh,52rem);
+  }
+}
 @media(max-width:870px) {
   html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud {
     grid-template-columns:auto minmax(0,1fr) auto;
@@ -398,7 +399,8 @@ html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__session-actions > *
   }
 }
 @media(prefers-reduced-motion:reduce) {
-  html[data-qubit-manga="on"] .qchat[data-manga-agent] :is(.qchat__manga-atom,.qchat__manga-indeterminate::before) {
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-atom,
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-indeterminate::before {
     animation:none!important;
   }
   html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-meter > span {
