@@ -1833,7 +1833,7 @@ function SidebarSystemActions({
       {q5t ? (
         <ul className="q5t-system-actions flex flex-row items-stretch gap-2">
           {restartItem && (
-            <li className="min-w-0 flex-1">
+            <li className="min-w-0 flex-1" data-system-action="restart">
               <Q5TPrimaryButton
                 className="q5t-system-primary"
                 disabled={restartDisabled}
@@ -1936,6 +1936,7 @@ function SystemActionButton({
   return (
     <li
       className="min-w-0 flex-1"
+      data-system-action={item.action}
       onMouseEnter={collapsed ? showTooltip : undefined}
       onMouseLeave={collapsed ? hideTooltip : undefined}
     >
@@ -1977,11 +1978,10 @@ function SystemActionButton({
         </Button>
       </ImportantTooltip>
 
-      {collapsed && tooltipAnchor && (
+      {collapsed && tooltipAnchor && !item.disabledReason && (
         <SidebarTooltip
           anchor={tooltipAnchor}
           label={displayLabel}
-          detail={item.disabledReason}
           warmRef={tooltipWarmRef}
         />
       )}
