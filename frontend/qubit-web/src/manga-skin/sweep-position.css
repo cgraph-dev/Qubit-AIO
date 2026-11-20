@@ -1,1 +1,126 @@
-/* Sweep lane: position */
+/* Sweep lane: position
+ *
+ * Evidence-backed overlay/layout repairs only. Loaded after every other Manga
+ * stylesheet, so each rule carries an explicit high-specificity gate rather
+ * than relying on source order alone.
+ */
+
+/* -------------------------------------------------------------------------
+ * 1. Theme / language utility picker.
+ *
+ * With the optional ZIP asset pack installed, [data-qm-panel] paints the
+ * nine-slice dropdown artwork (including its title tab) as a ::before layer,
+ * and its 29/19/21 padding outranks the earlier picker repair. That is why a
+ * stray pink corner tab sat behind the Theme title and the panel surface was
+ * transparent. This picker is a standalone dialog with its own head/body, so
+ * it gets one normal frame and no duplicated art layer.
+ * ---------------------------------------------------------------------- */
+html:root[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel],
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-utility-picker[data-qm-panel] {
+  background: #1b1030 !important;
+  background-image: none !important;
+  border: 2px solid #ff269a !important;
+  border-image: none !important;
+  border-radius: 2px !important;
+  box-shadow: 3px 4px 0 #080615, 6px 7px 0 rgba(255, 38, 154, .35) !important;
+  padding: 12px !important;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  box-sizing: border-box;
+}
+html:root[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel]::before,
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-utility-picker[data-qm-panel]::before,
+html:root[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel]::after,
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-utility-picker[data-qm-panel]::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+/* The head/title and scroll body stay inside that single frame. */
+html:root[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel] > .qm-utility-picker__head {
+  min-width: 0;
+  padding-block: 2px 8px;
+  border-bottom: 2px solid #6e2a67;
+}
+html:root[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel] > .qm-utility-picker__body {
+  min-width: 0;
+  padding: 4px;
+}
+
+/* -------------------------------------------------------------------------
+ * 2. Page dialogs must paint above the fixed owner sidebar.
+ *
+ * Cron/MCP/Webhooks/Profiles/Models dialogs render inside App.tsx's
+ * `relative z-2` content column, while the Manga sidebar is `fixed z-50`.
+ * A descendant z-[100] cannot escape the z-2 stacking context, so on a
+ * 1024px viewport the 768px dialog runs from x=128 to x=896 and its left
+ * 186px is covered by the sidebar. Raising the content column only while a
+ * modal is open clears that collision without changing normal page layering.
+ * ---------------------------------------------------------------------- */
+html[data-qubit-manga="on"] #qubit-main-content > .relative.z-2:has([aria-modal="true"]) {
+  z-index: 60 !important;
+}
+
+/* -------------------------------------------------------------------------
+ * 3. Collapsed sidebar rail tooltips.
+ *
+ * The rail artwork fixes the tooltip width/height from the pointer position.
+ * A long disabled-reason could exceed the viewport, at which point the
+ * placement helper hid the whole tip. Capping the painted height lets the
+ * same placement stay visible and scroll its copy instead.
+ * ---------------------------------------------------------------------- */
+html[data-qubit-manga="on"] .manga-rail-tooltip[role="tooltip"] {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cc83ba transparent;
+}
+
+/* -------------------------------------------------------------------------
+ * 4. New owner sidebar frame and module header guards.
+ *
+ * The owner frame is decorative: it must never re-enter flex layout, widen
+ * the rail, or accept pointers. The module header must be shrinkable at every
+ * width so its artwork padding cannot create a horizontal scrollbar beside
+ * the page-header actions.
+ * ---------------------------------------------------------------------- */
+html[data-qubit-manga="on"] #app-sidebar > img.qubit-sidebar__frame {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: fill !important;
+  pointer-events: none !important;
+}
+html[data-qubit-manga="on"] .qubit-module-header {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+html[data-qubit-manga="on"] .qubit-module-header > h1 {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* The theme picker header is a flex row: keep the close control visible and
+   the title able to wrap inside the new frame on narrow screens. */
+html[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel] .qm-utility-picker__head {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+html[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel] .qm-utility-picker__head h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+html[data-qubit-manga="on"] .qm-utility-picker[data-qm-panel] .qm-utility-picker__head button {
+  flex: 0 0 auto;
+}
