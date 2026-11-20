@@ -1,1 +1,106 @@
-/* Sweep lane: header-frame */
+/* ==========================================================================
+   Sweep lane: header-frame
+   Manga (Q4/Q4-L) only. This file is imported last by MangaSkin.tsx, so its
+   rules win the cascade against every earlier legacy layer without editing
+   those layers in place.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Owner sidebar frame
+   The frame is a decorative overlay, never a flex child: absolute, full
+   inset, z-index 0. Every rail surface paints above it. The legacy CSS
+   perimeter frame is kept out of the DOM for Manga in App.tsx; hide it here
+   as well so a stale/approved-assets rule can never paint it again.
+   -------------------------------------------------------------------------- */
+html:root[data-qubit-manga="on"] #app-sidebar > img.qubit-sidebar__frame {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  flex: none !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  object-fit: fill !important;
+}
+
+/* nav / brand / system / utility / auth / colophon sit above the frame. */
+html:root[data-qubit-manga="on"] #app-sidebar >
+  :not(img.qubit-sidebar__frame):not(.qagent-sidebar__backdrop):not(.qm-manga-outer-frame) {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* The legacy perimeter frame must never paint for Manga, including the
+   approved-assets rule that otherwise forces display:block and z-index 30. */
+html:root[data-qubit-manga="on"] #app-sidebar > .qm-manga-outer-frame,
+html:root[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar > .qm-manga-outer-frame {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. Page header: the owner module-header plate is the only title plate.
+   Strip the legacy header background/border, its pseudo ornaments, the old
+   header art, and the old h1 plate that used to sit behind the new artwork.
+   -------------------------------------------------------------------------- */
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+html:root[data-qubit-manga="on"] [data-dashboard-page-header]::before,
+html:root[data-qubit-manga="on"] [data-dashboard-page-header]::after,
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] h1::before,
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  border: 0 !important;
+}
+
+/* QubitMangaHeaderArt is removed from PageHeaderProvider; hide it if a stale
+   layer ever reintroduces the old star/slash art. */
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-manga-header-art {
+  display: none !important;
+}
+
+/* Reset only the legacy h1 plate properties. The new plate's own type
+   (display face, uppercase, tracking) is preserved. */
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] h1 {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  text-shadow: none !important;
+  clip-path: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+/* The old left/right padding existed for the removed header art. Restore the
+   normal header gutters so the plate and its actions use the full bar. */
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] > div {
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+@media (min-width: 640px) {
+  html:root[data-qubit-manga="on"] [data-dashboard-page-header] > div {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+}
