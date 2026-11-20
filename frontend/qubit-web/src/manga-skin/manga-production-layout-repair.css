@@ -860,3 +860,77 @@ html[data-qubit-manga="on"] #app-sidebar nav .qm-section-titleplate .qubit-sideb
   font-size: 12px !important;
   letter-spacing: .045em !important;
 }
+
+/* The approved 05 plate must not remain behind the owner title plate. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head.qm-section-titleplate {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  aspect-ratio: auto !important;
+  margin: 7px 0 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  overflow: visible !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head.qm-section-titleplate::before,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qagent-sidebar__section-head.qm-section-titleplate::after {
+  content: none !important;
+  display: none !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qm-section-titleplate .qubit-sidebar-title {
+  block-size: 56px !important;
+  height: 56px !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) nav .qm-section-titleplate .qubit-sidebar-title__label {
+  font-size: 14px !important;
+}
+
+/* The footer is the whole plate, not an inner version badge. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__colophon,
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"][data-qubit-manga-zip="ready"] #app-sidebar .qagent-sidebar__colophon {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 48px !important;
+  padding: 8px 13px !important;
+  border: 2px solid #fff0ff !important;
+  border-top-color: #ff269a !important;
+  background: linear-gradient(105deg, #30133e, #0a0719) !important;
+  background-image: linear-gradient(105deg, #30133e, #0a0719) !important;
+  box-shadow: inset 0 3px 0 #ff269a, 2px 2px 0 #080411 !important;
+  color: #fff0ff !important;
+  overflow: hidden !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-footer-content {
+  min-height: 100% !important;
+  height: 100% !important;
+  align-items: center !important;
+  font-size: 12px !important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-footer-content > span {
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* Page title tooltips use the same Q5T shell but stay absolutely positioned. */
+html[data-qubit-manga="on"] .q5t-page-tooltip[role="tooltip"] {
+  position: fixed !important;
+  width: 300px !important;
+  min-width: 300px !important;
+  max-width: 300px !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #fff2fa !important;
+  overflow: visible !important;
+}

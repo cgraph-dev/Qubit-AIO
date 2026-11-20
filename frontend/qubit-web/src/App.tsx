@@ -79,6 +79,7 @@ import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { QubitMark } from "@/components/QubitMark";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { QubitSidebarTitle } from "@/components/QubitSidebarTitle";
+import { MangaPageTitleTooltips } from "@/components/MangaPageTitleTooltips";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { Q5TGatewayFrame } from "@/components/Q5TGatewayFrame";
 import { Q5TPrimaryButton } from "@/components/Q5TPrimaryButton";
@@ -922,6 +923,7 @@ export default function App() {
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background-base text-text-primary antialiased"
     >
       <SakugaToastHost />
+      <MangaPageTitleTooltips />
       <a
         href="#qubit-main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[300] focus:border focus:border-midground focus:bg-background-base focus:px-3 focus:py-2 focus:text-sm focus:text-foreground"
