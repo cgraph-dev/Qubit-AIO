@@ -1,0 +1,407 @@
+/**
+ * /qubit-chat manga agent presentation. SINGLE visual owner for the native
+ * central ChatPage; absolutely no selectors for #app-sidebar, [data-chat-inspector],
+ * .qchat__side or the terminal /chat route. Existing Sakuga actions are left alone.
+ *
+ * 9-slice SVG frame art: corners retain native proportions, side rails stretch.
+ * All metrics, titles, messages and buttons remain live React components.
+ */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] {
+  --qma-ink:#fff5ff;
+  --qma-muted:#d8b9e5;
+  --qma-gold:#ffe17c;
+  --qma-pink:#ff48b1;
+  --qma-border:#f54fb1;
+  --qma-bg:#12081e;
+  min-height:0;
+  min-width:0;
+  gap:0.35rem;
+  color:var(--qma-ink);
+  font-family:var(--theme-font-sans,Inter,system-ui,sans-serif);
+  font-size:clamp(13px,.86rem,16px);
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace {
+  display:flex;
+  min-height:0;
+  min-width:0;
+  flex:1 1 auto;
+  overflow:hidden;
+  gap:0.65rem;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation {
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:column;
+  min-height:0;
+  min-width:0;
+  overflow:hidden;
+  padding:7px clamp(8px,1.1vw,16px) 9px;
+  gap:6px;
+  background:linear-gradient(130deg,#210a2a 0%,#110819 58%,#160822 100%)!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+/* The exterior is ONE nine-slice border, not a background stretched over
+   another panel. Static frame and translucent fill never cover the DOM. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation::before {
+  content:""!important;
+  display:block!important;
+  position:absolute;
+  inset:0;
+  z-index:0;
+  border:18px solid transparent!important;
+  border-image-source:url("/manga-ui/qubit-chat/transcript.svg")!important;
+  border-image-slice:45 fill!important;
+  border-image-width:18px!important;
+  border-image-repeat:stretch!important;
+  background:none!important;
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation::after {
+  content:none!important;display:none!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation > * {
+  position:relative;
+  z-index:1;
+  min-width:0;
+}
+/* One rich header; controls keep their existing Sakuga DOM and appearance. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__conversation > .qchat__header {
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px 12px;
+  min-height:60px;
+  padding:10px 12px 10px 20px!important;
+  margin:0!important;
+  border:0!important;
+  border-bottom:1px solid rgba(255,105,194,.64)!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  background:linear-gradient(105deg,rgba(204,29,133,.33),rgba(35,8,45,.42) 35%,rgba(10,4,21,.95))!important;
+  overflow:visible;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::before {
+  content:"";
+  display:block;
+  flex:0 0 38px;
+  width:38px;height:38px;
+  background:url("/manga-ui/qubit-chat/atom.svg") center / contain no-repeat;
+  pointer-events:none;
+  filter:drop-shadow(0 0 5px rgba(255,184,29,.35));
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::after {
+  content:"";
+  position:absolute;
+  top:0;right:0;bottom:auto;left:0;
+  height:5px;
+  z-index:2;
+  background:linear-gradient(90deg,#ffc553 0 7%,#fd64c6 12%,transparent 30%,#fa2294 83%,#ffd042 96%);
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__title {
+  color:#fff9ff!important;
+  font:italic 900 clamp(16px,1.35rem,22px)/1.1 var(--theme-font-display,Rajdhani,Impact,sans-serif)!important;
+  text-transform:uppercase!important;
+  letter-spacing:.03em!important;
+  text-shadow:1px 2px 0 rgba(10,0,21,.9)!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header [data-testid="chat-model"] {
+  display:inline-flex;
+  align-items:center;
+  min-height:25px;
+  min-width:0;
+  max-width:min(34vw,330px);
+  margin:0;
+  padding:3px 8px;
+  background:#180b23;
+  border:1px solid #c47ac8;
+  color:#f4deff!important;
+  font:650 12px/1.25 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  text-shadow:none!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header > :last-child {margin-left:auto;min-width:0}
+/* Session HUD: same real data; no invented progress. Dividers are native
+   CSS and survive narrow widths without stretching illustration geometry. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud {
+  position:relative;
+  isolation:isolate;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:0;
+  min-height:57px;
+  margin:0!important;
+  padding:4px 9px!important;
+  border:1px solid rgba(255,91,181,.74)!important;
+  border-radius:3px!important;
+  background:linear-gradient(100deg,#260a31,#17091d 65%,#240b32)!important;
+  box-shadow:inset 0 1px rgba(255,183,235,.22)!important;
+  overflow:hidden;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud::before {
+  content:"";
+  position:absolute;top:0;right:0;left:0;height:2px;
+  background:linear-gradient(90deg,#ff3faf,#ffe19f 14%,transparent 36%,#fb30a1 84%);
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-mark {
+  width:62px;min-height:46px;
+  border:0!important;border-right:1px solid rgba(255,87,179,.47)!important;
+  background:none!important;box-shadow:none!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-mark strong {
+  color:#ff54b4!important;font:900 24px/1 var(--theme-font-display,Rajdhani,Impact,sans-serif)!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-track {
+  padding:5px clamp(8px,2vw,22px);min-width:0;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-copy {
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:3px 10px;
+  color:var(--qma-ink);
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-copy > span,
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-stat > span {
+  color:#f2d8ed!important;
+  font:750 11px/1.2 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+  letter-spacing:.045em!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-copy strong {
+  color:#f7e8f5!important;
+  font:650 11px/1.35 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+  letter-spacing:normal!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-charge {
+  color:#ff5cb9!important;
+  font:800 14px/1 var(--theme-font-display,Rajdhani,system-ui,sans-serif)!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-meter {
+  position:relative;
+  height:11px;min-height:11px;
+  border:1px solid #c947a6;
+  border-radius:2px;
+  background:#0d051a;
+  overflow:hidden;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-meter > span {
+  display:block;
+  height:100%;width:100%;
+  transform-origin:left center;
+  background:linear-gradient(110deg,#f91b94,#ff6dcb 54%,#f432a8)!important;
+  transition:transform 180ms ease-out;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-stat {
+  min-width:88px;min-height:43px;
+  padding:4px 11px!important;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;
+  border:0!important;border-left:1px solid rgba(255,97,195,.5)!important;
+  background:none!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-stat strong {
+  color:var(--qma-ink)!important;
+  font:800 16px/1.1 var(--theme-font-display,Rajdhani,system-ui,sans-serif)!important;
+  letter-spacing:.02em;
+}
+/* A summary is always visible and keyboard operable. Diagnostics remain in
+   DOM but stop occupying screen space when not needed. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__voice-details {
+  position:relative;
+  flex:0 0 auto;
+  min-width:0;
+  color:var(--qma-muted);
+  font:600 12px/1.3 var(--theme-font-sans,Inter,system-ui,sans-serif);
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__voice-details > summary {
+  display:inline-flex;align-items:center;
+  min-height:26px;padding:3px 10px;
+  border:1px solid rgba(245,82,182,.47);
+  background:#190b27;
+  border-radius:2px;
+  cursor:pointer;
+  color:#efd7f3;
+  list-style:revert;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__voice-details > summary:focus-visible {
+  outline:2px solid #ffd666;outline-offset:2px;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__voice-details > .qchat__voice-status {
+  max-height:min(27vh,150px);
+  margin:4px 0 2px!important;
+  padding:8px!important;
+  border:1px solid #783a80!important;
+  border-radius:2px;
+  background:rgba(14,5,27,.9)!important;
+  color:#e9d4ee!important;
+  font:500 12px/1.45 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+  overflow-y:auto;overflow-x:hidden;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__voice-status > span {
+  font-size:12px!important;letter-spacing:normal!important;
+  overflow-wrap:anywhere;
+}
+/* Transcript takes remaining height. Only inner messages scroll; the frame
+   belongs to the conversation and never repeats on message rows. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__transcript {
+  flex:1 1 auto;min-height:0;min-width:0;
+  margin:0!important;padding:12px clamp(8px,1.2vw,18px) 16px!important;
+  border:0!important;outline:0!important;
+  border-image:none!important;
+  border-radius:0!important;
+  background:none!important;background-image:none!important;
+  box-shadow:none!important;
+  overflow-x:hidden;overflow-y:auto;
+  scrollbar-color:#bd3c9b #180a24;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__messages {
+  border:0!important;border-image:none!important;
+  box-shadow:none!important;background:none!important;background-image:none!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__transcript :is(p,li) {
+  font-size:clamp(13px,.89rem,16px);
+  line-height:1.55;
+  overflow-wrap:anywhere;
+}
+/* Loading: SVG gold atom, Sakuga status and indeterminate shimmer. No fake
+   percentage and no spinner/cat from the previous shared loader. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__transcript-loading {
+  min-height:100%;
+  display:flex;align-items:center;justify-content:center;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-loader {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:9px;
+  max-width:100%;
+  padding:14px;
+  color:#fff3ff;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-atom {
+  display:block;width:clamp(84px,13vw,154px);height:auto;
+  animation:qma-atom-breathe 2.7s ease-in-out infinite;
+  filter:drop-shadow(0 0 8px rgba(255,145,31,.38));
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-loader-title {
+  color:#fff4ff;
+  font:italic 900 clamp(16px,1.3rem,22px)/1.2 var(--theme-font-display,Rajdhani,Impact,sans-serif);
+  letter-spacing:.05em;
+  text-align:center;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-loader > .qchat__manga-indeterminate {
+  position:relative;
+  display:block;
+  width:min(300px,65vw);
+  height:8px;
+  background:#1c082e;
+  border:1px solid #ed4caf;
+  border-radius:2px;
+  overflow:hidden;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__manga-indeterminate::before {
+  content:"";
+  display:block;
+  width:32%;height:100%;
+  background:linear-gradient(90deg,#f2279e,#ff8cda,#ed35aa);
+  transform:translateX(-105%);
+  animation:qma-loading-sweep 1.8s ease-in-out infinite;
+}
+@keyframes qma-loading-sweep {to{transform:translateX(330%)}}
+@keyframes qma-atom-breathe {0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.04);opacity:1}}
+/* Composer = ONE distinct frame, no ZIP background on the textarea or host.
+   Controls are unchanged Sakuga FileField / Button / Select / Textarea. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer {
+  position:relative;isolation:isolate;
+  display:flex;flex:0 0 auto;
+  align-items:flex-end;flex-wrap:wrap;
+  min-width:0;gap:8px!important;
+  margin:0!important;padding:16px clamp(12px,1.7vw,24px)!important;
+  border:0!important;border-image:none!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  background:linear-gradient(110deg,#220b2d,#150920)!important;
+  background-image:none!important;
+  overflow:visible;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer::before {
+  content:"";
+  display:block;
+  position:absolute;inset:0;z-index:0;
+  border:15px solid transparent;
+  border-image-source:url("/manga-ui/qubit-chat/composer.svg");
+  border-image-slice:35 fill;
+  border-image-width:15px;
+  border-image-repeat:stretch;
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer::after {content:none!important;display:none!important}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer > * {position:relative;z-index:1;min-width:0}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer textarea,
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer [id="qubit-chat-input"] {
+  color:#fff6ff!important;
+  background-image:none!important;
+  text-shadow:none!important;
+  font:500 14px/1.5 var(--theme-font-sans,Inter,system-ui,sans-serif)!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer textarea::placeholder {
+  color:#bca8cb;opacity:1;
+}
+/* No replacement button surfaces. Secondary/primary look is owned by
+   @/sakuga/ui, never by these selectors. */
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__session-actions {
+  display:flex;align-items:center;flex-wrap:wrap;
+  flex:0 0 auto;gap:7px!important;min-width:0;
+  margin:0!important;padding:5px 10px 3px!important;
+  border:0!important;border-image:none!important;
+  background:none!important;box-shadow:none!important;
+}
+html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__session-actions > * {
+  max-width:100%;white-space:normal;
+}
+/* Keep the single conversation frame above controls; sticky placement is
+   managed by existing app flex sizing, never by absolute overlay positions. */
+@media(max-width:870px) {
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-hud {
+    grid-template-columns:auto minmax(0,1fr) auto;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-stat--voice {
+    display:none;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header::before {
+    width:30px;height:30px;flex-basis:30px;
+  }
+}
+@media(max-width:560px) {
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] > .qchat__workspace > .qchat__conversation {
+    padding:5px 7px 7px;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__header {
+    padding:8px!important;
+    gap:6px;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-mark {
+    width:45px;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__run-stat {
+    min-width:68px;padding:4px!important;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__composer {
+    padding:12px!important;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__transcript {
+    padding:9px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] :is(.qchat__manga-atom,.qchat__manga-indeterminate::before) {
+    animation:none!important;
+  }
+  html[data-qubit-manga="on"] .qchat[data-manga-agent] .qchat__rank-meter > span {
+    transition:none!important;
+  }
+}
