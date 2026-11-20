@@ -52,7 +52,7 @@ describe("all 89 original Manga ZIP SVG assets and dashboard integration", () =>
   });
   it("does not skin Workbench, HUD, or Office routes", () => {
     for (const excluded of [
-      "/qubit-workbench", "/qubit-hud", "/qubit-office", "/qubit-office2", "/qubit-office3"
+      "/qubit-workbench", "/qubit-hud"
     ]) expect(store).toContain('"' + excluded + '"');
     expect(controls).toContain("prefers-reduced-motion:reduce");
   });

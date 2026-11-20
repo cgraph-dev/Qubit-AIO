@@ -18,9 +18,6 @@ export const MANGA_EXCLUDED_PATHS = [
   "/qubit-workbench",
   "/workbench", // Explicitly preserve the standalone Workbench route and descendants.
   "/qubit-hud",
-  "/qubit-office",
-  "/qubit-office2",
-  "/qubit-office3",
 ] as const;
 
 /** True when the current pathname may receive the manga skin. */

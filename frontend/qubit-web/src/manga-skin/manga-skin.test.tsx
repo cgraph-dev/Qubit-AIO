@@ -115,7 +115,7 @@ describe("MangaSkinGate", () => {
     expect(skinOn()).toBe(false);
 
     clickText("office");
-    expect(skinOn()).toBe(false);
+    expect(skinOn()).toBe(true);
 
     clickText("sessions");
     expect(skinOn()).toBe(true);
@@ -164,7 +164,7 @@ describe("bootstrapMangaSkin", () => {
     expect(skinOn()).toBe(true);
 
     bootstrapMangaSkin("/qubit-office");
-    expect(skinOn()).toBe(false);
+    expect(skinOn()).toBe(true);
 
     bootstrapMangaSkin("/qubit-workbench");
     expect(skinOn()).toBe(false);

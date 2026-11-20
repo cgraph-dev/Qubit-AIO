@@ -87,9 +87,12 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     expect(workspace).toContain("qm-refresh-icon--spinning");
     expect(css).toContain("qm-refresh-icon--spinning");
   });
-  it("keeps Office and Workbench out of scope while allowing /chat chrome", () => {
-    for (const route of ["/workbench","/qubit-workbench","/qubit-office","/qubit-office2","/qubit-office3"]) {
+  it("keeps Workbench out of scope while allowing chat and Office chrome", () => {
+    for (const route of ["/workbench","/qubit-workbench"]) {
       expect(routes).toContain('"' + route + '"');
+    }
+    for (const route of ["/qubit-office","/qubit-office2","/qubit-office3"]) {
+      expect(routes).not.toContain('"' + route + '"');
     }
     expect(routes).not.toContain('"/chat",');
     // No CSS instruction should modify individual terminal glyphs/cursors.
