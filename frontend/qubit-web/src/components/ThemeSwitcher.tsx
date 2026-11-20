@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { Palette, Check, Type } from "lucide-react";
 import { ListItem, Button } from "@/sakuga/ui";
@@ -28,50 +28,82 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
   const { themeName, availableThemes, setTheme, fontId, fontChoices, setFont } = useTheme();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [, setFlyoutLayoutVersion] = useState(0);
+  const [flyoutStyle, setFlyoutStyle] = useState<CSSProperties>();
+  const pickerId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const narrowViewport = useBelowBreakpoint(640);
   const useMobileSheet = Boolean(dropUp && narrowViewport);
 
   const close = useCallback(() => setOpen(false), []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, close]);
+  const closeAndFocus = useCallback(() => {
+    close();
+    requestAnimationFrame(() => wrapperRef.current?.querySelector<HTMLElement>(".qm-theme-trigger")?.focus());
+  }, [close]);
 
   useEffect(() => {
     if (!open || useMobileSheet) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (wrapperRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.key !== "Escape") return;
+      event.preventDefault();
+      closeAndFocus();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.composedPath().includes(wrapperRef.current!) ||
+          event.composedPath().includes(dropdownRef.current!)) return;
       close();
     };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [open, close, useMobileSheet]);
-
-  // A portal is not clipped by the rail, but it still needs to follow its
-  // trigger and stay inside the visible viewport during resize/scroll.
-  useEffect(() => {
-    if (!open || useMobileSheet) return;
-    const refresh = (event?: Event) => {
-      if (dropdownRef.current?.contains(event?.target as Node)) return;
-      setFlyoutLayoutVersion((v) => v + 1);
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target as Node | null;
+      if (wrapperRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      close();
     };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("focusin", onFocus);
+    };
+  }, [open, close, closeAndFocus, useMobileSheet]);
+
+  useLayoutEffect(() => {
+    if (!open || useMobileSheet) return;
+    const panel = dropdownRef.current;
+    const refresh = (event?: Event) => {
+      if (!dropUp || (event?.target instanceof Node && panel?.contains(event.target))) return;
+      const anchor = wrapperRef.current?.getBoundingClientRect();
+      if (!anchor) return;
+      const viewport = window.visualViewport;
+      const width = viewport?.width ?? window.innerWidth;
+      const height = viewport?.height ?? window.innerHeight;
+      const x = viewport?.offsetLeft ?? 0;
+      const y = viewport?.offsetTop ?? 0;
+      const panelWidth = Math.min(366, Math.max(1, width - 24));
+      const panelHeight = Math.min(570, Math.max(1, height - 24));
+      const sidebarRight = document.getElementById("app-sidebar")?.getBoundingClientRect().right;
+      const desiredLeft = Math.max(sidebarRight ?? 0, anchor.right) + 8;
+      setFlyoutStyle({
+        left: Math.max(x + 12, Math.min(desiredLeft, x + width - panelWidth - 12)),
+        top: Math.max(y + 12, Math.min(anchor.bottom - panelHeight, y + height - panelHeight - 12)),
+        width: panelWidth,
+        maxHeight: panelHeight,
+      });
+    };
+    refresh();
+    panel?.focus();
     window.addEventListener("resize", refresh);
     window.addEventListener("scroll", refresh, true);
+    window.visualViewport?.addEventListener("resize", refresh);
+    window.visualViewport?.addEventListener("scroll", refresh);
     return () => {
       window.removeEventListener("resize", refresh);
       window.removeEventListener("scroll", refresh, true);
+      window.visualViewport?.removeEventListener("resize", refresh);
+      window.visualViewport?.removeEventListener("scroll", refresh);
     };
-  }, [open, useMobileSheet]);
+  }, [open, dropUp, useMobileSheet]);
 
   const current = availableThemes.find((th) => th.name === themeName);
   const label = current?.label ?? themeName;
@@ -93,7 +125,8 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
         title={`${t.theme?.switchTheme ?? "Switch theme"}: ${label}`}
         aria-label={t.theme?.switchTheme ?? "Switch theme"}
         {...{ "aria-expanded": String(open) }}
-        {...{ "aria-haspopup": "listbox" }}
+        aria-haspopup="dialog"
+        aria-controls={open && !useMobileSheet ? pickerId : undefined}
       >
         <span className="inline-flex items-center gap-1.5">
           {mangaActive ? (
@@ -121,14 +154,14 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
       {useMobileSheet && (
         <BottomSheet
           backdropDismissLabel={t.common.close}
-          onClose={close}
+          onClose={closeAndFocus}
           open={open}
           title={sheetTitle}
         >
-          <div aria-label={sheetTitle} role="listbox">
+          <div data-appearance-picker="">
             <ThemeSwitcherOptions
               availableThemes={availableThemes}
-              close={close}
+              close={closeAndFocus}
               setTheme={setTheme}
               themeName={themeName}
             />
@@ -142,23 +175,6 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
       )}
 
       {open && !useMobileSheet && (() => {
-        const rect = wrapperRef.current?.getBoundingClientRect();
-        // `dropUp` is used by the sidebar rail. Anchor the flyout to the RIGHT
-        // edge of the sidebar (not over it) so the open listbox never covers
-        // the sidebar's own controls (e.g. Restart Gateway). While it is open
-        // the rest of the sidebar stays clickable, and a click anywhere outside
-        // dismisses it through the document mousedown handler above.
-        const sidebarRight =
-          document.getElementById("app-sidebar")?.getBoundingClientRect().right;
-        const flyoutLeft = dropUp
-          ? sidebarRight !== undefined && sidebarRight > 0
-            ? sidebarRight + 8
-            : (rect?.right ?? 0) + 8
-          : undefined;
-        const flyoutHeight = Math.min(570, Math.max(220, window.innerHeight - 24));
-        const flyoutWidth = Math.min(366, Math.max(260, window.innerWidth - 24));
-        const boundedLeft = Math.max(12, Math.min(flyoutLeft ?? 12, window.innerWidth - flyoutWidth - 12));
-        const boundedTop = Math.max(12, Math.min((rect?.bottom ?? 0) - flyoutHeight, window.innerHeight - flyoutHeight - 12));
         const dropdown = (
           <div
             ref={dropdownRef}
@@ -167,19 +183,11 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
               "qrail-flyout",
               dropUp ? "fixed z-[100]" : "absolute z-50 right-0 top-full mt-1",
             )}
-            data-align="top"
-            role="listbox"
-            style={
-              dropUp && rect
-                ? {
-                    top: boundedTop,
-                    left: boundedLeft,
-                    width: flyoutWidth,
-                    maxHeight: flyoutHeight,
-                    bottom: "auto",
-                  }
-                : undefined
-            }
+            id={pickerId}
+            data-appearance-picker=""
+            tabIndex={-1}
+            role="dialog"
+            style={dropUp ? flyoutStyle : undefined}
           >
             <div className="qrail-flyout__head">
               <Palette className="h-3 w-3" />
@@ -189,7 +197,7 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             <div className="qrail-flyout__body">
               <ThemeSwitcherOptions
                 availableThemes={availableThemes}
-                close={close}
+                close={closeAndFocus}
                 setTheme={setTheme}
                 themeName={themeName}
               />
@@ -223,7 +231,7 @@ function ThemeSwitcherOptions({
         return (
           <ListItem
             active={isActive}
-            aria-selected={isActive}
+            aria-pressed={isActive}
             className={cn("gap-3", mangaRow && "qm-theme-row qm-theme-row--manga")}
             data-manga-theme={mangaRow ? "true" : undefined}
             key={th.name}
@@ -231,7 +239,6 @@ function ThemeSwitcherOptions({
               setTheme(th.name);
               close();
             }}
-            role="option"
           >
             {mangaRow ? (
               <span aria-hidden className="qm-theme-row__spark">
@@ -245,12 +252,12 @@ function ThemeSwitcherOptions({
 
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <Typography
-                className="truncate text-display text-xs tracking-wide"
+                className="break-words text-display text-xs tracking-wide"
               >
                 {th.label}
               </Typography>
               {th.description && (
-                <Typography className="truncate text-xs tracking-normal text-text-tertiary">
+                <Typography className="break-words text-xs leading-normal tracking-normal text-text-tertiary">
                   {th.description}
                 </Typography>
               )}
@@ -287,7 +294,7 @@ const FONT_CATEGORY_LABEL_KEY: Record<FontChoice["category"], "fontSans" | "font
 
 /** Font-override section rendered below the theme list. Lets the user pick
  *  any catalog font independently of the active theme, or "Theme default"
- *  to clear the override. Each row previews itself in its own font. */
+ *  to clear the override. Rows show the catalog names without fetching every webfont. */
 function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
   const { t } = useI18n();
   const order: FontChoice["category"][] = ["sans", "serif", "mono"];
@@ -307,17 +314,16 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
       {/* Theme-default (clears the override). */}
       <ListItem
         active={fontId === THEME_DEFAULT_FONT_ID}
-        aria-selected={fontId === THEME_DEFAULT_FONT_ID}
+        aria-pressed={fontId === THEME_DEFAULT_FONT_ID}
         className="gap-3"
         onClick={() => setFont(THEME_DEFAULT_FONT_ID)}
-        role="option"
       >
         <span aria-hidden className="h-4 w-9 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <Typography className="truncate text-xs tracking-normal">
+          <Typography className="break-words text-xs tracking-normal">
             {t.theme?.fontDefault ?? "Theme default"}
           </Typography>
-          <Typography className="truncate text-xs tracking-normal text-text-tertiary">
+          <Typography className="break-words text-xs leading-normal tracking-normal text-text-tertiary">
             {t.theme?.fontDefaultHint ?? "Use the active theme's font"}
           </Typography>
         </div>
@@ -345,18 +351,15 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
               return (
                 <ListItem
                   active={isActive}
-                  aria-selected={isActive}
+                  aria-pressed={isActive}
                   className="gap-3"
                   key={f.id}
                   onClick={() => setFont(f.id)}
-                  role="option"
-                >
+                      >
                   <span aria-hidden className="h-4 w-9 shrink-0" />
                   <div className="flex min-w-0 flex-1 flex-col">
-                    {/* Preview the font in its own stack. */}
                     <span
-                      className="truncate text-sm"
-                      style={{ fontFamily: f.stack }}
+                      className="break-words text-sm"
                     >
                       {f.label}
                     </span>

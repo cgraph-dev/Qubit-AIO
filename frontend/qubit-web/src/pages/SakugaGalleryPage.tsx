@@ -808,7 +808,6 @@ export default function SakugaGalleryPage() {
   return (
     <SettingsPage wide className="skg">
       <SettingsPageHeader
-        title="Sakuga VFX gallery"
         description={
           <>
             Every vendored control and every Qubit extra, live in the dashboard.

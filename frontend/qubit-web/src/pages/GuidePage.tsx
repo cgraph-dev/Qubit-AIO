@@ -35,8 +35,7 @@ export default function GuidePage() {
   return (
     <SettingsPage wide>
       <SettingsPageHeader
-        title="Guide"
-        description="Qubit is one agent with several ways in: a terminal chat, a voice bridge, scheduled jobs, and surfaces that show you what it is doing. Start where you work most — everything below is already running."
+        description="Choose how to work with Qubit, from terminal chat and voice to scheduled jobs. Availability depends on your setup."
       />
 
       <SettingsSection

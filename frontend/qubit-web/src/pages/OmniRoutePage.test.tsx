@@ -61,7 +61,7 @@ afterEach(() => {
 describe("OmniRoutePage", () => {
   it("renders the gateway console with dashboard links", async () => {
     renderPage(<OmniRoutePage />);
-    expect(text()).toContain("OmniRoute Gateway");
+    expect(text()).toContain("Open OmniRoute dashboard (new tab)");
     const dashboard = container.querySelector(
       'a[href="http://127.0.0.1:20128"]',
     );
@@ -73,6 +73,6 @@ describe("OmniRoutePage", () => {
     // The CSP forbids a cross-origin probe; the page must not attempt one.
     await act(async () => {});
     expect(fetchUrls).toEqual([]);
-    expect(text()).toContain("cannot query it directly");
+    expect(text()).toContain("Live status is unavailable here");
   });
 });

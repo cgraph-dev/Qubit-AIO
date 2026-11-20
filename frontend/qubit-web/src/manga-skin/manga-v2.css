@@ -256,22 +256,6 @@ html[data-qubit-manga="on"] .qmodel-picker__header {
 html[data-qubit-manga="on"] .qmodel-picker__title {
   font-family:var(--qm-display)!important;font-size:1.25rem;font-weight:700;
 }
-html[data-qubit-manga="on"] .qrail-flyout {
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  max-height:min(570px,calc(100dvh - 24px))!important;
-  border:3px solid var(--qm-magenta)!important;
-  box-shadow:var(--qm-border-shadow)!important;
-  isolation:isolate;
-}
-html[data-qubit-manga="on"] .qrail-flyout__head {flex:0 0 auto}
-html[data-qubit-manga="on"] .qrail-flyout__body {
-  flex:1 1 auto;
-  min-height:0;
-  overflow-y:auto;
-  overscroll-behavior:contain;
-}
 html[data-qubit-manga="on"] .qm-select-root {display:inline-flex;vertical-align:middle;min-width:0;max-width:100%}
 html[data-qubit-manga="on"] .qm-select-trigger {
   display:flex;align-items:center;justify-content:space-between;gap:7px;

@@ -8,6 +8,7 @@ const BUILTIN: Record<string, keyof Translations["app"]["nav"]> = {
   "/logs": "logs",
   "/cron": "cron",
   "/skills": "skills",
+  "/agents": "agents",
   "/plugins": "plugins",
   "/profiles": "profiles",
   "/config": "config",
@@ -118,7 +119,7 @@ export function resolvePageTitle(
   t: Translations,
   pluginTabs: { path: string; label: string }[],
 ): string {
-  const normalized = pathname.replace(/\/$/, "") || "/";
+  const normalized = pathname.replace(/\/+$/, "").toLowerCase() || "/";
   if (normalized === "/") {
     return t.app.nav.sessions;
   }
@@ -126,7 +127,7 @@ export function resolvePageTitle(
   if (explicit) {
     return explicit;
   }
-  const plugin = pluginTabs.find((p) => p.path === normalized.toLowerCase());
+  const plugin = pluginTabs.find((p) => p.path.replace(/\/+$/, "").toLowerCase() === normalized);
   if (plugin) {
     return plugin.label;
   }
@@ -138,10 +139,11 @@ export function resolvePageTitle(
   if (literal) {
     return literal;
   }
-  // Derive title from pathname: "/profiles" → "Profiles"
-  const segment = normalized.slice(1);
+  // Keep fallback titles readable for nested or hyphenated paths.
+  const segment = normalized.split("/").filter(Boolean).at(-1);
   if (segment) {
-    return segment.charAt(0).toUpperCase() + segment.slice(1);
+    return segment.split(/[-_]+/).filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   }
   return t.app.webUi;
 }

@@ -173,8 +173,7 @@ export default function OpenVikingStudioPage() {
           (see lib/resolve-page-title.ts), matching the sibling
           OpenViking*Page convention. */}
       <SettingsPageHeader
-        title="Open Viking Studio"
-        description="The OpenViking Studio, embedded. Qubit's context database — one filesystem for knowledge, memory and skills."
+        description="Browse and manage the knowledge, memory, and skills stored in OpenViking."
       />
 
       <SettingsSection title="Server">

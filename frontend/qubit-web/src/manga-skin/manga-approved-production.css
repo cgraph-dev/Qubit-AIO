@@ -52,7 +52,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-st
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-name,
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qbrand-label {
-  color:#fffaff!important;font:800 14px/1.28 system-ui,sans-serif!important;
+  color:#fffaff!important;font:800 14px/1.28 var(--theme-font-sans)!important;
   text-shadow:0 1px 3px #07030b!important;letter-spacing:0!important;
   min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;
 }
@@ -104,7 +104,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([d
   z-index:5!important;position:relative!important;
   transform:none!important;
   color:var(--qm-approved-light)!important;
-  font:italic 850 14px/1.2 system-ui,sans-serif!important;
+  font:italic 850 14px/1.2 var(--theme-font-sans)!important;
   letter-spacing:0!important;text-shadow:1px 2px 0 #13061a!important;
   white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
 }
@@ -149,7 +149,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .q
   display:flex;align-items:center;min-height:39px!important;
   padding:8px 11px!important;margin:3px 0!important;
   color:#f7eaff!important;
-  font:650 13px/1.45 system-ui,sans-serif!important;
+  font:650 13px/1.45 var(--theme-font-sans)!important;
   text-shadow:none!important;letter-spacing:0!important;
   border:1px solid rgba(242,177,255,.55)!important;
   border-radius:2px!important;
@@ -197,11 +197,11 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
   background:url("/manga-ui/approved/03_system_titlebar.webp") center/100% 100% no-repeat!important;
   border:0!important;outline:0!important;border-radius:0!important;
   box-shadow:none!important;clip-path:none!important;
-  color:#160821!important;font:italic 900 16px/1.15 system-ui,sans-serif!important;
+  color:#160821!important;font:italic 900 16px/1.15 var(--theme-font-sans)!important;
   letter-spacing:0!important;text-shadow:none!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head > span:first-child {
-  color:#190725!important;font:italic 900 16px/1 system-ui,sans-serif!important;
+  color:#190725!important;font:italic 900 16px/1 var(--theme-font-sans)!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-row {
   display:grid!important;
@@ -250,7 +250,7 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
   padding:6px 8px!important;gap:6px!important;
   color:inherit!important;background:transparent!important;
   border:0!important;border-radius:0!important;box-shadow:none!important;
-  font:750 10.5px/1.25 system-ui,sans-serif!important;
+  font:750 10.5px/1.25 var(--theme-font-sans)!important;
   text-shadow:0 1px 1px #080410!important;
 }
 
@@ -268,18 +268,18 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__to
   border:0!important;border-radius:0!important;box-shadow:none!important;
   color:#fff8ff!important;
   background:url("/manga-ui/approved/04_tooltip_plate.webp") center/100% 100% no-repeat!important;
-  font:500 13px/1.35 system-ui,sans-serif!important;
+  font:500 13px/1.35 var(--theme-font-sans)!important;
   letter-spacing:0!important;text-shadow:none!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-title {
   display:block!important;max-width:100%!important;
-  font:850 13.5px/1.25 system-ui,sans-serif!important;
+  font:850 13.5px/1.25 var(--theme-font-sans)!important;
   color:#ffe82b!important;text-shadow:none!important;
   overflow-wrap:anywhere!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] .qagent-sidebar__tooltip-detail {
   display:block!important;max-width:100%!important;
-  font:520 12px/1.35 system-ui,sans-serif!important;
+  font:520 12px/1.35 var(--theme-font-sans)!important;
   color:#fff4ff!important;text-shadow:none!important;
   overflow-wrap:anywhere!important;
 }

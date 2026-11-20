@@ -6,6 +6,13 @@ the local divergence. The historical per-record ledger `docs/UPSTREAM_REUSE.md`
 was retired in `eafb54e26`; references to its `R<n>` record ids below are
 historical, and this file is the surviving attribution record.
 
+## Inter and Rajdhani — dashboard webfonts
+
+Inter by the Inter Project Authors and Rajdhani by Indian Type Foundry are
+distributed under the SIL Open Font License 1.1. The dashboard ships unmodified
+Google Fonts WOFF2 subsets. The original license texts, versioned subset URLs,
+and SHA-256 digests are in `frontend/qubit-web/public/fonts-dashboard/`.
+
 ## CopilotKit — human-in-the-loop approval semantics
 
 The durable approval store `voicebridge/approvals.py` adapts the tested state

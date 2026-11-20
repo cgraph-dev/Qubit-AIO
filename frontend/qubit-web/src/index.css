@@ -6,6 +6,7 @@
    families the browser never loads and components fall back to a system
    stack (Tabs, Segmented, Typography, Buttons, etc. all look unstyled). */
 @import '@nous-research/ui/styles/fonts.css';
+@import './styles/dashboard-fonts.css';
 @import '@nous-research/ui/styles/globals.css';
 
 /* ------------------------------------------------------------------ */
@@ -281,9 +282,12 @@ code { font-size: 0.875rem; }
 /* the rail itself, and entirely theme-derived so a light theme stays light. */
 /* ------------------------------------------------------------------------ */
 .qrail-flyout {
-  min-width: 15.5rem;
-  max-height: 70dvh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: min(15.5rem, calc(100dvw - 24px));
+  max-width: calc(100dvw - 24px);
+  max-height: min(570px, calc(100dvh - 24px));
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--midground-base) 20%, transparent);
   border-radius: var(--theme-radius, 0.5rem);
   background: color-mix(in srgb, var(--background-base) 97%, #000);
@@ -296,9 +300,7 @@ code { font-size: 0.875rem; }
 }
 
 .qrail-flyout__head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -309,14 +311,19 @@ code { font-size: 0.875rem; }
 }
 
 .qrail-flyout__title {
-  font-family: var(--theme-font-mono, ui-monospace, monospace) !important;
-  font-size: 0.63rem !important;
-  font-weight: 600;
-  letter-spacing: 0.16em;
+  font-family: var(--theme-font-display) !important;
+  font-size: .9rem !important;
+  font-weight: 700;
+  letter-spacing: .05em;
   text-transform: uppercase;
 }
 
 .qrail-flyout__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 0.3rem 0 0.35rem;
 }
 

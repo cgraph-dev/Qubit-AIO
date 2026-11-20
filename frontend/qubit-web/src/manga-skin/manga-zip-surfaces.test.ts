@@ -25,7 +25,7 @@ describe("full Manga ZIP asset integration safety", () => {
   });
 
   it("keeps existing yellow selected-route treatment and backend status", () => {
-    expect(style).toContain('.qagent-sidebar__link:not([aria-current="page"])');
+    expect(style).not.toContain("nav-default.svg");
     expect(style).not.toContain('.qagent-sidebar__link[aria-current="page"] {');
     expect(sidebarFix).toContain('url("/manga-ui/sidebar-gateway.svg")');
   });

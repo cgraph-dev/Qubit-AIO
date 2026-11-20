@@ -46,20 +46,6 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :i
   .settings-section,.settings-group,.kitchen-panel,.workboard-card,[data-slot="card"]
 )>* {position:relative;z-index:1}
 
-/* Navigation: default, hover, keyboard focus and disabled states from the ZIP.
- * Selected stays the existing yellow SVG + impact-star animation (untouched). */
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:not([aria-current="page"]) {
-  background:url("/manga-ui/zip/nav-default.svg") center/100% 100% no-repeat!important;
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:hover:not([aria-current="page"]) {
-  background-image:url("/manga-ui/zip/nav-hover.svg")!important;
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:focus-visible:not([aria-current="page"]) {
-  background-image:url("/manga-ui/zip/nav-focused.svg")!important;outline:3px solid #ffe525!important;outline-offset:2px;
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-disabled="true"] {
-  background-image:url("/manga-ui/zip/nav-disabled.svg")!important;opacity:.55;
-}
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon {
   /* Footer art is ornamentation only; live LED and version/brand stay above. */
   background:

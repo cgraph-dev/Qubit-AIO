@@ -303,10 +303,9 @@ export default function CanvasPage() {
     <SettingsPage wide>
       <div className="contents" aria-label="Canvas">
         <SettingsPageHeader
-          title="Canvas"
           description={
             <>
-              Root: {root} Every write is confirm-gated and path-confined.
+              Canvas folder: {root}. Changes require confirmation and stay within this folder.
               {authority ? ` Authority: ${authority}` : ""}
             </>
           }

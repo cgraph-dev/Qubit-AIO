@@ -4,13 +4,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
   BUILTIN_THEMES,
   isMangaThemeName,
-  isRetiredThemeName,
   midnightTheme,
 } from "./presets";
 import {
@@ -19,6 +19,7 @@ import {
   setMangaEnabled,
 } from "@/manga-skin/manga-store";
 import { migrateThemeName } from "./themeAliases";
+import { mergeThemeChoices } from "./themeChoices";
 import {
   FONT_CHOICES,
   THEME_DEFAULT_FONT_ID,
@@ -75,11 +76,13 @@ function readStoredPreference(key: string, legacyKey: string): string | null {
   return null;
 }
 
-/** Renames of built-in theme keys we've shipped previously. Without this,
- *  users who saved one of the old names in localStorage (or had it
- *  persisted server-side) would silently fall back to `defaultTheme`
- *  because the lookup in `resolveTheme` no longer finds the stale key.
- *  The map + `migrateThemeName` live in `./themeAliases` (pure module). */
+function writePreference(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Persistence on the server still works when local storage is unavailable.
+  }
+}
 
 /** Tracks fontUrls we've already injected so multiple theme switches don't
  *  pile up <link> tags. Keyed by URL. */
@@ -480,11 +483,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** All selectable themes (shown in the picker). Starts with just the
    *  built-ins; the API call below merges in user themes. */
   const [availableThemes, setAvailableThemes] = useState<ThemeListEntry[]>(() =>
-    Object.values(BUILTIN_THEMES).map((t) => ({
-      name: t.name,
-      label: t.label,
-      description: t.description,
-    })),
+    mergeThemeChoices([]),
   );
 
   /** Full definitions for user themes keyed by name — the API provides
@@ -513,13 +512,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return valid;
   });
 
+  // A GET started at mount must not overwrite a new choice made while it
+  // was in flight. The catalog still updates independently.
+  const themeChanged = useRef(false);
+  const fontChanged = useRef(false);
+
   // Resolve a theme name to a full DashboardTheme, falling back to default
   // only when neither a built-in nor a user theme is found.
   const resolveTheme = useCallback(
     (name: string): DashboardTheme => {
       return (
-        BUILTIN_THEMES[name] ??
-        userThemeDefs[name] ??
+        (Object.hasOwn(BUILTIN_THEMES, name) ? BUILTIN_THEMES[name] : undefined) ??
+        (Object.hasOwn(userThemeDefs, name) ? userThemeDefs[name] : undefined) ??
         midnightTheme
       );
     },
@@ -562,33 +566,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           (resp.themes ?? []).map((t) => t.name),
         );
         if (resp.themes?.length) {
-          const served = resp.themes
-            .filter((t) => !isRetiredThemeName(t.name))
-            .map((t) => {
-              // The client owns the built-in labels/descriptions (normal-order
-              // naming). A rolling/stale backend may still return the old
-              // Q2..Q6 labels, so never let it overwrite a client built-in.
-              const builtin = BUILTIN_THEMES[t.name];
-              return {
-                name: t.name,
-                label: builtin?.label ?? t.label,
-                description: builtin?.description ?? t.description,
-                definition: t.definition,
-              };
-            });
-          // Keep built-ins that this client knows about but a not-yet-restarted
-          // server does not list (e.g. a newly shipped Q6). A built-in is
-          // client-owned; the server list is authoritative only for user YAMLs
-          // and for the exact metadata it does serve.
-          const servedNames = new Set(served.map((t) => t.name));
-          const missingBuiltins = Object.values(BUILTIN_THEMES)
-            .filter((t) => !servedNames.has(t.name))
-            .map((t) => ({
-              name: t.name,
-              label: t.label,
-              description: t.description,
-            }));
-          setAvailableThemes([...served, ...missingBuiltins]);
+          setAvailableThemes(mergeThemeChoices(resp.themes));
           // Index any definitions the server shipped (user themes).
           const defs: Record<string, DashboardTheme> = {};
           for (const entry of resp.themes) {
@@ -598,21 +576,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           }
           if (Object.keys(defs).length > 0) setUserThemeDefs(defs);
         }
-        if (resp.active) {
+        if (resp.active && !themeChanged.current) {
           const migratedActive = migrateThemeName(resp.active);
           // Forward compatibility: a new client can ship a built-in theme
           // before the running server's list contains it. Do not let the
           // older server's active value clobber that local choice; keep it
           // and try to persist it (a stale server may 400 harmlessly).
           const localBuiltinAheadOfServer =
-            Boolean(BUILTIN_THEMES[themeName]) &&
+            Object.hasOwn(BUILTIN_THEMES, themeName) &&
             !servedNames.has(themeName);
           if (localBuiltinAheadOfServer) {
             api.setTheme(themeName).catch(() => {});
           } else {
             if (migratedActive !== themeName) {
               setThemeName(migratedActive);
-              window.localStorage.setItem(STORAGE_KEY, migratedActive);
+              writePreference(STORAGE_KEY, migratedActive);
             }
             // If the server is still persisting the stale key, push the
             // migrated value back so it converges too — otherwise every
@@ -637,14 +615,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     api
       .getFontPref()
       .then((resp) => {
-        if (cancelled) return;
+        if (cancelled || fontChanged.current) return;
         const serverId =
           resp?.font && getFontChoice(resp.font) ? resp.font : THEME_DEFAULT_FONT_ID;
         if (serverId !== fontId) {
           setFontId(serverId);
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem(FONT_STORAGE_KEY, serverId);
-          }
+          writePreference(FONT_STORAGE_KEY, serverId);
         }
       })
       .catch(() => {});
@@ -663,10 +639,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         ...Object.keys(userThemeDefs),
       ]);
       const next = knownNames.has(name) ? name : "q2";
+      themeChanged.current = true;
       setThemeName(next);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, next);
-      }
+      writePreference(STORAGE_KEY, next);
       api.setTheme(next).catch(() => {});
     },
     [availableThemes, userThemeDefs],
@@ -674,10 +649,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setFont = useCallback((id: string) => {
     const next = getFontChoice(id) ? id : THEME_DEFAULT_FONT_ID;
+    fontChanged.current = true;
     setFontId(next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(FONT_STORAGE_KEY, next);
-    }
+    writePreference(FONT_STORAGE_KEY, next);
     api.setFontPref(next).catch(() => {});
   }, []);
 

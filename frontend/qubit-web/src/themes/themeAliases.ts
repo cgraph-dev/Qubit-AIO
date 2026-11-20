@@ -33,5 +33,5 @@ export const THEME_NAME_ALIASES: Record<string, string> = {
 };
 
 export function migrateThemeName(name: string): string {
-  return THEME_NAME_ALIASES[name] ?? name;
+  return Object.hasOwn(THEME_NAME_ALIASES, name) ? THEME_NAME_ALIASES[name] : name;
 }

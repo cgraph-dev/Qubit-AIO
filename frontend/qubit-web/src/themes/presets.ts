@@ -9,14 +9,12 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  *
  * Theme ids are Qubit-owned (`q2`..`q6`); the picker presents them in normal
  * order as Q1..Q4. Q1, Q1-L, Q5 and Q5-L were retired at owner request (the
- * Q1/Q5 definitions remain only as internal fallbacks, never as picker
- * entries). Every remaining theme ships a "-L" large variant (Q1-L .. Q4-L)
+ * old IDs still migrate when they are read). Every remaining theme ships a "-L" large variant (Q1-L .. Q4-L)
  * that keeps the same look with a bigger root size and roomier spacing. Theme names must stay in sync
  * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
  * `qubit_cli/web_server_dashboard.py`.
  *
- * `defaultTheme` (Q1) is no longer selectable; it remains a definition for
- * legacy fallbacks only. The live fallback is Q2 (`midnightTheme`).
+ * The fallback is `midnightTheme` (internal q2, shown as Q1).
  */
 
 // ---------------------------------------------------------------------------
@@ -55,28 +53,11 @@ const LARGE_LAYOUT: Partial<ThemeLayout> = {
 // Themes
 // ---------------------------------------------------------------------------
 
-/** Q1 — the canonical deep-teal look and the dashboard default. */
-export const defaultTheme: DashboardTheme = {
-  name: "default",
-  label: "Q1",
-  description: "Q1 — deep teal canvas with warm cream ink and an amber glow",
-  palette: {
-    background: { hex: "#041c1c", alpha: 1 },
-    midground: { hex: "#ffe6cb", alpha: 1 },
-    foreground: { hex: "#ffffff", alpha: 0 },
-    warmGlow: "rgba(255, 189, 56, 0.35)",
-    noiseOpacity: 1,
-  },
-  typography: DEFAULT_TYPOGRAPHY,
-  layout: DEFAULT_LAYOUT,
-  terminalBackground: "#000000",
-};
-
 /** Q2 — deep blue-violet night canvas. */
 export const midnightTheme: DashboardTheme = {
   name: "q2",
   label: "Q1",
-  description: "Q1 — near-black navy canvas with a lilac tint and violet glow",
+  description: "Near-black navy with lilac text and a violet glow",
   palette: {
     background: { hex: "#0a0a1f", alpha: 1 },
     midground: { hex: "#d4c8ff", alpha: 1 },
@@ -102,7 +83,7 @@ export const midnightTheme: DashboardTheme = {
 export const monoTheme: DashboardTheme = {
   name: "q3",
   label: "Q2",
-  description: "Q2 — neutral greyscale canvas with square corners and no accent hue",
+  description: "Neutral grayscale with square corners",
   palette: {
     background: { hex: "#0e0e0e", alpha: 1 },
     midground: { hex: "#eaeaea", alpha: 1 },
@@ -127,7 +108,7 @@ export const monoTheme: DashboardTheme = {
 export const cyberpunkTheme: DashboardTheme = {
   name: "q4",
   label: "Q3",
-  description: "Q3 — black canvas, monospace throughout, bright mint signal colour",
+  description: "Black with monospace text and bright mint accents",
   palette: {
     background: { hex: "#040608", alpha: 1 },
     midground: { hex: "#9bffcf", alpha: 1 },
@@ -153,33 +134,6 @@ export const cyberpunkTheme: DashboardTheme = {
   },
 };
 
-/** Q5 — maximum-contrast accessibility preset. */
-export const contrastTheme: DashboardTheme = {
-  name: "q5",
-  label: "Q5",
-  description: "Q5 — pure black canvas, pure white ink, maximum contrast",
-  palette: {
-    background: { hex: "#000000", alpha: 1 },
-    midground: { hex: "#e8ff8f", alpha: 1 },
-    foreground: { hex: "#ffffff", alpha: 0 },
-    warmGlow: "rgba(232, 255, 143, 0.22)",
-    noiseOpacity: 0,
-  },
-  typography: {
-    ...DEFAULT_TYPOGRAPHY,
-    lineHeight: "1.6",
-  },
-  layout: {
-    ...DEFAULT_LAYOUT,
-    radius: "0.25rem",
-  },
-  colorOverrides: {
-    success: "#a5df7b",
-    warning: "#f0c56b",
-    destructive: "#ff8178",
-  },
-};
-
 /** Q6 — the opt-in manga skin as a first-class theme. Selecting Q6 (or
  *  Q6-L) enables the scoped `html[data-qubit-manga]` visual layer; selecting
  *  any other theme turns it back off. The palette below is the fallback for
@@ -188,7 +142,7 @@ export const mangaTheme: DashboardTheme = {
   name: "q6",
   label: "Q4",
   description:
-    "Q6 — manga ink: hot magenta frames, deep navy plate and yellow impact accents",
+    "Manga — magenta frames, deep navy surfaces, and yellow accents",
   palette: {
     background: { hex: "#08061a", alpha: 1 },
     midground: { hex: "#f7e9ff", alpha: 1 },
@@ -201,7 +155,7 @@ export const mangaTheme: DashboardTheme = {
     fontSans: `"Inter", ${SYSTEM_SANS}`,
     fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
     fontDisplay: '"Rajdhani", "Arial Narrow", "Segoe UI", system-ui, sans-serif',
-    fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap",
+
     letterSpacing: "0.002em",
   },
   layout: {
@@ -256,7 +210,7 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
     ...base,
     name,
     label: `Q${num}-L`,
-    description: `Q${num}-L — the Q${num} look with larger type and roomier spacing`,
+    description: "Larger text and roomier spacing",
     typography: { ...base.typography, ...LARGE_TYPOGRAPHY },
     layout: { ...base.layout, ...LARGE_LAYOUT },
   };

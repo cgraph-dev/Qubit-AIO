@@ -66,7 +66,9 @@ sakuga-button::part(button) {
   justify-content: center;
   gap: 6px;
   padding: 5px 12px;
-  font-size: 13px;
+  font-style: normal;
+  font-family: var(--theme-font-sans);
+  font-size: max(.9rem, 13px);
   line-height: 1.2;
   border-width: 2.5px;
   border-radius: 10px;
@@ -74,7 +76,8 @@ sakuga-button::part(button) {
 
 sakuga-input::part(input) {
   padding: 7px 12px;
-  font-size: 14px;
+  font-family: var(--theme-font-sans);
+  font-size: max(.9rem, 14px);
   line-height: 1.35;
   border-width: 2.5px;
   box-shadow: 4px 5px 0 var(--sk-soft, #b8b3ff);
@@ -87,7 +90,8 @@ sakuga-tabs::part(tabs) {
 
 sakuga-tabs::part(tab) {
   padding: 6px 10px;
-  font-size: 13px;
+  font-family: var(--theme-font-sans);
+  font-size: max(.9rem, 13px);
   line-height: 1.2;
 }
 

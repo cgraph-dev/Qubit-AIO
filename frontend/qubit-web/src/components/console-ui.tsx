@@ -41,20 +41,20 @@ export function SettingsPage({
   );
 }
 
-/** Upstream `renderSettingsPageHeader` — the h1 + optional description. */
+/** Optional secondary heading and introduction below the route title. */
 export function SettingsPageHeader({
   title,
   description,
   actions,
 }: {
-  title: ReactNode;
+  title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
     <header className="settings-page__header" data-qm-surface="page-header">
       <div className="settings-page__copy">
-        <h2 className="settings-page__title">{title}</h2>
+        {title ? <h2 className="settings-page__title">{title}</h2> : null}
         {description ? (
           <p className="settings-page__desc">{description}</p>
         ) : null}

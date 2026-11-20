@@ -65,7 +65,6 @@ export const FONT_CHOICES: FontChoice[] = [
     label: "Inter",
     category: "sans",
     stack: `"Inter", ${SYSTEM_SANS}`,
-    fontUrl: GF("Inter:wght@400;500;600;700"),
   },
   {
     id: "ibm-plex-sans",
@@ -151,7 +150,7 @@ const FONT_BY_ID: Record<string, FontChoice> = Object.fromEntries(
  *  sentinel and for any unknown id. */
 export function getFontChoice(id: string | null | undefined): FontChoice | undefined {
   if (!id || id === THEME_DEFAULT_FONT_ID) return undefined;
-  return FONT_BY_ID[id];
+  return Object.hasOwn(FONT_BY_ID, id) ? FONT_BY_ID[id] : undefined;
 }
 
 /** Whether an id refers to a real catalog font (vs. theme-default/unknown). */

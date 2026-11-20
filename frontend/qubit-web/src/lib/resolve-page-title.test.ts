@@ -60,6 +60,8 @@ describe("resolvePageTitle", () => {
 
   it("falls back to capitalized path segment for unknown routes", () => {
     expect(resolvePageTitle("/whatever", t, [])).toBe("Whatever");
+    expect(resolvePageTitle("/plugin/job-history", t, [])).toBe("Job History");
+    expect(resolvePageTitle("/MCP/", t, [])).toBe("MCP");
   });
 
   it("treats root as sessions and trailing slashes as equivalent", () => {

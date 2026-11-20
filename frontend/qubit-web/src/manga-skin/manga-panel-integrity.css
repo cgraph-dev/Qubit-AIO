@@ -13,7 +13,7 @@ html:root[data-qubit-manga="on"] {
   --qm-content-muted:#d8c6e7;
   --qm-content-heading:#fff9ff;
   --qm-content-border:rgba(242,84,186,.66);
-  --qm-content-font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --qm-content-font:var(--theme-font-sans);
 }
 /* 1. Stop four copies of the ZIP module-header from being painted in one
    long row. Small, stable, single title plate; never repeat or 100%-stretch
@@ -45,7 +45,7 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
   box-shadow:0 2px 0 rgba(7,2,14,.75),inset 0 1px rgba(255,235,255,.37)!important;
   clip-path:none!important;
   color:var(--qm-content-heading)!important;
-  font:800 clamp(13px,.9rem,16px)/1.3 var(--qm-content-font)!important;
+  font:700 max(.9rem,13px)/1.3 var(--qm-display)!important;
   letter-spacing:.025em!important;
   text-transform:uppercase!important;
   text-align:left!important;
@@ -233,7 +233,7 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
 @media(max-width:720px) {
   html:root[data-qubit-manga="on"] #qubit-main-content :is(
     .settings-page__title,.settings-section__heading,.qplate-module__head
-  ) {min-height:32px!important;padding:6px 37px 6px 21px!important;font-size:13px!important}
+  ) {min-height:32px!important;padding:6px 37px 6px 21px!important}
 }
 @media(prefers-reduced-motion:reduce) {
   html:root[data-qubit-manga="on"] #qubit-main-content :is(button,a[href],[role="button"],sakuga-button) {
@@ -250,7 +250,7 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
   [data-slot="card-title"],[data-slot="table-cell"],[data-slot="table-head"]
 ) {
   font-family:var(--qm-content-font)!important;
-  font-size:clamp(12px,.78rem,14px)!important;
+  font-size:max(.82rem,12px)!important;
   line-height:1.4!important;
   letter-spacing:normal!important;
   text-shadow:none!important;
@@ -272,7 +272,7 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
 html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-row__desc,.settings-section__desc,.settings-page__desc
 ) {
-  font-size:clamp(12px,.76rem,14px)!important;
+  font-size:max(.82rem,12px)!important;
   line-height:1.48!important;
   color:var(--qm-content-muted)!important;
   text-shadow:none!important;
@@ -319,7 +319,7 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
 
 /* Rail overlays are portalled outside the page. The viewport-bounded panel
    paints the only border and the body (not the sheet) scrolls. */
-html:root[data-qubit-manga="on"] .qrail-flyout[role="listbox"] {
+html:root[data-qubit-manga="on"] .qrail-flyout[data-appearance-picker] {
   box-sizing:border-box;
   min-width:0;
   max-width:calc(100dvw - 24px);
@@ -328,9 +328,6 @@ html:root[data-qubit-manga="on"] .qrail-flyout[role="listbox"] {
   border-radius:3px!important;
   background:#1b1030!important;
   box-shadow:0 8px 24px #080412a6!important;
-}
-html:root[data-qubit-manga="on"] .qrail-flyout__body {
-  scrollbar-gutter:stable;
 }
 
 /* The generic Manga form skin frames ordinary fields, not the composer
@@ -393,7 +390,7 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] h1 {
   border-left:3px solid #ffe56f;
   background:linear-gradient(112deg,#cf237e,#6b205b 76%,#271331);
   color:#fff9ff;
-  font:800 1rem/1.3 var(--qm-content-font);
+  font:700 1.15rem/1.3 var(--qm-display);
   letter-spacing:.04em;
   text-transform:uppercase;
 }
@@ -425,7 +422,7 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
 html:root[data-qubit-manga="on"] :is(
   :is([role="dialog"],[role="alertdialog"]):not(.fixed.inset-0),
   :is([role="dialog"],[role="alertdialog"]).fixed.inset-0 > :first-child
-):not(.qm-confirm-dialog,.qmodel-picker) {
+):not(.qm-confirm-dialog,.qmodel-picker,[data-appearance-picker]) {
   min-width:0;
   max-width:min(100%,calc(100vw - 24px));
   border:2px solid var(--qm-magenta)!important;
@@ -444,4 +441,45 @@ html:root[data-qubit-manga="on"] .qm-confirm-dialog__actions > sakuga-button {
   border:0!important;
   background:none!important;
   box-shadow:none!important;
+}
+
+
+/* Use the existing theme tokens for legacy design-system font utilities
+   inside routed pages. Keep code, the terminal, and the component gallery
+   on their explicit typography. */
+html[data-qubit-manga="on"] #qubit-main-content [data-qm-route]:not([data-qm-route="/chat"],[data-qm-route="/sakuga-gallery"]) :is(.font-mondwest,.font-compressed):not(:is(code,kbd,pre,samp)) {
+  font-family:var(--theme-font-sans);
+}
+html[data-qubit-manga="on"] #qubit-main-content [data-qm-route]:not([data-qm-route="/chat"],[data-qm-route="/sakuga-gallery"]) :is(h2,h3,h4).font-expanded {
+  font-family:var(--theme-font-display);
+}
+
+
+/* A decorative ZIP button has fixed internal insets, so it puts a second
+   frame around only part of a navigation row. The fallback paints the real
+   link box. Installed approved rail styling retains its own artwork. */
+html:root[data-qubit-manga="on"]:not([data-qm-approved-assets="ready"]) #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:not([aria-current="page"]) {
+  background:linear-gradient(110deg,#281537,#171025)!important;
+  border:1px solid #79437f!important;
+  box-shadow:none!important;
+}
+html:root[data-qubit-manga="on"]:not([data-qm-approved-assets="ready"]) #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link:hover:not([aria-current="page"]) {
+  background:#391941!important;
+  border-color:#f875c6!important;
+}
+html:root[data-qubit-manga="on"]:not([data-qm-approved-assets="ready"]) #app-sidebar .qagent-sidebar__link:focus-visible {
+  outline:2px solid #ffe525!important;
+  outline-offset:2px;
+}
+/* The base wordmark uses transparent text fill over a clipped gradient.
+   Manga swaps that background, so its live label needs a solid fill. */
+html:root[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name .qbrand-label {
+  -webkit-text-fill-color:currentColor!important;
+  background-image:none!important;
+  animation:none!important;
+}
+html:root[data-qubit-manga="on"]:not([data-qm-approved-assets="ready"]) #app-sidebar .qbrand-label {
+  color:#fff4ff!important;
+  -webkit-text-stroke:0!important;
+  text-shadow:0 1px 2px #080411!important;
 }

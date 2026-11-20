@@ -171,8 +171,7 @@ export default function NodesPage() {
     <SettingsPage wide>
       <div className="contents" aria-label="Nodes">
         <SettingsPageHeader
-          title="Nodes"
-          description="Enrolled nodes: describe, approve, dispatch, rename, revoke, remove."
+          description="Review connected nodes, manage their access, and assign work."
           actions={
             <Button variant="secondary"
               type="button"

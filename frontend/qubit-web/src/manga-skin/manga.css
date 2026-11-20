@@ -791,11 +791,11 @@ html[data-qubit-manga="on"] #qubit-main-content .font-compressed[class*="border"
 /* Sakuga button host — see --sk-* above for the shadow-tree palette. */
 html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item)::part(button) {
   border-radius: 2px;
-  font-family: var(--qm-display);
-  font-style: italic;
-  font-weight: 900;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-family: var(--theme-font-sans);
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 html[data-qubit-manga="on"] sakuga-button.qsk-list-item::part(button) {
@@ -1031,13 +1031,6 @@ html[data-qubit-manga="on"] #qubit-main-content [role="menuitem"]:hover {
   background: var(--qm-wash) !important;
   color: var(--qm-ink) !important;
   box-shadow: inset 3px 0 0 var(--qm-magenta);
-}
-
-html[data-qubit-manga="on"] .qrail-flyout {
-  border: 2px solid var(--qm-magenta) !important;
-  border-radius: 2px !important;
-  background: var(--qm-panel) !important;
-  box-shadow: var(--qm-lift) !important;
 }
 
 html[data-qubit-manga="on"] .qrail-flyout__head {

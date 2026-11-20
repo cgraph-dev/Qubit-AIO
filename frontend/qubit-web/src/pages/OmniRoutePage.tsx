@@ -38,8 +38,7 @@ export default function OmniRoutePage() {
   return (
     <SettingsPage>
       <SettingsPageHeader
-        title="OmniRoute Gateway"
-        description="Local AI gateway: Qubit fails over to omniroute/auto when a primary provider rate-limits. The dashboard opens in a new tab (OmniRoute refuses framing)."
+        description="When your primary provider reaches its rate limit, Qubit can switch to OmniRoute."
         actions={
           <a
             href={GATEWAY_DASHBOARD}
@@ -47,7 +46,7 @@ export default function OmniRoutePage() {
             rel="noreferrer"
             className="btn btn--ghost btn--sm"
           >
-            Open dashboard
+            Open OmniRoute dashboard (new tab)
           </a>
         }
       />
@@ -55,7 +54,7 @@ export default function OmniRoutePage() {
       <SettingsSection title="Gateway status" testId="omniroute-status">
         <SettingsRow
           title="Server"
-          description="Open the OmniRoute dashboard to confirm the gateway is running. The Qubit dashboard cannot query it directly: this page runs under a same-origin Content-Security-Policy, so a cross-origin request to the gateway is blocked."
+          description="Live status is unavailable here. Open OmniRoute to check whether the gateway is running."
           testId="omniroute-status-row"
         />
         <SettingsRow
