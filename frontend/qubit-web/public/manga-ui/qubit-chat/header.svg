@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 146" role="img" aria-label="Text-free Manga chrome header"><defs>
+<linearGradient id="chrome" x1="0" y1="0" x2=".24" y2="1"><stop stop-color="#fff8ff"/><stop offset=".13" stop-color="#d9b6e5"/><stop offset=".27" stop-color="#fbf0ff"/><stop offset=".48" stop-color="#806298"/><stop offset=".66" stop-color="#3b2258"/><stop offset=".83" stop-color="#edb4ff"/><stop offset="1" stop-color="#7d438f"/></linearGradient>
+<linearGradient id="pink" x1="0" y1="0" x2="1" y2=".68"><stop stop-color="#ff8bdc"/><stop offset=".15" stop-color="#ff36b0"/><stop offset=".48" stop-color="#e71d93"/><stop offset=".78" stop-color="#951359"/><stop offset="1" stop-color="#390f40"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2=".72" y2="1"><stop stop-color="#fffbd4"/><stop offset=".16" stop-color="#ffe95a"/><stop offset=".42" stop-color="#ffab09"/><stop offset=".7" stop-color="#d36f00"/><stop offset="1" stop-color="#fff177"/></linearGradient>
+<radialGradient id="ink" cx=".43" cy=".47" r=".76"><stop stop-color="#310c3b"/><stop offset=".58" stop-color="#1a0829"/><stop offset="1" stop-color="#090516"/></radialGradient>
+<radialGradient id="lumen"><stop stop-color="#fff5c9"/><stop offset=".2" stop-color="#ffcb47"/><stop offset=".55" stop-color="#ff8b07"/><stop offset="1" stop-color="#ff3e84" stop-opacity="0"/></radialGradient>
+<pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.15" fill="#ff45b1" opacity=".74"/></pattern>
+</defs>
+<path d="M35 13H1013L1037 39V115L1017 136H34L12 114V38Z" fill="url(#ink)" stroke="#0b0516" stroke-width="13"/>
+<path d="M35 13H1013L1037 39V115L1017 136H34L12 114V38Z" fill="none" stroke="url(#chrome)" stroke-width="8"/>
+<path d="M36 22H1009L1028 42V112L1012 126H36L22 111V41Z" fill="none" stroke="#ff3cae" stroke-width="3"/>
+<path d="M45 34H355L315 107H43Z" fill="url(#pink)" stroke="#ff9ee3" stroke-width="2"/>
+<path d="M60 34H80L53 103H45Z M170 35H202L160 103H128Z" fill="#ffe3f5" opacity=".16"/>
+<path d="M326 34L353 34L325 108L300 108Z" fill="#2c0838"/><path d="M339 48L354 48L338 89L323 89Z" fill="#ffca20"/>
+<path d="M795 22H998" stroke="#ffd3fc" stroke-width="3" opacity=".74"/><path d="M900 17H931L920 26H889Z M954 17H995L983 26H946Z" fill="url(#gold)"/></svg>
