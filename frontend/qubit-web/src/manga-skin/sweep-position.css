@@ -253,6 +253,7 @@ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar_
 /* Collapsed system actions are full-size stacked icon buttons, not two
    squeezed 19px slivers. */
 html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__system > ul {
+  display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   gap: 6px !important;
