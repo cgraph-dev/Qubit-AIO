@@ -8,8 +8,9 @@ import { setMangaEnabled } from "@/manga-skin/manga-store";
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
-function mount(onChange = vi.fn()) {
+function mount(onChange = vi.fn(), modal = false) {
   container = document.createElement("div");
+  if (modal) container.setAttribute("aria-modal", "true");
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
@@ -50,18 +51,20 @@ afterEach(() => {
 describe("MangaAwareSelect portal", () => {
   it("renders an accessible dropdown at document.body rather than inside a clipped ancestor", () => {
     mount();
-    const combobox = container!.querySelector<HTMLButtonElement>('[role="combobox"]')!;
-    act(() => combobox.click());
+    const trigger = container!.querySelector<HTMLButtonElement>(".qm-select-trigger")!;
+    act(() => trigger.click());
     const popover = document.body.querySelector<HTMLElement>(".qm-select-popover");
-    expect(popover).not.toBeNull();
+    expect(popover?.getAttribute("role")).toBe("dialog");
+    expect(popover?.hasAttribute("data-qm-panel")).toBe(true);
+    expect(trigger.getAttribute("aria-controls")).toBe(popover?.id);
     expect(container!.contains(popover)).toBe(false);
-    expect(combobox.getAttribute("aria-expanded")).toBe("true");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(popover?.querySelectorAll('[role="option"]')).toHaveLength(2);
   });
 
   it("chooses an option without moving its hidden form field", () => {
     const onChange = mount();
-    act(() => container!.querySelector<HTMLButtonElement>('[role="combobox"]')!.click());
+    act(() => container!.querySelector<HTMLButtonElement>(".qm-select-trigger")!.click());
     const choice = document.body.querySelector<HTMLButtonElement>('[role="option"]:last-child')!;
     act(() => choice.click());
     expect(onChange).toHaveBeenCalledWith("high");
@@ -70,10 +73,23 @@ describe("MangaAwareSelect portal", () => {
 
   it("closes on Escape and restores trigger focus", () => {
     mount();
-    const trigger = container!.querySelector<HTMLButtonElement>('[role="combobox"]')!;
+    const trigger = container!.querySelector<HTMLButtonElement>(".qm-select-trigger")!;
     act(() => trigger.click());
-    act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    act(() => document.querySelector(".qm-select-filter")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(document.body.querySelector(".qm-select-popover")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("keeps options and keyboard focus inside the owning modal", async () => {
+    mount(vi.fn(), true);
+    const trigger = container!.querySelector<HTMLButtonElement>(".qm-select-trigger")!;
+    act(() => trigger.click());
+    await settle();
+    const filter = container!.querySelector<HTMLInputElement>(".qm-select-filter")!;
+    expect(document.activeElement).toBe(filter);
+    act(() => filter.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+    expect(document.activeElement?.getAttribute("role")).toBe("option");
+    act(() => document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(document.activeElement).toBe(trigger);
   });
 

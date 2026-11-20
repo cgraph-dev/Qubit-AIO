@@ -171,9 +171,10 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root?.unmount());
   container?.remove();
-  // Keep the frame primitives installed for the life of the file: GSAP can
-  // schedule one ticker callback after unmount, and removing them first is a
-  // load-dependent unhandled ReferenceError.
+  // Stop the shared ticker while the frame stubs still exist. Otherwise it
+  // can wake against globals Vitest has already torn down.
+  const { gsap } = await import("gsap");
+  gsap.ticker.sleep();
 });
 
 describe("SessionsPage resume routing", () => {

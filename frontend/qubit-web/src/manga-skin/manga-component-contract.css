@@ -349,8 +349,7 @@ html[data-qubit-manga="on"] #qubit-build-notice .qm-build-notice__close {
   opacity: 1 !important;
   min-width: 28px;
 }
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-floating-menu,
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is([role="listbox"],[role="menu"],.dropdown-panel) {
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is([role="listbox"],[role="menu"],.dropdown-panel):not([data-qm-panel],[data-qm-panel-options]) {
   padding: 16px !important;
   border: 0 !important;
   border-radius: 0 !important;

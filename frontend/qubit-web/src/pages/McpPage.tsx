@@ -640,7 +640,7 @@ export default function McpPage() {
           aria-modal="true"
           aria-labelledby="create-mcp-title"
         >
-          <div
+          <div data-qm-form-panel=""
             className={cn(
               themedBody,
               "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col",
@@ -815,7 +815,7 @@ export default function McpPage() {
           aria-modal="true"
           aria-labelledby="install-mcp-title"
         >
-          <div
+          <div data-qm-form-panel=""
             className={cn(
               themedBody,
               "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col",
@@ -894,7 +894,7 @@ export default function McpPage() {
           aria-modal="true"
           aria-labelledby="invoke-mcp-title"
         >
-          <div
+          <div data-qm-form-panel=""
             className={cn(
               themedBody,
               "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",

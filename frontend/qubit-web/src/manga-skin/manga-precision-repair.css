@@ -441,7 +441,7 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-build-notice {
 }
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
  .dropdown-panel,[role="listbox"],[role="menu"]
-) {
+):not([data-qm-panel],[data-qm-panel-options]) {
  border:0!important;border-radius:0!important;
  padding:12px!important;
  background:var(--qm-panel)!important;

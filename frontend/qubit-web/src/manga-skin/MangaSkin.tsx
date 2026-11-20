@@ -39,6 +39,7 @@ import "./manga-studio-art.css";
 import "./manga-approved-production.css";
 import "./manga-production-layout-repair.css";
 import "./manga-panel-integrity.css";
+import "./manga-popup-panels.css";
 
 /** The skin only exists when the gate is mounted under the router. */
 function useMangaPreference(): boolean {

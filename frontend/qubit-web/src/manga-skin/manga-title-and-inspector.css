@@ -138,20 +138,6 @@ html[data-qubit-manga="on"] .qchat__side button {max-width:100%;}
 html[data-qubit-manga="on"] .qchat__side :is(.qchat__tools,.qchat__sessions) button {
   overflow-wrap:anywhere;white-space:normal;
 }
-@media(min-width:1024px) {
- html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .language-switcher .qm-select-trigger {
-  width:100%!important;min-width:0!important;max-width:100%!important;
-  min-height:34px;height:34px;display:flex;justify-content:center;
-  padding:3px!important;overflow:hidden;font-size:0!important;
- }
- html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .language-switcher .qm-select-trigger::before {
-  content:"文";position:static;display:block;
-  color:#fff0ff;font:700 15px/1 system-ui,sans-serif!important;
- }
- html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .language-switcher :is(.qm-select-label,.qm-select-chevron) {
-  display:none!important;
- }
-}
 @media(prefers-reduced-motion:reduce) {
  html[data-qubit-manga="on"] :is(
  #qubit-main-content .settings-page__title,

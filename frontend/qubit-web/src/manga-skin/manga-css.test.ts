@@ -19,7 +19,11 @@ describe("manga skin stylesheet", () => {
 
   it("styles the Q6 theme-panel entry and active trigger", () => {
     expect(css).toContain(".qm-theme-trigger[data-manga-theme=\"true\"]");
-    expect(css).toContain("sakuga-button.qm-theme-row--manga::part(button)");
+    const popup = readFileSync(new URL("./manga-popup-panels.css", import.meta.url), "utf8");
+    expect(popup).toContain('.qm-picker-choice[aria-pressed="true"]');
+    expect(popup).toContain('border-image: var(--qmz-dropdown-panel)');
+    expect(existsSync(root + "zip/dropdown-panel.svg")).toBe(true);
+    expect(css).not.toContain("qrail-flyout");
   });
 
   it("carries the full manga palette", () => {

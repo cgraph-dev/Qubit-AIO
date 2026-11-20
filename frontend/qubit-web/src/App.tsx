@@ -1216,7 +1216,7 @@ export default function App() {
                 label={t.theme?.switchTheme ?? "Switch theme"}
                 tooltipWarmRef={tooltipWarmRef}
               >
-                <ThemeSwitcher collapsed={isDesktopCollapsed} dropUp />
+                <ThemeSwitcher collapsed={isDesktopCollapsed} />
               </SidebarIconWithTooltip>
 
               <SidebarIconWithTooltip
@@ -1224,7 +1224,7 @@ export default function App() {
                 label={t.language.switchTo}
                 tooltipWarmRef={tooltipWarmRef}
               >
-                <LanguageSwitcher collapsed={isDesktopCollapsed} dropUp />
+                <LanguageSwitcher collapsed={isDesktopCollapsed} />
               </SidebarIconWithTooltip>
             </div>
 

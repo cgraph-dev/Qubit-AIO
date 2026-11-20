@@ -1,0 +1,194 @@
+/* The original Manga dropdown artwork is the surface, not an overlay.
+   Nine-slicing keeps the title tab and bevels intact as the panel reflows. */
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-panel] {
+  isolation: isolate;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 29px 19px 21px !important;
+}
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-panel]::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  transform: none !important;
+  z-index: -1 !important;
+  pointer-events: none;
+  background: none !important;
+  border: 1px solid transparent;
+  border-image: var(--qmz-dropdown-panel) 38 70 68 155 fill / 26px 47px 45px 104px stretch;
+}
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-panel]::after {
+  content: none !important;
+}
+
+.qm-utility-picker {
+  box-sizing: border-box;
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-width: none;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--midground-base) 35%, transparent);
+  border-radius: var(--theme-radius, .5rem);
+  background: var(--background-base);
+  color: var(--midground-base);
+  box-shadow: 0 12px 38px #0a051886;
+  font: 400 .875rem/1.45 var(--theme-font-sans, system-ui, sans-serif);
+}
+.qm-utility-picker[open],
+.qm-floating-menu,
+html:root[data-qubit-manga="on"] .qm-confirm-dialog[data-qm-panel] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+.qm-utility-picker::backdrop { background: rgb(5 2 15 / .40); }
+.qm-utility-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 6px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+}
+.qm-utility-picker__head h2 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 700 1.25rem/1.2 var(--theme-font-display);
+}
+.qm-utility-picker__head button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.qm-utility-picker__body,
+.qm-panel-scroll,
+html[data-qubit-manga="on"] .qm-confirm-dialog[data-qm-panel] .qm-confirm-dialog__header {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  overflow-wrap: anywhere;
+}
+.qm-utility-picker__body { padding: 4px; }
+.qm-picker-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 7px 8px;
+  text-align: start;
+  border: 1px solid transparent;
+}
+.qm-picker-choice:hover,
+.qm-utility-picker__head button:hover,
+.qm-utility-trigger:hover {
+  background: color-mix(in srgb, currentColor 11%, transparent);
+}
+.qm-picker-choice[aria-pressed="true"] {
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  font-weight: 600;
+}
+.qm-picker-choice > svg { flex: none; margin-inline-start: auto; }
+.qm-utility-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  max-width: 100%;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 44%, transparent);
+  color: var(--midground-base);
+  text-align: start;
+  font: 600 .875rem/1.25 var(--theme-font-sans, system-ui, sans-serif);
+}
+.qm-language-trigger > span { min-width: 0; overflow-wrap: anywhere; }
+.qm-language-trigger > svg { flex: none; }
+
+html[data-qubit-manga="on"] .qm-utility-picker {
+  background-color: #1b1030;
+  color: #fff0ff;
+}
+html[data-qubit-manga="on"] .qm-picker-choice[aria-pressed="true"] {
+  background: #54224d;
+  border-color: #ff75ca;
+}
+html[data-qubit-manga="on"] .qm-language-trigger {
+  border-color: #bf78f6;
+  color: #fff0ff;
+}
+.qm-utility-picker button:focus-visible,
+.qm-utility-trigger:focus-visible,
+html[data-qubit-manga="on"] [data-qm-panel] :is(button, input):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+html[data-qubit-manga="on"] [data-qm-panel] :is(button, input):focus-visible { outline-color: #fff475; }
+html[data-qubit-manga="on"] .qm-confirm-dialog[data-qm-panel] .qm-confirm-dialog__actions {
+  flex: none;
+  flex-wrap: wrap;
+}
+html[data-qubit-manga="on"] [data-qm-panel] :is(.qm-select-option, .qm-panel-scroll [role="menuitem"]) {
+  min-height: 44px;
+  white-space: normal;
+  text-align: start;
+}
+.qm-floating-menu[data-qm-panel] { margin-top: 0; min-width: 0; }
+.qm-select-popover__top { flex: none; }
+.qm-select-empty { padding-inline: 8px; }
+@media (forced-colors: active) {
+  html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-panel] {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border: 1px solid CanvasText !important;
+  }
+  html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-panel]::before { content: none !important; }
+}
+/* An assignment confirmation must appear above its still-open action menu. */
+html[data-qubit-manga="on"] [data-confirm-backdrop] { z-index: 2147482700; }
+html[data-qubit-manga="on"] .qmodel-picker[data-qm-panel] .qmodel-picker__close {
+  top: 28px;
+  right: 20px;
+}
+html[data-qubit-manga="on"] .qmodel-picker[data-qm-panel] .qmodel-picker__header {
+  padding-inline-end: 48px;
+}
+/* These form panels already have their own scroll behavior and footer.
+   Paint the frame on the border box so it cannot scroll with the fields. */
+html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-form-panel] {
+  border: solid transparent !important;
+  border-width: 26px 17px 16px !important;
+  border-image: var(--qmz-dropdown-panel) 38 70 27 155 fill / 26px 47px 16px 104px stretch !important;
+  background: none !important;
+  box-shadow: none !important;
+  min-width: 0;
+  max-height: calc(100dvh - 24px);
+  overflow-wrap: anywhere;
+}
+html[data-qubit-manga="on"] [data-qm-form-panel] > header { padding-inline-end: 44px; }
+@media (forced-colors: active) {
+  html:root[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-form-panel] {
+    border: 1px solid CanvasText !important;
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+}
+html[data-qubit-manga="on"] :is(.qm-utility-picker__body, .qm-panel-scroll, .qm-select-popover__options) {
+  scrollbar-width: thin;
+  scrollbar-color: #cc83ba transparent;
+}

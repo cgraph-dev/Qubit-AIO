@@ -317,19 +317,6 @@ html:root[data-qubit-manga="on"] #qubit-main-content :is(
   overflow-wrap:anywhere!important;
 }
 
-/* Rail overlays are portalled outside the page. The viewport-bounded panel
-   paints the only border and the body (not the sheet) scrolls. */
-html:root[data-qubit-manga="on"] .qrail-flyout[data-appearance-picker] {
-  box-sizing:border-box;
-  min-width:0;
-  max-width:calc(100dvw - 24px);
-  padding:0!important;
-  border:2px solid var(--qm-magenta)!important;
-  border-radius:3px!important;
-  background:#1b1030!important;
-  box-shadow:0 8px 24px #080412a6!important;
-}
-
 /* The generic Manga form skin frames ordinary fields, not the composer
    textarea, which already sits inside an interactive dock. */
 html:root[data-qubit-manga="on"] #qubit-main-content .qb-composer-input > textarea {
@@ -422,7 +409,7 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
 html:root[data-qubit-manga="on"] :is(
   :is([role="dialog"],[role="alertdialog"]):not(.fixed.inset-0),
   :is([role="dialog"],[role="alertdialog"]).fixed.inset-0 > :first-child
-):not(.qm-confirm-dialog,.qmodel-picker,[data-appearance-picker]) {
+):not(.qm-confirm-dialog,.qmodel-picker,[data-qm-panel],[data-qm-form-panel]) {
   min-width:0;
   max-width:min(100%,calc(100vw - 24px));
   border:2px solid var(--qm-magenta)!important;

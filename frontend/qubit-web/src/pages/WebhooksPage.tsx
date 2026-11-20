@@ -494,7 +494,7 @@ export default function WebhooksPage() {
           aria-modal="true"
           aria-labelledby="create-webhook-title"
         >
-          <div className={cn(themedBody, "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto")}>
+          <div data-qm-form-panel="" className={cn(themedBody, "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto")}>
             <Button
               variant="secondary"
               onClick={closeCreateModal}
@@ -665,7 +665,7 @@ export default function WebhooksPage() {
           aria-modal="true"
           aria-labelledby="webhook-deliveries-title"
         >
-          <div
+          <div data-qm-form-panel=""
             className={cn(
               themedBody,
               "relative w-full max-w-2xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",

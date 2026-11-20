@@ -288,6 +288,8 @@ function UseAsMenu({
         variant="secondary"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="h-6 px-2 text-xs uppercase"
       >
         Use as <ChevronDown className="h-3 w-3" />
@@ -296,11 +298,13 @@ function UseAsMenu({
         <MangaMenuSurface
           anchorRef={menuAnchorRef}
           dataUseAsMenu
+          label="Model assignment"
           onClose={() => setOpen(false)}
           className="absolute right-0 top-full mt-1 z-50 min-w-[220px] border border-border bg-card shadow-lg"
         >
           <Button variant="secondary"
             type="button"
+            role="menuitem"
             onClick={() => assign("main", "")}
             disabled={busy}
             className="flex w-full items-center justify-between px-3 py-2 text-xs uppercase hover:bg-muted/50 disabled:opacity-40"
@@ -316,12 +320,13 @@ function UseAsMenu({
             )}
           </Button>
 
-          <div className="border-t border-border/50 px-3 py-1.5 text-display text-xs tracking-wider text-text-tertiary">
+          <div role="presentation" className="border-t border-border/50 px-3 py-1.5 text-display text-xs tracking-wider text-text-tertiary">
             Auxiliary task
           </div>
 
           <Button variant="secondary"
             type="button"
+            role="menuitem"
             onClick={() => assign("auxiliary", "")}
             disabled={busy}
             className="flex w-full items-center justify-between px-3 py-1.5 text-xs uppercase hover:bg-muted/50 disabled:opacity-40"
@@ -333,6 +338,7 @@ function UseAsMenu({
             <Button variant="secondary"
               key={t.key}
               type="button"
+            role="menuitem"
               onClick={() => assign("auxiliary", t.key)}
               disabled={busy}
               className="flex w-full items-center justify-between px-3 py-1.5 text-xs uppercase hover:bg-muted/50 disabled:opacity-40"
@@ -347,7 +353,7 @@ function UseAsMenu({
           ))}
 
           {error && (
-            <div className="px-3 py-2 text-xs text-destructive border-t border-border/50">
+            <div role="status" className="px-3 py-2 text-xs text-destructive border-t border-border/50">
               {error}
             </div>
           )}

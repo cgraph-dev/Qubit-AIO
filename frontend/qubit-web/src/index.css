@@ -276,57 +276,6 @@ code { font-size: 0.875rem; }
   .qagent-sidebar__tooltip { animation: none; }
 }
 
-/* ------------------------------------------------------------------------ */
-/* Rail flyouts — the theme and language pickers, opened from the rail's     */
-/* utility strip and portalled to <body>. Same instrument panel language as  */
-/* the rail itself, and entirely theme-derived so a light theme stays light. */
-/* ------------------------------------------------------------------------ */
-.qrail-flyout {
-  display: flex;
-  flex-direction: column;
-  min-width: min(15.5rem, calc(100dvw - 24px));
-  max-width: calc(100dvw - 24px);
-  max-height: min(570px, calc(100dvh - 24px));
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--midground-base) 20%, transparent);
-  border-radius: var(--theme-radius, 0.5rem);
-  background: color-mix(in srgb, var(--background-base) 97%, #000);
-  box-shadow:
-    0 24px 60px -18px rgb(0 0 0 / 72%),
-    0 0 0 1px color-mix(in srgb, var(--midground-base) 6%, transparent);
-  color: var(--midground-base);
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--midground-base) 22%, transparent) transparent;
-}
-
-.qrail-flyout__head {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--midground-base) 14%, transparent);
-  background: color-mix(in srgb, var(--background-base) 97%, #000);
-  color: color-mix(in srgb, var(--midground-base) 55%, var(--background-base));
-}
-
-.qrail-flyout__title {
-  font-family: var(--theme-font-display) !important;
-  font-size: .9rem !important;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-}
-
-.qrail-flyout__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  padding: 0.3rem 0 0.35rem;
-}
-
 /* Three-stop palette chip: the theme's own colours, framed by its accent. */
 .qrail-swatch {
   display: inline-flex;

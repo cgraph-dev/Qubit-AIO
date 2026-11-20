@@ -49,6 +49,7 @@ export function ConfirmDialog({
       <div
         ref={dialogRef}
         role="dialog"
+        data-qm-panel=""
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}

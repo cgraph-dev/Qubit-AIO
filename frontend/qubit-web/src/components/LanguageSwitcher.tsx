@@ -1,36 +1,41 @@
-import { Select, type SakugaSelectProps } from "@/sakuga/ui";
+import { useId, useRef, useState } from "react";
+import { Check, ChevronDown, Languages } from "lucide-react";
 import { useI18n } from "@/i18n/context";
-import { LOCALE_META } from "@/i18n";
-import type { Locale } from "@/i18n";
+import { LOCALE_META, type Locale } from "@/i18n";
+import { UtilityPickerPanel } from "@/manga-skin/UtilityPickerPanel";
 
-/**
- * Language picker — the Sakuga select composition over every supported locale.
- *
- * The previous version was a bespoke listbox with a separate mobile sheet and
- * a portal for the sidebar's drop-up case. The Sakuga `Select` already owns the
- * trigger, the filterable panel, Escape/outside-click handling and the value
- * semantics, so the language list is now one control rather than three
- * implementations. Endonyms stay the labels: languages are not countries.
- */
-export function LanguageSwitcher({ collapsed = false, dropUp: _dropUp }: LanguageSwitcherProps) {
+const locales = Object.keys(LOCALE_META) as Locale[];
+
+export function LanguageSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const { locale, setLocale, t } = useI18n();
-  const allLocales = Object.entries(LOCALE_META) as Array<[Locale, (typeof LOCALE_META)[Locale]]>;
-  const options = allLocales.map(([code, meta]) => ({ value: code, label: meta.name }));
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const anchor = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
+  const label = t.language.switchTo;
 
   return (
-    <Select
-      label={t.language.switchTo}
-      value={locale}
-      options={options}
-      onChange={(next) => setLocale(next as Locale)}
-      className="language-switcher qsk-select--compact"
-      style={{ "--sk-input-width": collapsed ? "100%" : "10rem", width: collapsed ? "100%" : undefined, minWidth: 0, maxWidth: "100%" } as SakugaSelectProps["style"]}
-    />
+    <div ref={anchor} className="language-switcher">
+      <button type="button" className="qm-utility-trigger qm-language-trigger"
+        aria-label={`${label}: ${LOCALE_META[locale].name}`} title={label} aria-expanded={open} aria-haspopup="dialog"
+        aria-controls={open ? id : undefined} onClick={() => setOpen(true)}>
+        <Languages size={15} aria-hidden />
+        {!collapsed && <><span lang={locale} dir="auto">{LOCALE_META[locale].name}</span><ChevronDown size={13} aria-hidden /></>}
+      </button>
+      {open && (
+        <UtilityPickerPanel id={id} title={label} closeLabel={t.common.close} anchor={anchor} onClose={close}>
+          <div role="group" aria-label={label}>
+            {locales.map((code) => (
+              <button type="button" key={code} lang={code} dir="auto"
+                aria-pressed={code === locale} data-qm-picker-choice="" className="qm-picker-choice"
+                onClick={() => { setLocale(code); close(); }}>
+                <span>{LOCALE_META[code].name}</span>
+                {code === locale && <Check size={16} aria-hidden />}
+              </button>
+            ))}
+          </div>
+        </UtilityPickerPanel>
+      )}
+    </div>
   );
-}
-
-interface LanguageSwitcherProps {
-  collapsed?: boolean;
-  /** Kept for call-site compatibility; the Sakuga panel positions itself. */
-  dropUp?: boolean;
 }

@@ -379,7 +379,7 @@ export function ModelPickerDialog(props: Props) {
       aria-modal="true"
       aria-labelledby="model-picker-title"
     >
-      <div className={cn(themedBody, "qmodel-picker relative flex max-h-[84vh] w-full max-w-4xl flex-col overflow-hidden")}>
+      <div data-qm-panel="" className={cn(themedBody, "qmodel-picker relative flex max-h-[84vh] w-full max-w-4xl flex-col overflow-hidden")}>
         <Button
           variant="secondary"
           onClick={onClose}
@@ -396,7 +396,7 @@ export function ModelPickerDialog(props: Props) {
             </span>
             <div className="min-w-0">
               <h2 id="model-picker-title" className="qmodel-picker__title">{title}</h2>
-              <p className="qmodel-picker__eyebrow">MODEL CONTROL <span>·</span> PROVIDER MATRIX</p>
+              <p className="qmodel-picker__eyebrow">Choose a provider and model</p>
             </div>
           </div>
           <p className="qmodel-picker__current">

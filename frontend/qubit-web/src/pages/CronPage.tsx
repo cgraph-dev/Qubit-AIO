@@ -1004,7 +1004,7 @@ export default function CronPage() {
           aria-modal="true"
           aria-labelledby="create-cron-title"
         >
-          <div className={cn(themedBody, "cron-editor-dialog relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
+          <div data-qm-form-panel="" className={cn(themedBody, "cron-editor-dialog relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
             <Button
               variant="secondary"
               size="icon"
@@ -1075,7 +1075,7 @@ export default function CronPage() {
           aria-modal="true"
           aria-labelledby="edit-cron-title"
         >
-          <div className={cn(themedBody, "cron-editor-dialog relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
+          <div data-qm-form-panel="" className={cn(themedBody, "cron-editor-dialog relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
             <Button
               variant="secondary"
               size="icon"

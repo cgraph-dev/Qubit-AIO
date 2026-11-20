@@ -401,7 +401,6 @@ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility > div {
 }
 
 html[data-qubit-manga="on"] #app-sidebar .language-switcher {
-  --sk-input-width: 6.5rem !important;
   max-width: 100%;
 }
 
@@ -443,10 +442,8 @@ html[data-qubit-manga="on"] .qchat__side * {
   scrollbar-width: thin;
 }
 
-/* Theme picker: Q6 / Q6-L use the yellow manga badge. These rules are
-   deliberately unscoped — the row must already look like the manga button
-   while another theme is active and the picker is open. */
-.qm-theme-trigger[data-manga-theme="true"]::part(button) {
+/* Q6 / Q6-L use the yellow manga badge in the sidebar. */
+.qm-theme-trigger[data-manga-theme="true"] {
   background: #ffe500 !important;
   color: #080615 !important;
   border-color: #05030f !important;
@@ -461,7 +458,7 @@ html[data-qubit-manga="on"] .qchat__side * {
   line-height: 1;
 }
 
-.qm-theme-trigger__label {
+.qm-theme-trigger[data-manga-theme="true"] .qm-theme-trigger__label {
   color: #080615 !important;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -476,29 +473,6 @@ html[data-qubit-manga="on"] .qchat__side * {
   box-shadow:
     0 0 0 1px #05030f,
     0 0 7px 1px rgba(40, 213, 119, 0.8);
-}
-
-sakuga-button.qm-theme-row--manga::part(button) {
-  min-height: 2.45rem;
-  background: #ffe500 !important;
-  color: #080615 !important;
-  border-color: #05030f !important;
-  box-shadow: 3px 4px 0 #ff269a !important;
-  font-style: italic;
-  font-weight: 900;
-}
-
-sakuga-button.qm-theme-row--manga::part(button):hover {
-  background: #fff45c !important;
-}
-
-sakuga-button.qm-theme-row--manga .text-display {
-  color: #080615 !important;
-  font-weight: 900;
-}
-
-sakuga-button.qm-theme-row--manga .text-text-tertiary {
-  color: rgba(8, 6, 21, 0.72) !important;
 }
 
 .qm-theme-row__spark {
@@ -806,14 +780,14 @@ html[data-qubit-manga="on"] sakuga-button.qsk-list-item::part(button) {
    primary = magenta plate, secondary = ink plate with a magenta keyline.
    This also keeps the outline and its offset shadow from collapsing to the
    same colour (the /sessions import action and /qubit-chat composer). */
-html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not(.qm-theme-trigger):not([variant="secondary"])::part(button) {
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not([variant="secondary"])::part(button) {
   background: var(--qm-yellow) !important;
   color: var(--qm-black) !important;
   border-color: var(--qm-black) !important;
   box-shadow: 3px 4px 0 var(--qm-magenta) !important;
 }
 
-html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item):not(.qm-theme-trigger)[variant="secondary"]::part(button) {
+html[data-qubit-manga="on"] sakuga-button:not(.qsk-list-item)[variant="secondary"]::part(button) {
   background: var(--qm-panel-2) !important;
   color: var(--qm-ink) !important;
   border-color: var(--qm-magenta) !important;
@@ -1031,12 +1005,6 @@ html[data-qubit-manga="on"] #qubit-main-content [role="menuitem"]:hover {
   background: var(--qm-wash) !important;
   color: var(--qm-ink) !important;
   box-shadow: inset 3px 0 0 var(--qm-magenta);
-}
-
-html[data-qubit-manga="on"] .qrail-flyout__head {
-  border-bottom: 2px solid var(--qm-magenta) !important;
-  background: linear-gradient(90deg, rgba(255, 38, 154, 0.32), var(--qm-panel)) !important;
-  color: var(--qm-ink) !important;
 }
 
 /* ----------------------------------------------------------- dialogs etc */

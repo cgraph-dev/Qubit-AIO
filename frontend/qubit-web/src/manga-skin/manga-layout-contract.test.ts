@@ -41,7 +41,8 @@ describe("Manga shell and inspector design contracts", () => {
     expect(app).toContain('data-collapsed={isDesktopCollapsed}');
     expect(repair).toContain("width:56px!important");
     expect(repair).toContain("grid-template-columns:minmax(0,1fr)");
-    expect(repair).toContain("--sk-input-width:100%!important");
+    expect(repair).toContain(".language-switcher .qm-language-trigger");
+    expect(repair).not.toContain(".language-switcher sakuga-select");
   });
 
   it("removes old microstripes and uses clear star-and-three-stroke plates", () => {

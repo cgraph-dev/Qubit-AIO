@@ -478,7 +478,7 @@ export const ar = defineLocale({
   },
 
   language: {
-    switchTo: "التبديل إلى الإنجليزية",
+    switchTo: "تغيير اللغة",
   },
 
   theme: {

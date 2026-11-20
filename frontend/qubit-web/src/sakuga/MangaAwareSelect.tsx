@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { SakugaSelect as OriginalSelect, type SakugaSelectProps } from "@qubit/shared/sakuga";
+import { panelPlacement, visibleViewport } from "@/manga-skin/panelPlacement";
 import { useMangaLayerActive } from "@/manga-skin/useMangaLayerActive";
 
 /**
@@ -25,6 +26,7 @@ function MangaSelect({
   const [placement, setPlacement] = useState<CSSProperties>({});
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   const menuId = useId();
   const listId = `${menuId}-listbox`;
@@ -41,23 +43,15 @@ function MangaSelect({
   const reposition = useCallback(() => {
     const box = trigger.current?.getBoundingClientRect();
     if (!box) return;
-    const margin = 12;
-    const gap = 6;
-    const maxWidth = Math.max(190, window.innerWidth - margin * 2);
-    const width = Math.min(360, maxWidth);
-    const left = Math.max(margin, Math.min(box.left, window.innerWidth - margin - width));
-    const availableBelow = window.innerHeight - box.bottom - gap - margin;
-    const availableAbove = box.top - gap - margin;
-    const up = availableBelow < 260 && availableAbove > availableBelow;
-    const available = Math.max(120, up ? availableAbove : availableBelow);
-    const maxHeight = Math.min(420, available);
-    setPlacement({
-      position: "fixed",
-      left,
-      width,
-      maxHeight,
-      ...(up ? { bottom: window.innerHeight - box.top + gap, top: "auto" } : { top: box.bottom + gap, bottom: "auto" }),
-    });
+    const viewport = visibleViewport();
+    const dimensions = panelPlacement(box, viewport, { width: 360, height: 420 });
+    const element = panel.current;
+    const body = element?.querySelector(".qm-select-popover__options");
+    const height = element && body
+      ? Math.min(dimensions.maxHeight, element.offsetHeight + body.scrollHeight - body.clientHeight)
+      : dimensions.maxHeight;
+    const { top } = panelPlacement(box, viewport, { width: dimensions.width, height });
+    setPlacement({ position: "fixed", ...dimensions, top });
   }, []);
 
   useLayoutEffect(() => {
@@ -68,12 +62,16 @@ function MangaSelect({
       reposition();
     };
     window.addEventListener("resize", reposition);
+    window.visualViewport?.addEventListener("resize", reposition);
+    window.visualViewport?.addEventListener("scroll", reposition);
     window.addEventListener("scroll", onScroll, true);
     return () => {
       window.removeEventListener("resize", reposition);
+      window.visualViewport?.removeEventListener("resize", reposition);
+      window.visualViewport?.removeEventListener("scroll", reposition);
       window.removeEventListener("scroll", onScroll, true);
     };
-  }, [open, reposition]);
+  }, [open, reposition, shown.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,16 +79,11 @@ function MangaSelect({
       const target = e.target as Node;
       if (!trigger.current?.contains(target) && !panel.current?.contains(target)) close();
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); close(true); }
-    };
     document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
     const focusFrame = window.setTimeout(() => filterRef.current?.focus(), 0);
     return () => {
       window.clearTimeout(focusFrame);
       document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
     };
   }, [open, close]);
 
@@ -101,29 +94,47 @@ function MangaSelect({
   };
 
   return (
-    <span className={["qm-select-root", className].filter(Boolean).join(" ")} id={id} style={style as unknown as CSSProperties} data-testid={testId}>
+    <span className={["qm-select-root", className].filter(Boolean).join(" ")} style={style as unknown as CSSProperties} data-testid={testId}>
       {name && <input type="hidden" name={name} value={current ?? ""} />}
       <button
         ref={trigger}
+        id={id}
         type="button"
         className="qm-select-trigger"
-        role="combobox"
-        aria-label={label}
-        aria-haspopup="listbox"
+        aria-label={`${label}: ${chosen?.label ?? placeholder}`}
+        aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls={open ? listId : undefined}
+        aria-controls={open ? menuId : undefined}
         disabled={disabled}
-        onClick={() => { if (!open) reposition(); setOpen((v) => !v); }}
+        onClick={() => {
+          if (open) { close(); return; }
+          // Keep keyboard focus inside the owning modal, even though the
+          // options are painted outside its fields and scrollable body.
+          setPortalHost(trigger.current?.closest<HTMLElement>('[aria-modal="true"]') ?? document.body);
+          reposition();
+          setOpen(true);
+        }}
       >
         <span className="qm-select-label">{chosen?.label ?? placeholder}</span>
         <span aria-hidden="true" className={open ? "qm-select-chevron qm-select-chevron--open" : "qm-select-chevron"}>▾</span>
       </button>
-      {open && typeof document !== "undefined" && createPortal(
+      {open && portalHost && createPortal(
         <div
           ref={panel}
           id={menuId}
           className="qm-select-popover"
-          role="group"
+          role="dialog"
+          data-qm-panel=""
+          onBlur={(event) => {
+            const next = event.relatedTarget;
+            if (next && !event.currentTarget.contains(next) && next !== trigger.current) close();
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            close(true);
+          }}
           aria-label={label}
           style={placement}
         >
@@ -144,28 +155,36 @@ function MangaSelect({
               }}
             />
           </div>
+          {shown.length === 0 && <div className="qm-select-empty" role="status">{options.length ? "No matches" : "No options available"}</div>}
           <div
             id={listId}
+            data-qm-panel-options=""
             className="qm-select-popover__options"
             role="listbox"
             aria-label={label}
           >
-            {shown.length === 0 && <div className="qm-select-empty">No matches</div>}
             {shown.map((option) => (
               <button
                 type="button"
                 className="qm-select-option"
                 role="option"
+                tabIndex={-1}
                 aria-selected={option.value === current}
                 key={option.value}
                 disabled={option.disabled}
                 onClick={() => select(option.value)}
                 onKeyDown={(e) => {
-                  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+                  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
                   e.preventDefault();
                   const enabled = Array.from(panel.current?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') ?? []);
                   const at = enabled.indexOf(e.currentTarget);
-                  enabled[(at + (e.key === "ArrowDown" ? 1 : -1) + enabled.length) % enabled.length]?.focus();
+                  if (e.key === "ArrowUp" && at === 0) {
+                    filterRef.current?.focus();
+                    return;
+                  }
+                  const next = e.key === "Home" ? 0 : e.key === "End" ? enabled.length - 1
+                    : (at + (e.key === "ArrowDown" ? 1 : -1) + enabled.length) % enabled.length;
+                  enabled[next]?.focus();
                 }}
               >
                 <span className="qm-select-radio" aria-hidden="true">{option.value === current ? "●" : ""}</span>
@@ -174,7 +193,7 @@ function MangaSelect({
             ))}
           </div>
         </div>,
-        document.body,
+        portalHost,
       )}
     </span>
   );

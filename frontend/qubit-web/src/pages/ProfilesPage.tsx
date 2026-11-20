@@ -116,6 +116,7 @@ function ProfileActionsMenu({
         <MangaMenuSurface
           anchorRef={containerRef}
           menuRef={floatingMenuRef}
+          label={labels.actions}
           onClose={() => setOpen(false)}
           className="absolute right-0 top-full z-50 mt-1 min-w-[200px] border border-border bg-card shadow-lg"
         >
@@ -809,7 +810,7 @@ export default function ProfilesPage() {
           aria-modal="true"
           aria-labelledby="create-profile-title"
         >
-          <div
+          <div data-qm-form-panel=""
             className={cn(
               themedBody,
               "relative w-full max-w-md border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",
@@ -1219,7 +1220,7 @@ export default function ProfilesPage() {
           aria-modal="true"
           aria-labelledby="profile-editor-title"
         >
-          <div
+          <div data-qm-form-panel=""
             className={cn(
               themedBody,
               "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",
