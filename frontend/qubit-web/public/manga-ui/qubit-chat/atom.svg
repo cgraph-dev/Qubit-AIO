@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="Gold manga loading atom"><defs>
+<linearGradient id="chrome" x1="0" y1="0" x2=".24" y2="1"><stop stop-color="#fff8ff"/><stop offset=".13" stop-color="#d9b6e5"/><stop offset=".27" stop-color="#fbf0ff"/><stop offset=".48" stop-color="#806298"/><stop offset=".66" stop-color="#3b2258"/><stop offset=".83" stop-color="#edb4ff"/><stop offset="1" stop-color="#7d438f"/></linearGradient>
+<linearGradient id="pink" x1="0" y1="0" x2="1" y2=".68"><stop stop-color="#ff8bdc"/><stop offset=".15" stop-color="#ff36b0"/><stop offset=".48" stop-color="#e71d93"/><stop offset=".78" stop-color="#951359"/><stop offset="1" stop-color="#390f40"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2=".72" y2="1"><stop stop-color="#fffbd4"/><stop offset=".16" stop-color="#ffe95a"/><stop offset=".42" stop-color="#ffab09"/><stop offset=".7" stop-color="#d36f00"/><stop offset="1" stop-color="#fff177"/></linearGradient>
+<radialGradient id="ink" cx=".43" cy=".47" r=".76"><stop stop-color="#310c3b"/><stop offset=".58" stop-color="#1a0829"/><stop offset="1" stop-color="#090516"/></radialGradient>
+<radialGradient id="lumen"><stop stop-color="#fff5c9"/><stop offset=".2" stop-color="#ffcb47"/><stop offset=".55" stop-color="#ff8b07"/><stop offset="1" stop-color="#ff3e84" stop-opacity="0"/></radialGradient>
+<pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.15" fill="#ff45b1" opacity=".74"/></pattern>
+</defs>
+<circle cx="160" cy="160" r="113" fill="none" stroke="#b12e85" stroke-width="3" opacity=".36" stroke-dasharray="24 12 5 15"/>
+<circle cx="160" cy="160" r="89" fill="none" stroke="#e842a8" stroke-width="2" opacity=".25"/>
+<g stroke="url(#gold)" fill="none" stroke-width="6"><ellipse cx="160" cy="160" rx="105" ry="36" transform="rotate(-35 160 160)"/><ellipse cx="160" cy="160" rx="105" ry="36" transform="rotate(35 160 160)"/><ellipse cx="160" cy="160" rx="105" ry="36" transform="rotate(90 160 160)"/></g>
+<circle cx="160" cy="160" r="35" fill="url(#lumen)"/>
+<path d="M160 125L169 151L194 160L169 169L160 195L151 169L126 160L151 151Z" fill="#fffde3"/>
+<g fill="url(#gold)" stroke="#ffec85" stroke-width="2"><circle cx="82" cy="113" r="9"/><circle cx="249" cy="161" r="9"/><circle cx="135" cy="256" r="9"/></g>
+<path d="M50 160H76 M244 160H270 M160 51V77 M160 243V269" stroke="#ff4cae" stroke-width="2.5" opacity=".75"/></svg>
