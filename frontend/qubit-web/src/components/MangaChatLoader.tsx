@@ -12,7 +12,7 @@ export function MangaChatLoader({ label = "Loading conversation…" }: { label?:
   // this marker before the lazy native ChatPage mounts.
   if (typeof document === "undefined" ||
       document.documentElement.dataset.qubitManga !== "on") {
-    return <QubitAtomLoader label={label} size="sm" />;
+    return <QubitAtomLoader label="Loading chat…" size="sm" />;
   }
   return (
     <div className="qchat__manga-loader" data-testid="manga-chat-loader">
