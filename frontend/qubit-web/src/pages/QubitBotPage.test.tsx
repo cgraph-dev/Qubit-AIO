@@ -250,6 +250,20 @@ describe("QubitBotPage", () => {
     expect(t).toContain("INTELLIGENCE_PERSISTENCE_OPERATOR_REQUIRED");
   });
 
+  it("keeps the accessible multiline input and its controls in one composer row", async () => {
+    renderPage();
+    await flush();
+    const row = container!.querySelector(".qb-composer-row");
+    const field = row?.querySelector<HTMLElement>(".qb-composer-input");
+    const input = field?.querySelector("textarea");
+    expect(input?.getAttribute("aria-label")).toBe("Message Qubit Bot");
+    expect(field?.querySelector("label")).toBeNull();
+    expect(field?.style.maxHeight).toBe("");
+    expect(field?.style.overflowY).toBe("");
+    expect(row?.querySelector(".qb-plus-btn")).not.toBeNull();
+    expect(row?.querySelector(".qb-send-btn")).not.toBeNull();
+  });
+
   it("sends a turn with the composer text", async () => {
     renderPage();
     await flush();

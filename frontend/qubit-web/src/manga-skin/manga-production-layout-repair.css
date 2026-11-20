@@ -571,25 +571,21 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
   box-shadow:none!important;
   overflow:hidden!important;
 }
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__action {
+/* The artwork belongs on the real button, never behind another button
+   drawn by the shadow element. Keep the slotted labels wrap-capable. */
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell .qagent-sidebar__action {
   box-sizing:border-box!important;
-  display:flex!important;
+  display:block!important;
   width:100%!important;
   min-width:0!important;
-  min-height:39px!important;
-  height:39px!important;
+  height:auto!important;
   padding:0!important;
-  background:url("/manga-ui/approved/06_primary_button.webp") center / 100% 100% no-repeat!important;
+  background:none!important;
   border:0!important;
-  border-radius:0!important;
   box-shadow:none!important;
   color:#fffaff!important;
 }
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__action:disabled {
-  background-image:url("/manga-ui/approved/07_disabled_button.webp")!important;
-  opacity:.82!important;
-}
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__action::part(button) {
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell .qagent-sidebar__action::part(button) {
   box-sizing:border-box!important;
   display:flex!important;
   align-items:center!important;
@@ -597,15 +593,16 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
   min-width:0!important;
   width:100%!important;
   min-height:39px!important;
-  height:39px!important;
-  padding:4px 6px!important;
-  font:700 10px/1.1 system-ui,sans-serif!important;
-  background:none!important;
+  padding:5px 8px!important;
+  font:700 10px/1.2 system-ui,sans-serif!important;
+  color:inherit!important;
+  background:#23142f url("/manga-ui/approved/06_primary_button.webp") center / 100% 100% no-repeat!important;
   border:0!important;
   box-shadow:none!important;
-  white-space:nowrap!important;
-  overflow:hidden!important;
-  text-overflow:ellipsis!important;
+  white-space:normal!important;
+}
+html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-shell .qagent-sidebar__action[disabled]::part(button) {
+  background-image:url("/manga-ui/approved/07_disabled_button.webp")!important;
 }
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__utility,
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__colophon {

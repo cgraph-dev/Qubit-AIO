@@ -1662,7 +1662,7 @@ export default function ModelsPage() {
     <div className="flex min-w-0 max-w-full flex-col gap-6">
       <PluginSlot name="models:top" />
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+      <div className="grid min-w-0 items-start gap-6 lg:grid-cols-2">
         <ModelSettingsPanel
           aux={aux}
           activeProfile={activeProfile}

@@ -65,9 +65,6 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-disabled="true"] {
   background-image:url("/manga-ui/zip/nav-disabled.svg")!important;opacity:.55;
 }
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
-  background-image:url("/manga-ui/zip/sidebar-gateway.svg")!important;
-}
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__colophon {
   /* Footer art is ornamentation only; live LED and version/brand stay above. */
   background:
@@ -136,18 +133,6 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-confirm-dialog::be
  * Add data-qm-zip-asset="name" only to a real decorative element. */
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset] {
   position:relative;isolation:isolate;
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="analytics-stat"] {
-  border-color:#b965ff;background-image:url("/manga-ui/zip/analytics-stat.svg");
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="plugin-card"] {
-  background-image:url("/manga-ui/zip/plugin-card.svg");
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="model-card"] {
-  background-image:url("/manga-ui/zip/model-card.svg");
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="profile-card"] {
-  background-image:url("/manga-ui/zip/profile-card.svg");
 }
 @media(max-width:760px) {
   html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(

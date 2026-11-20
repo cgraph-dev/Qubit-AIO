@@ -186,11 +186,17 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="ti
 
 /* Opt-in asset attachment. Page code may decorate any existing live control
  * with data-qm-zip-asset, keeping the React element/ARIA/click handler intact.
- * Default is an undersurface: the live text and children stay above the art. */
+ * Only decorative assets may paint an undersurface. Content cards already
+ * own their frame, and their layout must follow live text, not an SVG ratio. */
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset] {
   position:relative;isolation:isolate;
 }
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset]::before {
+html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset]:not(:where(
+  [data-qm-zip-asset="model-card"],[data-qm-zip-asset="profile-card"],
+  [data-qm-zip-asset="plugin-card"],[data-qm-zip-asset="file-grid"],
+  [data-qm-zip-asset="analytics-stat"],[data-qm-zip-asset="analytics-chart"],
+  [data-qm-zip-asset="table-surface"]
+))::before {
   content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
   background-image:var(--qmz-active-art);
   background-size:100% 100%;background-repeat:no-repeat;

@@ -67,15 +67,16 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
   it("keeps the numbered System menu separate from the fixed gateway instrument", () => {
     expect(app).toContain('className="qagent-sidebar__system qm-manga-gateway-shell"');
     expect(app).toContain('className="qagent-sidebar__telemetry qm-manga-gateway-plate"');
-    expect(css).toContain('background: url("/manga-ui/zip/sidebar-gateway.svg")');
+    expect(css).toContain("Fallback before (or without) approved art");
     expect(css).toContain(".qm-manga-gateway-shell .qagent-sidebar__action::part(button)");
     expect(css).toContain(".qm-manga-gateway-shell > ul > li");
     expect(app).not.toContain('className="qm-manga-system-index"');
   });
-  it("uses original ZIP assets for tooltip, dropdown and update notification", () => {
-    for (const asset of ["tooltip", "dropdown-panel", "toast-info", "sidebar-gateway"]) {
+  it("uses original ZIP assets for tooltip and update notification, with a solid dropdown", () => {
+    for (const asset of ["tooltip", "toast-info"]) {
       expect(css).toContain('/manga-ui/zip/' + asset + '.svg');
     }
+    expect(css).not.toContain('/manga-ui/zip/dropdown-panel.svg');
     expect(tip).toContain('const manga = document.documentElement.dataset.qubitManga === "on"');
     expect(tip).toContain('...(manga ? {} : {');
     expect(kit).toContain("installOriginalMangaAssets");

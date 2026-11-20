@@ -128,7 +128,7 @@ html[data-qubit-manga="on"] {
   --component-card-background:
     linear-gradient(135deg, rgba(255, 38, 154, 0.08), transparent 44%),
     var(--qm-panel) !important;
-  --component-card-box-shadow: var(--qm-lift) !important;
+  --component-card-box-shadow: none !important;
   --component-card-clip-path: none !important;
   --component-card-border-image: none !important;
 
@@ -887,7 +887,7 @@ html[data-qubit-manga="on"] [role="dialog"][aria-label$="options"] {
    excluded on purpose). */
 html[data-qubit-manga="on"] #qubit-main-content :is(
     input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.xterm-helper-textarea),
-    textarea:not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea, #bot-composer),
     select
   ),
 html[data-qubit-manga="on"] .qchat__side :is(

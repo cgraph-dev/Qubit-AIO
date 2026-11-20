@@ -949,14 +949,11 @@ export default function QubitBotPage() {
             <Textarea
               id="bot-composer"
               ref={composerRef}
-              label="Message Qubit Bot"
               className="qb-composer-input"
               aria-label="Message Qubit Bot"
               {...({ "data-agent-context": JSON.stringify(BOT_AGENT_CONTEXT.value) } as Record<string, unknown>)}
               value={composer}
               rows={1}
-              autoResize
-              style={{ maxHeight: 140, overflowY: "auto" }}
               placeholder={
                 !loaded
                   ? historyError

@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 const base = (process.env.BASE_URL ?? "http://localhost:5173").replace(/\/$/, "");
 const output = resolve(process.env.OUTPUT_DIR ?? "manga-visual-audit");
 const defaults = [
- "/qubit-chat","/sessions","/models","/cron","/qubit-scheduler",
+ "/qubit-chat","/qubit-bot","/sessions","/models","/cron","/qubit-scheduler",
  "/qubit-tasks","/qubit-taskflows","/files","/analytics","/agents",
  "/profiles","/skills","/plugins","/mcp","/channels","/system",
  "/config","/env","/logs","/qubit-memory","/open-viking",
@@ -69,6 +69,25 @@ try {
        docWidth:root.scrollWidth,
        viewWidth:screenWidth,
        main:rect(main),rail:rect(rail),side:rect(side),
+       panelProblems: [
+        ...[...document.querySelectorAll(".settings-section__header")].flatMap((el) =>
+          getComputedStyle(el).backgroundImage.includes("url(") ? ["section-header-has-frame-art"] : []),
+        ...[...document.querySelectorAll('[data-qm-zip-asset="model-card"]')].flatMap((el) =>
+          [getComputedStyle(el), getComputedStyle(el, "::before")].some((style) =>
+            style.backgroundImage.includes("url(")) ? ["model-card-has-frame-art"] : []),
+        ...[...document.querySelectorAll(".settings-row__desc,.settings-section__desc")].flatMap((el) =>
+          el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2 ? ["settings-copy-overflow"] : []),
+        ...[...document.querySelectorAll(".qb-composer-row")].flatMap((row) => {
+          const input = row.querySelector("textarea");
+          if (!input) return ["composer-input-missing"];
+          const box = input.getBoundingClientRect();
+          const bounds = row.getBoundingClientRect();
+          const style = getComputedStyle(input);
+          return box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1 ||
+            box.top < bounds.top - 1 || box.bottom > bounds.bottom + 1 ||
+            parseFloat(style.borderTopWidth) > 0 ? ["composer-input-outside-dock-or-framed"] : [];
+        }),
+       ],
        clippedElements:[...document.querySelectorAll("input,select,textarea,button")].filter((el) => {
          const r=el.getBoundingClientRect();return r.width>0 && r.height>0 && (r.right>screenWidth+3 || r.left<-3);
        }).slice(0,15).map((el) => el.outerHTML.slice(0,140)),
@@ -76,6 +95,8 @@ try {
     });
     record.scrollOverflow = metrics.docWidth > metrics.viewWidth + 3;
     record.clippedInputs = metrics.clippedElements;
+    record.panelProblems = [...new Set(metrics.panelProblems)];
+    for (const kind of record.panelProblems) problems.push({width,route,kind});
     record.marked = metrics.marked;
     if (metrics.marked !== "on") problems.push({width,route,kind:"manga-theme-not-activated",detail:"Q6 may be overridden by persisted server theme or auth redirect"});
     if (!metrics.main) problems.push({width,route,kind:"main-content-missing"});

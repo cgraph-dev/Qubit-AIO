@@ -138,7 +138,7 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
  padding:18px 17px 14px!important;
  min-height:190px!important;
  border:0!important;outline:0!important;border-radius:0!important;
- background:url("/manga-ui/zip/sidebar-gateway.svg") center/100% 100% no-repeat!important;
+ background:none!important;
  box-shadow:none!important;
  overflow:visible!important;
 }
@@ -407,11 +407,6 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__action:disabled::part(button) {
  opacity:.6!important;
 }
-/* Use the original root gateway asset as a no-flash fallback while
-   /zip/manifest.json is loading. */
-html[data-qubit-manga="on"]:not([data-qubit-manga-zip="ready"]) #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system{
- background-image:url("/manga-ui/sidebar-gateway.svg")!important;
-}
 /* Consistent readable controls, without modifying xterm. */
 html[data-qubit-manga="on"] .qchat__side :is(button,input,[role="combobox"]){
  font-size:13px!important;
@@ -449,7 +444,7 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
 ) {
  border:0!important;border-radius:0!important;
  padding:12px!important;
- background:url("/manga-ui/zip/dropdown-panel.svg") center/100% 100% no-repeat!important;
+ background:var(--qm-panel)!important;
  box-shadow:0 3px 0 #070411!important;
  color:#fff3ff!important;
 }

@@ -309,18 +309,11 @@ html[data-qubit-manga="on"] .qm-bot-page :is(.qb-hero-title,.qb-thread-bar h2,.q
  color:#fff0ff!important;font-family:var(--qm-page-heading)!important;
  font-weight:800!important;letter-spacing:.02em;
 }
-html[data-qubit-manga="on"] .qm-bot-page :is(
- .qb-starter-btn,.qb-send-btn,.qb-plus-btn,.qb-below-toggle
-) {
- min-height:38px;
- border:2px solid #b965ff!important;
- box-shadow:2px 2px 0 #080615!important;
-}
 html[data-qubit-manga="on"] .qm-bot-page .qb-composer-row {
  display:flex;align-items:end;gap:9px;min-width:0;
 }
-html[data-qubit-manga="on"] .qm-bot-page .qb-composer-input {
- min-width:0;flex:1 1 auto;line-height:1.5!important;
+html[data-qubit-manga="on"] .qm-bot-page .qb-composer-input > textarea {
+ line-height:1.5!important;
  font:500 .91rem/1.5 var(--qm-page-body)!important;
 }
 html[data-qubit-manga="on"] .qm-bot-page .qb-bubble-user {

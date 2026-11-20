@@ -205,7 +205,7 @@
    round button, focus border tint). */
 .qb-composer {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   gap: 7px;
   border-radius: 32px;
   border: 1px solid var(--color-input);
@@ -216,17 +216,22 @@
   border-color: var(--color-ring);
 }
 .qb-composer-input {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+}
+
+/* Sakuga renders a field wrapper around the native textarea. The dock owns
+   the frame, and only the native input owns multiline scrolling. */
+.qb-composer-input > textarea.qsk-textarea {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   font-size: 15px;
   line-height: 24px;
   padding: 10px 2px;
   color: var(--color-foreground);
 }
-.qb-composer-input:focus {
+.qb-composer-input > textarea:focus {
   outline: none;
   box-shadow: none;
 }
@@ -427,8 +432,8 @@
 
 /* Composer expands 44px -> 140px (upstream multiline TextInput +
    `onContentSizeChange`; the page sets the measured height inline). */
-.qb-composer-input {
-  resize: none;
+.qb-composer-input > textarea.qsk-textarea {
+  resize: none !important;
   overflow-y: auto;
   display: block;
   box-sizing: border-box;
