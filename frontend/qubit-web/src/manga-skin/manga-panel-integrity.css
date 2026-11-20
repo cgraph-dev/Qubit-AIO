@@ -470,3 +470,26 @@ html:root[data-qubit-manga="on"]:not([data-qm-approved-assets="ready"]) #app-sid
   -webkit-text-stroke:0!important;
   text-shadow:0 1px 2px #080411!important;
 }
+
+/* Shared page/section title ornaments: use the owner's sharpened corner and
+   the full magenta impact slashes. This is intentionally shared by every page
+   header and every settings section title. */
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-page__title,.settings-section__heading,.settings-section__title,.qplate-module__head
+)::before,
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::before {
+  width: 42px !important;
+  height: 38px !important;
+  top: -10px !important;
+  left: -12px !important;
+  background: url("/manga-ui/q5t-sharpened-corner.svg") center / contain no-repeat !important;
+}
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-page__title,.settings-section__heading,.settings-section__title,.qplate-module__head
+)::after,
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
+  width: 54px !important;
+  height: 35px !important;
+  right: 6px !important;
+  background: url("/manga-ui/manga-impact-slashes.svg") center / contain no-repeat !important;
+}
