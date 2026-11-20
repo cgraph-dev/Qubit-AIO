@@ -549,3 +549,42 @@ html[data-qubit-manga="on"] .q5t-important-tooltip[role="tooltip"] {
   color: #fff2fa !important;
   overflow: visible !important;
 }
+
+/* The owner frame is an overlay, never a flex child. */
+html[data-qubit-manga="on"] #app-sidebar > img.qubit-sidebar__frame {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  object-fit: fill !important;
+}
+html[data-qubit-manga="on"] #app-sidebar > nav,
+html[data-qubit-manga="on"] #app-sidebar > .qagent-sidebar__brand-row,
+html[data-qubit-manga="on"] #app-sidebar > .qagent-sidebar__system,
+html[data-qubit-manga="on"] #app-sidebar > .qagent-sidebar__utility,
+html[data-qubit-manga="on"] #app-sidebar > .qagent-sidebar__colophon {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* The new module header owns the page-header plate; the old header frame
+   must not sit behind it or add another star. */
+html[data-qubit-manga="on"] [data-dashboard-page-header] {
+  background: none !important;
+  background-image: none !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header]::before,
+html[data-qubit-manga="on"] [data-dashboard-page-header]::after,
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::before,
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-manga-header-art {
+  display: none !important;
+}
