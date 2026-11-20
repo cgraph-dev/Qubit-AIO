@@ -210,3 +210,8 @@ export function MangaSkinGate(): null {
 
   return null;
 }
+import "./sweep-header-frame.css";
+import "./sweep-tooltips.css";
+import "./sweep-collapsed.css";
+import "./sweep-text.css";
+import "./sweep-position.css";
