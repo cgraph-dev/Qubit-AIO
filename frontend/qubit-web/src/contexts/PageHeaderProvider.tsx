@@ -2,6 +2,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -11,7 +12,17 @@ import { resolvePageTitle } from "@/lib/resolve-page-title";
 import { isChatPath } from "@/lib/chat-routes";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
-import { MangaPageGuide } from "@/manga-skin/MangaPageGuide";
+
+interface HeaderSlots {
+  pathname: string;
+  titleOverride: string | null;
+  afterTitle: ReactNode;
+  end: ReactNode;
+}
+
+function emptySlots(pathname: string): HeaderSlots {
+  return { pathname, titleOverride: null, afterTitle: null, end: null };
+}
 
 export function PageHeaderProvider({
   children,
@@ -22,19 +33,17 @@ export function PageHeaderProvider({
 }) {
   const { pathname } = useLocation();
   const { t } = useI18n();
-  const [titleOverride, setTitleOverride] = useState<string | null>(null);
-  const [afterTitle, setAfterTitle] = useState<ReactNode>(null);
-  const [end, setEnd] = useState<ReactNode>(null);
+  // Clear the previous route's slots before descendants register their new
+  // controls. A parent layout effect runs after child layout effects and
+  // would wipe controls that registered during the same commit.
+  const [slots, setSlots] = useState(() => emptySlots(pathname));
+  if (slots.pathname !== pathname) setSlots(emptySlots(pathname));
+  const { titleOverride, afterTitle, end } = slots;
 
-  // Clear any per-page title / toolbar slots when the path changes. Child routes
-  // re-fill these on mount via usePageHeader.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  const mainRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
-    setTitleOverride(null);
-    setAfterTitle(null);
-    setEnd(null);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [pathname]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const defaultTitle = useMemo(
     () => resolvePageTitle(pathname, t, pluginTabs),
@@ -57,105 +66,58 @@ export function PageHeaderProvider({
   const isEnvRoute =
     pathname === "/env" || pathname.startsWith("/env/");
 
-  const value = useMemo(
-    () => ({
-      setAfterTitle,
-      setEnd,
-      setTitle: setTitleOverride,
-    }),
-    [],
-  );
+  const value = useMemo(() => {
+    const update = (patch: Partial<HeaderSlots>) => {
+      setSlots((current) => current.pathname === pathname ? { ...current, ...patch } : current);
+    };
+    return {
+      setAfterTitle: (node: ReactNode) => update({ afterTitle: node }),
+      setEnd: (node: ReactNode) => update({ end: node }),
+      setTitle: (titleOverride: string | null) => update({ titleOverride }),
+    };
+  }, [pathname]);
 
   return (
     <PageHeaderContext.Provider value={value}>
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
         <header
+          role="banner"
+          data-dashboard-page-header=""
           className={cn(
-            "z-1 w-full shrink-0",
-            "box-border border-b border-current/20",
-            "bg-background-base",
-            // Mobile stacks title + toolbar — fixed h-14 clips content; desktop stays one row.
-            "min-h-0 overflow-x-hidden overflow-y-visible py-3 sm:h-14 sm:min-h-[3.5rem] sm:overflow-hidden sm:py-0",
-            // The chat route hides this bar outright: the embedded TUI draws its own
-            // title inside Ink, so a second "Chat" plate directly above it is pure
-            // duplicate chrome eating 56px of terminal height. `hidden` (display:none)
-            // rather than removing the node — the route outlet and its scroll
-            // containers are siblings here, and the PTY/xterm sizing is driven by the
-            // container it mounts into, so removing the element wholesale risks a
-            // zero-height terminal on the first measure.
+            "relative z-1 w-full shrink-0 border-b border-border bg-background-base",
             isChatRoute && "hidden",
           )}
-          style={{
-            // Opaque plate: a translucent/backdrop header let the ambient scene
-            // ghost through under the "Chat" bar.
-            background: "#0a1730",
-            borderBottom: "1px solid rgb(179 199 224 / 22%)",
-            color: "#e8eef7",
-          }}
-          role="banner"
         >
-          <div
-            className={cn(
-              "flex w-full min-w-0 flex-1 gap-3 px-3 sm:h-full sm:gap-3 sm:px-6",
-              isChatRoute
-                ? "flex-row items-center"
-                : "flex-col justify-center sm:flex-row sm:items-center",
-            )}
-          >
-            <div
-              className={cn(
-                "flex min-w-0 flex-1 gap-2 sm:gap-3",
-                afterTitle && isEnvRoute
-                  ? "flex-col items-start sm:flex-row sm:items-center"
-                  : afterTitle
-                    ? "flex-row flex-wrap items-center"
-                    : "flex-row items-center",
-              )}
-            >
-              <h1
-                className={cn(
-                  "font-expanded min-w-0 text-sm font-bold tracking-[0.08em] text-midground",
-                  afterTitle && isEnvRoute
-                    ? "max-w-full sm:min-w-0 sm:shrink sm:truncate"
-                    : afterTitle
-                      ? "shrink truncate"
-                      : "truncate",
-                )}
-              >
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3 sm:px-6">
+            <div className={cn(
+              "flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2",
+              isEnvRoute && "items-start",
+            )}>
+              <h1 className="min-w-0 max-w-full font-expanded text-sm font-bold tracking-[0.08em] text-midground [overflow-wrap:anywhere]">
                 {displayTitle}
               </h1>
               {afterTitle ? (
                 <div
+                  data-page-header-actions=""
                   className={cn(
-                    "min-w-0 scrollbar-none",
-                    isEnvRoute
-                      ? "w-full overflow-x-auto sm:flex-1 sm:overflow-x-auto"
-                      : "shrink-0 overflow-visible",
+                    "min-w-0 max-w-full overflow-x-auto scrollbar-none",
+                    isEnvRoute && "w-full",
                   )}
                 >
                   {afterTitle}
                 </div>
               ) : null}
             </div>
-
             {end ? (
-              <div
-                className={cn(
-                  "flex min-w-0 sm:max-w-md sm:flex-1",
-                  isChatRoute
-                    ? "w-auto shrink-0 justify-end"
-                    : "w-full justify-start sm:justify-end",
-                )}
-              >
+              <div data-page-header-actions="" className="flex min-w-0 max-w-full flex-wrap justify-start sm:justify-end">
                 {end}
               </div>
             ) : null}
           </div>
         </header>
 
-        <MangaPageGuide />
-
         <main
+          ref={mainRef}
           id="qubit-main-content"
           tabIndex={-1}
           className={cn(

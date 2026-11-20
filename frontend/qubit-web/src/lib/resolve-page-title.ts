@@ -126,7 +126,7 @@ export function resolvePageTitle(
   if (explicit) {
     return explicit;
   }
-  const plugin = pluginTabs.find((p) => p.path === normalized);
+  const plugin = pluginTabs.find((p) => p.path === normalized.toLowerCase());
   if (plugin) {
     return plugin.label;
   }

@@ -200,10 +200,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-ma
   color:#160821!important;font:italic 900 16px/1.15 system-ui,sans-serif!important;
   letter-spacing:0!important;text-shadow:none!important;
 }
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head::before,
-html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head::after {
-  content:none!important;display:none!important;
-}
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate > .qagent-sidebar__section-head > span:first-child {
   color:#190725!important;font:italic 900 16px/1 system-ui,sans-serif!important;
 }

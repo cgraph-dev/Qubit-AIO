@@ -24,9 +24,9 @@ describe("Manga overflow and browser audit safeguards", () => {
  });
  it("only accepts a verified Q6 UI capture and protects sensitive routes", () => {
    expect(audit).toContain('context.addInitScript');
-   expect(audit).toContain('manga-theme-not-activated');
-   expect(audit).toContain('SKIPPED_SENSITIVE_ROUTE');
+   expect(audit).toContain('wrong-theme-gate');
+   expect(audit).toContain('!onPath(sensitive, route)');
    expect(audit).toContain('collapsed-footer-overlap');
-   expect(audit).toContain('main-content-missing');
+   expect(audit).toContain('#qubit-main-content');
  });
 });

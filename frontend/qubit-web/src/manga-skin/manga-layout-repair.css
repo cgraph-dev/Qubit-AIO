@@ -3,9 +3,7 @@
  */
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::after,
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row::before,
-html[data-qubit-manga="on"] header[role="banner"]::after,
-html[data-qubit-manga="on"] .qchat__header::after,
-html[data-qubit-manga="on"] header[role="banner"]::before {
+html[data-qubit-manga="on"] .qchat__header::after {
   content:none!important;display:none!important;
 }
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-row {
@@ -33,15 +31,6 @@ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__brand-name {
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
   background:linear-gradient(108deg,#ff269a,#9d258b 76%,#361346)!important;
   background-image:linear-gradient(108deg,#ff269a,#9d258b 76%,#361346)!important;
-}
-html[data-qubit-manga="on"] header[role="banner"] {
-  border-top:3px solid #ff269a!important;
-  border-bottom:3px solid #ff269a!important;
-}
-html[data-qubit-manga="on"] header[role="banner"] h1 {
-  border:2px solid #05030f!important;
-  border-left:5px solid #ffe500!important;
-  box-shadow:3px 3px 0 #05030f,5px 5px 0 #ff269a!important;
 }
 /* Right-side inspector: a visually connected column of angular plates.
    Do not clip content: menus and Sakuga FX can overdraw their own bounds. */

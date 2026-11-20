@@ -38,7 +38,7 @@ html[data-qubit-manga="on"] {
 /* Headline typography is condensed and purposeful; form copy remains legible. */
 html[data-qubit-manga="on"] :is(
   .qagent-sidebar__brand-name,.qagent-sidebar__section-head,
-  header[role="banner"] h1,.settings-page__title,.settings-section__heading,
+ .settings-page__title,.settings-section__heading,
   .qplate-module__head,.qm-confirm-dialog__title
 ) {font-family:var(--qm-display)!important;font-weight:800;letter-spacing:.055em;}
 html[data-qubit-manga="on"] :is(
@@ -122,25 +122,6 @@ html[data-qubit-manga="on"] :is(
  .qm-confirm-dialog,.kitchen-panel,[data-qm-surface="panel"]
 ) {min-width:0;}
 /* Header is a long edged art-directed band; tab and corner retain proportions. */
-html[data-qubit-manga="on"] header[role="banner"] {
-  position:relative;isolation:isolate;min-height:46px;
-  border-block:2px solid var(--qm-magenta)!important;
-  background:linear-gradient(100deg,#27112f,#0b081a 70%)!important;
-  box-shadow:inset 0 0 0 2px var(--qm-black),0 3px 0 var(--qm-ink)!important;
-}
-html[data-qubit-manga="on"] header[role="banner"]::after {
-  content:"";position:absolute;right:16px;top:7px;width:78px;height:12px;
-  pointer-events:none;opacity:.95;
-  background:repeating-linear-gradient(115deg,var(--qm-hot) 0 8px,var(--qm-black) 8px 12px);
-  clip-path:polygon(12px 0,100% 0,100% 100%,0 100%);
-}
-html[data-qubit-manga="on"] header[role="banner"] h1 {
-  position:relative;z-index:1;margin-right:85px;padding:6px 22px!important;
-  color:var(--qm-ink)!important;text-shadow:2px 2px 0 var(--qm-black);
-  background:linear-gradient(100deg,var(--qm-hot),#a52489)!important;
-  border:2px solid var(--qm-black)!important;clip-path:polygon(0 0,100% 0,calc(100% - 15px) 100%,0 100%);
-  max-width:max-content;
-}
 /* Form typography, affordances and space; never apply decorative animations to
  * fields while typing or to scrollable/virtualized lists. */
 html[data-qubit-manga="on"] :is(
@@ -185,7 +166,6 @@ html[data-qubit-manga="on"] .qm-confirm-dialog__actions button {
 }
 html[data-qubit-manga="on"] .qm-confirm-dialog__actions button:active {transform:translate(1px,2px);}
 @media (max-width:650px) {
- html[data-qubit-manga="on"] header[role="banner"] h1 {font-size:.82rem!important;max-width:calc(100% - 95px);}
  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {min-height:66px!important;}
  html[data-qubit-manga="on"] .qm-confirm-dialog {max-width:calc(100vw - 24px);}
 }

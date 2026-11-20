@@ -69,31 +69,6 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
 }
 /* Illustration 1: long horizontal header frame, perspective-cut pink title,
    hazard right cap and three independent indicator dots. */
-html[data-qubit-manga="on"] header[role="banner"] {
-  position:relative;isolation:isolate;min-height:52px!important;
-  border-block:2px solid var(--qm-art-pink)!important;
-  background:linear-gradient(95deg,#291036 0%,#0c081e 70%)!important;
-  box-shadow:inset 0 0 0 2px #080615,inset 0 -2px 0 var(--qm-art-paper),0 3px 0 #080615!important;
-}
-html[data-qubit-manga="on"] header[role="banner"] h1 {
-  display:inline-flex;align-items:center;min-height:35px;max-width:max-content;
-  margin-right:115px;padding:5px 22px!important;
-  background:linear-gradient(95deg,#ff3cb2,#d82998)!important;
-  border:2px solid #080615!important;
-  clip-path:polygon(0 0,100% 0,calc(100% - 15px) 100%,0 100%);
-}
-html[data-qubit-manga="on"] header[role="banner"]::after {
-  content:"";position:absolute;pointer-events:none;z-index:0;
-  width:111px;height:18px;right:14px;top:50%;
-  transform:translateY(-50%);opacity:1;
-  background:
-    radial-gradient(circle at 92% 50%,#fff0ff 0 4px,#080615 4.5px 5.5px,transparent 6px),
-    radial-gradient(circle at 79% 50%,#ff269a 0 4px,#080615 4.5px 5.5px,transparent 6px),
-    radial-gradient(circle at 66% 50%,#ffe500 0 4px,#080615 4.5px 5.5px,transparent 6px),
-    repeating-linear-gradient(115deg,#ff269a 0 9px,#080615 9px 14px);
-  background-size:100% 100%,100% 100%,100% 100%,53% 100%;
-  background-position:center,center,center,left center;background-repeat:no-repeat;
-}
 /* Illustration 2: responsive layered panel/popup anatomy, with original fixed
    corner artwork rather than distorted whole-frame image backgrounds. */
 html[data-qubit-manga="on"] :is(
@@ -133,10 +108,6 @@ html[data-qubit-manga="on"] :is(
 }
 html[data-qubit-manga="on"] .qm-confirm-dialog {
   animation:qm-pr11-plate-in 300ms cubic-bezier(.16,1,.3,1) both!important;
-}
-@media (max-width:640px) {
- html[data-qubit-manga="on"] header[role="banner"] h1 {max-width:calc(100% - 118px);font-size:.82rem!important;}
- html[data-qubit-manga="on"] header[role="banner"]::after {width:75px;right:7px;}
 }
 @media (prefers-reduced-motion:reduce) {
  html[data-qubit-manga="on"] .qm-confirm-dialog {animation:none!important;}

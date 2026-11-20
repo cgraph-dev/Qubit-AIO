@@ -92,3 +92,35 @@ describe("App /qubit-hud route", () => {
     }
   });
 });
+
+describe("plugin route ownership", () => {
+  it("uses the same first visible plugin for the route and sidebar on a collision", () => {
+    mockManifests.push(
+      { name: "hidden-audit", label: "Hidden audit", icon: "Gauge", tab: { path: "/audit-route", hidden: true } },
+      { name: "first-audit", label: "First audit", icon: "Gauge", tab: { path: "/audit-route" } },
+      { name: "second-audit", label: "Second audit", icon: "Gauge", tab: { path: "/AUDIT-ROUTE/" } },
+    );
+    try {
+      const html = renderAt("/audit-route");
+      expect(html.match(/href="\/audit-route"/g)).toHaveLength(1);
+      expect(html).toContain('data-plugin="first-audit"');
+      expect(html).not.toContain('data-plugin="hidden-audit"');
+      expect(html).not.toContain("Second audit");
+    } finally {
+      mockManifests.length = 0;
+    }
+  });
+
+  it("does not layer the native chat host behind a native chat override", () => {
+    mockManifests.push({ name: "native-chat-audit", label: "Native chat", icon: "Gauge", tab: {
+      path: "/qubit-chat", override: "/qubit-chat",
+    } });
+    try {
+      const html = renderAt("/qubit-chat");
+      expect(html).toContain('data-plugin="native-chat-audit"');
+      expect(html).not.toContain('data-chat-active="true"');
+    } finally {
+      mockManifests.length = 0;
+    }
+  });
+});

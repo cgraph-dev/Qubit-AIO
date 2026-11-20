@@ -5,7 +5,6 @@ html[data-qubit-manga="on"] {
   --qm-title-hot:#ff269a; --qm-title-yellow:#ffe500; --qm-title-ink:#080615;
 }
 html[data-qubit-manga="on"] :is(
- header[role="banner"] h1,
  #qubit-main-content .settings-page__title,
  #qubit-main-content .settings-section__heading,
  .qchat__side .qplate-module__head
@@ -26,7 +25,6 @@ html[data-qubit-manga="on"] :is(
   overflow:visible;
 }
 html[data-qubit-manga="on"] :is(
- header[role="banner"] h1,
  #qubit-main-content .settings-page__title,
  #qubit-main-content .settings-section__heading,
  .qchat__side .qplate-module__head
@@ -39,7 +37,6 @@ html[data-qubit-manga="on"] :is(
   animation:qm-title-star 340ms cubic-bezier(.22,1.5,.4,1) both;
 }
 html[data-qubit-manga="on"] :is(
- header[role="banner"] h1,
  #qubit-main-content .settings-page__title,
  #qubit-main-content .settings-section__heading,
  .qchat__side .qplate-module__head
@@ -65,14 +62,12 @@ html[data-qubit-manga="on"] :is(
    the page heading. On narrow screens use a smaller but still legible set. */
 @media(max-width:700px) {
  html[data-qubit-manga="on"] :is(
-  header[role="banner"] h1,
-  #qubit-main-content .settings-page__title,
+ #qubit-main-content .settings-page__title,
   #qubit-main-content .settings-section__heading,
   .qchat__side .qplate-module__head
  ) {padding:6px 42px 6px 20px!important;font-size:.9rem!important}
  html[data-qubit-manga="on"] :is(
-  header[role="banner"] h1,
-  #qubit-main-content .settings-page__title,
+ #qubit-main-content .settings-page__title,
   #qubit-main-content .settings-section__heading,
   .qchat__side .qplate-module__head
  )::after {right:8px;width:24px}
@@ -159,8 +154,7 @@ html[data-qubit-manga="on"] .qchat__side :is(.qchat__tools,.qchat__sessions) but
 }
 @media(prefers-reduced-motion:reduce) {
  html[data-qubit-manga="on"] :is(
-  header[role="banner"] h1,
-  #qubit-main-content .settings-page__title,
+ #qubit-main-content .settings-page__title,
   #qubit-main-content .settings-section__heading,
   .qchat__side .qplate-module__head
  )::before {animation:none!important}

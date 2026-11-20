@@ -23,11 +23,6 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] {
 
 /* Header, footer, titles and dividers: use the ZIP as small-size accents,
  * not stretched full-width bitmap copies. */
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] header[role="banner"]::before {
-  content:"";position:absolute;pointer-events:none;z-index:0;
-  inset:0;background:url("/manga-ui/zip/header-full.svg") center/100% 100% no-repeat;
-  opacity:.32;
-}
 /* The original ZIP module-header is a decorative multi-strip asset, NOT a
  * scalable heading background. Stretching it across 100%-width headings
  * produces the four clipped/title plates seen on Qubit TV and Talk.
@@ -121,19 +116,9 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] :is(
   .cron-table,.sessions-table,.workboard-table,.settings-table
 ) {border:2px solid #ff269a;box-shadow:3px 3px #080615}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [role="dialog"] {
-  border:3px solid #ff269a!important;
-  box-shadow:0 0 0 2px #fff0ff,5px 5px #080615!important;
-}
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-confirm-dialog::before {
-  background-image:url("/manga-ui/zip/modal-confirm.svg")!important;
-}
 /* Utility escape hatch for future page-specific React components. The 89 named
  * files are installed and can be selected without modifying global selectors.
  * Add data-qm-zip-asset="name" only to a real decorative element. */
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset] {
-  position:relative;isolation:isolate;
-}
 @media(max-width:760px) {
   html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] #qubit-main-content :is(
     .settings-section,.settings-group,.kitchen-panel,[data-slot="card"]

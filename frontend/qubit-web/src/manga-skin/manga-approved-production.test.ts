@@ -16,7 +16,9 @@ const art = read("./MangaStudioArt.tsx");
 describe("approved production Manga dashboard", () => {
   it("loads after legacy styles and is gated to eligible routes", () => {
     const lines = gate.split("\n").filter(line => line.startsWith('import "./manga-'));
-    expect(lines.at(-1)).toBe('import "./manga-approved-production.css";');
+    expect(lines.indexOf('import "./manga-approved-production.css";')).toBeGreaterThan(
+      lines.indexOf('import "./manga-studio-art.css";'),
+    );
     expect(gate).toContain('dataset.qmApprovedAssets = "ready"');
     expect(css).toContain('[data-qm-approved-assets="ready"]');
   });

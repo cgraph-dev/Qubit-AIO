@@ -130,3 +130,32 @@ describe("useModalBehavior", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+it("lets only the top layer trap focus and handle Escape", async () => {
+  const outerClose = vi.fn();
+  const innerClose = vi.fn();
+  await render(true, outerClose);
+  const pair = (nested: boolean) => (
+    <>
+      <Dialog open onClose={outerClose} />
+      <Dialog open={nested} onClose={innerClose} />
+    </>
+  );
+  await act(async () => root!.render(pair(false)));
+  const first = document.querySelector<HTMLButtonElement>("[role=dialog] button");
+  first?.focus();
+  await act(async () => root!.render(pair(true)));
+  const dialogs = [...document.querySelectorAll("[role=dialog]")];
+  expect(dialogs).toHaveLength(2);
+  expect(dialogs[1].contains(document.activeElement)).toBe(true);
+  first?.focus();
+  expect(dialogs[1].contains(document.activeElement)).toBe(true);
+  document.dispatchEvent(key("Escape"));
+  expect(innerClose).toHaveBeenCalledOnce();
+  expect(outerClose).not.toHaveBeenCalled();
+  await act(async () => root!.render(pair(false)));
+  expect(document.activeElement).toBe(first);
+  expect(document.body.style.overflow).toBe("hidden");
+  document.dispatchEvent(key("Escape"));
+  expect(outerClose).toHaveBeenCalledOnce();
+});

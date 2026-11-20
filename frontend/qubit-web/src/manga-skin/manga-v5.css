@@ -151,15 +151,6 @@ html[data-qubit-manga="on"] #qubit-main-content :is(
   filter:brightness(1.07);
 }
 html[data-qubit-manga="on"] #qubit-main-content :is(
- [role="dialog"],[role="alertdialog"]
-) {
-  max-width:calc(100vw - 22px);
-  border:3px solid #ff269a!important;
-  border-top:5px solid #ffe500!important;
-  background:#160e29!important;
-  box-shadow:3px 3px 0 #05030f,6px 6px 0 #fff0ff!important;
-}
-html[data-qubit-manga="on"] #qubit-main-content :is(
  .settings-page,.settings-section,table
 ) {min-width:0}
 html[data-qubit-manga="on"] #qubit-main-content table {

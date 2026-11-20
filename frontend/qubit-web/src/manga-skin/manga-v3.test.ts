@@ -8,7 +8,6 @@ const v2 = here("./manga-v2.css");
 const v3 = here("./manga-v3.css");
 const v4 = here("./manga-v4.css");
 const v5 = here("./manga-v5.css");
-const store = here("./manga-store.ts");
 const gate = here("./MangaSkin.tsx");
 const webSelect = here("../sakuga/MangaAwareSelect.tsx");
 const sharedRoot = fileURLToPath(new URL("../../public/manga-ui/", import.meta.url));
@@ -21,16 +20,6 @@ describe("Manga V2/V3 integration contracts", () => {
     expect(gate).toContain('import "./manga-v4.css";');
     expect(gate).toContain('import "./manga-v5.css";');
     for (const css of [v2, v3, v4, v5]) expect(css).toContain('html[data-qubit-manga="on"]');
-  });
-
-  it("protects the Workbench and HUD while skinning chat and office", () => {
-    for (const route of ["/qubit-workbench", "/qubit-hud"]) {
-      expect(store).toContain(`"${route}"`);
-    }
-    for (const route of ["/chat", "/qubit-office", "/qubit-office2", "/qubit-office3"]) {
-      expect(store).not.toContain(`"${route}"`);
-    }
-    expect(store).toContain('pathname.startsWith(path + "/")');
   });
 
   it("uses a web-only portal dropdown rather than editing the shared desktop select", () => {

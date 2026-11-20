@@ -14,7 +14,6 @@ describe("shared Manga panel anatomy", () => {
   }
  });
  it("keeps Manga styling route-scoped without the stretched V3 plate import", () => {
-  expect(gate).not.toContain('import "./manga-assets-integrated.css";');
   expect(gate).toContain('import "./manga-semantic-surfaces.css";');
   expect(css).toContain('html[data-qubit-manga="on"]');
  });

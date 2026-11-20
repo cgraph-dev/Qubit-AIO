@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Connect, type Plugin } from "vite";
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 
@@ -128,6 +128,20 @@ function hermesDevToken(): Plugin {
   };
 }
 
+/** The standalone gallery uses .html. Only the extensionless React route
+ * is rewritten so Vite does not serve the public file in its place. */
+function preserveGalleryRoute(): Plugin {
+  const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
+    if (/^\/sakuga-gallery\/?(?:\?|$)/.test(req.url ?? "")) req.url = "/index.html";
+    next();
+  };
+  return {
+    name: "qubit:gallery-route",
+    configureServer: (server) => { server.middlewares.use(rewrite); },
+    configurePreviewServer: (server) => { server.middlewares.use(rewrite); },
+  };
+}
+
 export default defineConfig({
   // Qubit serves the dashboard at the host root; asset/plugin URLs resolve
   // from "/" (no "/hermes/" base path).
@@ -136,6 +150,7 @@ export default defineConfig({
     react(),
     babel({ presets: [compilerPreset()] }),
     tailwindcss(),
+    preserveGalleryRoute(),
     hermesDevToken(),
     stripRepoPaths(),
   ],
@@ -185,7 +200,7 @@ export default defineConfig({
           groups: [
             {
               name: "react-vendor",
-              test: /node_modules[\\/](react|react-dom|scheduler|react-router|react-router)([\\/]|$)/,
+              test: /node_modules[\\/](react|react-dom|scheduler|react-router)([\\/]|$)/,
             },
             {
               name: "xterm",
@@ -219,11 +234,11 @@ export default defineConfig({
   server: {
     proxy: {
       // Qubit-owned API namespace injected via window.__QUBIT_API_PREFIX__.
-      "/agent": {
+      "^/agent(?:/|$)": {
         target: BACKEND,
         ws: true,
       },
-      "/api": {
+      "^/api(?:/|$)": {
         target: BACKEND,
         ws: true,
       },

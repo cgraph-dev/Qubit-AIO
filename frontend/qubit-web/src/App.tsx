@@ -12,7 +12,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { stageChrome, stageRoute } from "@/lib/stageReveal";
+import { stageChrome } from "@/lib/stageReveal";
 import {
   Routes,
   Route,
@@ -228,7 +228,7 @@ import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { prefetchRoute } from "@/lib/route-prefetch";
 import { latchChatActivation } from "@/lib/chat-activation";
-import { isChatPath, isFullHeightPath, isNativeChatPath } from "@/lib/chat-routes";
+import { isChatPath, isFullHeightPath, isNativeChatPath, NATIVE_CHAT_PATH, normalizeRoutePath } from "@/lib/chat-routes";
 import { ROUTE_TITLES } from "@/lib/resolve-page-title";
 import {
   parsePolicyRefusal,
@@ -610,11 +610,16 @@ function resolveIcon(name: string): ComponentType<{ className?: string }> {
   return ICON_MAP[name] ?? Puzzle;
 }
 
+// React Router matches these paths case-insensitively and ignores a trailing slash.
+function routeKey(path: string): string {
+  return normalizeRoutePath(path).toLowerCase();
+}
+
 /** Every path a nav tree owns, including group children. */
 function collectNavPaths(items: readonly NavItem[]): Set<string> {
   const paths = new Set<string>();
   const add = (item: NavItem) => {
-    paths.add(item.path);
+    paths.add(routeKey(item.path));
     for (const child of item.children ?? []) add(child);
   };
   for (const item of items) add(item);
@@ -639,7 +644,7 @@ function buildNavItems(
     // it again puts two items with the same `path` into the sidebar list, which
     // React keys collide on (`key={item.path}`) and the menu shows the entry
     // twice. Skip it — the built-in entry wins.
-    if (ownedPaths.has(manifest.tab.path)) continue;
+    if (ownedPaths.has(routeKey(manifest.tab.path))) continue;
 
     const pluginItem: NavItem = {
       path: manifest.tab.path,
@@ -661,7 +666,7 @@ function buildNavItems(
     } else {
       items.push(pluginItem);
     }
-    ownedPaths.add(pluginItem.path);
+    ownedPaths.add(routeKey(pluginItem.path));
   }
 
   return items;
@@ -690,13 +695,15 @@ function buildRoutes(
   key: string;
   path: string;
   element: ReactNode;
+  pluginLabel?: string;
 }> {
   const byOverride = new Map<string, PluginManifest>();
   const addons: PluginManifest[] = [];
 
   for (const m of manifests) {
     if (m.tab.override) {
-      byOverride.set(m.tab.override, m);
+      const key = routeKey(m.tab.override);
+      if (!byOverride.has(key)) byOverride.set(key, m);
     } else {
       addons.push(m);
     }
@@ -706,41 +713,39 @@ function buildRoutes(
     key: string;
     path: string;
     element: ReactNode;
+    pluginLabel?: string;
   }> = [];
 
   for (const [path, Component] of Object.entries(builtinRoutes)) {
-    const om = byOverride.get(path);
+    const om = byOverride.get(routeKey(path));
     if (om) {
       routes.push({
         key: `override:${om.name}`,
         path,
         element: <PluginPage name={om.name} />,
+        pluginLabel: om.label,
       });
     } else {
       routes.push({ key: `builtin:${path}`, path, element: <Component /> });
     }
   }
 
-  for (const m of addons) {
-    if (m.tab.hidden) continue;
-    if (m.tab.path === "/plugins") continue;
-    if (builtinRoutes[m.tab.path]) continue;
-    routes.push({
-      key: `plugin:${m.name}`,
-      path: m.tab.path,
-      element: <PluginPage name={m.name} />,
-    });
-  }
-
-  for (const m of manifests) {
-    if (!m.tab.hidden) continue;
-    if (m.tab.path === "/plugins") continue;
-    if (builtinRoutes[m.tab.path] || m.tab.override) continue;
-    routes.push({
-      key: `plugin:hidden:${m.name}`,
-      path: m.tab.path,
-      element: <PluginPage name={m.name} />,
-    });
+  const ownedPaths = new Set(Object.keys(builtinRoutes).map(routeKey));
+  // Visible tabs own collisions before hidden links. Within each group,
+  // keep the same first-manifest rule the sidebar uses.
+  for (const hidden of [false, true]) {
+    for (const m of addons) {
+      if (Boolean(m.tab.hidden) !== hidden) continue;
+      const path = routeKey(m.tab.path);
+      if (ownedPaths.has(path)) continue;
+      ownedPaths.add(path);
+      routes.push({
+        key: `plugin:${path}`,
+        path: m.tab.path,
+        element: <PluginPage name={m.name} />,
+        pluginLabel: m.label,
+      });
+    }
   }
 
   return routes;
@@ -794,15 +799,7 @@ export default function App() {
   const isDocsRoute = pathname === "/docs" || pathname === "/docs/";
   // Both chat routes render the one persistent ChatPage host.
   const isChatRoute = isChatPath(pathname);
-  const stageRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLElement>(null);
-
-  // GSAP: pages arrive instead of snapping. The embedded terminal owns its own
-  // painting surface, so it is deliberately excluded.
-  useEffect(() => {
-    if (isChatRoute) return;
-    stageRoute(stageRef.current);
-  }, [isChatRoute, pathname]);
 
   // GSAP: the nav stack settles in once on first paint.
   useEffect(() => {
@@ -825,26 +822,10 @@ export default function App() {
     );
   }, [isNativeChatRoute]);
 
-  // A plugin can replace the built-in /chat page via `tab.override: "/chat"`
-  // in its manifest.  When one does, `buildRoutes` already swaps the route
-  // element for <PluginPage /> — but we also have to suppress the
-  // persistent ChatPage host below, or the plugin's page and the built-in
-  // terminal would paint on top of each other.  The override is niche
-  // (nothing ships overriding /chat today) but it's an advertised
-  // extension point, so preserve the pre-persistence contract: when a
-  // plugin owns /chat, the built-in chat UI is entirely absent.
-  //
-  // Waiting on `pluginsLoading` is load-bearing: manifests arrive
-  // asynchronously from /api/dashboard/plugins, so on initial render
-  // `chatOverriddenByPlugin` is always false.  Without the loading
-  // gate, the persistent host would mount, spawn a PTY, and THEN get
-  // yanked out from under the user when the plugin's manifest resolves
-  // — killing the session mid-paint.  Delaying host mount by the
-  // plugin-load window (typically <50ms, worst case 2s safety timeout)
-  // is the cheaper trade-off.
-  const chatOverriddenByPlugin = useMemo(
-    () => manifests.some((m) => m.tab.override === "/chat"),
-    [manifests],
+  // Only an override of the native route owns the persistent native host.
+  // The terminal route has its own route element and override.
+  const nativeChatOverridden = manifests.some(
+    (manifest) => manifest.tab.override && routeKey(manifest.tab.override) === NATIVE_CHAT_PATH,
   );
 
   const builtinRoutes = useMemo(
@@ -899,15 +880,10 @@ export default function App() {
     [builtinRoutes, manifests],
   );
   const pluginTabMeta = useMemo(
-    () =>
-      manifests.map((m) => {
-        // Hidden tabs (/qubit-approvals, /qubit-brand) still claim a URL, so
-        // they need a real page title too; ROUTE_TITLES keeps the Qubit overlay
-        // labels distinct from the vendored duplicate routes.
-        const path = m.tab.override ?? m.tab.path;
-        return { path, label: ROUTE_TITLES[path] ?? m.label };
-      }),
-    [manifests],
+    () => routes.flatMap(({ path, pluginLabel }) =>
+      pluginLabel === undefined ? [] : [{ path: routeKey(path), label: pluginLabel }],
+    ),
+    [routes],
   );
 
   const layoutVariant = theme.layoutVariant ?? "standard";
@@ -996,15 +972,11 @@ export default function App() {
       </header>
 
       {mobileOpen && (
-        <Button
-          variant="secondary"
+        <button
+          type="button"
           aria-label={t.app.closeNavigation}
           onClick={closeMobile}
-          fx={false}
-          className={cn(
-            "lg:hidden fixed inset-0 z-40 p-0 block",
-            "bg-black/70",
-          )}
+          className="lg:hidden fixed inset-0 z-40 block bg-black/70 p-0"
         />
       )}
 
@@ -1104,6 +1076,8 @@ export default function App() {
               <Button
                 variant="secondary"
                 onClick={toggleCollapsed}
+                data-sidebar-toggle=""
+                aria-expanded={!isDesktopCollapsed}
                 aria-label={
                   collapsed ? t.common.expand : t.common.collapse
                 }
@@ -1281,7 +1255,6 @@ export default function App() {
             >
               <PluginSlot name="pre-main" />
               <div
-                ref={stageRef}
                 data-qm-route={pathname}
                 className={cn(
                   "w-full min-w-0",
@@ -1311,7 +1284,7 @@ export default function App() {
                 </ProfileKeyedRoutes>
 
                 {embeddedChat &&
-                  !chatOverriddenByPlugin &&
+                  !nativeChatOverridden &&
                   (pluginsLoading ? (
                     isNativeChatRoute ? (
                       <RouteFallback label="Loading chat…" />

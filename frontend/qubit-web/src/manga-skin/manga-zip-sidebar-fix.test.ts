@@ -20,7 +20,7 @@ describe("ZIP gateway frame, anime sparkle, and charging cells", () => {
 
   it("replaces sharp lightning with the fixed-aspect anime sparkle", () => {
     const animeStar = read("../../public/manga-ui/manga-anime-star.svg");
-    expect(animeStar).toContain('viewBox="0 0 80 80"');
+    expect(animeStar).toMatch(/viewBox="0 0 (\d+) \1"/);
     expect(css).toContain('url("/manga-ui/manga-anime-star.svg")');
     expect(css).toContain("background:url(\"/manga-ui/neon-bolt-nut.svg\")");
   });

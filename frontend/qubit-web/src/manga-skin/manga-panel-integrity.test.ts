@@ -37,7 +37,7 @@ describe("Manga web-dashboard page panel integrity", () => {
     expect(gate).toContain("now - lastCue < 280");
     expect(sidebar).not.toContain('#app-sidebar *\\n');
     expect(sidebar).toContain("DO NOT disable animations across every sidebar descendant");
-    expect(gate).toContain('pathname === "/chat"');
+    expect(gate).toContain('isTerminalChatPath(pathname)');
   });
   it("does not target the terminal, office, workbench, or unrelated themes", () => {
     expect(styles).toContain('html:root[data-qubit-manga="on"]');

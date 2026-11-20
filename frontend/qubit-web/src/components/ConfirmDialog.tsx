@@ -33,17 +33,14 @@ export function ConfirmDialog({
   const dialogRef = useModalBehavior({
     open,
     onClose: onCancel,
-    initialFocusSelector: "[data-confirm]",
+    initialFocusSelector: destructive ? ".qm-confirm-dialog__cancel" : "[data-confirm]",
   });
 
   if (!open) return null;
 
   return createPortal(
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={description ? descriptionId : undefined}
+      data-confirm-backdrop=""
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -51,9 +48,13 @@ export function ConfirmDialog({
     >
       <div
         ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={cn(
           themedBody,
-          "qm-confirm-dialog relative w-full max-w-md border border-border bg-card shadow-2xl",
+          "qm-confirm-dialog relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto border border-border bg-card shadow-2xl",
         )}
       >
         <div className="qm-confirm-dialog__header flex items-start gap-3 p-4 border-b border-border">

@@ -99,10 +99,6 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
   background:url("/manga-ui/neon-bolt-nut.svg") center/contain no-repeat!important;
   animation:none!important;
 }
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::after,
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qm-manga-charge-cells {
-  display:none!important;
-}
 @keyframes qm-atom-glow {
   0%,100% {filter:drop-shadow(0 0 2px #ffe92d);opacity:.88}
   50% {filter:drop-shadow(0 0 8px #fff982) drop-shadow(0 0 4px #ff2ca4);opacity:1}

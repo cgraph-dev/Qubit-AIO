@@ -13,23 +13,6 @@ html[data-qubit-manga="on"] {
 html[data-qubit-manga="on"] #qubit-main-content {
  min-width:0;font-family:var(--qm-body-font);color:var(--qm-ink);
 }
-html[data-qubit-manga="on"] header[role="banner"] {
- min-height:62px;z-index:1;
- box-shadow:0 3px 0 #05030f,0 5px 0 #ff269a,0 7px 0 rgba(255,240,255,.65)!important;
-}
-html[data-qubit-manga="on"] header[role="banner"] > div {
- min-width:0;padding-inline:17px;gap:10px;
-}
-html[data-qubit-manga="on"] header[role="banner"] h1 {
- display:flex;align-items:center;
- padding:6px 14px 6px 12px;min-height:36px;
- max-width:100%;
- border:2px solid #05030f!important;border-left:6px solid #ffe500!important;
- background:linear-gradient(100deg,#fe319e 0%,#a629a9 68%,#28123e 100%);
- color:#fff!important;font:700 clamp(.9rem,1.2vw,1.13rem)/1.15 var(--qm-heading-font);
- letter-spacing:.08em;text-shadow:2px 2px 0 #05030f;
- clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%);
-}
 html[data-qubit-manga="on"] .settings-page__header,
 html[data-qubit-manga="on"] .settings-section__header {
  position:relative;min-width:0;gap:12px;
@@ -233,8 +216,6 @@ html[data-qubit-manga="on"] .qchat__composer:focus-within {
  box-shadow:0 -3px 0 #05030f,0 -5px 0 rgba(255,229,0,.55);
 }
 @media(max-width:720px) {
- html[data-qubit-manga="on"] header[role="banner"] {min-height:53px}
- html[data-qubit-manga="on"] header[role="banner"] > div {padding-inline:9px}
  html[data-qubit-manga="on"] :is(.settings-group,[data-slot="card"])::before {width:30px;height:30px}
  html[data-qubit-manga="on"] :is(.settings-group,[data-slot="card"])::after {width:28px;height:28px}
  html[data-qubit-manga="on"] .settings-row {gap:7px}

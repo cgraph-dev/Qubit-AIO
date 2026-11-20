@@ -31,7 +31,7 @@ describe("full Manga ZIP asset integration safety", () => {
   });
 
   it("carries all key page-family hooks while respecting motion", () => {
-    for (const surface of ["header-full.svg", "right-model.svg", "chat-composer.svg", "modal-confirm.svg"]) {
+    for (const surface of ["right-model.svg", "chat-composer.svg"]) {
       expect(style).toContain(surface);
     }
     expect(style).toContain("prefers-reduced-motion:reduce");

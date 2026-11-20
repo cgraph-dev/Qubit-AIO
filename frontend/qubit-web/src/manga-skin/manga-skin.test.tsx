@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useNavigate } from "react-router";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MangaSkinGate } from "./MangaSkin";
 import {
@@ -115,10 +115,28 @@ describe("MangaSkinGate", () => {
     expect(skinOn()).toBe(false);
 
     clickText("office");
-    expect(skinOn()).toBe(true);
+    expect(skinOn()).toBe(false);
 
     clickText("sessions");
     expect(skinOn()).toBe(true);
+  });
+
+  it("does not reload the asset manifests while navigating inside Manga", () => {
+    const fetch = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      setMangaEnabled(true);
+      mount("/models");
+      expect(fetch).toHaveBeenCalledTimes(2);
+      clickText("sessions");
+      expect(fetch).toHaveBeenCalledTimes(2);
+      clickText("workbench");
+      expect(skinOn()).toBe(false);
+      clickText("sessions");
+      expect(fetch).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("stays off when the theme/preference is disabled", () => {
@@ -146,7 +164,7 @@ describe("bootstrapMangaSkin", () => {
     expect(skinOn()).toBe(true);
 
     bootstrapMangaSkin("/qubit-office");
-    expect(skinOn()).toBe(true);
+    expect(skinOn()).toBe(false);
 
     bootstrapMangaSkin("/qubit-workbench");
     expect(skinOn()).toBe(false);

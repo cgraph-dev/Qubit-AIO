@@ -65,7 +65,6 @@ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar_
 }
 /* Page headings: the same three visible ink marks as in the reference. */
 html[data-qubit-manga="on"] :is(
- header[role="banner"] h1,
  #qubit-main-content .settings-page__title,
  #qubit-main-content .settings-section__heading,
  .qchat__side .qplate-module__head
@@ -163,8 +162,7 @@ html[data-qubit-manga="on"] .qchat__side > :is(
 html[data-qubit-manga="on"] :is(.qm-skill-editor-dialog,.qm-skill-learn-dialog)::before {
   animation:qm-reference-corner-arrive 340ms cubic-bezier(.18,1.5,.34,1) both;
 }
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after,
-html[data-qubit-manga="on"] header[role="banner"] h1::after {
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__section-head::after {
   animation:qm-reference-ink-reveal 260ms ease-out 65ms both;
 }
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__link[aria-current="page"]::after {

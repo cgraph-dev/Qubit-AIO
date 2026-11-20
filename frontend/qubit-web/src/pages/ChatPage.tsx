@@ -963,7 +963,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   }, [messages, session, transcriptSession]);
 
   useEffect(() => {
-    setTitle(isActive ? t.app.nav.chat : null);
+    if (!isActive) return;
+    setTitle(t.app.nav.chat);
     return () => setTitle(null);
   }, [isActive, setTitle, t.app.nav.chat]);
 

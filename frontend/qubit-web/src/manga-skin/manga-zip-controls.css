@@ -70,10 +70,6 @@ html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-route] [data-
 }
 
 /* Modal, tooltip, dropdown, toasts and warnings. */
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] .qm-confirm-dialog,
-html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [role="dialog"] {
-  border:3px solid #ff269a!important;background-color:#171027!important;
-}
 html[data-qubit-manga="on"][data-qubit-manga-zip="ready"] [data-qm-zip-asset="modal-warning"] {
   background-image:url("/manga-ui/zip/modal-warning.svg");
 }

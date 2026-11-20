@@ -46,9 +46,6 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-
   animation:qm-zip-charge-cell 2.1s steps(1,end) infinite!important;
   will-change:auto;
 }
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(1) {
-  animation-delay:0s!important;
-}
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-charge-cells i:nth-child(2) {
   animation-delay:-.7s!important;
 }

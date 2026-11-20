@@ -194,26 +194,6 @@ html[data-qubit-manga="on"] video[src*="sidebar-backdrop"] {
 
 /* ------------------------------------------------------------- page header */
 
-html[data-qubit-manga="on"] header[role="banner"] {
-  background: linear-gradient(100deg, #2b0a2a 0%, #160e28 42%, #1b0f34 100%) !important;
-  border-bottom: 2px solid var(--qm-magenta) !important;
-  box-shadow:
-    0 3px 0 var(--qm-black),
-    0 4px 0 rgba(255, 38, 154, 0.45) !important;
-  color: var(--qm-ink) !important;
-}
-
-html[data-qubit-manga="on"] header[role="banner"] h1 {
-  padding-left: 0.65rem;
-  border-left: 4px solid var(--qm-yellow);
-  color: var(--qm-ink) !important;
-  font-family: var(--qm-display);
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-shadow: 2px 2px 0 var(--qm-black);
-}
-
 /* Mobile top bar (no role) */
 html[data-qubit-manga="on"] #root > div > header {
   background: linear-gradient(100deg, #2b0a2a, #160e28) !important;
@@ -406,11 +386,6 @@ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link--nested[aria-curr
   height: 2px;
   border-radius: 0;
   background: var(--qm-black);
-}
-
-html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__link:focus-visible {
-  outline: 2px solid var(--qm-yellow) !important;
-  outline-offset: 2px;
 }
 
 html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__utility,
@@ -1073,28 +1048,12 @@ html[data-qubit-manga="on"] .qrail-flyout__head {
 
 /* ----------------------------------------------------------- dialogs etc */
 
-html[data-qubit-manga="on"] [role="dialog"] {
-  border: 3px solid var(--qm-magenta) !important;
-  border-radius: 3px !important;
-  background: var(--qm-panel) !important;
-  box-shadow: var(--qm-lift) !important;
-}
-
 html[data-qubit-manga="on"] [role="dialog"] [role="heading"],
 html[data-qubit-manga="on"] [role="dialog"] h2,
 html[data-qubit-manga="on"] [role="dialog"] h3 {
   font-family: var(--qm-display);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-html[data-qubit-manga="on"] [role="dialog"] > :first-child {
-  border-top: 4px solid var(--qm-yellow);
-}
-
-html[data-qubit-manga="on"] [role="alertdialog"] {
-  border: 3px solid var(--qm-yellow) !important;
-  background: var(--qm-panel) !important;
 }
 
 html[data-qubit-manga="on"] sakuga-tooltip::part(tip) {
@@ -1354,11 +1313,6 @@ html[data-qubit-manga="on"] #qubit-main-content .overflow-hidden[class*="bg-back
     clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
   }
 
-  html[data-qubit-manga="on"] header[role="banner"] h1 {
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-  }
-
   html[data-qubit-manga="on"] .qchat__side.qchat__side {
     border-left-width: 2px !important;
     box-shadow: none;
@@ -1564,9 +1518,6 @@ html[data-qubit-manga="on"] #qubit-main-content :is(input,textarea,select) {
   min-width: 0;
   max-width: 100%;
   line-height: 1.5;
-}
-html[data-qubit-manga="on"] #qubit-main-content :is(table,[role="table"]) {
-  font-variant-numeric: tabular-nums;
 }
 html[data-qubit-manga="on"] #qubit-main-content :is(th,[role="columnheader"]) {
   font-weight: 800;

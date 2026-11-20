@@ -13,7 +13,7 @@ This pass addresses the owner's **actual generated reference screenshots**, not 
 - New `manga-ux.css`: coherent form controls and labels across shared settings pages, public Sakuga ExtraField styling, responsive layout, and a scroll-safe Cron editor.
 - `CronPage.tsx`: task / schedule / delivery sections, understandable advanced options, one consistent create/edit dialog.
 - `ScheduleBuilder.tsx`: clear preview such as "Run every 30 minutes" without changing the backend schedule string.
-- `MangaPageGuide.tsx` and `PageHeaderProvider.tsx`: short "what can I do here?" sentence on eligible Manga dashboard routes.
+- `PageHeaderProvider.tsx`: the responsive title and action bar. The redundant theme-only explanations were removed in the dashboard UX audit.
 - `sidebar-sections.ts`: plain-English destination descriptions. No routes removed.
 - Vitest coverage for schedule explanations, page guides and protected route behavior.
 

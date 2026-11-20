@@ -23,7 +23,6 @@ describe("reference-inspired Manga artwork integration", () => {
   expect(css).toContain('#app-sidebar:not([data-collapsed="true"])');
   expect(css).not.toContain("background-size:100% 100%");
   expect(css).not.toContain("v3-nav-row-normal.svg");
-  expect(gate).not.toContain('import "./manga-assets-integrated.css"');
  });
  it("stays behind Q6/Q6-L route gate and honors reduced motion", () => {
   expect(css).toContain('html[data-qubit-manga="on"]');

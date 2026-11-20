@@ -141,7 +141,6 @@ html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__colophon {
   font-size: .63rem;
   letter-spacing: .08em;
 }
-html[data-qubit-manga="on"] header[role="banner"],
 html[data-qubit-manga="on"] .qchat__header {
   position: relative;
   border-top: 3px solid var(--qm-magenta)!important;
@@ -150,7 +149,6 @@ html[data-qubit-manga="on"] .qchat__header {
     linear-gradient(120deg,rgba(255,38,154,.24),transparent 42%),
     linear-gradient(95deg,#200c30,#0b071b 80%)!important;
 }
-html[data-qubit-manga="on"] header[role="banner"]::after,
 html[data-qubit-manga="on"] .qchat__header::after {
   position: absolute;
   content: "";
@@ -162,7 +160,6 @@ html[data-qubit-manga="on"] .qchat__header::after {
   clip-path: polygon(8px 0,100% 0,100% 100%,0 100%);
   pointer-events: none;
 }
-html[data-qubit-manga="on"] header[role="banner"] h1,
 html[data-qubit-manga="on"] #qubit-main-content h1,
 html[data-qubit-manga="on"] #qubit-main-content h2 {
   font-family: var(--qm-display)!important;
@@ -347,7 +344,6 @@ html[data-qubit-manga="on"] .qm-select-chevron--open {transform:rotate(180deg)}
   html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"]::after {display:none}
 }
 @media(max-width:720px) {
-  html[data-qubit-manga="on"] header[role="banner"]::after,
   html[data-qubit-manga="on"] .qchat__header::after {width:45px;right:12px}
   html[data-qubit-manga="on"] .qchat__composer {padding:8px}
   html[data-qubit-manga="on"] .settings-section__heading {font-size:.75rem}

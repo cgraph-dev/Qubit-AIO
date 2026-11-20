@@ -51,7 +51,6 @@ describe("manga skin stylesheet", () => {
       "#app-sidebar",
       ".qagent-sidebar__section-head",
       ".qagent-sidebar__link[aria-current=\"page\"]",
-      'header[role="banner"]',
       ".settings-section__heading",
       ".settings-group",
       ".settings-row",

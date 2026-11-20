@@ -4,11 +4,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/sakuga/ui", () => ({
-  Button: ({ children, variant: _variant, fx: _fx, ...props }: {
+  Button: ({ children, variant, ...props }: {
     children?: React.ReactNode;
-    variant?: string;fx?: unknown;
+    variant?: string;
     [key: string]: unknown;
-  }) => <button {...props}>{children}</button>,
+  }) => <button data-variant={variant} {...props}>{children}</button>,
 }));
 vi.mock("@/hooks/useModalBehavior", () => ({
   useModalBehavior: () => ({ current: null }),
@@ -27,7 +27,6 @@ beforeEach(() => {
 afterEach(async () => {
  await act(async () => {root.unmount();});
  host.remove();
- document.querySelector('[role="dialog"]')?.remove();
 });
 
 describe("unified Manga confirmation dialog", () => {
@@ -45,7 +44,8 @@ describe("unified Manga confirmation dialog", () => {
     confirmLabel="Restart Gateway" onCancel={onCancel} onConfirm={onConfirm}/>,
   ));
   const dialog=document.querySelector('[role="dialog"]')!;
-  expect(dialog).not.toBeNull();
+  expect(dialog.matches(".qm-confirm-dialog")).toBe(true);
+  expect(dialog.parentElement?.matches("[data-confirm-backdrop]:not([role])")).toBe(true);
   expect(dialog.getAttribute("aria-modal")).toBe("true");
   expect(dialog.querySelector(".qm-confirm-dialog__title")?.textContent).toContain("Restart gateway?");
   expect(dialog.querySelector(".qm-confirm-dialog__description")?.textContent).toContain("reconnect");

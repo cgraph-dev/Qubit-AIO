@@ -123,7 +123,6 @@ html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-si
   width:19px;height:19px;left:7px;top:50%;transform:translateY(-50%);animation:none;
   background:url("/manga-ui/neon-bolt-nut.svg") center/contain no-repeat!important;
 }
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system .qagent-sidebar__section-head::after {display:none!important}
 html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__telemetry-key {
   color:#ffe529!important;font-weight:700!important;letter-spacing:.085em;
 }

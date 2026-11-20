@@ -1,9 +1,26 @@
 import { useEffect, useRef } from "react";
 import { firstFocusable, trapTabKey } from "@/lib/focus-trap";
 
+type ModalLayer = { focus: () => void; element: HTMLDivElement };
+const layers: ModalLayer[] = [];
+let scrollLock: { overflow: string; opener: HTMLElement | null } | null = null;
+
+function lockDocument(opener: HTMLElement | null) {
+  scrollLock = { overflow: document.body.style.overflow, opener };
+  document.body.style.overflow = "hidden";
+}
+
+function unlockDocument() {
+  const lock = scrollLock;
+  if (!lock) return;
+  scrollLock = null;
+  document.body.style.overflow = lock.overflow;
+  if (lock.opener?.isConnected) lock.opener.focus();
+}
+
 /**
  * Hook that adds standard modal behaviors when `open` is true:
- * - Escape key calls `onClose`
+ * - Only the top dialog handles Escape and focus, including nested portals
  * - Body scroll is locked
  * - Tab / Shift+Tab are trapped inside the dialog
  * - Focus moves into the dialog on open and is restored on close
@@ -34,51 +51,52 @@ export function useModalBehavior({
     if (!open) return;
 
     const container = containerRef.current;
-    const prevActive = document.activeElement as HTMLElement | null;
-    const alreadyInside = Boolean(
-      container && prevActive && container.contains(prevActive),
-    );
-
-    if (!alreadyInside) {
-      const preferred = initialFocusSelector
-        ? container?.querySelector<HTMLElement>(initialFocusSelector)
-        : null;
-      (preferred ?? firstFocusable(container))?.focus?.();
-    }
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      trapTabKey(container, e);
+    if (!container) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const layer: ModalLayer = {
+      element: container,
+      focus: () => {
+        const preferred = initialFocusSelector
+          ? container.querySelector<HTMLElement>(initialFocusSelector)
+          : null;
+        (preferred ?? firstFocusable(container))?.focus();
+      },
     };
+    const isTop = () => layers.at(-1) === layer;
+    if (layers.length === 0) lockDocument(previousFocus);
+    layers.push(layer);
+    if (!container.contains(previousFocus)) layer.focus();
 
-    // A pointer click on the backdrop or a programmatic focus move outside
-    // the dialog must not leave a keyboard user stranded behind it.
-    const onFocusIn = (e: FocusEvent) => {
-      if (!container) return;
-      const target = e.target as Node | null;
-      if (target && !container.contains(target)) {
-        if (initialFocusSelector) {
-          container.querySelector<HTMLElement>(initialFocusSelector)?.focus();
-        } else {
-          firstFocusable(container)?.focus();
-        }
+    const onKey = (event: KeyboardEvent) => {
+      if (!isTop() || event.defaultPrevented) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+      } else {
+        trapTabKey(container, event);
+      }
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      if (isTop() && !container.contains(event.target as Node | null)) {
+        layer.focus();
       }
     };
 
     document.addEventListener("keydown", onKey);
     document.addEventListener("focusin", onFocusIn);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("focusin", onFocusIn);
-      document.body.style.overflow = prevOverflow;
-      prevActive?.focus?.();
+      const wasTop = isTop();
+      layers.splice(layers.indexOf(layer), 1);
+
+      const remaining = layers.at(-1);
+      if (!remaining) {
+        unlockDocument();
+      } else if (wasTop) {
+        if (remaining.element.contains(previousFocus)) previousFocus?.focus?.();
+        else remaining.focus();
+      }
     };
   }, [open, initialFocusSelector]);
 

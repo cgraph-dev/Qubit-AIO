@@ -368,11 +368,6 @@ html[data-qubit-manga="on"] :is([role="menuitem"],[role="option"]):is(:hover,[da
   background:rgba(255,229,0,.2)!important;
   color:#fff4ff!important;
 }
-html[data-qubit-manga="on"] :is([role="dialog"],[role="alertdialog"]) {
-  max-width:min(94vw,800px);
-  border:2px solid #fff0ff!important;
-  box-shadow:4px 4px 0 #080411,7px 7px 0 #ff269a!important;
-}
 html[data-qubit-manga="on"] :is([role="tooltip"],.qagent-sidebar__tooltip) {
   border:2px solid #f8ebff!important;
   border-radius:3px!important;

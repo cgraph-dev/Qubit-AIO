@@ -377,3 +377,71 @@ html:root[data-qubit-manga="on"] #qubit-main-content .qm-bot-page .qb-send-btn::
 html:root[data-qubit-manga="on"] #qubit-main-content .qm-bot-page .qb-composer:focus-within {
   border-color:#ffb5e9!important;
 }
+
+
+/* The route header has one titleplate. The same bar can grow to fit a
+   second toolbar row rather than cutting it off below a fixed height. */
+html[data-qubit-manga="on"] [data-dashboard-page-header] {
+  border-color:var(--qm-magenta);
+  background:linear-gradient(100deg,#251232,#0b081a 72%);
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1 {
+  position:relative;
+  width:fit-content;
+  padding:7px 39px 7px 20px;
+  border:1px solid #f875c6;
+  border-left:3px solid #ffe56f;
+  background:linear-gradient(112deg,#cf237e,#6b205b 76%,#271331);
+  color:#fff9ff;
+  font:800 1rem/1.3 var(--qm-content-font);
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::before,
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::before {
+  top:-6px;
+  left:-7px;
+  width:21px;
+  height:21px;
+  background:url("/manga-ui/manga-impact-star.svg") center / contain no-repeat;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] h1::after {
+  top:50%;
+  right:8px;
+  width:24px;
+  height:15px;
+  transform:translateY(-50%);
+  background:url("/manga-ui/manga-reference-three-strokes.svg") center / contain no-repeat;
+}
+
+/* Some older dialogs put their accessible role on a full-screen scrim.
+   Style its direct panel, not the scrim. Confirmation and model-picker
+   surfaces already own their chrome. */
+html:root[data-qubit-manga="on"] :is(
+  :is([role="dialog"],[role="alertdialog"]):not(.fixed.inset-0),
+  :is([role="dialog"],[role="alertdialog"]).fixed.inset-0 > :first-child
+):not(.qm-confirm-dialog,.qmodel-picker) {
+  min-width:0;
+  max-width:min(100%,calc(100vw - 24px));
+  border:2px solid var(--qm-magenta)!important;
+  background-color:var(--qm-panel)!important;
+  box-shadow:0 10px 24px #070411a6!important;
+}
+html:root[data-qubit-manga="on"] .qm-confirm-dialog {
+  overflow-y:auto!important;
+  box-shadow:0 10px 24px #070411a6!important;
+}
+html:root[data-qubit-manga="on"] .qm-confirm-dialog::before,
+html:root[data-qubit-manga="on"] .qm-confirm-dialog::after {
+  content:none!important;
+}
+html:root[data-qubit-manga="on"] .qm-confirm-dialog__actions > sakuga-button {
+  border:0!important;
+  background:none!important;
+  box-shadow:none!important;
+}

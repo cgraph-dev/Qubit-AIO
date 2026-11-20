@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { useLocation } from "react-router";
 import { emitFxAt } from "@/sakuga/ui";
+import { isTerminalChatPath } from "@/lib/chat-routes";
 import {
   applyMangaAttribute,
   currentMangaEnabled,
@@ -56,18 +57,17 @@ function useMangaPreference(): boolean {
  */
 export function MangaSkinGate(): null {
   const { pathname } = useLocation();
-  const enabled = useMangaPreference();
+  const active = useMangaPreference() && mangaRouteEligible(pathname);
 
   // Layout effect: the marker must be gone before the excluded surface paints.
   useLayoutEffect(() => {
-    applyMangaAttribute(enabled && mangaRouteEligible(pathname));
-  }, [enabled, pathname]);
+    applyMangaAttribute(active);
+  }, [active]);
 
   // Enable the optional ZIP asset layer only when all original assets have
   // actually been installed. Missing files must never blank existing UI.
   useEffect(() => {
     const root = document.documentElement;
-    const active = enabled && mangaRouteEligible(pathname);
     if (!active) {
       delete root.dataset.qubitMangaZip;
       return;
@@ -92,14 +92,13 @@ export function MangaSkinGate(): null {
       controller.abort();
       delete root.dataset.qubitMangaZip;
     };
-  }, [enabled, pathname]);
+  }, [active]);
 
   // The approved production art is a separate, checksum-verified install.
   // Only activate it when every required asset was installed: no broken
   // backgrounds or silently mixed prototypes on first load.
   useEffect(() => {
     const root = document.documentElement;
-    const active = enabled && mangaRouteEligible(pathname);
     delete root.dataset.qmApprovedAssets;
     if (!active) return;
     const controller = new AbortController();
@@ -143,7 +142,7 @@ export function MangaSkinGate(): null {
       controller.abort();
       delete root.dataset.qmApprovedAssets;
     };
-  }, [enabled, pathname]);
+  }, [active]);
 
   // One page-visibility listener governs all slow CSS reflection loops.
   // Animation is also turned off for prefers-reduced-motion in CSS.
@@ -164,7 +163,7 @@ export function MangaSkinGate(): null {
   // components already animate themselves; do not emit a second effect there.
   // One cue per 280ms, only when the user explicitly clicks an enabled action.
   useEffect(() => {
-    if (!enabled || !mangaRouteEligible(pathname) || pathname === "/chat") return;
+    if (!active || isTerminalChatPath(pathname)) return;
     let lastCue = 0;
     const onAction = (event: MouseEvent) => {
       if (document.hidden ||
@@ -187,7 +186,7 @@ export function MangaSkinGate(): null {
     };
     document.addEventListener("click", onAction, true);
     return () => document.removeEventListener("click", onAction, true);
-  }, [enabled, pathname]);
+  }, [active, pathname]);
 
   useEffect(() => () => {
     applyMangaAttribute(false);
