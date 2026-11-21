@@ -1608,7 +1608,7 @@ export default function ModelsPage() {
     // the far-right `end` slot. The active period is conveyed by the
     // filled (non-outlined) button — no redundant period badge.
     setAfterTitle(
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="qm-header-periods flex flex-wrap items-center gap-1.5">
         {PERIODS.map((p) => (
           <Button
             key={p.label}

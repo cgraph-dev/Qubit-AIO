@@ -1183,7 +1183,7 @@ export default function SessionsPage() {
       return;
     }
     setAfterTitle(
-      <Badge tone="secondary" className="text-xs tabular-nums">
+      <Badge tone="secondary" className="qm-session-count text-xs tabular-nums">
         {total}
       </Badge>,
     );
