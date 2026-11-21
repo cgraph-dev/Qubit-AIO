@@ -49,20 +49,21 @@ html:root[data-qubit-manga="on"] body > .manga-rail-tooltip > .manga-rail-toolti
   min-height: 29px !important;
   margin: 4px 0 0 22px !important;
   padding: 0 3px !important;
-  color: #fff6ff !important;
-  font: 700 9px/1.1 var(--theme-font-display, "Rajdhani", system-ui, sans-serif) !important;
-  letter-spacing: 0.015em !important;
-  line-height: 1.1 !important;
+  color: #ffe500 !important;
+  font: 800 11px/1.12 var(--theme-font-display, "Rajdhani", system-ui, sans-serif) !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.12 !important;
   text-align: center !important;
   text-transform: uppercase !important;
   text-wrap: balance !important;
   white-space: normal !important;
   overflow-wrap: anywhere !important;
   text-shadow:
-    0 1px 0 #120318,
-    0 0 2px #120318,
+    0 1px 0 #080615,
+    0 2px 0 #080615,
+    0 0 2px #080615,
     0 1px 3px rgba(4, 0, 10, 0.95),
-    0 2px 6px rgba(0, 0, 0, 0.72) !important;
+    0 2px 6px rgba(0, 0, 0, 0.8) !important;
 }
 
 /* Body starts below the title and stays clear of the three corner
@@ -73,8 +74,8 @@ html:root[data-qubit-manga="on"] body > .manga-rail-tooltip > .manga-rail-toolti
   box-sizing: border-box !important;
   margin: 7px 70px 0 30px !important;
   padding: 0 !important;
-  color: #ffeaf7 !important;
-  font: 600 10.5px/1.32 var(--theme-font-sans, system-ui, sans-serif) !important;
+  color: #fff6ff !important;
+  font: 600 12.5px/1.38 var(--theme-font-sans, system-ui, sans-serif) !important;
   letter-spacing: 0.005em !important;
   text-align: start !important;
   white-space: normal !important;

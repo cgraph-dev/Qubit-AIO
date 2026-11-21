@@ -38,6 +38,14 @@ describe("Manga sidebar menu tooltip", () => {
     expect(body).toMatch(/text-shadow:[^;]*0 1px 3px/);
   });
 
+  it("keeps the title yellow and both faces legible inside the plate", () => {
+    const title = css.slice(css.indexOf(".manga-rail-tooltip__title"));
+    const body = css.slice(css.indexOf(".manga-rail-tooltip__body"));
+    expect(title).toMatch(/color: #ffe500/);
+    expect(title).toMatch(/font: 800 11px\/1\.12/);
+    expect(body).toMatch(/font: 600 12\.5px\/1\.38/);
+  });
+
   it("fires the Sakuga open cue from the trigger once, skipping warm/reduced motion", () => {
     expect(tip).toContain('playLocalFx("pop", trigger');
     expect(tip).toContain("fxRef");
