@@ -1,5 +1,5 @@
-/* Final Manga treatment for the Skills toggles and the two system actions.
-   Loaded after every other Manga sheet so these are the last overrides. */
+/* Final Manga treatment for the Skills toggles.
+   Loaded after every other Manga sheet so this is the last override. */
 
 /* Skills rows: the upstream 108x54 toggle is too wide for the skills row.
    Keep the control's art and mechanics, shrink it to 76x38, and let the
@@ -14,101 +14,10 @@ html[data-qubit-manga="on"] .qm-skill-row sakuga-toggle {
   overflow: visible !important;
 }
 
-/* The two system actions share one manga control language. No looping glow,
-   no pulsing plate: a single hover lift and a press travel. */
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action,
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action::part(button),
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .q5t-primary,
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .q5t-primary__plate {
-  animation: none !important;
-}
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action::part(button) {
-  border-radius: 3px !important;
-  border: 2px solid #080615 !important;
-  box-shadow: 3px 3px 0 #080615 !important;
-  font-family: var(--qm-display, "Bangers", system-ui, sans-serif) !important;
-  font-style: italic !important;
-  letter-spacing: .045em !important;
-  text-transform: uppercase !important;
-  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease !important;
-}
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action:hover:not([disabled])::part(button) {
-  transform: translate(-1px, -1px) !important;
-  filter: saturate(1.16) brightness(1.06) !important;
-  box-shadow: 4px 4px 0 #080615 !important;
-}
-html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action:active:not([disabled])::part(button) {
-  transform: translate(1px, 1px) !important;
-  box-shadow: 1px 1px 0 #080615 !important;
-}
-
-/* Expanded rail: Restart keeps the owner's Q5T plate; Update gets the same
-   approved primary plate and proportions instead of a second bare rectangle. */
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) [data-system-action="restart"] .q5t-primary {
-  width: 100% !important;
-  min-height: 56px !important;
-}
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) [data-system-action="update"] .qagent-sidebar__action {
-  display: block !important;
-  width: 100% !important;
-  min-height: 56px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  background: none !important;
-  box-shadow: none !important;
-}
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) [data-system-action="update"] .qagent-sidebar__action::part(button) {
-  width: 100% !important;
-  min-height: 56px !important;
-  padding: 10px 8px !important;
-  color: #fff8ff !important;
-  background: url("/manga-ui/approved/06_primary_button.webp") center / 100% 100% no-repeat,
-    linear-gradient(180deg, #50112f, #210c17) !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  text-shadow: 0 1px 2px #080410, 0 0 4px #ff3ca8 !important;
-  font-size: 12px !important;
-  line-height: 1.1 !important;
-}
-html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) [data-system-action="update"] .qagent-sidebar__action[disabled]::part(button) {
-  color: #d6bfd0 !important;
-  background-image: url("/manga-ui/approved/07_disabled_button.webp") !important;
-  opacity: .8 !important;
-  filter: saturate(.45) !important;
-}
-
-/* Collapsed rail: two compact ink plates, Restart yellow and Update violet,
-   each with the same black offset edge as the rest of the skin. */
-html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] [data-system-action] .qagent-sidebar__action {
-  background: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] [data-system-action="restart"] .qagent-sidebar__action::part(button) {
-  color: #17070f !important;
-  background: #ffe500 !important;
-  border-color: #080615 !important;
-  box-shadow: 3px 3px 0 #080615 !important;
-}
-html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] [data-system-action="update"] .qagent-sidebar__action::part(button) {
-  color: #fff4ff !important;
-  background: linear-gradient(180deg, #6a278c, #2a0d3d) !important;
-  border-color: #080615 !important;
-  box-shadow: 3px 3px 0 #080615 !important;
-}
-html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] [data-system-action] .qagent-sidebar__action[disabled]::part(button) {
-  color: #8f7a8d !important;
-  background: #2a1b30 !important;
-  opacity: .8 !important;
-  filter: saturate(.35) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action::part(button) {
-    transition: none !important;
-  }
-  html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action:hover:not([disabled])::part(button),
-  html[data-qubit-manga="on"] #app-sidebar [data-system-action] .qagent-sidebar__action:active:not([disabled])::part(button) {
-    transform: none !important;
-  }
-}
+/* The two system actions (Restart Gateway, Update Qubit) are owned by
+   components/qm-system-action/qm-system-action.css, which paints the
+   owner-supplied plate and the 40x40 compact cut. The former
+   .qagent-sidebar__action / .q5t-primary overrides that used to live here
+   fought that artwork (forced min-heights, plate backgrounds, per-action
+   colours), so they are removed rather than layered. Classic themes render
+   the untouched SystemActionButton and never match either sheet. */

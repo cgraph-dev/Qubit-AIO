@@ -82,8 +82,8 @@ import { QubitSidebarTitle } from "@/components/QubitSidebarTitle";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarFrame } from "@/components/SidebarFrame";
 import { ImportantTooltip } from "@/components/ImportantTooltip";
+import { QmSystemActionButton } from "@/components/qm-system-action/QmSystemActionButton";
 import { Q5TGatewayFrame } from "@/components/Q5TGatewayFrame";
-import { Q5TPrimaryButton } from "@/components/Q5TPrimaryButton";
 import { Q5TSystemTitle } from "@/components/Q5TSystemTitle";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
@@ -1757,16 +1757,30 @@ function SidebarSystemActions({
   const q5t = manga && !collapsed;
   const gatewaySummary = status ? gatewayLine(status, t) : null;
   const stripLabel = (value: string) => value.replace(/[:：]\s*$/, "");
-  const restartItem = items.find((item) => item.action === "restart");
-  const updateItem = items.find((item) => item.action === "update");
-  const restartPending = pendingAction === "restart";
-  const restartRunning = activeAction === "restart" && isRunning && !restartPending;
-  const restartDisabled = !restartItem || !!restartItem.disabledReason || (
-    isBusy && !(restartPending || (activeAction === "restart" && isRunning))
-  );
-  const restartLabel = restartRunning
-    ? (restartItem?.runningLabel ?? t.status.restartingGateway)
-    : (restartItem?.label ?? t.status.restartGateway);
+
+  const renderQmAction = (item: SystemActionItem) => {
+    const pending = pendingAction === item.action;
+    const running = activeAction === item.action && isRunning && !pending;
+    const disabled =
+      !!item.disabledReason ||
+      (isBusy && !(pending || (activeAction === item.action && isRunning)));
+    return (
+      <QmSystemActionButton
+        key={item.action}
+        action={item.action}
+        collapsed={collapsed}
+        disabled={disabled}
+        isPending={pending}
+        isRunning={running}
+        label={item.label}
+        runningLabel={item.runningLabel}
+        spin={item.spin}
+        disabledReason={item.disabledReason}
+        onClick={() => handleClick(item.action)}
+        tooltipWarmRef={tooltipWarmRef}
+      />
+    );
+  };
 
   const handleClick = (action: SystemAction) => {
     if (isBusy) return;
@@ -1830,35 +1844,16 @@ function SidebarSystemActions({
 
       {!q5t && <GatewayDot collapsed={collapsed} status={status} tooltipWarmRef={tooltipWarmRef} />}
 
-      {q5t ? (
-        <ul className="q5t-system-actions flex flex-row items-stretch gap-2">
-          {restartItem && (
-            <li className="min-w-0 flex-1" data-system-action="restart">
-              <Q5TPrimaryButton
-                className="q5t-system-primary"
-                disabled={restartDisabled}
-                aria-busy={restartPending || restartRunning}
-                aria-label={restartLabel}
-                onClick={() => handleClick("restart")}
-              >
-                {restartLabel}
-              </Q5TPrimaryButton>
-            </li>
+      {manga ? (
+        <ul
+          className={cn(
+            "qm-manga-system-actions",
+            collapsed
+              ? "qm-manga-system-actions--collapsed flex flex-col gap-2"
+              : "flex flex-row items-stretch gap-2",
           )}
-          {updateItem && (
-            <SystemActionButton
-              collapsed={false}
-              disabled={
-                !!updateItem.disabledReason ||
-                (isBusy && !(pendingAction === "update" || (activeAction === "update" && isRunning)))
-              }
-              tooltipWarmRef={tooltipWarmRef}
-              isPending={pendingAction === "update"}
-              isRunning={activeAction === "update" && isRunning && pendingAction !== "update"}
-              item={updateItem}
-              onClick={() => handleClick("update")}
-            />
-          )}
+        >
+          {items.map(renderQmAction)}
         </ul>
       ) : (
         <ul className="flex flex-row gap-2">
