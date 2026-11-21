@@ -190,5 +190,32 @@ html[data-qubit-manga="on"] [data-qm-form-panel] > header { padding-inline-end: 
 }
 html[data-qubit-manga="on"] :is(.qm-utility-picker__body, .qm-panel-scroll, .qm-select-popover__options) {
   scrollbar-width: thin;
-  scrollbar-color: #cc83ba transparent;
+  scrollbar-color: #ffe500 #2a1740;
+}
+html[data-qubit-manga="on"] :is(.qm-utility-picker__body, .qm-select-popover__options)::-webkit-scrollbar {
+  width: 8px;
+}
+html[data-qubit-manga="on"] :is(.qm-utility-picker__body, .qm-select-popover__options)::-webkit-scrollbar-track {
+  background: #2a1740;
+}
+html[data-qubit-manga="on"] :is(.qm-utility-picker__body, .qm-select-popover__options)::-webkit-scrollbar-thumb {
+  background: #ffe500;
+  border: 2px solid #2a1740;
+}
+.qm-utility-picker__filter {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 34px;
+  margin: 6px 0 2px;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, currentColor 36%, transparent);
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.qm-utility-picker__filter:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
 }

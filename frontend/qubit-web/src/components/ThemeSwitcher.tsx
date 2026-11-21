@@ -1,6 +1,8 @@
 import { FxButton } from "@/sakuga/FxButton";
 import { useId, useRef, useState } from "react";
 import { UtilityPickerPanel } from "@/manga-skin/UtilityPickerPanel";
+import { PickerRow } from "@/manga-skin/PickerPanel";
+import { useMangaLayerActive } from "@/manga-skin/useMangaLayerActive";
 import { Palette, Check, Type } from "lucide-react";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { BUILTIN_THEMES, THEME_DEFAULT_FONT_ID, useTheme } from "@/themes";
@@ -64,11 +66,28 @@ export function ThemeSwitcher({ collapsed = false }: ThemeSwitcherProps) {
       </FxButton>
 
       {open && (
-        <UtilityPickerPanel id={pickerId} title={pickerTitle} closeLabel={t.common.close} anchor={wrapperRef} onClose={close}>
-          <div role="group" aria-label={pickerTitle}>
-            <ThemeSwitcherOptions availableThemes={availableThemes} close={close} setTheme={setTheme} themeName={themeName} />
-          </div>
-          <FontSection fontChoices={fontChoices} fontId={fontId} setFont={setFont} />
+        <UtilityPickerPanel
+          id={pickerId}
+          title={pickerTitle}
+          closeLabel={t.common.close}
+          anchor={wrapperRef}
+          onClose={close}
+          filterLabel={`Filter ${pickerTitle}`}
+        >
+          {(filter) => (
+            <>
+              <div role="group" aria-label={pickerTitle}>
+                <ThemeSwitcherOptions
+                  availableThemes={availableThemes}
+                  close={close}
+                  setTheme={setTheme}
+                  themeName={themeName}
+                  filter={filter}
+                />
+              </div>
+              <FontSection fontChoices={fontChoices} fontId={fontId} setFont={setFont} filter={filter} />
+            </>
+          )}
         </UtilityPickerPanel>
       )}
     </div>
@@ -80,21 +99,31 @@ function ThemeSwitcherOptions({
   close,
   setTheme,
   themeName,
+  filter,
 }: ThemeSwitcherOptionsProps) {
+  const manga = useMangaLayerActive();
+  const needle = filter.trim().toLocaleLowerCase();
+  const shown = needle
+    ? availableThemes.filter((th) =>
+        [th.label, th.description ?? "", th.name]
+          .some((value) => value.toLocaleLowerCase().includes(needle)),
+      )
+    : availableThemes;
+  if (shown.length === 0) {
+    return <div className="qm-select-empty" role="status">No matching themes</div>;
+  }
   return (
     <>
-      {availableThemes.map((th) => {
+      {shown.map((th) => {
         const isActive = th.name === themeName;
         const paletteTheme = Object.hasOwn(BUILTIN_THEMES, th.name) ? BUILTIN_THEMES[th.name] : th.definition;
         const mangaRow = isMangaThemeName(th.name);
 
         return (
-          <FxButton type="button"
-            aria-pressed={isActive}
-            data-qm-picker-choice=""
-            className="qm-picker-choice"
+          <PickerRow
+            selected={isActive}
             key={th.name}
-            onClick={() => {
+            onSelect={() => {
               setTheme(th.name);
               close();
             }}
@@ -130,15 +159,15 @@ function ThemeSwitcherOptions({
                   isActive && "qm-theme-row__lamp--on",
                 )}
               />
-            ) : (
+            ) : !manga ? (
               <Check
                 className={cn(
                   "h-3 w-3 shrink-0 text-midground",
                   isActive ? "opacity-100" : "opacity-0",
                 )}
               />
-            )}
-          </FxButton>
+            ) : null}
+          </PickerRow>
         );
       })}
     </>
@@ -154,12 +183,22 @@ const FONT_CATEGORY_LABEL_KEY: Record<FontChoice["category"], "fontSans" | "font
 /** Font-override section rendered below the theme list. Lets the user pick
  *  any catalog font independently of the active theme, or "Theme default"
  *  to clear the override. Rows show the catalog names without fetching every webfont. */
-function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
+function FontSection({ fontChoices, fontId, setFont, filter }: FontSectionProps) {
   const { t } = useI18n();
+  const manga = useMangaLayerActive();
+  const needle = filter.trim().toLocaleLowerCase();
   const order: FontChoice["category"][] = ["sans", "serif", "mono"];
+  const defaultLabel = t.theme?.fontDefault ?? "Theme default";
+  const defaultHint = t.theme?.fontDefaultHint ?? "Use the active theme's font";
+  const showDefault = !needle || `${defaultLabel} ${defaultHint}`.toLocaleLowerCase().includes(needle);
+  const matches = (label: string) => !needle || label.toLocaleLowerCase().includes(needle);
+  const groups = order
+    .map((cat) => ({ cat, fonts: fontChoices.filter((f) => f.category === cat && matches(f.label)) }))
+    .filter((group) => group.fonts.length > 0);
+  if (!showDefault && groups.length === 0) return null;
   return (
     <>
-      <div className="mt-1 border-t border-current/20 px-3 pb-1 pt-2">
+      <div role="presentation" className="mt-1 border-t border-current/20 px-3 pb-1 pt-2">
         <span className="inline-flex items-center gap-1.5">
           <Type className="h-3 w-3 text-text-tertiary" />
           <Typography
@@ -170,36 +209,36 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
         </span>
       </div>
 
-      {/* Theme-default (clears the override). */}
-      <FxButton type="button"
-        aria-pressed={fontId === THEME_DEFAULT_FONT_ID}
-        className="qm-picker-choice"
-        onClick={() => setFont(THEME_DEFAULT_FONT_ID)}
-      >
-        <span aria-hidden className="h-4 w-9 shrink-0" />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <Typography className="break-words text-xs tracking-normal">
-            {t.theme?.fontDefault ?? "Theme default"}
-          </Typography>
-          <Typography className="break-words text-xs leading-normal tracking-normal text-text-tertiary">
-            {t.theme?.fontDefaultHint ?? "Use the active theme's font"}
-          </Typography>
-        </div>
-        <Check
-          className={cn(
-            "h-3 w-3 shrink-0 text-midground",
-            fontId === THEME_DEFAULT_FONT_ID ? "opacity-100" : "opacity-0",
+      {showDefault && (
+        <PickerRow
+          selected={fontId === THEME_DEFAULT_FONT_ID}
+          onSelect={() => setFont(THEME_DEFAULT_FONT_ID)}
+        >
+          <span aria-hidden className="h-4 w-9 shrink-0" />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <Typography className="break-words text-xs tracking-normal">
+              {defaultLabel}
+            </Typography>
+            <Typography className="break-words text-xs leading-normal tracking-normal text-text-tertiary">
+              {defaultHint}
+            </Typography>
+          </div>
+          {!manga && (
+            <Check
+              className={cn(
+                "h-3 w-3 shrink-0 text-midground",
+                fontId === THEME_DEFAULT_FONT_ID ? "opacity-100" : "opacity-0",
+              )}
+            />
           )}
-        />
-      </FxButton>
+        </PickerRow>
+      )}
 
-      {order.map((cat) => {
-        const fonts = fontChoices.filter((f) => f.category === cat);
-        if (fonts.length === 0) return null;
+      {groups.map(({ cat, fonts }) => {
         const catLabel = t.theme?.[FONT_CATEGORY_LABEL_KEY[cat]] ?? cat;
         return (
-          <div key={cat}>
-            <div className="px-3 pb-0.5 pt-1.5">
+          <div key={cat} role="presentation">
+            <div role="presentation" className="px-3 pb-0.5 pt-1.5">
               <Typography className="text-[0.65rem] uppercase tracking-[0.1em] text-text-tertiary">
                 {catLabel}
               </Typography>
@@ -207,11 +246,10 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
             {fonts.map((f) => {
               const isActive = f.id === fontId;
               return (
-                <FxButton type="button"
-                  aria-pressed={isActive}
-                  className="qm-picker-choice"
+                <PickerRow
+                  selected={isActive}
                   key={f.id}
-                  onClick={() => setFont(f.id)}
+                  onSelect={() => setFont(f.id)}
                 >
                   <span aria-hidden className="h-4 w-9 shrink-0" />
                   <div className="flex min-w-0 flex-1 flex-col">
@@ -221,13 +259,15 @@ function FontSection({ fontChoices, fontId, setFont }: FontSectionProps) {
                       {f.label}
                     </span>
                   </div>
-                  <Check
-                    className={cn(
-                      "h-3 w-3 shrink-0 text-midground",
-                      isActive ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                </FxButton>
+                  {!manga && (
+                    <Check
+                      className={cn(
+                        "h-3 w-3 shrink-0 text-midground",
+                        isActive ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                  )}
+                </PickerRow>
               );
             })}
           </div>
@@ -263,12 +303,14 @@ interface ThemeSwitcherOptionsProps {
   close: () => void;
   setTheme: (name: string) => void;
   themeName: string;
+  filter: string;
 }
 
 interface FontSectionProps {
   fontChoices: FontChoice[];
   fontId: string;
   setFont: (id: string) => void;
+  filter: string;
 }
 
 interface ThemeSwitcherProps {
