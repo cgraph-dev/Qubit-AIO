@@ -1,0 +1,80 @@
+/* /webhooks subscription rows.
+ *
+ * Long, hyphenated values (`hmac-freshness-replay-store`) and event names
+ * (`task.completed`) are rendered as Badge spans whose upstream base style is
+ * `leading-none` with wide tracking. Inside the Manga shell that combination
+ * clips descenders and forces a single unbreakable line, so a row with several
+ * badges overflowed and the paired icon buttons were pushed out of the card.
+ *
+ * The layout fix is theme-neutral: the row stacks on narrow widths, badges
+ * wrap their own text, and the URL wraps instead of being truncated. Only the
+ * visual size of the Sakuga icon buttons is scoped to Manga, where the
+ * generous shadow-DOM padding made them oversized and clip the offset shadow.
+ */
+
+.qm-webhooks-page {
+  min-width: 0;
+}
+
+.qm-webhooks-page .qm-webhook-badge {
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  min-height: 0;
+  max-width: 100%;
+  padding-block: 0.2rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+}
+
+.qm-webhooks-page .qm-webhook-actions {
+  min-width: 0;
+}
+
+.qm-webhooks-page .qm-webhook-actions > * {
+  flex: 0 0 auto;
+}
+
+.qm-webhooks-page sakuga-button.qm-webhook-icon-btn {
+  flex: 0 0 auto;
+}
+
+html[data-qubit-manga="on"] .qm-webhooks-page sakuga-button.qm-webhook-icon-btn::part(button) {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+html[data-qubit-manga="on"] .qm-webhooks-page sakuga-button.qm-webhook-icon-btn > svg {
+  width: 16px;
+  height: 16px;
+}
+
+html[data-qubit-manga="on"] .qm-webhooks-page sakuga-button.qm-webhook-toggle::part(button) {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+html[data-qubit-manga="on"] .qm-webhooks-page sakuga-button.qm-webhook-toggle {
+  max-width: 100%;
+}
