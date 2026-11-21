@@ -1,0 +1,58 @@
+{
+  "01_sidebar_header.webp": {
+    "sha256": "ba87fa00faa918a29fbf096ec1c45e21166fd7145bf89db70fb95cde982894d0",
+    "bytes": 254844
+  },
+  "02_system_panel_frame.webp": {
+    "sha256": "a57d306b29532d8944f60533fbbf6ce2f7c104e65e745a4a1d115213f31417f5",
+    "bytes": 143852
+  },
+  "03_system_titlebar.webp": {
+    "sha256": "529aa2ce05feb19be05b65f1468c562c8ca051ee1deb4f6388570980fe481798",
+    "bytes": 71002
+  },
+  "04_tooltip_plate.webp": {
+    "sha256": "f987dac90a1f353a98e52cc0c6364429b911f50ecd4735dce121079a90c35f5f",
+    "bytes": 316528
+  },
+  "05_section_titlebar_starless.webp": {
+    "sha256": "86b4c8a7925e0f66405df16a7e5656bc19f6bab0f99cc0b46492f608ff1f1e3d",
+    "bytes": 564472
+  },
+  "06_primary_button.webp": {
+    "sha256": "3b0e2f0cfce4ee041373ac3003cf9be64ecb78610c6505194ef68ba51b1bc02e",
+    "bytes": 48744
+  },
+  "07_disabled_button.webp": {
+    "sha256": "0f38c101ea04cd307c7b91826438f2f11a405ee4c4a7075d6ad56707796cd52e",
+    "bytes": 43388
+  },
+  "08_checkbox_idle.webp": {
+    "sha256": "d8905af53a094641c3651eaa52832dd941596969abeca2d39cdfee3cd2d66a97",
+    "bytes": 11402
+  },
+  "09_checkbox_active.webp": {
+    "sha256": "6739bbdc4f2f1ca0b802093cf8faaaf61ae621b0f484cca8ffe01dac43c127c8",
+    "bytes": 26154
+  },
+  "10_impact_strokes.webp": {
+    "sha256": "eda3ffa269e0b6f7df1442ed75d8edc6f5e67b9e2fd78c8fd94b11c46e1c1bbf",
+    "bytes": 51738
+  },
+  "11_atom_emblem.webp": {
+    "sha256": "6f5961b1f1869b22a2d3b129c8900f68b976ade5e26a55974ff7b000aaf62283",
+    "bytes": 116744
+  },
+  "12_anime_eye_panel.webp": {
+    "sha256": "6ccf27cee669e615d3e5737e3c23009309df60da497eac54acbd57df70bce269",
+    "bytes": 547902
+  },
+  "13_star_only.webp": {
+    "sha256": "4025efe85726a763b639d8a3f3832023672fe2dd782f503d39dabbafbee9e1da",
+    "bytes": 101736
+  },
+  "14_three_gold_bars.webp": {
+    "sha256": "ade701b110ee2f38ac0d749832bb336ed6976917fccca45ee573e636ec3ae5fe",
+    "bytes": 45318
+  }
+}
