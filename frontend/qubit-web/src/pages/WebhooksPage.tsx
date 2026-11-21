@@ -30,6 +30,7 @@ import { Button, Input, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/
 import { Label } from "@nous-research/ui/ui/components/label";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
+import "./WebhooksPage.css";
 
 interface CreatedWebhook {
   url: string;
@@ -61,7 +62,7 @@ function CopyButton({ value }: { value: string }) {
       title="Copy"
       aria-label="Copy"
       onClick={handleCopy}
-      className="text-muted-foreground hover:text-foreground"
+      className="qm-webhook-icon-btn shrink-0 text-muted-foreground hover:text-foreground"
     >
       {copied ? <Check /> : <Copy />}
     </Button>
@@ -469,7 +470,7 @@ export default function WebhooksPage() {
   const pendingName = webhookDelete.pendingId ?? "";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="qm-webhooks-page flex flex-col gap-6">
 
       <DeleteConfirmDialog
         open={webhookDelete.isOpen}
@@ -498,7 +499,7 @@ export default function WebhooksPage() {
             <Button
               variant="secondary"
               onClick={closeCreateModal}
-              className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              className="qm-webhook-icon-btn absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
             >
               <X />
@@ -674,7 +675,7 @@ export default function WebhooksPage() {
             <Button
               variant="secondary"
               onClick={closeDeliveries}
-              className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              className="qm-webhook-icon-btn absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
             >
               <X />
@@ -704,6 +705,7 @@ export default function WebhooksPage() {
                       className="flex items-start gap-3 border border-border bg-background/40 px-3 py-2 text-xs"
                     >
                       <Badge
+                        className="qm-webhook-badge"
                         tone={
                           d.verdict === "DELIVERED"
                             ? "success"
@@ -831,17 +833,25 @@ export default function WebhooksPage() {
 
         {subscriptions.map((sub: WebhookRoute) => (
           <Card key={sub.name}>
-            <CardContent className="flex items-start gap-4 py-4">
+            <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4">
               <div className={cn("flex-1 min-w-0", !sub.enabled && "opacity-60")}>
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-medium text-sm truncate">
+                <div className="flex items-center gap-2 mb-1 flex-wrap min-w-0">
+                  <span className="font-medium text-sm break-words min-w-0">
                     {sub.name}
                   </span>
-                  <Badge tone="outline">{sub.deliver}</Badge>
+                  <Badge className="qm-webhook-badge" tone="outline">
+                    {sub.deliver}
+                  </Badge>
                   {sub.deliver_only && (
-                    <Badge tone="secondary">deliver only</Badge>
+                    <Badge className="qm-webhook-badge" tone="secondary">
+                      deliver only
+                    </Badge>
                   )}
-                  {!sub.enabled && <Badge tone="warning">disabled</Badge>}
+                  {!sub.enabled && (
+                    <Badge className="qm-webhook-badge" tone="warning">
+                      disabled
+                    </Badge>
+                  )}
                 </div>
 
                 {sub.description && (
@@ -850,29 +860,32 @@ export default function WebhooksPage() {
                   </p>
                 )}
 
-                <div className="flex items-center gap-1 flex-wrap mb-2">
+                <div className="flex items-center gap-1 flex-wrap mb-2 min-w-0">
                   {sub.events.length === 0 ? (
-                    <Badge tone="secondary">(all)</Badge>
+                    <Badge className="qm-webhook-badge" tone="secondary">
+                      (all)
+                    </Badge>
                   ) : (
                     sub.events.map((evt) => (
-                      <Badge key={evt} tone="secondary">
+                      <Badge key={evt} className="qm-webhook-badge" tone="secondary">
                         {evt}
                       </Badge>
                     ))
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex-1 min-w-0 truncate font-mono">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                  <span className="flex-1 min-w-0 break-all font-mono">
                     {sub.url}
                   </span>
                   <CopyButton value={sub.url} />
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="qm-webhook-actions flex flex-wrap items-center gap-1.5 sm:justify-end">
                 <Button
                   variant="secondary"
+                  className="qm-webhook-icon-btn"
                   title="Rotate signing secret"
                   aria-label="Rotate signing secret"
                   disabled={actionBusy === `${sub.name}:rotate`}
@@ -886,6 +899,7 @@ export default function WebhooksPage() {
                 </Button>
                 <Button
                   variant="secondary"
+                  className="qm-webhook-icon-btn"
                   title="Send test delivery"
                   aria-label="Send test delivery"
                   disabled={actionBusy === `${sub.name}:test` || !sub.enabled}
@@ -895,6 +909,7 @@ export default function WebhooksPage() {
                 </Button>
                 <Button
                   variant="secondary"
+                  className="qm-webhook-icon-btn"
                   title="Delivery history"
                   aria-label="Delivery history"
                   onClick={() => openDeliveries(sub)}
@@ -903,6 +918,7 @@ export default function WebhooksPage() {
                 </Button>
                 <Button
                   variant="secondary"
+                  className="qm-webhook-icon-btn"
                   title="Retry last failed delivery"
                   aria-label="Retry last failed delivery"
                   disabled={actionBusy === `${sub.name}:retry` || !sub.enabled}
@@ -916,7 +932,7 @@ export default function WebhooksPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  className="uppercase"
+                  className="qm-webhook-toggle uppercase"
                   disabled={togglingName === sub.name}
                   onClick={() => handleToggleEnabled(sub.name, !sub.enabled)}
                 >
@@ -924,6 +940,7 @@ export default function WebhooksPage() {
                 </Button>
                 <Button
                   variant="secondary"
+                  className="qm-webhook-icon-btn"
                   title="Delete"
                   aria-label="Delete"
                   onClick={() => webhookDelete.requestDelete(sub.name)}
