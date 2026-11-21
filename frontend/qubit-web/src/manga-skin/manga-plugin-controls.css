@@ -1,0 +1,98 @@
+/* ==========================================================================
+   Manga skin — plugin pages that still ship the design-system controls.
+   --------------------------------------------------------------------------
+   Several overlay plugins (Boards, Models & Providers, Gateway) render the
+   vendored @nous-research/ui Button/Input directly instead of the Sakuga
+   controls the rest of the dashboard now uses. In the Manga shell those DS
+   controls inherited the theme's near-white midground (a white plate on the
+   navy page) and their own arc-border shimmer + active invert animation.
+
+   These rules repaint only the page roots those plugins mark with
+   `.qm-plugin-controls`, using the same plate / keyline / offset-shadow
+   language as the Sakuga Manga controls. Classic (no data-qubit-manga) is
+   untouched, and no plugin markup or behaviour is changed.
+   ========================================================================== */
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls {
+  color: var(--qm-ink);
+}
+
+/* Design-system arc-border is a looping gradient stroke shown on hover,
+   focus and press. It is the stale animation this pass removes. */
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls .arc-border {
+  display: none !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(button, [role="button"]) {
+  border: 2px solid var(--qm-magenta) !important;
+  border-radius: 2px !important;
+  background: var(--qm-panel-2) !important;
+  color: var(--qm-ink) !important;
+  box-shadow: 3px 4px 0 var(--qm-black) !important;
+  font-family: var(--theme-font-sans);
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: normal;
+  text-transform: none;
+  filter: none !important;
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):hover {
+  border-color: var(--qm-yellow) !important;
+  background: var(--qm-panel-3) !important;
+  color: var(--qm-ink) !important;
+  filter: none !important;
+  transform: translateY(-1px);
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active {
+  transform: translate(1px, 2px) !important;
+  box-shadow: 1px 1px 0 var(--qm-black) !important;
+  filter: none !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(button, [role="button"]):focus-visible {
+  border-color: var(--qm-yellow) !important;
+  outline: 2px solid var(--qm-yellow) !important;
+  outline-offset: 2px !important;
+  box-shadow: 2px 2px 0 var(--qm-black) !important;
+}
+
+/* Selected tabs keep the shared yellow plate from the generic Manga tab
+   rule; the resting tab still gets the dark plate above. */
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls [role="tab"][aria-selected="true"] {
+  background: var(--qm-yellow) !important;
+  color: var(--qm-black) !important;
+  border-color: var(--qm-black) !important;
+  box-shadow: 2px 2px 0 var(--qm-magenta) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(input, textarea, select) {
+  border: 2px solid var(--qm-violet) !important;
+  border-radius: 2px !important;
+  background: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
+  box-shadow: 4px 5px 0 rgba(255, 38, 154, 0.4) !important;
+  font-family: var(--qm-mono);
+  transition: none !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(input, textarea, select)::placeholder {
+  color: var(--qm-faint) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(input, textarea, select):focus-visible {
+  border-color: var(--qm-yellow) !important;
+  outline: 2px solid var(--qm-yellow) !important;
+  outline-offset: 2px !important;
+  box-shadow: 4px 5px 0 rgba(185, 101, 255, 0.55) !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .qm-plugin-controls :is(input, textarea, select):disabled {
+  opacity: 0.55 !important;
+}

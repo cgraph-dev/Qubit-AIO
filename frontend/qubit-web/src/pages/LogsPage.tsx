@@ -46,6 +46,7 @@ import { PluginSlot } from "@/plugins";
 // text like "parse_errors=0" can't render an INFO line red.
 import { classifyLine } from "@/lib/log-classify";
 import { rebrand } from "@/lib/rebrand";
+import "./LogsPage.css";
 
 const FILES = ["agent", "errors", "gateway"] as const;
 const LEVELS = ["ALL", "DEBUG", "INFO", "WARNING", "ERROR"] as const;
@@ -213,15 +214,15 @@ export default function LogsPage() {
 
   useLayoutEffect(() => {
     setAfterTitle(
-      <span className="flex items-center gap-1.5">
-        <Badge tone="secondary" className="text-xs">
+      <span className="qm-logs-header-actions flex items-center gap-1.5">
+        <Badge tone="secondary" className="qm-logs-meta text-xs">
           {formatFilterLabel(file)} · {formatFilterLabel(level)} ·{" "}
           {formatFilterLabel(component)}
         </Badge>
         <Button
           type="button"
           variant="secondary"
-          className="text-muted-foreground hover:text-foreground"
+          className="qm-logs-header-btn text-muted-foreground hover:text-foreground"
           onClick={exportLogs}
           disabled={lines.length === 0}
           aria-label="Export log lines"
@@ -236,10 +237,10 @@ export default function LogsPage() {
         <Button
           type="button"
           variant="secondary"
-          className="text-muted-foreground hover:text-foreground"
           onClick={fetchLogs}
           disabled={loading}
           aria-label={t.common.refresh}
+          className="qm-logs-header-btn text-muted-foreground hover:text-foreground"
         >
           {loading ? <Spinner /> : <RefreshCw />}
         </Button>

@@ -218,3 +218,4 @@ import "./sweep-collapsed.css";
 import "./sweep-text.css";
 import "./sweep-position.css";
 import "./sweep-system-actions.css";
+import "./manga-plugin-controls.css";

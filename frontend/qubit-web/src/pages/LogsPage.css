@@ -1,0 +1,78 @@
+/* ==========================================================================
+   /logs — Manga page-header controls.
+   --------------------------------------------------------------------------
+   The Logs page publishes its file/level/component badge and the two header
+   actions through the shared page-header plate. The plate's painted cap tapers
+   before the right edge, so the default-size Sakuga buttons sat over it. These
+   rules compact the local cluster (keeping every label, aria-label and click
+   handler) and give the meta readout the yellow + dark drop-shadow treatment
+   used by the rest of the module plate.
+
+   Scope is the Manga attribute only; classic keeps the shared header exactly
+   as shipped. The selectors are page-local (`.qm-logs-*`), not header-wide.
+   ========================================================================== */
+
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-header-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  /* Hold the cluster off the tapered cap at the right edge of the plate. */
+  padding-inline-end: 16px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* AGENT · ALL · ALL — yellow ink with the plate's dark drop shadow. */
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-meta {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 18px !important;
+  padding: 0 3px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--qm-yellow) !important;
+  font-family: var(--qm-display) !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.09em !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  text-shadow:
+    1px 2px 0 #080615,
+    0 0 5px rgba(255, 173, 0, 0.6) !important;
+}
+
+/* Compact icon actions. Same host/part contract as every Sakuga Manga
+   control, so focus and press feedback stay consistent. */
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-header-btn::part(button) {
+  height: 22px !important;
+  min-width: 24px !important;
+  min-height: 0 !important;
+  padding: 0 6px !important;
+  border-width: 1.5px !important;
+  border-radius: 2px !important;
+  box-shadow: 2px 2px 0 var(--qm-black) !important;
+}
+
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-header-btn::part(button):hover:not(:disabled) {
+  border-color: var(--qm-yellow) !important;
+  background: var(--qm-panel-3) !important;
+}
+
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-header-btn svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-header-actions {
+    gap: 3px !important;
+    padding-inline-end: 10px !important;
+  }
+  html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-logs-header-btn::part(button) {
+    height: 20px !important;
+    padding: 0 5px !important;
+  }
+}
