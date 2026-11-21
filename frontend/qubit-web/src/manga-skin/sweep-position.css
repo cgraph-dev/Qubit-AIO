@@ -281,3 +281,54 @@ html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qagent-sidebar_
   min-height: 40px !important;
   padding: 0 !important;
 }
+
+/* --------------------------------------------------------------------------
+   Compact Manga page-header actions.
+   The plate artwork's usable body tapers out at x≈488 of its 510px box, while
+   the meta slot ends only 16px from the box edge, so the Models period cluster
+   and the Sessions count sat over the painted cap. Inset the meta slot and
+   shrink the period/refresh controls (keeping filters, refresh behaviour and
+   the accessible labels untouched); classic/non-Manga headers are unchanged.
+   -------------------------------------------------------------------------- */
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header__meta:has(.qm-header-periods),
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header__meta:has(.qm-session-count) {
+  padding-inline-end: 10px !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-header-periods {
+  gap: 4px !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-header-periods sakuga-button::part(button) {
+  height: 24px !important;
+  min-height: 0 !important;
+  padding: 0 8px !important;
+  border-width: 1.5px !important;
+  border-radius: 2px !important;
+  font: 700 10px/1 var(--qm-body, system-ui, sans-serif) !important;
+  letter-spacing: .03em !important;
+  box-shadow: 2px 2px 0 var(--qm-black) !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-header-periods sakuga-button:not([variant="secondary"])::part(button) {
+  box-shadow: 2px 2px 0 var(--qm-magenta) !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-header-periods sakuga-button svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-session-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 20px !important;
+  margin-inline-end: 3px;
+  padding: 0 7px !important;
+  border: 2px solid var(--qm-black) !important;
+  border-radius: 2px !important;
+  background: var(--qm-yellow) !important;
+  color: var(--qm-black) !important;
+  font: 800 11px/1 var(--qm-display, "Rajdhani", system-ui, sans-serif) !important;
+  letter-spacing: .1em !important;
+  text-shadow: none !important;
+  box-shadow: 2px 2px 0 var(--qm-magenta) !important;
+}
