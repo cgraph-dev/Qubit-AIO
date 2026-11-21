@@ -70,6 +70,37 @@ describe("kanban manga tooltips", () => {
     expect(inner.title).toBe("inner");
   });
 
+  it("does not add a second bubble when a HoverTip child inherits an ancestor title", () => {
+    const board = document.createElement("div");
+    board.className = "qubit-kanban";
+    const header = document.createElement("div");
+    header.className = "qubit-kanban-column-header";
+    header.title = "Column help";
+    const tip = document.createElement("span");
+    tip.className = "qsk-hover-tip";
+    const inner = document.createElement("button");
+    tip.append(inner);
+    header.append(tip);
+    board.append(header);
+    document.body.append(board);
+    cleanup = installKanbanTooltips();
+
+    hover(inner);
+    expect(inner.hasAttribute("title")).toBe(false);
+    expect(header.hasAttribute("title")).toBe(false);
+    expect(header.getAttribute("data-qm-tip")).toBe("Column help");
+    expect(document.querySelector(".qm-kanban-tip")).toBeNull();
+
+    hover(header);
+    expect(header.hasAttribute("title")).toBe(false);
+    expect(header.getAttribute("data-qm-tip")).toBe("Column help");
+    expect(document.querySelector(".qm-kanban-tip")?.textContent).toBe("Column help");
+
+    leave(header);
+    expect(header.getAttribute("title")).toBe("Column help");
+    expect(document.querySelector(".qm-kanban-tip")).toBeNull();
+  });
+
   it("cleans up the bubble and listeners on unmount", () => {
     const board = document.createElement("div");
     board.className = "qubit-kanban";

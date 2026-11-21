@@ -9,48 +9,35 @@ function isInsideBoard(node: Element | null): boolean {
   return !!node?.closest(BOARD);
 }
 
-function triggerFrom(target: EventTarget | null): HTMLElement | null {
-  if (!(target instanceof Element)) return null;
-  const el = target.closest<HTMLElement>("[title]");
-  if (!el || !isInsideBoard(el)) return null;
-  return el;
+function restoreTitle(el: HTMLElement) {
+  const stored = el.getAttribute("data-qm-tip");
+  if (stored === null) return;
+  el.removeAttribute("data-qm-tip");
+  if (!el.hasAttribute("title")) el.setAttribute("title", stored);
+}
+
+function suppressTitle(el: HTMLElement): boolean {
+  const title = el.getAttribute("title");
+  if (title === null) return false;
+  el.removeAttribute("title");
+  el.setAttribute("data-qm-tip", title);
+  return true;
 }
 
 /**
  * Turns plain `title` tooltips inside the Kanban board into one fixed,
- * portaled Manga bubble. Returns the cleanup.
+ * portaled Manga bubble. A trigger that the bundle already wraps in
+ * `.qsk-hover-tip` keeps that single bubble; its native ancestor title is
+ * suppressed instead of opening a second tooltip. Returns the cleanup.
  */
 export function installKanbanTooltips(): () => void {
-  let trigger: HTMLElement | null = null;
+  let portalTrigger: HTMLElement | null = null;
   let suppressed: HTMLElement | null = null;
   let bubble: HTMLDivElement | null = null;
-  let label: HTMLSpanElement | null = null;
-
-  const restore = (el: HTMLElement) => {
-    const stored = el.getAttribute("data-qm-tip");
-    if (stored === null) return;
-    el.removeAttribute("data-qm-tip");
-    if (!el.hasAttribute("title")) el.setAttribute("title", stored);
-  };
-
-  const unsuppress = () => {
-    if (suppressed) restore(suppressed);
-    suppressed = null;
-  };
-
-  const suppress = (el: HTMLElement) => {
-    if (suppressed === el) return;
-    unsuppress();
-    const title = el.getAttribute("title");
-    if (!title) return;
-    el.removeAttribute("title");
-    el.setAttribute("data-qm-tip", title);
-    suppressed = el;
-  };
 
   const position = () => {
-    if (!trigger || !bubble) return;
-    const rect = trigger.getBoundingClientRect();
+    if (!portalTrigger || !bubble) return;
+    const rect = portalTrigger.getBoundingClientRect();
     const width = bubble.offsetWidth;
     const height = bubble.offsetHeight;
     const placement = rect.top - height - 10 >= 8 ? "top" : "bottom";
@@ -64,75 +51,96 @@ export function installKanbanTooltips(): () => void {
     bubble.style.setProperty("--qm-tip-arrow", `${Math.round(clamp(center - left, 12, width - 12))}px`);
   };
 
-  const hide = () => {
-    if (trigger) restore(trigger);
-    unsuppress();
-    trigger = null;
-    label = null;
+  const hidePortal = () => {
+    if (portalTrigger) restoreTitle(portalTrigger);
+    portalTrigger = null;
     bubble?.remove();
     bubble = null;
   };
 
-  const show = (el: HTMLElement) => {
-    const title = el.getAttribute("title");
-    if (!title || trigger === el) return;
-    hide();
-    el.removeAttribute("title");
-    el.setAttribute("data-qm-tip", title);
-    trigger = el;
+  const unsuppress = () => {
+    if (suppressed) restoreTitle(suppressed);
+    suppressed = null;
+  };
+
+  const suppress = (el: HTMLElement | null) => {
+    if (suppressed === el) return;
+    unsuppress();
+    if (el && suppressTitle(el)) suppressed = el;
+  };
+
+  const showPortal = (el: HTMLElement) => {
+    hidePortal();
+    const title = el.getAttribute("title") ?? el.getAttribute("data-qm-tip");
+    if (!title) return;
+    if (el === suppressed) suppressed = null;
+    if (el.hasAttribute("title")) suppressTitle(el);
+    portalTrigger = el;
     bubble = document.createElement("div");
     bubble.id = BUBBLE_CLASS;
     bubble.className = BUBBLE_CLASS;
     bubble.setAttribute("role", "tooltip");
-    label = document.createElement("span");
+    const label = document.createElement("span");
     label.textContent = title;
     bubble.append(label);
     document.body.append(bubble);
     position();
   };
 
-  const onPointerOver = (event: Event) => {
-    const el = triggerFrom(event.target);
-    if (!el) return;
-    if (el.closest(".qsk-hover-tip")) {
-      hide();
-      suppress(el);
+  const enter = (target: Element) => {
+    if (!isInsideBoard(target)) return;
+    if (target.closest(".qsk-hover-tip")) {
+      hidePortal();
+      const titled =
+        target.closest<HTMLElement>("[title]") ??
+        target.closest<HTMLElement>("[data-qm-tip]");
+      if (titled && isInsideBoard(titled)) suppress(titled);
+      else unsuppress();
       return;
     }
-    show(el);
+    unsuppress();
+    const el = target.closest<HTMLElement>("[title]");
+    if (!el || !isInsideBoard(el)) {
+      hidePortal();
+      return;
+    }
+    showPortal(el);
   };
 
-  const onPointerOut = (event: PointerEvent) => {
-    const next = event.relatedTarget;
-    if (trigger && !(next instanceof Node && trigger.contains(next))) hide();
-    if (suppressed && !(next instanceof Node && suppressed.contains(next))) unsuppress();
+  const leave = (next: EventTarget | null) => {
+    if (portalTrigger && !(next instanceof Node && portalTrigger.contains(next))) {
+      hidePortal();
+    }
+    if (suppressed && !(next instanceof Node && suppressed.contains(next))) {
+      unsuppress();
+    }
   };
+
+  const onPointerOver = (event: Event) => {
+    if (!(event.target instanceof Element)) return;
+    enter(event.target);
+  };
+
+  const onPointerOut = (event: PointerEvent) => leave(event.relatedTarget);
 
   const onFocusIn = (event: Event) => {
-    const el = triggerFrom(event.target);
-    if (!el) return;
-    if (el.closest(".qsk-hover-tip")) {
-      hide();
-      suppress(el);
-      return;
-    }
-    show(el);
+    if (!(event.target instanceof Element)) return;
+    enter(event.target);
   };
 
-  const onFocusOut = (event: FocusEvent) => {
-    const next = event.relatedTarget;
-    if (trigger && !(next instanceof Node && trigger.contains(next))) hide();
-    if (suppressed && !(next instanceof Node && suppressed.contains(next))) unsuppress();
-  };
+  const onFocusOut = (event: FocusEvent) => leave(event.relatedTarget);
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") hide();
+    if (event.key === "Escape") {
+      hidePortal();
+      unsuppress();
+    }
   };
 
-  const onViewportChange = () => hide();
+  const onViewportChange = () => hidePortal();
 
   const observer = new MutationObserver(() => {
-    if (trigger && !trigger.isConnected) hide();
+    if (portalTrigger && !portalTrigger.isConnected) hidePortal();
     if (suppressed && !suppressed.isConnected) unsuppress();
   });
   observer.observe(document.body, { childList: true, subtree: true });
@@ -146,7 +154,8 @@ export function installKanbanTooltips(): () => void {
   window.addEventListener("resize", onViewportChange);
 
   return () => {
-    hide();
+    hidePortal();
+    unsuppress();
     observer.disconnect();
     document.removeEventListener("pointerover", onPointerOver, true);
     document.removeEventListener("pointerout", onPointerOut, true);
