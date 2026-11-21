@@ -51,15 +51,19 @@ export const ROUTE_TITLES: Record<string, string> = {
   // Family pages without an i18n nav key or plugin tab: the naive path
   // fallback mangles them ("/agent-workspace" → "Agent-workspace",
   // "/admin/skills-review" → "Admin/skills-review"). Titles match each
-  // page's own heading, Qubit-branded for the header.
-  "/agent-workspace": "Qubit Agent Workspace",
-  "/nodes": "Qubit Nodes",
-  "/devices": "Qubit Devices",
-  "/session-ops": "Qubit Session Ops",
-  "/worktrees": "Qubit Worktrees",
-  "/checkpoints": "Qubit Checkpoints",
-  "/qubit-board-admin": "Qubit Board Admin",
-  "/qubit-task-inbox": "Qubit Task Inbox",
+  // page's own heading and the sidebar label. Do NOT prefix the product name
+  // here: the header already sits beside the Qubit brand rail, so an extra
+  // "Qubit" made these plates read "QUBIT AGENT WORKSPACE" and overlap the
+  // module-header artwork. Product surfaces whose own name includes Qubit
+  // (Qubit Chat, Qubit Office, Qubit Canvas, ...) keep it.
+  "/agent-workspace": "Agent Workspace",
+  "/nodes": "Nodes",
+  "/devices": "Devices",
+  "/session-ops": "Session Ops",
+  "/worktrees": "Worktrees",
+  "/checkpoints": "Checkpoints",
+  "/qubit-board-admin": "Board Admin",
+  "/qubit-task-inbox": "Task Inbox",
   "/qubit-talk": "Voice & Speech",
   "/qubit-scheduler": "Tasks & Scheduling",
   "/admin/skills-review": "Skills Review Queue",
