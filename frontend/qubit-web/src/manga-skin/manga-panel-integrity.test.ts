@@ -39,6 +39,32 @@ describe("Manga web-dashboard page panel integrity", () => {
     expect(sidebar).toContain("DO NOT disable animations across every sidebar descendant");
     expect(gate).toContain('isTerminalChatPath(pathname)');
   });
+  it("drops the redundant frame around a section tab strip but keeps the tablist", () => {
+    expect(styles).toContain(
+      '.settings-section:has(> .settings-section__actions[role="tablist"]):not(:has(> .settings-group))',
+    );
+    expect(styles).toContain(
+      '.settings-section > .settings-section__actions[role="tablist"]',
+    );
+    expect(styles).toContain("background-color:transparent!important");
+    const at = styles.indexOf(
+      '.settings-section > .settings-section__actions[role="tablist"]',
+    );
+    const body = styles.slice(at, styles.indexOf("}", at));
+    expect(body).toContain("border:0!important");
+    expect(body).toContain("box-shadow:none!important");
+  });
+
+  it("gives heading count badges spacing and a yellow manga plate", () => {
+    const at = styles.indexOf(") .settings-count {");
+    expect(at).toBeGreaterThanOrEqual(0);
+    const body = styles.slice(at, styles.indexOf("}", at));
+    expect(body).toContain("margin-inline-start:10px!important");
+    expect(body).toContain("flex:0 0 auto!important");
+    expect(body).toContain("background:var(--qm-yellow");
+    expect(body).toContain("box-shadow:2px 2px 0 var(--qm-black");
+  });
+
   it("does not target the terminal, office, workbench, or unrelated themes", () => {
     expect(styles).toContain('html:root[data-qubit-manga="on"]');
     expect(styles).not.toContain("xterm");
