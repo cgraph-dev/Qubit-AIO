@@ -425,7 +425,8 @@
     }
 
     var list = tasks || [];
-    return e("div", {style: {padding: 16, maxWidth: 960}},
+    return e("div", {className: "qm-plugin-controls",
+      style: {padding: 16, maxWidth: 960}},
       e("h2", null, "Boards"),
       e("p", {style: {opacity: 0.75}},
         "Kanban boards on the canonical store — same backend as `qubit kanban` CLI and voice. ",

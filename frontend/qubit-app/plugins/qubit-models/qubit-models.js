@@ -227,7 +227,8 @@
 
     var selectedId = target[0] || fId[0];
 
-    return e("div", {style: {padding: 16, maxWidth: 1080}},
+    return e("div", {className: "qm-plugin-controls",
+      style: {padding: 16, maxWidth: 1080}},
       e("h2", null, "Models & Providers"),
       e("p", {style: {opacity: 0.75}},
         "Canonical model and provider profiles — the same resolver the CLI ",

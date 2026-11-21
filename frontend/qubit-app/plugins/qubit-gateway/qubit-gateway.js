@@ -141,7 +141,8 @@
       });
     }
 
-    return e("div", {style: {padding: 16, maxWidth: 960}},
+    return e("div", {className: "qm-plugin-controls",
+      style: {padding: 16, maxWidth: 960}},
       e("h2", null, "Gateway"),
       e("p", {style: {opacity: 0.75}},
         "Account-bound records with typed link states — same backend as CLI and voice. ",
