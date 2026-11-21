@@ -127,6 +127,47 @@ html:root[data-qubit-manga="on"] #qubit-main-content .settings-section:has(> .se
   border:0!important;
   padding:0!important;
 }
+/* A section that only arranges a header and a tab strip is layout, not a
+   framed plate. The v5 tablist skin paints a dark box behind the tab row and
+   the title wash paints a second box behind the whole strip; keep the header
+   and the real tabs (role/aria unchanged) but drop both redundant frames. */
+html:root[data-qubit-manga="on"] #qubit-main-content .settings-section:has(> .settings-section__actions[role="tablist"]):not(:has(> .settings-group)) {
+  background-image:none!important;
+  background-color:transparent!important;
+  box-shadow:none!important;
+  border:0!important;
+}
+html:root[data-qubit-manga="on"] #qubit-main-content .settings-section > .settings-section__actions[role="tablist"] {
+  background-color:transparent!important;
+  background-image:none!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+}
+/* Count badges inside the shared title plate must never touch the heading:
+   give them their own yellow plate with a dark offset shadow. */
+html:root[data-qubit-manga="on"] #qubit-main-content :is(
+  .settings-page__title,.settings-section__heading,.qplate-module__head
+) .settings-count {
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 0 auto!important;
+  min-width:20px!important;
+  height:auto!important;
+  margin-inline-start:10px!important;
+  padding:2px 8px!important;
+  border:2px solid var(--qm-black,#05030f)!important;
+  border-radius:2px!important;
+  background:var(--qm-yellow,#ffe500)!important;
+  color:var(--qm-black,#05030f)!important;
+  font:800 .78rem/1.1 var(--qm-display,"Arial Black",system-ui,sans-serif)!important;
+  letter-spacing:.04em!important;
+  white-space:nowrap!important;
+  text-shadow:none!important;
+  box-shadow:2px 2px 0 var(--qm-black,#05030f)!important;
+}
 html:root[data-qubit-manga="on"] #qubit-main-content :is(
   .settings-group,.qplate-module,[data-slot="card"],[data-qm-surface="panel"]
 ) {
