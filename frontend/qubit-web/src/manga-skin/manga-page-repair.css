@@ -166,9 +166,60 @@ html[data-qubit-manga="on"] .qm-config-category {
  font:700 .82rem/1.25 var(--qm-page-body)!important;
  border-bottom:1px solid rgba(185,101,255,.32)!important;
 }
-html[data-qubit-manga="on"] .qm-config-category[data-active="true"],
-html[data-qubit-manga="on"] .qm-config-category.is-active {
- background:var(--qm-page-yellow)!important;color:#080615!important;
+/* Selected filter row: the Manga gold plate. The Sakuga list-item default
+ * paints the inner button magenta with an inset gold edge, which reads as an
+ * orange line over the plate; paint the part itself instead. */
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[data-active="true"],
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[aria-current="true"],
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category.is-active {
+ background:transparent!important;color:#080615!important;
+ border-bottom-color:transparent!important;
+}
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[data-active="true"]::part(button),
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[aria-current="true"]::part(button),
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category.is-active::part(button) {
+ background:var(--qm-page-yellow)!important;
+ color:#080615!important;
+ font-weight:800!important;
+ border:2px solid #080615!important;
+ box-shadow:3px 3px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[data-active="true"]::part(button):hover,
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[aria-current="true"]::part(button):hover,
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category.is-active::part(button):hover {
+ background:#fff06a!important;color:#080615!important;
+ border-color:#080615!important;
+ box-shadow:3px 3px 0 #080615!important;
+}
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[data-active="true"]::part(button):focus-visible,
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category[aria-current="true"]::part(button):focus-visible,
+html[data-qubit-manga="on"] .qm-config-categories sakuga-button.qm-config-category.is-active::part(button):focus-visible {
+ outline:2px solid #080615!important;
+ outline-offset:2px;
+ box-shadow:3px 3px 0 #080615!important;
+}
+/* The count sits on the gold plate, so the light-theme slot colour is
+ * unreadable; keep it dark like the label. */
+html[data-qubit-manga="on"] .qm-config-categories .qm-config-category[data-active="true"] > span.tabular-nums,
+html[data-qubit-manga="on"] .qm-config-categories .qm-config-category[aria-current="true"] > span.tabular-nums,
+html[data-qubit-manga="on"] .qm-config-categories .qm-config-category.is-active > span.tabular-nums {
+ color:#080615!important;opacity:.72;
+}
+/* The 60+ category list scrolls inside its own plate; keep the Manga rail
+ * scrollbar instead of the browser default. */
+html[data-qubit-manga="on"] .qm-config-categories [class*="overflow-y-auto"] {
+ scrollbar-width:thin;
+ scrollbar-color:var(--qm-page-purple) #180a28;
+}
+html[data-qubit-manga="on"] .qm-config-categories [class*="overflow-y-auto"]::-webkit-scrollbar {
+ width:8px;height:8px;
+}
+html[data-qubit-manga="on"] .qm-config-categories [class*="overflow-y-auto"]::-webkit-scrollbar-track {
+ background:#180a28;
+}
+html[data-qubit-manga="on"] .qm-config-categories [class*="overflow-y-auto"]::-webkit-scrollbar-thumb {
+ background:var(--qm-page-purple);
+ border:2px solid #180a28;
 }
 html[data-qubit-manga="on"] .qm-config-actions {
  min-width:0;padding:11px 13px;gap:12px!important;
