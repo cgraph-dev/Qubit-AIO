@@ -1,0 +1,108 @@
+/* Manga skin — Kanban board controls and tooltips.
+   Scoped to `.qubit-kanban`; classic (no data-qubit-manga) is untouched. */
+
+/* Per-column "+" add: drop the global Manga offset plate so only the chip
+   shows, matching the column header outline. */
+html[data-qubit-manga="on"] .qubit-kanban sakuga-button.qubit-kanban-column-add::part(button) {
+  background: var(--qm-panel-2) !important;
+  color: var(--qm-ink) !important;
+  border-color: var(--qm-magenta) !important;
+  box-shadow: none !important;
+  border-radius: 2px !important;
+  padding: 0 4px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  line-height: 1 !important;
+}
+
+/* Orchestration pill: its emerald host is the control. Neutralise the inner
+   Sakuga plate so no green plate surrounds a yellow square. */
+html[data-qubit-manga="on"] .qubit-kanban sakuga-button[class*="bg-emerald-500"]::part(button) {
+  background: transparent !important;
+  color: inherit !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  height: auto !important;
+  font: inherit !important;
+  letter-spacing: normal !important;
+}
+
+/* Bundle HoverTip bubbles open below the trigger, away from the panel above
+   and out of the column scroller's top clip. */
+html[data-qubit-manga="on"] .qubit-kanban .qsk-hover-tip__bubble {
+  top: calc(100% + 10px) !important;
+  bottom: auto !important;
+  z-index: 2147482500 !important;
+}
+
+html[data-qubit-manga="on"] .qubit-kanban .qsk-hover-tip__bubble::after {
+  top: auto !important;
+  bottom: 100% !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-left: 2.5px solid var(--qm-black) !important;
+  border-top: 2.5px solid var(--qm-black) !important;
+  transform: rotate(45deg) translate(-2px, 6px) !important;
+}
+
+/* Portaled manga bubble for plain `title` tooltips. Fixed to the viewport so
+   no column/panel overflow can clip it. */
+html[data-qubit-manga="on"] body > #qm-kanban-tip {
+  position: fixed !important;
+  z-index: 2147483600 !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  width: max-content !important;
+  max-width: min(280px, calc(100vw - 16px)) !important;
+  padding: 9px 13px !important;
+  border: 2.5px solid var(--qm-black) !important;
+  border-radius: 3px !important;
+  background: var(--qm-ink) !important;
+  color: var(--qm-black) !important;
+  box-shadow: 4px 5px 0 var(--qm-magenta) !important;
+  font: 600 12.5px/1.35 var(--theme-font-sans, system-ui, sans-serif) !important;
+  letter-spacing: normal !important;
+  text-align: start !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  pointer-events: none !important;
+  animation: qm-kanban-tip-in 140ms cubic-bezier(.2, 1.6, .4, 1);
+}
+
+html[data-qubit-manga="on"] body > #qm-kanban-tip::after {
+  content: "";
+  position: absolute;
+  left: var(--qm-tip-arrow, 50%);
+  width: 11px;
+  height: 11px;
+  margin-left: -6px;
+  background: var(--qm-ink);
+  transform: rotate(45deg);
+}
+
+html[data-qubit-manga="on"] body > #qm-kanban-tip[data-placement="top"]::after {
+  top: 100%;
+  margin-top: -7px;
+  border-right: 2.5px solid var(--qm-black);
+  border-bottom: 2.5px solid var(--qm-black);
+}
+
+html[data-qubit-manga="on"] body > #qm-kanban-tip[data-placement="bottom"]::after {
+  bottom: 100%;
+  margin-bottom: -7px;
+  border-left: 2.5px solid var(--qm-black);
+  border-top: 2.5px solid var(--qm-black);
+}
+
+@keyframes qm-kanban-tip-in {
+  from { opacity: 0; transform: translateY(3px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-qubit-manga="on"] body > #qm-kanban-tip {
+    animation: none !important;
+  }
+}
