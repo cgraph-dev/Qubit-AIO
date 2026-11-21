@@ -53,7 +53,6 @@ import {
   FRESH_CHAT_SESSION_ID,
 } from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
-import { QubitAtomLoader } from "@/components/QubitAtomLoader";
 import { MangaChatLoader } from "@/components/MangaChatLoader";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 import { Markdown } from "@/components/Markdown";
@@ -2130,6 +2129,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       : null;
 
   const hasMessages = messages.length > 0 || streamingText.length > 0;
+  // The full-pane transcript loader is on screen: do not render a second
+  // activity animation in the model-controls slot at the same time.
+  const chatPaneLoading = transcriptState === "loading" && !hasMessages;
   const activeTranscript = transcriptSession === session ? messages : [];
   const transcriptUserTurns = activeTranscript.filter(
     (message) => message.role === "user" && message.kind !== "tool",
@@ -2553,7 +2555,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             aria-busy={busy}
             className="qchat__transcript min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3"
           >
-            {transcriptState === "loading" && !hasMessages ? (
+            {chatPaneLoading ? (
               <div
                 data-state="loading"
                 className="qchat__transcript-loading"
@@ -3164,13 +3166,16 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 label={t.app.modelToolsSheetTitle}
               />
               <Suspense fallback={
-                <div className="qchat__model-skeleton" role="status" aria-label="Loading model controls">
-                  <QubitAtomLoader
-                    label="Loading model controls…"
-                    size="sm"
-                    showBar={false}
-                  />
-                </div>
+                chatPaneLoading ? null : (
+                  <div className="qchat__model-skeleton">
+                    <SakugaLoading
+                      label="Loading model controls…"
+                      showLabel={false}
+                      className="qchat__model-loader"
+                      style={{ "--sk-progress-width": "100%" } as React.CSSProperties}
+                    />
+                  </div>
+                )
               }>
                 <ChatSidebar
                   channel={channel}

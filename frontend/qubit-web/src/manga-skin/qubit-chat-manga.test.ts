@@ -43,15 +43,17 @@ describe("native /qubit-chat Manga agent contract", () => {
     expect(css).not.toContain(".qchat__composer > button {");
   });
 
-  it("uses genuine session data and a non-percentage loading state", () => {
+  it("uses genuine session data and a single Sakuga loading animation", () => {
     expect(chat).toContain('aria-valuenow={levelProgress}');
     expect(chat).toContain('{String(sessionToolRuns).padStart(2, "0")}');
     expect(chat).toContain('<MangaChatLoader label="Loading conversation…" />');
     expect(loader).toContain("<SakugaLoading label={label} />");
-    expect(loader).toContain('className="qchat__manga-indeterminate"');
-    expect(loader).toContain("showCat={false}");
+    expect(loader).not.toContain("qubit-chat/atom.svg");
+    expect(loader).not.toContain("qchat__manga-indeterminate");
+    expect(loader).not.toContain("QubitAtomLoader");
     expect(loader).toContain('size?: "md" | "inline"');
     expect(chat).toContain('<MangaChatLoader size="inline" />');
+    expect(chat).not.toContain("QubitAtomLoader");
     expect(css).toContain(".qchat__manga-atom-inline");
   });
 
