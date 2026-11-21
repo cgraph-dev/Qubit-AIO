@@ -760,13 +760,15 @@ html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-gateway {
   max-width: none !important;
   width: 100% !important;
 }
+/* Generated gateway plate: artwork owns the inset, rows keep 3 equal bands. */
 html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-gateway__content {
-  padding: 10% 12% 6% !important;
-  font-size: 11px !important;
+  padding: 0 !important;
+  font-size: clamp(12px, 4.7cqw, 22px) !important;
 }
 html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-gateway__content dl {
-  gap: .3em .55em !important;
+  gap: 0 !important;
 }
+
 html[data-qubit-manga="on"] #app-sidebar .q5t-system-actions {
   align-items: stretch !important;
 }
