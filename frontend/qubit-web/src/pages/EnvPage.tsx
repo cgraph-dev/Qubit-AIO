@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   KeyRound,
@@ -27,7 +27,6 @@ import {
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
-import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
 
 /* ------------------------------------------------------------------ */
@@ -563,7 +562,6 @@ export default function EnvPage() {
   const [showAdvanced, setShowAdvanced] = useState(true); // Show all providers by default
   const { toast, showToast } = useToast();
   const { t } = useI18n();
-  const { setAfterTitle } = usePageHeader();
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -575,7 +573,7 @@ export default function EnvPage() {
     return () => { live = false; };
   }, [loadAttempt]);
 
-  // Scroll-to sub-nav in the page header. Every section is structural (the
+  // Scroll-to sub-nav in the page body. Every section is structural (the
   // Qubit OAUTH/PROVIDERS/TOOLS/GATEWAY/SETTINGS/CUSTOM KEYS tab family), so
   // each entry is present even when the catalog has no rows for that category;
   // the section card renders its own empty state.
@@ -598,36 +596,11 @@ export default function EnvPage() {
     ];
   }, [t]);
 
-  useLayoutEffect(() => {
-    if (!vars) {
-      setAfterTitle(null);
-      return;
-    }
-    const scrollTo = (id: string) => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-    setAfterTitle(
-      <nav
-        className="flex shrink-0 flex-nowrap items-center gap-1"
-        aria-label="Jump to section"
-      >
-        {sections.map((s) => (
-          <Button
-            key={s.id}
-            type="button"
-            variant="secondary"
-            onClick={() => scrollTo(s.id)}
-            className="shrink-0 cursor-pointer px-2 py-0.5 font-mondwest text-display text-xs tracking-wider text-text-secondary hover:text-foreground border border-border/50 hover:border-foreground/30 transition-colors"
-          >
-            {s.label}
-          </Button>
-        ))}
-      </nav>,
-    );
-    return () => {
-      setAfterTitle(null);
-    };
-  }, [vars, sections, setAfterTitle]);
+  // Jump-to-section actions live in the page body (not the page-header plate);
+  // they are only shown once the catalog has loaded.
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const handleSave = async (key: string) => {
     const value = edits[key];
@@ -863,6 +836,25 @@ export default function EnvPage() {
           {showAdvanced ? t.env.hideAdvanced : t.env.showAdvanced}
         </Button>
       </div>
+
+      {vars ? (
+        <nav
+          className="flex shrink-0 flex-wrap items-center gap-1"
+          aria-label="Jump to section"
+        >
+          {sections.map((s) => (
+            <Button
+              key={s.id}
+              type="button"
+              variant="secondary"
+              onClick={() => scrollToSection(s.id)}
+              className="shrink-0 cursor-pointer px-2 py-0.5 font-mondwest text-display text-xs tracking-wider text-text-secondary hover:text-foreground border border-border/50 hover:border-foreground/30 transition-colors"
+            >
+              {s.label}
+            </Button>
+          ))}
+        </nav>
+      ) : null}
 
       <div id="section-oauth">
         <OAuthProvidersCard
