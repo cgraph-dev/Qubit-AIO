@@ -12,7 +12,7 @@ function isInsideBoard(node: Element | null): boolean {
 function triggerFrom(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Element)) return null;
   const el = target.closest<HTMLElement>("[title]");
-  if (!el || !isInsideBoard(el) || el.closest(".qsk-hover-tip")) return null;
+  if (!el || !isInsideBoard(el)) return null;
   return el;
 }
 
@@ -22,8 +22,31 @@ function triggerFrom(target: EventTarget | null): HTMLElement | null {
  */
 export function installKanbanTooltips(): () => void {
   let trigger: HTMLElement | null = null;
+  let suppressed: HTMLElement | null = null;
   let bubble: HTMLDivElement | null = null;
   let label: HTMLSpanElement | null = null;
+
+  const restore = (el: HTMLElement) => {
+    const stored = el.getAttribute("data-qm-tip");
+    if (stored === null) return;
+    el.removeAttribute("data-qm-tip");
+    if (!el.hasAttribute("title")) el.setAttribute("title", stored);
+  };
+
+  const unsuppress = () => {
+    if (suppressed) restore(suppressed);
+    suppressed = null;
+  };
+
+  const suppress = (el: HTMLElement) => {
+    if (suppressed === el) return;
+    unsuppress();
+    const title = el.getAttribute("title");
+    if (!title) return;
+    el.removeAttribute("title");
+    el.setAttribute("data-qm-tip", title);
+    suppressed = el;
+  };
 
   const position = () => {
     if (!trigger || !bubble) return;
@@ -42,13 +65,8 @@ export function installKanbanTooltips(): () => void {
   };
 
   const hide = () => {
-    if (trigger) {
-      const stored = trigger.getAttribute("data-qm-tip");
-      if (stored !== null) {
-        trigger.removeAttribute("data-qm-tip");
-        if (!trigger.hasAttribute("title")) trigger.setAttribute("title", stored);
-      }
-    }
+    if (trigger) restore(trigger);
+    unsuppress();
     trigger = null;
     label = null;
     bubble?.remove();
@@ -63,6 +81,7 @@ export function installKanbanTooltips(): () => void {
     el.setAttribute("data-qm-tip", title);
     trigger = el;
     bubble = document.createElement("div");
+    bubble.id = BUBBLE_CLASS;
     bubble.className = BUBBLE_CLASS;
     bubble.setAttribute("role", "tooltip");
     label = document.createElement("span");
@@ -74,26 +93,36 @@ export function installKanbanTooltips(): () => void {
 
   const onPointerOver = (event: Event) => {
     const el = triggerFrom(event.target);
-    if (el) show(el);
+    if (!el) return;
+    if (el.closest(".qsk-hover-tip")) {
+      hide();
+      suppress(el);
+      return;
+    }
+    show(el);
   };
 
   const onPointerOut = (event: PointerEvent) => {
-    if (!trigger) return;
     const next = event.relatedTarget;
-    if (next instanceof Node && trigger.contains(next)) return;
-    hide();
+    if (trigger && !(next instanceof Node && trigger.contains(next))) hide();
+    if (suppressed && !(next instanceof Node && suppressed.contains(next))) unsuppress();
   };
 
   const onFocusIn = (event: Event) => {
     const el = triggerFrom(event.target);
-    if (el) show(el);
+    if (!el) return;
+    if (el.closest(".qsk-hover-tip")) {
+      hide();
+      suppress(el);
+      return;
+    }
+    show(el);
   };
 
   const onFocusOut = (event: FocusEvent) => {
-    if (!trigger) return;
     const next = event.relatedTarget;
-    if (next instanceof Node && trigger.contains(next)) return;
-    hide();
+    if (trigger && !(next instanceof Node && trigger.contains(next))) hide();
+    if (suppressed && !(next instanceof Node && suppressed.contains(next))) unsuppress();
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -104,6 +133,7 @@ export function installKanbanTooltips(): () => void {
 
   const observer = new MutationObserver(() => {
     if (trigger && !trigger.isConnected) hide();
+    if (suppressed && !suppressed.isConnected) unsuppress();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 

@@ -44,7 +44,7 @@ describe("kanban manga tooltips", () => {
     expect(document.querySelector(".qm-kanban-tip")).toBeNull();
   });
 
-  it("ignores triggers outside the board and inside a bundle HoverTip", () => {
+  it("ignores triggers outside the board but suppresses native titles inside a HoverTip", () => {
     const outside = document.createElement("span");
     outside.title = "outside";
     const tip = document.createElement("span");
@@ -59,11 +59,15 @@ describe("kanban manga tooltips", () => {
     cleanup = installKanbanTooltips();
 
     hover(outside);
-    hover(inner);
-
     expect(outside.title).toBe("outside");
-    expect(inner.title).toBe("inner");
+
+    hover(inner);
+    expect(inner.hasAttribute("title")).toBe(false);
+    expect(inner.getAttribute("data-qm-tip")).toBe("inner");
     expect(document.querySelector(".qm-kanban-tip")).toBeNull();
+
+    leave(inner);
+    expect(inner.title).toBe("inner");
   });
 
   it("cleans up the bubble and listeners on unmount", () => {
