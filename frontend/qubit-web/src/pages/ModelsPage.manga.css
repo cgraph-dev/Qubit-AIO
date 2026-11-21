@@ -1,0 +1,39 @@
+/* ==========================================================================
+   /models - Manga module-header title containment.
+   --------------------------------------------------------------------------
+   The shared header plate (qubit-module-header.svg, 510px art) paints a pink
+   enamel title zone that ends at roughly x=218 of 510, where the gold diagonal
+   slashes begin. The plate also shrinks with the viewport, so those slashes
+   move left toward the title. The Models title must never reach them while the
+   meta cluster (7d/30d/90d/refresh) keeps its position.
+
+   The page header is rendered as a sibling of the route wrapper, so a plain
+   `[data-qm-route="/models"] .qubit-module-header` descendant selector cannot
+   match. Scope through `:has()` on the document root instead; this also keeps
+   the rules off every other route. Does not touch the shared manga CSS.
+   ========================================================================== */
+
+html[data-qubit-manga="on"]:has([data-qm-route="/models"]) [data-dashboard-page-header] .qubit-module-header > h1 {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  /* At the full 510px plate this holds the text before the gold bars
+     (~x=212 of 510); the percentage cap tracks the plate as it shrinks.
+     Percentages resolve against the plate's content box, not its border box. */
+  max-width: min(190px, 40%) !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  line-height: 1.05 !important;
+  letter-spacing: .05em !important;
+  /* Keep "MODELS" on one line at every supported width while the box shrinks. */
+  font-size: clamp(.9rem, 2.6vw, 1rem) !important;
+  text-align: left !important;
+}
+
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"]:has([data-qm-route="/models"]) [data-dashboard-page-header] .qubit-module-header > h1 {
+    /* Mobile plate uses 16px start padding and scales the art to the viewport,
+       so the pink zone is proportionally narrower; shave the cap slightly. */
+    max-width: min(190px, 38%) !important;
+  }
+}
