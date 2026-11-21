@@ -1820,7 +1820,7 @@ function SidebarSystemActions({
         <>
           <Q5TSystemTitle>{t.app.system}</Q5TSystemTitle>
           <Q5TGatewayFrame>
-            <NavLink to="/sessions" title={t.app.statusOverview} className="block text-left">
+            <NavLink to="/sessions" title={t.app.statusOverview} className="q5t-gateway__link block text-left">
               <dl>
                 <div>
                   <dt>{stripLabel(t.app.gatewayStatusLabel)}</dt>
