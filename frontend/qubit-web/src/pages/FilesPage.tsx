@@ -191,7 +191,11 @@ export default function FilesPage() {
 
   useEffect(() => {
     setAfterTitle(
-      <Badge tone="outline" className="max-w-[22rem] truncate text-xs" title={headerPath}>
+      <Badge
+        tone="outline"
+        className="qm-header-chip qm-header-chip--path max-w-[22rem] truncate text-xs"
+        title={headerPath}
+      >
         {headerPath}
       </Badge>,
     );

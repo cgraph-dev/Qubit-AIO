@@ -332,3 +332,41 @@ html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-session-count {
   text-shadow: none !important;
   box-shadow: 2px 2px 0 var(--qm-magenta) !important;
 }
+
+/* --------------------------------------------------------------------------
+   Shared Manga header meta chips.
+   Every page-header meta item (Sessions count, Files path, Logs filters,
+   OpenViking status, Skills count) uses one plate-safe chip so the painted
+   module frame is never crossed. Long values ellipsize inside the chip
+   instead of overflowing; the rule is Manga-only and leaves classic headers
+   and page bodies untouched.
+   -------------------------------------------------------------------------- */
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header__meta {
+  padding-inline-end: 10px !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header__meta:has(.qm-header-chip) {
+  overflow: hidden !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-header-chip {
+  display: inline-block !important;
+  min-width: 0 !important;
+  max-width: min(22rem, 100%) !important;
+  height: 20px !important;
+  margin-inline-end: 3px !important;
+  padding: 0 7px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  border: 2px solid var(--qm-black) !important;
+  border-radius: 2px !important;
+  background: var(--qm-yellow) !important;
+  color: var(--qm-black) !important;
+  font: 800 11px/16px var(--qm-display, "Rajdhani", system-ui, sans-serif) !important;
+  letter-spacing: .1em !important;
+  text-shadow: none !important;
+  box-shadow: 2px 2px 0 var(--qm-magenta) !important;
+  vertical-align: middle !important;
+}
+html[data-qubit-manga="on"] [data-dashboard-page-header] .qm-header-chip--path {
+  letter-spacing: .02em !important;
+}

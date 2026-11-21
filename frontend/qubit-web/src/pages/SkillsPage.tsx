@@ -337,7 +337,7 @@ export default function SkillsPage() {
       return;
     }
     setAfterTitle(
-      <span className="flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+      <span className="qm-header-chip flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
         {t.skills.enabledOf
           .replace("{enabled}", String(enabledCount))
           .replace("{total}", String(skills.length))}

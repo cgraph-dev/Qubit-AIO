@@ -526,7 +526,7 @@ export default function AnalyticsPage() {
     // filled (non-outlined) button — no redundant period badge.
     setAfterTitle(
       showTokens === false ? null : (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="qm-header-periods flex flex-wrap items-center gap-1.5">
           {PERIODS.map((p) => (
             <Button
               key={p.label}
