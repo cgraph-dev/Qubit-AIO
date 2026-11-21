@@ -1,0 +1,25 @@
+/* Manga-skin corrections scoped to the Harness Router route only.
+ *
+ * The upstream console paints `.hx-primary` as a filled plate (and
+ * `.hx-secondary` as a bordered card) on the element itself, with its own
+ * padding. On a Sakuga button that stock plate shows around and beneath the
+ * shadow-DOM control, so the create/action buttons read as two stacked
+ * plates with a yellow underlay. Clear the host chrome and let the Sakuga
+ * `::part(button)` keep its own ink plate, magenta keyline, offset shadow and
+ * focus-visible ring. Non-manga themes are untouched.
+ */
+html[data-qubit-manga="on"] [data-qm-route="/qubit-harness-router"] sakuga-button.hx-primary,
+html[data-qubit-manga="on"] [data-qm-route="/qubit-harness-router"] sakuga-button.hx-secondary {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+html[data-qubit-manga="on"] [data-qm-route="/qubit-harness-router"] sakuga-button.hx-primary:hover,
+html[data-qubit-manga="on"] [data-qm-route="/qubit-harness-router"] sakuga-button.hx-secondary:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+}

@@ -1,0 +1,13 @@
+/* /env manga skin — flat section-jump and custom-key controls.
+ *
+ * The generic Manga button chrome paints a hard offset plate inside every
+ * Sakuga button (manga.css ~line 783 overrides `::part(button)` with a
+ * 3px 4px magenta / black slab). On the compact section-jump row and the
+ * custom-key actions that plate reads as a stray pink container sitting
+ * under the control. Remove only that offset shadow here; the button face,
+ * type, border and the focus-visible ring are left untouched.
+ */
+html[data-qubit-manga="on"] [data-qm-route="/env"] .qm-env-sections sakuga-button::part(button),
+html[data-qubit-manga="on"] [data-qm-route="/env"] #section-custom sakuga-button::part(button) {
+  box-shadow: none !important;
+}

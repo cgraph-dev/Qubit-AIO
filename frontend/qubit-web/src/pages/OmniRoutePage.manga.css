@@ -1,0 +1,21 @@
+/* Manga skin, /omniroute only: keep the long page title ("OMNIROUTE GATEWAY")
+   inside the pink enamel title zone of the shared module-header plate. The
+   gold diagonal slashes start around x=218/510, so the title is capped well
+   left of them and may wrap to two lines instead of running underneath.
+
+   The route marker `[data-qm-route]` lives on the content wrapper *below* the
+   provider-rendered page header, not around it, so the route is selected on
+   <html> with :has() instead of as an ancestor of `.qubit-module-header`.
+   Shared manga CSS is intentionally untouched. */
+
+html[data-qubit-manga="on"]:has([data-qm-route="/omniroute"])
+  [data-dashboard-page-header] .qubit-module-header > h1 {
+  flex: 1 1 auto !important;
+  max-width: min(190px, 38%) !important;
+  min-width: 0 !important;
+  font-size: 12px !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0.04em !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}

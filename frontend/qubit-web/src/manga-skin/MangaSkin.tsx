@@ -8,6 +8,7 @@ import {
   mangaRouteEligible,
   subscribeManga,
 } from "./manga-store";
+import { installKanbanTooltips } from "./manga-kanban-tooltips";
 import "./manga.css";
 import "./manga-v2.css";
 import "./manga-v3.css";
@@ -41,6 +42,7 @@ import "./manga-production-layout-repair.css";
 import "./manga-panel-integrity.css";
 import "./manga-popup-panels.css";
 import "./chat-inspector.css";
+import "./manga-kanban-controls.css";
 // Scope all new art to the central native /qubit-chat surface, never the rail or inspector.
 import "./qubit-chat-manga.css";
 
@@ -158,6 +160,12 @@ export function MangaSkinGate(): null {
       controller.abort();
       delete root.dataset.qmApprovedAssets;
     };
+  }, [active]);
+
+  // Kanban plain-title tooltips become one Manga bubble, never OS tooltips.
+  useEffect(() => {
+    if (!active) return;
+    return installKanbanTooltips();
   }, [active]);
 
   // One page-visibility listener governs all slow CSS reflection loops.
