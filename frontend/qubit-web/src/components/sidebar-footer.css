@@ -1,0 +1,22 @@
+/* Qubit Atom mark in the collapsed manga footer. Hidden everywhere else. */
+.qm-manga-footer-atom {
+  display: none;
+}
+
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer-atom {
+  display: block;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+/* Give the version the remaining room: the org initial is replaced by the atom. */
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer-org {
+  display: none !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar[data-collapsed="true"] .qm-manga-footer-content.qm-manga-footer-content {
+  justify-content: center !important;
+  align-items: center !important;
+}
