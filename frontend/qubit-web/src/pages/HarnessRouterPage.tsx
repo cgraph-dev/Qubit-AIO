@@ -43,6 +43,7 @@ import {
 } from "@/lib/ocFamilyHarnessApi";
 import { refusalOrError } from "@/lib/policy-refusal";
 import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
+import "./HarnessRouterPage.manga.css";
 
 function errText(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
