@@ -20,35 +20,125 @@
 .manga-rail-tooltip__title {
   font: 700 1rem/1.2 var(--theme-font-display, system-ui, sans-serif);
 }
-html[data-qubit-manga="on"] .manga-rail-tooltip {
-  color: #fff0ff;
-  width: 270px;
-  min-height: 105px;
-  padding: 8px 29px 21px 25px;
-  background: url("/manga-ui/sidebar-menu-tooltip.svg") center / 100% 100% no-repeat;
-  border: 0;
-  border-image: none;
+
+/* --------------------------------------------------------------------------
+   Manga rail plate: sidebar-menu-tooltip.svg (viewBox 270x105).
+
+   Measured safe regions of the artwork:
+     pink title tab   x 14..110, y 4..31   (narrows toward the base)
+     clear body field x 24..204, y 36..84
+     pink bolt        x 212..256, y 37..71
+     gold corner      x 203..255, y 67..91
+     pink corner      x 16..96,  y 62..89
+
+   The manga-skinned sweep sheet also paints this plate with `!important`.
+   These rules repeat the contract at a higher specificity so the shared
+   tooltip layout stays authoritative no matter which stylesheet chunk lands
+   first: the title lives wholly inside the tab (clear of its underlined
+   base), the body starts below the tab and keeps out of the corner art, and
+   long copy scrolls inside its own field instead of stretching the plate.
+   -------------------------------------------------------------------------- */
+html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] {
+  display: block !important;
+  gap: 0 !important;
+  box-sizing: border-box !important;
+  width: 270px !important;
+  max-width: calc(100vw - 24px) !important;
+  height: 105px !important;
+  min-height: 105px !important;
+  max-height: none !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-image: none !important;
+  background: #0a0a1f url("/manga-ui/sidebar-menu-tooltip.svg") center / 100% 100% no-repeat !important;
+  color: #fff0ff !important;
+  font: 600 11.5px/1.36 var(--theme-font-sans, system-ui, sans-serif) !important;
+  text-align: start !important;
+  overflow: hidden !important;
 }
-html[data-qubit-manga="on"] .manga-rail-tooltip__title {
-  max-width: 100%;
-  color: #fff0ff;
-  font: 700 11px/1.25 system-ui, sans-serif;
-  text-transform: uppercase;
-  white-space: normal;
-  overflow-wrap: anywhere;
+
+/* Title: inside the pink tab, centred and capped to two short lines.
+   x 25..89 clears the tab's slanted left and right edges at every row. */
+html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__title {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 64px !important;
+  max-width: 64px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  max-height: 22px !important;
+  margin: 5px 0 0 25px !important;
+  padding: 0 2px !important;
+  overflow: hidden !important;
+  color: #ffe500 !important;
+  font: 800 9px/1.1 var(--theme-font-display, "Rajdhani", system-ui, sans-serif) !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
+  text-wrap: balance !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  text-shadow:
+    0 1px 0 #080615,
+    0 2px 0 #080615,
+    0 0 2px #080615,
+    0 1px 3px rgba(4, 0, 10, 0.95),
+    0 2px 6px rgba(0, 0, 0, 0.8) !important;
 }
-html[data-qubit-manga="on"] .manga-rail-tooltip__body {
-  margin-top: 13px;
-  color: #f0dcf3;
-  font: 500 12px/1.35 system-ui, sans-serif;
-  white-space: normal;
-  overflow-wrap: anywhere;
+
+/* Body: starts below the tab (y 34), spans the clear field, and scrolls
+   within y 34..83 so four-plus lines never reach the bottom bevel. */
+html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__body {
+  display: block !important;
+  box-sizing: border-box !important;
+  margin: 7px 70px 0 30px !important;
+  padding: 0 2px 0 0 !important;
+  max-height: 49px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cc83ba transparent !important;
+  color: #fff6ff !important;
+  font: 600 11.5px/1.36 var(--theme-font-sans, system-ui, sans-serif) !important;
+  letter-spacing: 0.005em !important;
+  text-align: start !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  text-shadow:
+    0 1px 1px rgba(6, 2, 12, 0.95),
+    0 1px 3px rgba(6, 2, 12, 0.9),
+    0 0 6px rgba(0, 0, 0, 0.65) !important;
 }
+
 @media (forced-colors: active) {
-  html[data-qubit-manga="on"] .manga-rail-tooltip {
-    border: 1px solid CanvasText;
-    background: Canvas;
-    color: CanvasText;
-    padding: 11px 14px;
+  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] {
+    width: 270px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 11px 14px !important;
+    border: 1px solid CanvasText !important;
+    background: Canvas !important;
+    color: CanvasText !important;
+    overflow: visible !important;
+  }
+  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__title,
+  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__body {
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 0 4px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    color: CanvasText !important;
+    text-shadow: none !important;
   }
 }
