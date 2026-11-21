@@ -44,6 +44,7 @@ import {
 import { titleFromSessionInfoPayload } from "@/lib/chat-title";
 import { chatLiveFrame } from "@/lib/chatLiveEvents";
 
+import "./ChatSidebar.manga.css";
 import { cn } from "@/lib/utils";
 import { AlertCircle, ChevronDown, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -580,6 +581,7 @@ export function ChatSidebar({
             variant="secondary"
             onClick={() => setModelOpen(true)}
             className={cn(
+              "qchat__model-trigger",
               "max-w-full min-w-0 px-0 py-0",
               "self-start normal-case tracking-normal text-sm font-medium",
               "hover:underline disabled:no-underline",

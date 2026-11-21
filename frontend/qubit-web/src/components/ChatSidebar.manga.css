@@ -1,0 +1,17 @@
+/*
+ * Manga skin correction for the MODEL card trigger.
+ *
+ * The shared manga layer puts an offset plate (`box-shadow: 3px 4px 0`) under
+ * every Sakuga button; on the sidebar's model trigger that plate reads as a
+ * stray container under the model name. Keep the border/background and hover
+ * underline, drop only the offset plate.
+ */
+html[data-qubit-manga="on"] .qchat__model-panel .qchat__model-trigger::part(button) {
+  box-shadow: none !important;
+}
+
+html[data-qubit-manga="on"] .qchat__model-panel .qchat__model-trigger::part(button):focus-visible {
+  box-shadow: none !important;
+  outline: 2px solid var(--qm-magenta);
+  outline-offset: 2px;
+}

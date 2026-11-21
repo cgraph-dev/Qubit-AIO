@@ -13,6 +13,7 @@ import { fuzzyRank } from "@/lib/fuzzy";
 import { queryMatchesProviderOnly } from "@/lib/model-picker-filter";
 import { modelSearchText } from "@/lib/model-search-text";
 import "./ModelPickerDialog.css";
+import "./ModelPickerDialog.manga.css";
 
 /**
  * Two-stage model picker modal.

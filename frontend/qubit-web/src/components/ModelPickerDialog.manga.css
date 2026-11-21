@@ -1,0 +1,23 @@
+/*
+ * Manga skin correction for the model picker footer.
+ *
+ * The shared manga layer paints an offset plate (`box-shadow: 3px 4px 0`) on
+ * every Sakuga button. Inside the picker's action row that reads as a stray
+ * purple/black container beneath "Refresh Models", "Cancel" and "Switch".
+ * Drop the offset plate for these three actions only; their border, background
+ * and hover treatment from ModelPickerDialog.css stay intact, and keyboard
+ * focus gets an explicit ring instead of the removed shadow.
+ */
+html[data-qubit-manga="on"] .qmodel-picker .qmodel-picker__actions sakuga-button.qmodel-picker__action::part(button) {
+  box-shadow: none !important;
+}
+
+html[data-qubit-manga="on"] .qmodel-picker .qmodel-picker__actions sakuga-button.qmodel-picker__action::part(button):hover {
+  box-shadow: none !important;
+}
+
+html[data-qubit-manga="on"] .qmodel-picker .qmodel-picker__actions sakuga-button.qmodel-picker__action::part(button):focus-visible {
+  box-shadow: none !important;
+  outline: 2px solid var(--qm-magenta, var(--qmp-accent));
+  outline-offset: 2px;
+}
