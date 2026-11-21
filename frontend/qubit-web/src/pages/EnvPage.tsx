@@ -28,6 +28,7 @@ import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
+import "./EnvPage.manga.css";
 
 /* ------------------------------------------------------------------ */
 /*  Provider grouping                                                  */
@@ -839,7 +840,7 @@ export default function EnvPage() {
 
       {vars ? (
         <nav
-          className="flex shrink-0 flex-wrap items-center gap-1"
+          className="qm-env-sections flex shrink-0 flex-wrap items-center gap-1"
           aria-label="Jump to section"
         >
           {sections.map((s) => (
