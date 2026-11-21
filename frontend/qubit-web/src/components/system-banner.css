@@ -1,0 +1,38 @@
+/* Manga-only SYSTEM banner art (owner-supplied v2). The classic Q5T titlebar
+   above stays untouched and visible whenever the Manga skin is off. */
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-titlebar.qubit-system-banner {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  block-size: auto;
+  min-height: 0 !important;
+  aspect-ratio: 375 / 82;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  overflow: hidden;
+  background: url("./system-banner.svg") center / 100% 100% no-repeat;
+  container-type: inline-size;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-titlebar.qubit-system-banner .q5t-titlebar__art {
+  display: none !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .q5t-system-shell .q5t-titlebar.qubit-system-banner .qubit-system-banner__label {
+  position: absolute;
+  inset-inline: 12.5% 25%;
+  top: 43%;
+  transform: translateY(-50%);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #210d27;
+  font: 850 clamp(12px, 5.33cqw, 20px) / 1 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
