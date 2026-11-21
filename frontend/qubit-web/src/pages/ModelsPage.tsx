@@ -47,6 +47,8 @@ import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
 import { MangaMenuSurface } from "@/manga-skin/MangaMenuSurface";
 import { Button, HoverTooltip, Input, Select, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 
+import "./ModelsPage.manga.css";
+
 const PERIODS = [
   { label: "7d", days: 7 },
   { label: "30d", days: 30 },
