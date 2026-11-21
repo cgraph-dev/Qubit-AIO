@@ -38,7 +38,7 @@
    base), the body starts below the tab and keeps out of the corner art, and
    long copy scrolls inside its own field instead of stretching the plate.
    -------------------------------------------------------------------------- */
-html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] {
+html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip][role="tooltip"] {
   display: block !important;
   gap: 0 !important;
   box-sizing: border-box !important;
@@ -59,7 +59,7 @@ html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] {
 
 /* Title: inside the pink tab, centred and capped to two short lines.
    x 25..89 clears the tab's slanted left and right edges at every row. */
-html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__title {
+html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip][role="tooltip"] > .manga-rail-tooltip__title {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -92,7 +92,7 @@ html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] >
 
 /* Body: starts below the tab (y 34), spans the clear field, and scrolls
    within y 34..83 so four-plus lines never reach the bottom bevel. */
-html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__body {
+html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip][role="tooltip"] > .manga-rail-tooltip__body {
   display: block !important;
   box-sizing: border-box !important;
   margin: 7px 70px 0 30px !important;
@@ -116,7 +116,7 @@ html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] >
 }
 
 @media (forced-colors: active) {
-  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] {
+  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip][role="tooltip"] {
     width: 270px !important;
     height: auto !important;
     min-height: 0 !important;
@@ -127,8 +127,8 @@ html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] >
     color: CanvasText !important;
     overflow: visible !important;
   }
-  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__title,
-  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip] > .manga-rail-tooltip__body {
+  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip][role="tooltip"] > .manga-rail-tooltip__title,
+  html:root[data-qubit-manga="on"] body > .manga-rail-tooltip[data-rail-tooltip][role="tooltip"] > .manga-rail-tooltip__body {
     display: block !important;
     width: auto !important;
     max-width: none !important;
