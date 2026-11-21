@@ -1808,12 +1808,23 @@ function SidebarSystemActions({
           <Q5TGatewayFrame>
             <NavLink to="/sessions" title={t.app.statusOverview} className="block text-left">
               <dl>
-                <dt>{stripLabel(t.app.gatewayStatusLabel)}</dt>
-                <dd className={gatewaySummary?.tone}>{gatewaySummary?.label ?? "…"}</dd>
-                <dt>{stripLabel(t.app.activeSessionsLabel)}</dt>
-                <dd>{status?.active_sessions ?? "…"}</dd>
-                <dt>Latency</dt>
-                <dd>{latencyMs === null || latencyMs === undefined ? "—" : formatLatency(latencyMs)}</dd>
+                <div>
+                  <dt>{stripLabel(t.app.gatewayStatusLabel)}</dt>
+                  <dd
+                    className={gatewaySummary?.tone}
+                    data-state={gatewaySummary?.tone === "text-success" ? "up" : "down"}
+                  >
+                    {gatewaySummary?.label ?? "…"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{stripLabel(t.app.activeSessionsLabel)}</dt>
+                  <dd>{status?.active_sessions ?? "…"}</dd>
+                </div>
+                <div>
+                  <dt>Latency</dt>
+                  <dd>{latencyMs === null || latencyMs === undefined ? "—" : formatLatency(latencyMs)}</dd>
+                </div>
               </dl>
             </NavLink>
           </Q5TGatewayFrame>
