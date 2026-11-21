@@ -97,9 +97,9 @@ def test_d8_d9_d10_duplicate_routes_have_distinct_identities():
     # The vendored counterparts must not share a title with the Qubit surface;
     # what makes them distinct is that no entry here claims the vendored path
     # itself. `/kanban` is the vendored Boards tab and stays untitled here;
-    # `/devices` IS a Qubit family page (titled "Qubit Devices", like /nodes
-    # and /canvas) and is deliberately distinct from the vendored tab's own
-    # label -- so the invariant is distinctness, not absence.
+    # `/devices` is a Qubit family page, titled "Devices" like /nodes so the
+    # header matches the sidebar; it stays deliberately distinct from the
+    # vendored tab's own label -- the invariant is distinctness, not absence.
     assert "/kanban" not in titles
     assert titles.get("/devices") != titles["/qubit-runtime"]
     app = APP.read_text(encoding="utf-8")

@@ -72,14 +72,14 @@ describe("resolvePageTitle", () => {
   it("resolves the family pages to proper Qubit product titles", () => {
     // Regression: the naive fallback mangled these ("Agent-workspace",
     // "Admin/skills-review"). Each title matches its page's own heading.
-    expect(resolvePageTitle("/agent-workspace", t, [])).toBe("Qubit Agent Workspace");
-    expect(resolvePageTitle("/nodes", t, [])).toBe("Qubit Nodes");
-    expect(resolvePageTitle("/devices", t, [])).toBe("Qubit Devices");
-    expect(resolvePageTitle("/session-ops", t, [])).toBe("Qubit Session Ops");
-    expect(resolvePageTitle("/worktrees", t, [])).toBe("Qubit Worktrees");
-    expect(resolvePageTitle("/checkpoints", t, [])).toBe("Qubit Checkpoints");
-    expect(resolvePageTitle("/qubit-board-admin", t, [])).toBe("Qubit Board Admin");
-    expect(resolvePageTitle("/qubit-task-inbox", t, [])).toBe("Qubit Task Inbox");
+    expect(resolvePageTitle("/agent-workspace", t, [])).toBe("Agent Workspace");
+    expect(resolvePageTitle("/nodes", t, [])).toBe("Nodes");
+    expect(resolvePageTitle("/devices", t, [])).toBe("Devices");
+    expect(resolvePageTitle("/session-ops", t, [])).toBe("Session Ops");
+    expect(resolvePageTitle("/worktrees", t, [])).toBe("Worktrees");
+    expect(resolvePageTitle("/checkpoints", t, [])).toBe("Checkpoints");
+    expect(resolvePageTitle("/qubit-board-admin", t, [])).toBe("Board Admin");
+    expect(resolvePageTitle("/qubit-task-inbox", t, [])).toBe("Task Inbox");
     expect(resolvePageTitle("/qubit-talk", t, [])).toBe("Voice & Speech");
     expect(resolvePageTitle("/qubit-scheduler", t, [])).toBe("Tasks & Scheduling");
     expect(resolvePageTitle("/admin/skills-review", t, [])).toBe("Skills Review Queue");
