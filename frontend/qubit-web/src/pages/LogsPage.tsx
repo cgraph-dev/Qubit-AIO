@@ -214,7 +214,7 @@ export default function LogsPage() {
   useLayoutEffect(() => {
     setAfterTitle(
       <span className="flex items-center gap-1.5">
-        <Badge tone="secondary" className="text-xs">
+        <Badge tone="secondary" className="qm-header-chip text-xs">
           {formatFilterLabel(file)} · {formatFilterLabel(level)} ·{" "}
           {formatFilterLabel(component)}
         </Badge>

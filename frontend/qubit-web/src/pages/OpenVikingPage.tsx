@@ -163,7 +163,10 @@ export default function OpenVikingPage() {
   useEffect(() => {
     if (!pageHeader || connection === "loading") return;
     pageHeader.setAfterTitle(
-      <Badge tone={connection === "connected" ? "success" : "outline"}>
+      <Badge
+        tone={connection === "connected" ? "success" : "outline"}
+        className="qm-header-chip"
+      >
         {connection === "connected"
           ? "LOCAL ENGINE"
           : connection === "unavailable"
