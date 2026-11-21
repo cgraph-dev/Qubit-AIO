@@ -3,15 +3,43 @@
 
 /* Skills rows: the upstream 108x54 toggle is too wide for the skills row.
    Keep the control's art and mechanics, shrink it to 76x38, and let the
-   layout reserve that width so it can never sit over the skill text. */
+   layout reserve that width so it can never sit over the skill text.
+
+   Earlier passes used transform: scale(). A transform shrinks only the painted
+   result, so the host kept its 108px layout box and the row needed a negative
+   margin to compensate; any shared max-width cap on the host also clamped the
+   control before it scaled (it rendered ~52x26). `zoom` scales layout, paint
+   and hit-testing together, so the host really occupies 76x38 in the grid:
+   no negative margins, no overlap, and the click target matches the visual.
+   Override the shared Sakuga `max-width:100%` cap first, or the 108px host is
+   clamped by the first grid cell before zoom can apply. */
+html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row {
+  grid-template-columns: 76px minmax(0, 1fr) 40px !important;
+}
+html[data-qubit-manga="on"] .qm-skill-row > :first-child {
+  box-sizing: border-box;
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+}
 html[data-qubit-manga="on"] .qm-skill-row sakuga-toggle {
-  flex: 0 0 108px !important;
+  display: inline-block !important;
+  box-sizing: border-box;
   width: 108px !important;
+  min-width: 108px !important;
+  max-width: none !important;
   height: 54px !important;
-  margin: 0 -32px 0 0 !important;
-  transform: scale(0.704) !important;
-  transform-origin: left center !important;
+  min-height: 54px !important;
+  margin: 0 !important;
+  /* 108 * 0.7037 = 76.0, 54 * 0.7037 = 38.0. zoom (unlike transform)
+     shrinks the used layout box, so the grid cell and hit area agree. */
+  zoom: 0.7037037 !important;
   overflow: visible !important;
+}
+@media (max-width: 680px) {
+  html[data-qubit-manga="on"] #qubit-main-content .qm-skill-row {
+    grid-template-columns: 76px minmax(0, 1fr) 36px !important;
+  }
 }
 
 /* The two system actions (Restart Gateway, Update Qubit) are owned by
