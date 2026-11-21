@@ -8,6 +8,7 @@
  * in the Qubit runtime `.env` as `OMNIROUTE_API_KEY` and is only referenced.
  */
 import { copyTextToClipboard } from "@/lib/clipboard";
+import "./OmniRoutePage.manga.css";
 
 import {
   SettingsPage,
