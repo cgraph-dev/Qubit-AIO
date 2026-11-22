@@ -19,7 +19,7 @@
  * set. No literal colour values, raster assets, or text are introduced here.
  *
  * PORT PROVENANCE: ported verbatim from the canonical ChatGPT Stage 6
- * `/home/trick/Desktop/oui/drawing-primitives.ts`; the Perplexity alternate
+ * `drawing-primitives.ts` in the original local drawing prototype; the Perplexity alternate
  * primitives file was not merged. See `2five-adapter.ts` for the documented
  * seam into the native renderer and the exact reason it is not mounted live.
  */
