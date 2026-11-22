@@ -1161,11 +1161,14 @@ stage_products() {
     # Restore ONLY this generated receipt to its tracked bytes before handing
     # control to an older updater. Fresh checkouts do not track it and retain
     # their real, verifiable build receipt. No user source changes are touched.
-    local legacy_receipt="qubit_runtime/ui-tui/dist/hermes-build.json"
+    local legacy_receipt="ui-tui/dist/hermes-build.json"
+    if [ -d "$INSTALL_DIR/qubit_runtime" ]; then
+        legacy_receipt="qubit_runtime/$legacy_receipt"
+    fi
     if git -C "$INSTALL_DIR" ls-files --error-unmatch -- "$legacy_receipt" >/dev/null 2>&1; then
         if ! git -C "$INSTALL_DIR" diff --quiet -- "$legacy_receipt"; then
-            git -C "$INSTALL_DIR" restore --worktree -- "$legacy_receipt" \\
-                || fail "could not normalize legacy generated TUI receipt" products_build_failed
+            git -C "$INSTALL_DIR" restore --worktree -- "$legacy_receipt" ||
+                fail "could not normalize legacy generated TUI receipt" products_build_failed
             log "normalized legacy tracked TUI build receipt for upgrade compatibility"
         fi
     fi
