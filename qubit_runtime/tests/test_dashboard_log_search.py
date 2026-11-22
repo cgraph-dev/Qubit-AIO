@@ -67,3 +67,33 @@ def test_stateful_filter_is_fresh_on_second_pass(tmp_path):
     assert page == ["hit third\n"]
     assert more is True
     assert len(creations) == 2
+
+
+def test_pagination_is_exhaustive_without_duplicates(tmp_path):
+    path = tmp_path / "agent.log"
+    path.write_text("".join(f"hit {i}\n" for i in range(7)))
+    pages = []
+    for offset in (0, 3, 6):
+        page, more = search_log_page(
+            path, needle="HIT", offset=offset, limit=3,
+            accept_line_factory=lambda: (lambda _: True))
+        pages.append(page)
+        assert more is (offset < 6)
+    assert pages == [
+        ["hit 4\n", "hit 5\n", "hit 6\n"],
+        ["hit 1\n", "hit 2\n", "hit 3\n"],
+        ["hit 0\n"],
+    ]
+    assert search_log_page(
+        path, needle="hit", offset=7, limit=3,
+        accept_line_factory=lambda: (lambda _: True)) == ([], False)
+
+
+def test_invalid_utf8_and_bom_are_handled(tmp_path):
+    path = tmp_path / "agent.log"
+    path.write_bytes(b"\xef\xbb\xbfhit first\n\xffhit second\n")
+    page, more = search_log_page(
+        path, needle="hit", offset=0, limit=5,
+        accept_line_factory=lambda: (lambda _: True))
+    assert page == ["hit first\n", "\ufffdhit second\n"]
+    assert more is False
