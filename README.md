@@ -9,6 +9,35 @@ agent, caretaker, teacher, personal bot, and business organizer. It runs on your
 machine and gives you one agent for text, terminal, browser, files, coding tasks,
 and optional voice.
 
+<div align="center">
+
+### One agent. One workspace. Every tool you choose to connect.
+
+**Code · Research · Files · Browser · Terminal · Voice · Models · Skills · Plugins · MCP**
+
+</div>
+
+## Built as Qubit
+
+Qubit is a **solo-developer, AI-assisted engineering project**: one local-first agent designed to bring coding, personal assistance, automation, and voice into a single experience. Its product design, integration work, dashboard, voice features, packaging, and adapter strategy are developed under the Qubit name. The codebase also **ports and adapts components from [Hermes Agent](https://github.com/NousResearch/hermes-agent)** and draws on features and extension patterns from [OpenClaw](https://github.com/openclaw/openclaw). Qubit does not claim those upstream components were independently written from scratch.
+
+The goal is an **all-in-one agent**, not a promise that every possible integration already works. Local and cloud model providers, the CLI, dashboard, terminal, browser, files, messaging gateway, optional voice, and extensible capabilities are part of the architecture; availability depends on the active platform, configuration, permissions, and installed extensions.
+
+### Extending Qubit without fragmenting the agent
+
+The [adapter registry](adapters/README.md) defines extension seams for **skills, plugins, MCP servers, messaging channels, and tools**. Hermes-origin integrations can use existing skill discovery, plugin loading, and MCP registration; future Hermes or OpenClaw integrations can be ported behind the same Qubit interfaces. **This is an extensibility architecture, not a blanket guarantee of automatic compatibility with every past or future third-party plugin.** Individual packages may require adaptation, security review, and compatibility tests.
+
+| Surface | Qubit integration approach |
+| --- | --- |
+| Skills | Discover profile, bundled, and plugin-contributed skill definitions |
+| Plugins | Load supported plugin manifests and registration hooks |
+| MCP | Discover configured MCP servers and register their tools |
+| Messaging | Register platform adapters through the gateway |
+| Voice | Connect speech recognition, speech output, and interruption handling to the agent runtime |
+| Dashboard | Manage agent conversations and configuration through the local web interface |
+
+For implementation boundaries and known platform limitations, see [architecture](docs/ARCHITECTURE.md), [adapter registry](adapters/README.md), and [installation](INSTALL.md). Upstream authors and third-party licenses retain their respective attribution and terms.
+
 ## Features
 
 - Local-first agent runtime with tools for files, terminal, browser, and coding work.
