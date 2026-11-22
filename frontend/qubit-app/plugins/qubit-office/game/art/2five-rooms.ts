@@ -25,7 +25,7 @@
  * - animation values follow game/types.ts AnimationState.
  *
  * PORT PROVENANCE: ported verbatim from the canonical ChatGPT Stage 5
- * `/home/trick/Desktop/oui/rooms.ts`; the Perplexity alternate schema was not
+ * `rooms.ts` in the original local drawing prototype; the Perplexity alternate schema was not
  * merged. This module is deliberately NOT mounted by the live office, which
  * renders the vendored Habblaud client inside an iframe.
  */
