@@ -518,14 +518,14 @@ def scan_archive(path: Path) -> dict:
         for member in members:
             # An archive entry must never escape the extraction root. Reject
             # traversal even if the name also passes the secret-pattern scan.
-            if (member.name.startswith("/") or "\\\\" in member.name or
+            if (member.name.startswith("/") or "\\" in member.name or
                     any(part == ".." for part in member.name.split("/"))):
                 metadata.append("%s (unsafe archive path)" % member.name)
             if member.issym() or member.islnk():
                 # Absolute links and upward traversals can point outside the
                 # release tree; do not accept them as clean source artifacts.
                 target = member.linkname
-                if (target.startswith("/") or "\\\\" in target or
+                if (target.startswith("/") or "\\" in target or
                         any(part == ".." for part in target.split("/"))):
                     metadata.append("%s -> %s (unsafe archive link)" % (member.name, target))
             parts = PurePosixPath(member.name).parts
