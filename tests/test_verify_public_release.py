@@ -671,3 +671,16 @@ def test_archive_scan_rejects_member_beneath_symlink_even_if_link_comes_later(tm
         tar.addfile(link)
     report = verifier.scan_archive(archive)
     assert any("archive path traverses a link" in item for item in report["metadata"])
+
+
+def test_archive_scan_rejects_file_used_as_parent_directory(tmp_path):
+    verifier = _load()
+    archive = tmp_path / "file-parent.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name in ("release/config", "release/config/settings.json"):
+            payload = b"data"
+            entry = tarfile.TarInfo(name)
+            entry.size = len(payload)
+            tar.addfile(entry, io.BytesIO(payload))
+    report = verifier.scan_archive(archive)
+    assert any("non-directory parent" in item for item in report["metadata"])
