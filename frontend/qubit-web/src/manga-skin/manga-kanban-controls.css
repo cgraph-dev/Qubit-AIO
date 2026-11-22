@@ -15,17 +15,17 @@ html[data-qubit-manga="on"] .qubit-kanban sakuga-button.qubit-kanban-column-add:
   line-height: 1 !important;
 }
 
-/* Orchestration pill: its emerald host is the control. Neutralise the inner
-   Sakuga plate so no green plate surrounds a yellow square. */
-html[data-qubit-manga="on"] .qubit-kanban sakuga-button[class*="bg-emerald-500"]::part(button) {
+/* Orchestration mode pill: strip the emerald/grey Tailwind host plate and let
+   the standard Manga yellow Sakuga face show, matching "Orchestration
+   settings" beside it. */
+html[data-qubit-manga="on"] .qubit-kanban sakuga-button[class*="bg-emerald-500"],
+html[data-qubit-manga="on"] .qubit-kanban sakuga-button[class*="bg-muted/30"] {
   background: transparent !important;
-  color: inherit !important;
   border: 0 !important;
-  box-shadow: none !important;
+  border-radius: 0 !important;
   padding: 0 !important;
-  min-width: 0 !important;
-  height: auto !important;
-  font: inherit !important;
+  color: var(--qm-black) !important;
+  font-weight: 700 !important;
   letter-spacing: normal !important;
 }
 

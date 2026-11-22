@@ -139,9 +139,36 @@ export function installKanbanTooltips(): () => void {
 
   const onViewportChange = () => hidePortal();
 
+  // The column header repeats its help text in the visible `.qubit-kanban-
+  // column-sub` line. Its native `title` also fires while the pointer crosses
+  // the header on the way to the "+", producing a second OS tooltip; strip it
+  // before it can arm, and re-strip as columns re-render.
+  const stripHeaderTitles = () => {
+    document
+      .querySelectorAll<HTMLElement>(".qubit-kanban .qubit-kanban-column-header[title]")
+      .forEach((el) => {
+        const title = el.getAttribute("title");
+        if (!title) return;
+        el.removeAttribute("title");
+        el.setAttribute("data-qm-header-tip", title);
+      });
+  };
+
+  const restoreHeaderTitles = () => {
+    document.querySelectorAll<HTMLElement>("[data-qm-header-tip]").forEach((el) => {
+      const title = el.getAttribute("data-qm-header-tip");
+      if (title === null) return;
+      el.removeAttribute("data-qm-header-tip");
+      if (!el.hasAttribute("title")) el.setAttribute("title", title);
+    });
+  };
+
+  stripHeaderTitles();
+
   const observer = new MutationObserver(() => {
     if (portalTrigger && !portalTrigger.isConnected) hidePortal();
     if (suppressed && !suppressed.isConnected) unsuppress();
+    stripHeaderTitles();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
@@ -156,6 +183,7 @@ export function installKanbanTooltips(): () => void {
   return () => {
     hidePortal();
     unsuppress();
+    restoreHeaderTitles();
     observer.disconnect();
     document.removeEventListener("pointerover", onPointerOver, true);
     document.removeEventListener("pointerout", onPointerOut, true);

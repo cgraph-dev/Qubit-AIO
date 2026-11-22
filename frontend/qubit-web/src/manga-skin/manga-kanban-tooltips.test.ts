@@ -70,7 +70,7 @@ describe("kanban manga tooltips", () => {
     expect(inner.title).toBe("inner");
   });
 
-  it("does not add a second bubble when a HoverTip child inherits an ancestor title", () => {
+  it("strips the redundant column-header title so "+" has exactly one tooltip", () => {
     const board = document.createElement("div");
     board.className = "qubit-kanban";
     const header = document.createElement("div");
@@ -85,20 +85,19 @@ describe("kanban manga tooltips", () => {
     document.body.append(board);
     cleanup = installKanbanTooltips();
 
+    expect(header.hasAttribute("title")).toBe(false);
+    expect(header.getAttribute("data-qm-header-tip")).toBe("Column help");
+
     hover(inner);
-    expect(inner.hasAttribute("title")).toBe(false);
-    expect(header.hasAttribute("title")).toBe(false);
-    expect(header.getAttribute("data-qm-tip")).toBe("Column help");
     expect(document.querySelector(".qm-kanban-tip")).toBeNull();
 
-    hover(header);
-    expect(header.hasAttribute("title")).toBe(false);
-    expect(header.getAttribute("data-qm-tip")).toBe("Column help");
-    expect(document.querySelector(".qm-kanban-tip")?.textContent).toBe("Column help");
+    leave(inner);
+    expect(document.querySelector(".qm-kanban-tip")).toBeNull();
 
-    leave(header);
+    cleanup();
+    cleanup = null;
     expect(header.getAttribute("title")).toBe("Column help");
-    expect(document.querySelector(".qm-kanban-tip")).toBeNull();
+    expect(header.hasAttribute("data-qm-header-tip")).toBe(false);
   });
 
   it("cleans up the bubble and listeners on unmount", () => {
