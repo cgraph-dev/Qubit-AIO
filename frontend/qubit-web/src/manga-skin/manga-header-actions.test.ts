@@ -27,7 +27,7 @@ describe("Manga page-header action clusters", () => {
   it("puts other header meta text on the shared chip path", () => {
     expect(files).toContain("qm-header-chip qm-header-chip--path");
     expect(files).toContain("title={headerPath}");
-    expect(logs).toContain('className="qm-header-chip text-xs"');
+    expect(logs).toContain('<Badge tone="secondary" className="qm-header-chip qm-logs-meta text-xs">');
     expect(skills).toContain('className="qm-header-chip flex items-center gap-2');
     expect(openViking).toContain('className="qm-header-chip"');
   });

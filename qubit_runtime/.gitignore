@@ -339,3 +339,7 @@ native/fts5_cjk/*.so
 /pm/.lock.json.lock
 
 apps/desktop/.dist-build*
+
+# Host-specific TUI compiler receipt. Rebuilt during installation and update;
+# never track it, or a successful build leaves managed Git checkouts dirty.
+/ui-tui/dist/hermes-build.json

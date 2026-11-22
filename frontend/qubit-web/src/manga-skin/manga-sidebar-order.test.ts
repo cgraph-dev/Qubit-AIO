@@ -17,7 +17,8 @@ describe("Manga sidebar section numbering and plugin position", () => {
     expect(app).not.toContain("systemSectionIndex");
   });
   it("shows the Manga Chat and Workspace labels instead of translated Primary", () => {
-    expect(app).toContain('useMangaNavigation ? section.label : (t.app.sections?.[section.id] ?? section.label)');
+    expect(app).toContain("label={section.label.toUpperCase()}");
+    expect(app).toContain("t.app.sections?.[section.id] ?? section.label");
   });
   it("keeps extension/plugin navigation after numbered groups and before status", () => {
     expect(app.indexOf("sidebarSections.map(")).toBeLessThan(app.indexOf("sidebarNav.pluginItems.length > 0"));

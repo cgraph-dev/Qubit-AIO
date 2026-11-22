@@ -9,7 +9,7 @@ readme = "README.md"
 # under its original license and is recorded in THIRD_PARTY_NOTICES.md and
 # docs/UPSTREAM_REUSE.md. The repository as a whole is not an OSI-approved
 # open-source project.
-license = { text = "Qubit VoiceBridge Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
+license = "LicenseRef-Qubit-VoiceBridge-Educational"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 # Python floor is 3.12, not 3.11: the product uses PEP 701 f-strings (e.g.
 # voicebridge/local_llm.py) and scripts/install.sh creates the venv with
@@ -475,6 +475,28 @@ exclude = [
   # internal dev change reports carry machine-specific history; not needed to
   # build, run, or test the release
   "docs/CHANGE_REPORTS",
+  # Qubit Office planning/provenance and phase evidence are internal working
+  # records, not install-time documentation or runtime assets. These records
+  # contain developer-local absolute paths and must not ship in the public sdist.
+  # Keep them in Git for development/audit; never weaken the release path scanner.
+  "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+  "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+  "docs/QUBIT-OFFICE-DEPENDENCY-LOCK.json",
+  "docs/QUBIT-OFFICE-MASTER-PLAN.md",
+  "docs/QUBIT-OFFICE-PHASE-0.md",
+  "docs/QUBIT-OFFICE-REPO-LEDGER.md",
+  "docs/sakuga-migration-office.md",
+  "docs/superpowers/specs/2026-11-18-sakuga-vfx-integration-design.md",
+  "evidence/phase-0",
+  "evidence/phase-1",
+  "evidence/phase-2",
+  "evidence/phase-3",
+  "evidence/phase-4",
+  "evidence/phase-5",
+  "evidence/phase-6",
+  "evidence/phase-7",
+  "evidence/phase-8",
+
   # Developer-only scratch probes, session ledgers and audit output. They are
   # tracked for history and legitimately record the developer's home path, but
   # they are NOT product surfaces: they must not enter a release artifact.

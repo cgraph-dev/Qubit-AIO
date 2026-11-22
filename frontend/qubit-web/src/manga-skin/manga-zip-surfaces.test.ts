@@ -31,9 +31,10 @@ describe("full Manga ZIP asset integration safety", () => {
   });
 
   it("carries all key page-family hooks while respecting motion", () => {
-    for (const surface of ["right-model.svg", "chat-composer.svg"]) {
-      expect(style).toContain(surface);
-    }
+    expect(style).toContain("right-model.svg");
+    // The chat composer now has one native skin owner, not an overlapping ZIP sprite.
+    expect(style).not.toContain('background-image:url("/manga-ui/zip/chat-composer.svg")');
+    expect(style).toContain("qubit-chat-manga.css");
     expect(style).toContain("prefers-reduced-motion:reduce");
     expect(style).not.toContain("plugin-card.svg");
     expect(style).not.toContain("model-card.svg");

@@ -1153,6 +1153,25 @@ stage_products() {
     (cd "$rt" && run_logged "Building the qubit command and apps" \
         "$boot_py" -I -B -X utf8 qubit_cli/source_completion.py "${args[@]}") \
         || fail "app products or command publication failed" products_build_failed
+    # Compatibility bridge for installations still at an older Git commit that
+    # TRACKS the host-specific TUI receipt. The just-built receipt differs by
+    # Node/platform and would be autostashed by that older version's updater.
+    # The target release intentionally untracks it, so restoring the stash
+    # would cause a modify/delete conflict and abort otherwise valid upgrades.
+    # Restore ONLY this generated receipt to its tracked bytes before handing
+    # control to an older updater. Fresh checkouts do not track it and retain
+    # their real, verifiable build receipt. No user source changes are touched.
+    local legacy_receipt="ui-tui/dist/hermes-build.json"
+    if [ -d "$INSTALL_DIR/qubit_runtime" ]; then
+        legacy_receipt="qubit_runtime/$legacy_receipt"
+    fi
+    if git -C "$INSTALL_DIR" ls-files --error-unmatch -- "$legacy_receipt" >/dev/null 2>&1; then
+        if ! git -C "$INSTALL_DIR" diff --quiet -- "$legacy_receipt"; then
+            git -C "$INSTALL_DIR" restore --worktree -- "$legacy_receipt" ||
+                fail "could not normalize legacy generated TUI receipt" products_build_failed
+            log "normalized legacy tracked TUI build receipt for upgrade compatibility"
+        fi
+    fi
     wire_shell_path
     log_success "app products and qubit command ready"
 }
