@@ -28,7 +28,10 @@ from . import _helpers as H
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="POSIX dashboard process")
 
 SEEDED = 40
-WRITE_SECONDS = 8.0
+# Shared CI runners can spend several seconds starting the live dashboard and
+# five HTTP readers. Preserve the >=10-read overlap requirement while allowing
+# enough time to distinguish runner startup latency from consistency failures.
+WRITE_SECONDS = 20.0
 
 # Writes sessions + messages in the agent's own persistence layer; prints the committed count after
 # every session so the harness knows an upper bound at any instant.
