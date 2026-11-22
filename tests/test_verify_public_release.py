@@ -602,3 +602,30 @@ def test_infer_version_accepts_a_pep440_respelt_of_one_version():
         "Qubit-0.21.4-source.tar.gz",
         "qubit_voicebridge-0.21.5-py3-none-any.whl",
     }) is None
+
+
+@pytest.mark.parametrize(
+    "name,linkname",
+    [
+        ("../escaped.txt", None),
+        ("/absolute.txt", None),
+        (r"folder\\escaped.txt", None),
+        ("safe/link", "../../outside"),
+        ("safe/link", "/etc/passwd"),
+        ("safe/link", r"..\\outside"),
+    ],
+)
+def test_archive_scan_rejects_escaping_paths_and_links(tmp_path, name, linkname):
+    verifier = _load()
+    archive = tmp_path / "malicious.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        entry = tarfile.TarInfo(name)
+        if linkname is None:
+            entry.size = 4
+            tar.addfile(entry, io.BytesIO(b"safe"))
+        else:
+            entry.type = tarfile.SYMTYPE
+            entry.linkname = linkname
+            tar.addfile(entry)
+    report = verifier.scan_archive(archive)
+    assert report["metadata"], (name, linkname)
