@@ -27,7 +27,10 @@ jobs:
           python-version: "3.12"
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest==8.4.2
-      - name: Verify release archive and published-asset checks
-        run: python -m pytest -q tests/test_verify_public_release.py
+      - name: Verify release archive and clean-install gate contracts
+        run: |
+          python -m pytest -q \
+            tests/test_verify_public_release.py \
+            tests/test_release_fresh_install_gate.py
       - uses: ./.github/actions/check-clean-worktree
 
