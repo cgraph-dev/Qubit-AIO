@@ -34,3 +34,24 @@ def test_rejects_forbidden_hermes_directory(tmp_path: Path):
     plan["models"] = str(tmp_path / "rehearsal" / ".hermes" / "models")
     findings = rehearsal.isolation_findings(plan)
     assert any("forbidden .hermes" in issue for issue in findings)
+
+
+def test_rejects_symlink_escape(tmp_path: Path):
+    root = tmp_path / "rehearsal"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "linked-models").symlink_to(outside, target_is_directory=True)
+    plan = rehearsal.build_plan(work_root=root)
+    plan["models"] = str(root / "linked-models")
+    findings = rehearsal.isolation_findings(plan)
+    assert any("models escapes work_root" in issue for issue in findings)
+
+
+def test_rejects_live_hermes_home(tmp_path: Path, monkeypatch):
+    live = tmp_path / "rehearsal" / "operator-hermes"
+    monkeypatch.setenv("HERMES_HOME", str(live))
+    plan = rehearsal.build_plan(work_root=tmp_path / "rehearsal")
+    plan["xdg_cache"] = str(live / "cache")
+    findings = rehearsal.isolation_findings(plan)
+    assert any("live HERMES_HOME" in issue for issue in findings)
