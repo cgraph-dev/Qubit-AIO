@@ -517,8 +517,18 @@ try:
         assert asset, "no built dashboard asset referenced"
         st, _, ab = raw("/" + asset.group(1).decode())
         assert st == 200 and len(ab) > 1000, (st, len(ab))
-        st, _, pb = raw("/agent/api/dashboard/plugins",
+        # Exercise the installed HTTP authentication boundary, not only
+        # source-level token checks. The plugin catalog is sensitive: neither
+        # an absent credential nor an incorrect one may read it.
+        protected = "/agent/api/dashboard/plugins"
+        for bad_headers in ({}, {"X-Qubit-Session-Token": "incorrect-token"}):
+            denied_status, _, denied_body = raw(protected, bad_headers)
+            assert denied_status in (401, 403), (
+                "protected installed dashboard route accepted invalid auth",
+                denied_status, denied_body[:200])
+        st, _, pb = raw(protected,
                         {"X-Qubit-Session-Token": "rehearsal-token"})
+        assert st == 200, ("valid dashboard token rejected", st, pb[:200])
         names = [m["name"] for m in json.loads(pb)]
         for want in ("qubit-ops", "qubit-devices", "qubit-memory",
                      "qubit-reports", "qubit-approvals"):
