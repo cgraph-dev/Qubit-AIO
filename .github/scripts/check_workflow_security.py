@@ -15,8 +15,7 @@ security properties that YAML syntax cannot express:
 * a `v*`-tag release workflow creates drafts only (`gh release create --draft`).
 
 All workflows, including Windows install and update, are subject to the
-same managed security policy. New workflows cannot bypass these checks. Every other workflow is managed and must
-satisfy the full policy.
+same managed security policy. No workflow is exempt from these checks.
 """
 from __future__ import annotations
 
@@ -29,7 +28,6 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
-LEGACY_WORKFLOWS = set()
 
 #: Workflows allowed to read repository secrets, and the exact secret names
 #: they may read. Every entry must be a manually dispatched workflow with a
@@ -214,8 +212,6 @@ def main() -> int:
     errors: list[str] = []
     checked: list[str] = []
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
-        if path.name in LEGACY_WORKFLOWS:
-            continue
         checked.append(path.name)
         try:
             doc = load(path)
