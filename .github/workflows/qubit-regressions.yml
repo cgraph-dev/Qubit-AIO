@@ -32,6 +32,7 @@ jobs:
           python -m pytest -q \
             tests/test_verify_public_release.py \
             tests/test_release_fresh_install_gate.py \
-            tests/test_clean_install_isolation.py
+            tests/test_clean_install_isolation.py \
+            tests/test_dashboard_auth_contract.py
       - uses: ./.github/actions/check-clean-worktree
 
