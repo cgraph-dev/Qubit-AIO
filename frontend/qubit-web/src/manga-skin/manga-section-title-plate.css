@@ -1,19 +1,20 @@
 /* Manga section titles use the owner SYSTEM plate art (system-banner.svg).
    The same plate was previously only painted in the sidebar; it is now the
    shared SettingsSection / page section heading and is removed from the rail. */
-html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading {
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading:not(:has(.settings-count)) {
   display: inline-flex !important;
   align-items: center !important;
   align-self: flex-start !important;
   flex: 0 0 auto !important;
   box-sizing: border-box !important;
   width: fit-content !important;
-  max-width: 100% !important;
+  max-width: 380px !important;
   min-width: 0 !important;
   height: 42px !important;
   min-height: 42px !important;
   margin: 0 !important;
-  padding: 0 58px 0 38px !important;
+  justify-content: center !important;
+  padding: 0 90px !important;
   border: 0 !important;
   border-radius: 0 !important;
   background-color: transparent !important;
@@ -25,46 +26,37 @@ html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__hea
   clip-path: none !important;
   filter: none !important;
   overflow: hidden !important;
-  color: #210d27 !important;
+  color: #ffe500 !important;
   font-family: var(--qm-display, "Arial Black", system-ui, sans-serif) !important;
   font-size: clamp(11px, 1.15vw, 13.5px) !important;
   font-style: italic !important;
   font-weight: 900 !important;
   letter-spacing: 0.045em !important;
   line-height: 1 !important;
-  text-shadow: none !important;
+  text-shadow: 1px 2px 0 #080615, 0 0 6px rgba(255, 173, 0, 0.8) !important;
+  text-align: center !important;
   text-transform: uppercase !important;
   white-space: nowrap !important;
   text-overflow: ellipsis !important;
 }
 
-html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading::before,
-html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading::after {
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading:not(:has(.settings-count))::before,
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading:not(:has(.settings-count))::after {
   content: none !important;
   display: none !important;
   background: none !important;
 }
 
-html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading .settings-count {
-  margin-inline-start: 8px;
-  padding: 1px 7px;
-  border: 1.5px solid #210d27;
-  border-radius: 0;
-  background: #ffe500;
-  color: #210d27;
-  font-size: 0.72em;
-  font-weight: 900;
-  line-height: 1.2;
-}
+
 
 @media (max-width: 640px) {
-  html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading {
+  html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading:not(:has(.settings-count)) {
     width: fit-content !important;
     max-width: 100% !important;
     min-width: 0 !important;
     height: 40px !important;
     min-height: 40px !important;
-    padding: 0 48px 0 32px !important;
+    padding: 0 58px !important;
     font-size: 11px !important;
   }
 }
@@ -78,4 +70,17 @@ html:root[data-qubit-manga="on"] body #app-sidebar:not([data-collapsed="true"]) 
 }
 html:root[data-qubit-manga="on"] body #app-sidebar .qagent-sidebar__utility {
   margin-top: 2px !important;
+}
+
+
+/* Page header titles must stop before the gold bars at every route, not
+   only the two pages that were individually patched. */
+html:root[data-qubit-manga="on"] [data-dashboard-page-header] .qubit-module-header > h1 {
+  max-width: min(190px, 42%) !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.05 !important;
+  font-size: clamp(0.85rem, 2.2vw, 1rem) !important;
+  overflow: hidden !important;
 }
