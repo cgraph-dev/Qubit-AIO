@@ -528,6 +528,8 @@ def scan_archive(path: Path) -> dict:
                 if (target.startswith("/") or "\\" in target or
                         any(part == ".." for part in target.split("/"))):
                     metadata.append("%s -> %s (unsafe archive link)" % (member.name, target))
+            if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
+                metadata.append("%s (unsupported archive entry type)" % member.name)
             parts = PurePosixPath(member.name).parts
             if any(part in FORBIDDEN_DIR_SEGMENTS for part in parts):
                 metadata.append(member.name)
