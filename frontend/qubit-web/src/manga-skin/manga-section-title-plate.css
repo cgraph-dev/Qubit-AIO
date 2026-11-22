@@ -10,7 +10,7 @@ html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__hea
   height: 46px !important;
   min-height: 46px !important;
   margin: 0 !important;
-  padding: 0 30% 0 8% !important;
+  padding: 0 168px 0 32px !important;
   border: 0 !important;
   border-radius: 0 !important;
   background-color: transparent !important;
@@ -59,7 +59,7 @@ html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__hea
     width: 100% !important;
     height: 42px !important;
     min-height: 42px !important;
-    padding: 0 27% 0 7% !important;
+    padding: 0 96px 0 20px !important;
     font-size: 12px !important;
   }
 }
