@@ -1,0 +1,55 @@
+name: Qubit Manga UI contracts
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/qubit-web/src/manga-skin/**'
+      - 'frontend/qubit-web/src/sakuga/**'
+      - 'frontend/qubit-web/src/App.tsx'
+      - 'frontend/qubit-web/src/pages/**'
+      - 'frontend/qubit-web/src/components/**'
+      - 'frontend/qubit-web/package.json'
+      - 'frontend/qubit-web/package-lock.json'
+      - '.github/workflows/qubit-manga-contracts.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/qubit-web/src/manga-skin/**'
+      - 'frontend/qubit-web/src/sakuga/**'
+      - 'frontend/qubit-web/src/App.tsx'
+      - 'frontend/qubit-web/src/pages/**'
+      - 'frontend/qubit-web/src/components/**'
+      - 'frontend/qubit-web/package.json'
+      - 'frontend/qubit-web/package-lock.json'
+      - '.github/workflows/qubit-manga-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qubit-manga-contracts-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  manga:
+    name: Manga UI contract regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/qubit-web/package-lock.json
+      - name: Install web dependencies
+        working-directory: frontend/qubit-web
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Install shared dependencies
+        working-directory: frontend/qubit-shared
+        run: npm install --include=dev --legacy-peer-deps --no-audit --no-fund --no-package-lock
+      - name: Run Manga UI contracts
+        working-directory: frontend/qubit-web
+        run: npm run test -- src/manga-skin/
+      - uses: ./.github/actions/check-clean-worktree
