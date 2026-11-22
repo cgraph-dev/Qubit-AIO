@@ -1,0 +1,51 @@
+name: Qubit root package metadata
+
+on:
+  pull_request:
+    paths:
+      - pyproject.toml
+      - LICENSE
+      - THIRD_PARTY_NOTICES.md
+      - tests/test_root_package_metadata.py
+      - .github/workflows/qubit-package-metadata.yml
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - LICENSE
+      - THIRD_PARTY_NOTICES.md
+      - tests/test_root_package_metadata.py
+      - .github/workflows/qubit-package-metadata.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qubit-package-metadata-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  metadata:
+    name: Root PEP 639 metadata regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Validate metadata without runtime dependencies
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path = Path("tests/test_root_package_metadata.py")
+          assert path.is_file(), "root metadata regression test is missing"
+          spec = importlib.util.spec_from_file_location("qubit_metadata_test", path)
+          assert spec is not None and spec.loader is not None
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.test_root_license_is_pep639_expression()
+          PY
+      - uses: ./.github/actions/check-clean-worktree
