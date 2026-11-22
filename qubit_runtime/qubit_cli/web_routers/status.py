@@ -938,9 +938,10 @@ async def get_logs(
         from qubit_cli.log_search import search_log_page
         from qubit_cli.logs import _LineFilter
         def _search():
-            accept = _LineFilter(min_level=min_level, component_prefixes=comp_prefixes)
-            return search_log_page(log_path, needle=search, offset=offset,
-                                   limit=cap, accept_line=accept)
+            return search_log_page(
+                log_path, needle=search, offset=offset, limit=cap,
+                accept_line_factory=lambda: _LineFilter(
+                    min_level=min_level, component_prefixes=comp_prefixes))
         page, has_more = await asyncio.to_thread(_search)
         return {"file": file, "lines": page, "offset": offset, "limit": cap,
                 "returned": len(page), "has_more": has_more,
