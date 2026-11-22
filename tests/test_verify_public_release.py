@@ -656,3 +656,18 @@ def test_archive_scan_rejects_duplicate_normalized_paths(tmp_path, second_name):
             tar.addfile(entry, io.BytesIO(payload))
     report = verifier.scan_archive(archive)
     assert any("duplicate archive path" in item for item in report["metadata"])
+
+
+def test_archive_scan_rejects_member_beneath_symlink_even_if_link_comes_later(tmp_path):
+    verifier = _load()
+    archive = tmp_path / "linked-parent.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        child = tarfile.TarInfo("release/alias/overwritten.txt")
+        child.size = 7
+        tar.addfile(child, io.BytesIO(b"payload"))
+        link = tarfile.TarInfo("release/alias")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "real-directory"
+        tar.addfile(link)
+    report = verifier.scan_archive(archive)
+    assert any("archive path traverses a link" in item for item in report["metadata"])
