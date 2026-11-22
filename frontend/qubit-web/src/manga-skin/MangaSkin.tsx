@@ -43,6 +43,7 @@ import "./manga-panel-integrity.css";
 import "./manga-popup-panels.css";
 import "./chat-inspector.css";
 import "./manga-kanban-controls.css";
+import "./manga-section-title-plate.css";
 // Scope all new art to the central native /qubit-chat surface, never the rail or inspector.
 import "./qubit-chat-manga.css";
 

@@ -1,0 +1,61 @@
+/* Manga section titles use the owner SYSTEM plate art (system-banner.svg).
+   The same plate was previously only painted in the sidebar; it is now the
+   shared SettingsSection / page section heading and is removed from the rail. */
+html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading {
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  width: min(100%, 560px) !important;
+  max-width: 100% !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 30% 0 8% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url("../components/system-banner.svg") center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  filter: none !important;
+  overflow: hidden !important;
+  color: #210d27 !important;
+  font-family: var(--qm-display, "Arial Black", system-ui, sans-serif) !important;
+  font-size: clamp(12px, 1.55vw, 17px) !important;
+  font-style: italic !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.045em !important;
+  line-height: 1 !important;
+  text-shadow: none !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading::before,
+html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading .settings-count {
+  margin-inline-start: 8px;
+  padding: 1px 7px;
+  border: 1.5px solid #210d27;
+  border-radius: 0;
+  background: #ffe500;
+  color: #210d27;
+  font-size: 0.72em;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+@media (max-width: 640px) {
+  html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading {
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 27% 0 7% !important;
+    font-size: 12px !important;
+  }
+}

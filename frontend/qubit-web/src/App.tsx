@@ -84,7 +84,6 @@ import { SidebarFrame } from "@/components/SidebarFrame";
 import { ImportantTooltip } from "@/components/ImportantTooltip";
 import { QmSystemActionButton } from "@/components/qm-system-action/QmSystemActionButton";
 import { Q5TGatewayFrame } from "@/components/Q5TGatewayFrame";
-import { Q5TSystemTitle } from "@/components/Q5TSystemTitle";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
 import { useSidebarStatus } from "@/hooks/useSidebarStatus";
@@ -1818,7 +1817,6 @@ function SidebarSystemActions({
     <div className={cn("qagent-sidebar__system", q5t ? "q5t-system-shell" : "qm-manga-gateway-shell")}>
       {q5t ? (
         <>
-          <Q5TSystemTitle>{t.app.system}</Q5TSystemTitle>
           <Q5TGatewayFrame>
             <NavLink to="/sessions" title={t.app.statusOverview} className="q5t-gateway__link block text-left">
               <dl>
