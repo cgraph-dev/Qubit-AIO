@@ -511,6 +511,7 @@ def scan_archive(path: Path) -> dict:
     content: list[str] = []
     scanned_files = 0
     scanned_bytes = 0
+    skipped_files: list[str] = []
 
     with tarfile.open(path, "r:gz") as tar:
         members = tar.getmembers()
@@ -527,12 +528,17 @@ def scan_archive(path: Path) -> dict:
                 secret_files.append(member.name)
 
         for member in sorted(members, key=lambda item: item.name):
-            if not member.isfile() or member.size > MAX_SCAN_FILE_BYTES:
+            if not member.isfile():
                 continue
-            if scanned_bytes >= MAX_SCAN_TOTAL_BYTES:
-                break
+            if member.size > MAX_SCAN_FILE_BYTES:
+                skipped_files.append(member.name)
+                continue
+            if scanned_bytes + member.size > MAX_SCAN_TOTAL_BYTES:
+                skipped_files.append(member.name)
+                continue
             handle = tar.extractfile(member)
             if handle is None:
+                skipped_files.append(member.name)
                 continue
             data = handle.read(MAX_SCAN_FILE_BYTES)
             scanned_files += 1
@@ -550,6 +556,7 @@ def scan_archive(path: Path) -> dict:
         "content": content,
         "scanned_files": scanned_files,
         "scanned_bytes": scanned_bytes,
+        "skipped_files": skipped_files,
     }
 
 
@@ -822,6 +829,14 @@ def verify(
                     "source_archive_secret_files",
                     not scan["secret_files"],
                     "files=%s" % (", ".join(scan["secret_files"][:10]) or "none"),
+                )
+                report.add(
+                    "source_archive_scan_coverage",
+                    not scan["skipped_files"],
+                    "skipped=%d examples=%s" % (
+                        len(scan["skipped_files"]),
+                        ", ".join(scan["skipped_files"][:10]) or "none",
+                    ),
                 )
                 report.add(
                     "source_archive_content",
