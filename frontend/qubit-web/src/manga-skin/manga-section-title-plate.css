@@ -66,3 +66,14 @@ html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__hea
     font-size: 11px !important;
   }
 }
+
+/* The SYSTEM plate left the rail, so its 190px reservation would leave a
+   dead gap above the theme/language strip. Collapse it to content height and
+   tighten the strip that follows. */
+html:root[data-qubit-manga="on"] body #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__system {
+  min-height: 0 !important;
+  height: auto !important;
+}
+html:root[data-qubit-manga="on"] body #app-sidebar .qagent-sidebar__utility {
+  margin-top: 2px !important;
+}
