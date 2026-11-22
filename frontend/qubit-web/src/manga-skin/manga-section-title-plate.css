@@ -1,7 +1,7 @@
 /* Manga section titles use the owner SYSTEM plate art (system-banner.svg).
    The same plate was previously only painted in the sidebar; it is now the
    shared SettingsSection / page section heading and is removed from the rail. */
-html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading {
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading {
   display: flex !important;
   align-items: center !important;
   box-sizing: border-box !important;
@@ -13,7 +13,11 @@ html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading {
   padding: 0 30% 0 8% !important;
   border: 0 !important;
   border-radius: 0 !important;
-  background: url("../components/system-banner.svg") center / 100% 100% no-repeat !important;
+  background-color: transparent !important;
+  background-image: url("../components/system-banner.svg") !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
   box-shadow: none !important;
   clip-path: none !important;
   filter: none !important;
@@ -31,14 +35,14 @@ html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading {
   text-overflow: ellipsis !important;
 }
 
-html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading::before,
-html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading::after {
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading::before,
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading::after {
   content: none !important;
   display: none !important;
   background: none !important;
 }
 
-html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading .settings-count {
+html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading .settings-count {
   margin-inline-start: 8px;
   padding: 1px 7px;
   border: 1.5px solid #210d27;
@@ -51,7 +55,7 @@ html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading .sett
 }
 
 @media (max-width: 640px) {
-  html[data-qubit-manga="on"] #qubit-main-content .settings-section__heading {
+  html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading {
     width: 100% !important;
     height: 42px !important;
     min-height: 42px !important;
