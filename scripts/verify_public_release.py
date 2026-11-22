@@ -511,10 +511,49 @@ def scan_archive(path: Path) -> dict:
     content: list[str] = []
     scanned_files = 0
     scanned_bytes = 0
+    skipped_files: list[str] = []
 
     with tarfile.open(path, "r:gz") as tar:
         members = tar.getmembers()
+        seen_paths: set[str] = set()
+        link_paths = {
+            posixpath.normpath(item.name)
+            for item in members
+            if item.issym() or item.islnk()
+        }
+        nondirectory_paths = {
+            posixpath.normpath(item.name)
+            for item in members
+            if not item.isdir()
+        }
         for member in members:
+            # Tar permits duplicate names; later entries can overwrite earlier
+            # files or change their type during extraction. Reject ambiguity.
+            normalized = posixpath.normpath(member.name)
+            if normalized in seen_paths:
+                metadata.append("%s (duplicate archive path)" % member.name)
+            seen_paths.add(normalized)
+            # Extraction may follow an earlier symlink even when this member's
+            # own path has no traversal segments. Refuse linked ancestors.
+            ancestors = normalized.split("/")[:-1]
+            if any("/".join(ancestors[:i]) in link_paths for i in range(1, len(ancestors) + 1)):
+                metadata.append("%s (archive path traverses a link)" % member.name)
+            elif any("/".join(ancestors[:i]) in nondirectory_paths for i in range(1, len(ancestors) + 1)):
+                metadata.append("%s (archive path has a non-directory parent)" % member.name)
+            # An archive entry must never escape the extraction root. Reject
+            # traversal even if the name also passes the secret-pattern scan.
+            if (member.name.startswith("/") or "\\" in member.name or
+                    any(part == ".." for part in member.name.split("/"))):
+                metadata.append("%s (unsafe archive path)" % member.name)
+            if member.issym() or member.islnk():
+                # Absolute links and upward traversals can point outside the
+                # release tree; do not accept them as clean source artifacts.
+                target = member.linkname
+                if (target.startswith("/") or "\\" in target or
+                        any(part == ".." for part in target.split("/"))):
+                    metadata.append("%s -> %s (unsafe archive link)" % (member.name, target))
+            if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
+                metadata.append("%s (unsupported archive entry type)" % member.name)
             parts = PurePosixPath(member.name).parts
             if any(part in FORBIDDEN_DIR_SEGMENTS for part in parts):
                 metadata.append(member.name)
@@ -527,12 +566,17 @@ def scan_archive(path: Path) -> dict:
                 secret_files.append(member.name)
 
         for member in sorted(members, key=lambda item: item.name):
-            if not member.isfile() or member.size > MAX_SCAN_FILE_BYTES:
+            if not member.isfile():
                 continue
-            if scanned_bytes >= MAX_SCAN_TOTAL_BYTES:
-                break
+            if member.size > MAX_SCAN_FILE_BYTES:
+                skipped_files.append(member.name)
+                continue
+            if scanned_bytes + member.size > MAX_SCAN_TOTAL_BYTES:
+                skipped_files.append(member.name)
+                continue
             handle = tar.extractfile(member)
             if handle is None:
+                skipped_files.append(member.name)
                 continue
             data = handle.read(MAX_SCAN_FILE_BYTES)
             scanned_files += 1
@@ -550,6 +594,7 @@ def scan_archive(path: Path) -> dict:
         "content": content,
         "scanned_files": scanned_files,
         "scanned_bytes": scanned_bytes,
+        "skipped_files": skipped_files,
     }
 
 
@@ -822,6 +867,14 @@ def verify(
                     "source_archive_secret_files",
                     not scan["secret_files"],
                     "files=%s" % (", ".join(scan["secret_files"][:10]) or "none"),
+                )
+                report.add(
+                    "source_archive_scan_coverage",
+                    not scan["skipped_files"],
+                    "skipped=%d examples=%s" % (
+                        len(scan["skipped_files"]),
+                        ", ".join(scan["skipped_files"][:10]) or "none",
+                    ),
                 )
                 report.add(
                     "source_archive_content",

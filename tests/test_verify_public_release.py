@@ -373,6 +373,52 @@ def test_source_archive_rejects_secret_content(tmp_path: Path):
     assert _checks(report)["source_archive_content"]["ok"] is False
 
 
+
+def test_source_archive_rejects_unscanned_large_file(tmp_path: Path):
+    release = _build_release(
+        tmp_path,
+        source_extra={"large.dat": b"x" * (512 * 1024 + 1)},
+    )
+    rc, report = _verify(release)
+    assert rc == 1
+    coverage = _checks(report)["source_archive_scan_coverage"]
+    assert coverage["ok"] is False
+    assert "large.dat" in coverage["detail"]
+
+
+def test_source_archive_rejects_exhausted_scan_budget(tmp_path: Path):
+    module = _load()
+    archive = tmp_path / "source.tar.gz"
+    archive.write_bytes(_tar_bytes({"a.txt": b"abcd", "b.txt": b"efgh"}, "source"))
+    original = module.MAX_SCAN_TOTAL_BYTES
+    try:
+        module.MAX_SCAN_TOTAL_BYTES = 5
+        result = module.scan_archive(archive)
+    finally:
+        module.MAX_SCAN_TOTAL_BYTES = original
+    assert result["scanned_files"] == 1
+    assert result["skipped_files"] == ["source/b.txt"]
+    assert result["scanned_bytes"] <= 5
+
+
+
+def test_source_archive_rejects_secret_hidden_in_large_file(tmp_path: Path):
+    payload = b"x" * (512 * 1024) + b"ghp_" + b"a" * 36
+    release = _build_release(tmp_path, source_extra={"large-secret.txt": payload})
+    rc, report = _verify(release)
+    assert rc == 1
+    checks = _checks(report)
+    # Even when the secret matcher cannot inspect the file, verification must
+    # not report a safe release on the strength of an incomplete scan.
+    assert checks["source_archive_scan_coverage"]["ok"] is False
+
+
+def test_source_archive_complete_scan_reports_coverage(tmp_path: Path):
+    release = _build_release(tmp_path)
+    rc, report = _verify(release)
+    assert rc == 0, report
+    assert _checks(report)["source_archive_scan_coverage"]["ok"] is True
+
 def test_source_archive_allows_documented_placeholders(tmp_path: Path):
     release = _build_release(
         tmp_path,
@@ -556,3 +602,85 @@ def test_infer_version_accepts_a_pep440_respelt_of_one_version():
         "Qubit-0.21.4-source.tar.gz",
         "qubit_voicebridge-0.21.5-py3-none-any.whl",
     }) is None
+
+
+@pytest.mark.parametrize(
+    "name,linkname",
+    [
+        ("../escaped.txt", None),
+        ("/absolute.txt", None),
+        (r"folder\\escaped.txt", None),
+        ("safe/link", "../../outside"),
+        ("safe/link", "/etc/passwd"),
+        ("safe/link", r"..\\outside"),
+    ],
+)
+def test_archive_scan_rejects_escaping_paths_and_links(tmp_path, name, linkname):
+    verifier = _load()
+    archive = tmp_path / "malicious.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        entry = tarfile.TarInfo(name)
+        if linkname is None:
+            entry.size = 4
+            tar.addfile(entry, io.BytesIO(b"safe"))
+        else:
+            entry.type = tarfile.SYMTYPE
+            entry.linkname = linkname
+            tar.addfile(entry)
+    report = verifier.scan_archive(archive)
+    assert report["metadata"], (name, linkname)
+
+
+@pytest.mark.parametrize("entry_type", [tarfile.CHRTYPE, tarfile.BLKTYPE, tarfile.FIFOTYPE])
+def test_archive_scan_rejects_device_and_fifo_entries(tmp_path, entry_type):
+    verifier = _load()
+    archive = tmp_path / "special-entry.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        entry = tarfile.TarInfo("release/unsafe-device")
+        entry.type = entry_type
+        entry.devmajor = 1
+        entry.devminor = 3
+        tar.addfile(entry)
+    report = verifier.scan_archive(archive)
+    assert any("unsupported archive entry type" in item for item in report["metadata"])
+
+
+@pytest.mark.parametrize("second_name", ["release/config.txt", "release/./config.txt"])
+def test_archive_scan_rejects_duplicate_normalized_paths(tmp_path, second_name):
+    verifier = _load()
+    archive = tmp_path / "duplicate.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name, payload in [("release/config.txt", b"first"), (second_name, b"second")]:
+            entry = tarfile.TarInfo(name)
+            entry.size = len(payload)
+            tar.addfile(entry, io.BytesIO(payload))
+    report = verifier.scan_archive(archive)
+    assert any("duplicate archive path" in item for item in report["metadata"])
+
+
+def test_archive_scan_rejects_member_beneath_symlink_even_if_link_comes_later(tmp_path):
+    verifier = _load()
+    archive = tmp_path / "linked-parent.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        child = tarfile.TarInfo("release/alias/overwritten.txt")
+        child.size = 7
+        tar.addfile(child, io.BytesIO(b"payload"))
+        link = tarfile.TarInfo("release/alias")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "real-directory"
+        tar.addfile(link)
+    report = verifier.scan_archive(archive)
+    assert any("archive path traverses a link" in item for item in report["metadata"])
+
+
+def test_archive_scan_rejects_file_used_as_parent_directory(tmp_path):
+    verifier = _load()
+    archive = tmp_path / "file-parent.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name in ("release/config", "release/config/settings.json"):
+            payload = b"data"
+            entry = tarfile.TarInfo(name)
+            entry.size = len(payload)
+            tar.addfile(entry, io.BytesIO(payload))
+    report = verifier.scan_archive(archive)
+    assert any("non-directory parent" in item for item in report["metadata"])
