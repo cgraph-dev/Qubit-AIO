@@ -177,7 +177,7 @@ export function createTowerNavigator(
       if (node && typeof node.focus === "function") node.focus();
     };
 
-    // Roving-tabindex keyboard model: arrows/home/end move the selection (and
+    // Roving-tabindex keyboard model: arrow keys plus Home and End move the selection (and
     // focus), Enter/Space confirm the focused floor. All keys are handled on
     // the focused option so no global listener is needed.
     const onKeyDown = (event: { key: string;
