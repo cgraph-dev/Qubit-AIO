@@ -37,6 +37,14 @@ Do not delete inherited tests merely because they came from Hermes. Keep them wh
 
 The repository's `.github/scripts/check_workflow_security.py` enforces immutable action references, least-privilege permissions, no PR-target triggers, no self-hosted PR runners and restricted secrets for managed workflows. Its explicit `LEGACY_WORKFLOWS` exemption currently includes `windows-ci.yml` and `windows-install-update-e2e.yml`. These workflows are **not** covered by the managed security policy and require manual review and eventual migration; exemption must not be mistaken for a clean security audit.
 
+## CI evidence and triage (2026-11-22)
+
+The Qubit regression gate passed on PR #24 at commit `31bbd7e` after the workflow installed pytest, PyYAML and uv. This verifies the hermetic release-verifier and fake fresh-install contracts, **not** a real end-user installation. The dedicated dashboard log regression and install-E2E workflows passed on PR #23 at commit `783cb7e`; its general CI and E2E checks had not completed when inspected. Neither PR is merged solely on that evidence.
+
+The completed PR #22 runs exposed **independent** failures: seven Manga frontend contract assertions; upgrade tests involving a stale Git index lock and dirty checkout; two fresh-process tests failing on root `project.license` metadata; a concurrent dashboard session read timing assertion; and a fresh-install test reporting a dirty checkout. PR #22 itself modifies only the release scanner and verifier tests. Do not mark these unrelated failures as fixed by the scanner change. The root license metadata fix is proposed separately in PR #26 and still needs CI confirmation.
+
+The Windows workflow SHA-pin and least-privilege migration is proposed separately in PR #25. Until that PR merges, the legacy-workflow exemptions remain on `main`; do not describe the Windows security migration as landed.
+
 ## CI operating rules
 
 No CI job should silently pass when a required test file is missing. A check must distinguish **not run**, **failed**, and **passed**. Avoid exposing live API keys to untrusted pull requests. Pin GitHub Actions to immutable commit SHAs and minimize permissions. A workflow definition is not evidence of execution; verify actual run conclusions before merging a runtime fix.
