@@ -515,7 +515,14 @@ def scan_archive(path: Path) -> dict:
 
     with tarfile.open(path, "r:gz") as tar:
         members = tar.getmembers()
+        seen_paths: set[str] = set()
         for member in members:
+            # Tar permits duplicate names; later entries can overwrite earlier
+            # files or change their type during extraction. Reject ambiguity.
+            normalized = posixpath.normpath(member.name)
+            if normalized in seen_paths:
+                metadata.append("%s (duplicate archive path)" % member.name)
+            seen_paths.add(normalized)
             # An archive entry must never escape the extraction root. Reject
             # traversal even if the name also passes the secret-pattern scan.
             if (member.name.startswith("/") or "\\" in member.name or
