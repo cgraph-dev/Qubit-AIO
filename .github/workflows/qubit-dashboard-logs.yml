@@ -1,0 +1,36 @@
+name: Qubit dashboard log regressions
+
+# Qubit-specific regression gate; never reports green when tests are absent.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-logs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  log-search:
+    name: Dashboard full-history log search
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/qubit_runtime:${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install pytest
+        run: python -m pip install --disable-pip-version-check pytest==8.4.2
+      - name: Test log search, filtering and pagination
+        run: python -m pytest -q qubit_runtime/tests/test_dashboard_log_search.py
+      - name: Check the checkout is clean
+        uses: ./.github/actions/check-clean-worktree
