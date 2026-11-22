@@ -373,6 +373,40 @@ def test_source_archive_rejects_secret_content(tmp_path: Path):
     assert _checks(report)["source_archive_content"]["ok"] is False
 
 
+
+def test_source_archive_rejects_unscanned_large_file(tmp_path: Path):
+    release = _build_release(
+        tmp_path,
+        source_extra={"large.dat": b"x" * (512 * 1024 + 1)},
+    )
+    rc, report = _verify(release)
+    assert rc == 1
+    coverage = _checks(report)["source_archive_scan_coverage"]
+    assert coverage["ok"] is False
+    assert "large.dat" in coverage["detail"]
+
+
+def test_source_archive_rejects_exhausted_scan_budget(tmp_path: Path):
+    module = _load()
+    archive = tmp_path / "source.tar.gz"
+    archive.write_bytes(_tar_bytes({"a.txt": b"abcd", "b.txt": b"efgh"}, "source"))
+    original = module.MAX_SCAN_TOTAL_BYTES
+    try:
+        module.MAX_SCAN_TOTAL_BYTES = 5
+        result = module.scan_archive(archive)
+    finally:
+        module.MAX_SCAN_TOTAL_BYTES = original
+    assert result["scanned_files"] == 1
+    assert result["skipped_files"] == ["source/b.txt"]
+    assert result["scanned_bytes"] <= 5
+
+
+def test_source_archive_complete_scan_reports_coverage(tmp_path: Path):
+    release = _build_release(tmp_path)
+    rc, report = _verify(release)
+    assert rc == 0, report
+    assert _checks(report)["source_archive_scan_coverage"]["ok"] is True
+
 def test_source_archive_allows_documented_placeholders(tmp_path: Path):
     release = _build_release(
         tmp_path,
