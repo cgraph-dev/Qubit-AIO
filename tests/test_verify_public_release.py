@@ -401,6 +401,18 @@ def test_source_archive_rejects_exhausted_scan_budget(tmp_path: Path):
     assert result["scanned_bytes"] <= 5
 
 
+
+def test_source_archive_rejects_secret_hidden_in_large_file(tmp_path: Path):
+    payload = b"x" * (512 * 1024) + b"ghp_" + b"a" * 36
+    release = _build_release(tmp_path, source_extra={"large-secret.txt": payload})
+    rc, report = _verify(release)
+    assert rc == 1
+    checks = _checks(report)
+    # Even when the secret matcher cannot inspect the file, verification must
+    # not report a safe release on the strength of an incomplete scan.
+    assert checks["source_archive_scan_coverage"]["ok"] is False
+
+
 def test_source_archive_complete_scan_reports_coverage(tmp_path: Path):
     release = _build_release(tmp_path)
     rc, report = _verify(release)
