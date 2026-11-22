@@ -31,6 +31,6 @@ jobs:
       - name: Install pytest
         run: python -m pip install --disable-pip-version-check pytest==8.4.2
       - name: Test log search, filtering and pagination
-        run: python -m pytest -q qubit_runtime/tests/test_dashboard_log_search.py
+        run: python -m pytest -q --noconftest qubit_runtime/tests/test_dashboard_log_search.py
       - name: Check the checkout is clean
         uses: ./.github/actions/check-clean-worktree
