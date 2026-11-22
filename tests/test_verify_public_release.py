@@ -643,3 +643,16 @@ def test_archive_scan_rejects_device_and_fifo_entries(tmp_path, entry_type):
         tar.addfile(entry)
     report = verifier.scan_archive(archive)
     assert any("unsupported archive entry type" in item for item in report["metadata"])
+
+
+@pytest.mark.parametrize("second_name", ["release/config.txt", "release/./config.txt"])
+def test_archive_scan_rejects_duplicate_normalized_paths(tmp_path, second_name):
+    verifier = _load()
+    archive = tmp_path / "duplicate.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name, payload in [("release/config.txt", b"first"), (second_name, b"second")]:
+            entry = tarfile.TarInfo(name)
+            entry.size = len(payload)
+            tar.addfile(entry, io.BytesIO(payload))
+    report = verifier.scan_archive(archive)
+    assert any("duplicate archive path" in item for item in report["metadata"])
