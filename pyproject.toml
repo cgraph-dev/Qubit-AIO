@@ -9,7 +9,7 @@ readme = "README.md"
 # under its original license and is recorded in THIRD_PARTY_NOTICES.md and
 # docs/UPSTREAM_REUSE.md. The repository as a whole is not an OSI-approved
 # open-source project.
-license = { text = "Qubit VoiceBridge Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
+license = "LicenseRef-Qubit-VoiceBridge-Educational"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 # Python floor is 3.12, not 3.11: the product uses PEP 701 f-strings (e.g.
 # voicebridge/local_llm.py) and scripts/install.sh creates the venv with
