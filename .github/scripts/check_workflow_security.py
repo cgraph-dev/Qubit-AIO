@@ -14,11 +14,8 @@ security properties that YAML syntax cannot express:
   action pinned to a sha256 digest (local `./` actions are allowed);
 * a `v*`-tag release workflow creates drafts only (`gh release create --draft`).
 
-The three remaining upstream-derived workflows are listed as legacy and are
-intentionally not rewritten here (they still use self-hosted runners, unpinned
-actions, or tag pushes). The allowlist is explicit so a *new* workflow cannot
-inherit those exemptions silently. Every other workflow is managed and must
-satisfy the full policy.
+All workflows, including Windows install and update, are subject to the
+same managed security policy. No workflow is exempt from these checks.
 """
 from __future__ import annotations
 
@@ -31,10 +28,6 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
-LEGACY_WORKFLOWS = {
-    "windows-ci.yml",
-    "windows-install-update-e2e.yml",
-}
 
 #: Workflows allowed to read repository secrets, and the exact secret names
 #: they may read. Every entry must be a manually dispatched workflow with a
@@ -219,8 +212,6 @@ def main() -> int:
     errors: list[str] = []
     checked: list[str] = []
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
-        if path.name in LEGACY_WORKFLOWS:
-            continue
         checked.append(path.name)
         try:
             doc = load(path)
