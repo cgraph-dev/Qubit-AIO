@@ -2,15 +2,16 @@
    The same plate was previously only painted in the sidebar; it is now the
    shared SettingsSection / page section heading and is removed from the rail. */
 html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading {
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   box-sizing: border-box !important;
-  width: min(100%, 560px) !important;
-  max-width: 100% !important;
-  height: 46px !important;
-  min-height: 46px !important;
+  width: auto !important;
+  max-width: min(100%, 420px) !important;
+  min-width: 220px !important;
+  height: 42px !important;
+  min-height: 42px !important;
   margin: 0 !important;
-  padding: 0 168px 0 32px !important;
+  padding: 0 44px 0 38px !important;
   border: 0 !important;
   border-radius: 0 !important;
   background-color: transparent !important;
@@ -24,7 +25,7 @@ html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__hea
   overflow: hidden !important;
   color: #210d27 !important;
   font-family: var(--qm-display, "Arial Black", system-ui, sans-serif) !important;
-  font-size: clamp(12px, 1.55vw, 17px) !important;
+  font-size: clamp(11px, 1.15vw, 13.5px) !important;
   font-style: italic !important;
   font-weight: 900 !important;
   letter-spacing: 0.045em !important;
@@ -56,10 +57,12 @@ html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__hea
 
 @media (max-width: 640px) {
   html:root[data-qubit-manga="on"] body #qubit-main-content .settings-section__heading {
-    width: 100% !important;
-    height: 42px !important;
-    min-height: 42px !important;
-    padding: 0 96px 0 20px !important;
-    font-size: 12px !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 38px 0 32px !important;
+    font-size: 11px !important;
   }
 }
