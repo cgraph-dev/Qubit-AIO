@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-from plugins.jev import client
+from . import client
 from tools.registry import tool_error, tool_result
 
 SCHEMA: Dict[str, Any] = {
