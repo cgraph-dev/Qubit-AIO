@@ -2,6 +2,8 @@
 
 > Nobody knows what it will become.
 
+> **Repository roles:** [Qubit-AIO](https://github.com/cgraph-dev/Qubit-AIO) is the umbrella development repository and the source for the actively developed personal installation. [Qubit](https://github.com/cgraph-dev/Qubit) is the production distribution repository. They are two delivery stages of **one Qubit product**, not separate assistants. The production repository may intentionally lag behind development until changes are verified. Installation commands below use the production repository.
+
 Qubit is a personal AI agent — an all-in-one assistant that works as your coding
 agent, caretaker, teacher, personal bot, and business organizer. It runs on your
 machine and gives you one agent for text, terminal, browser, files, coding tasks,
