@@ -23,7 +23,7 @@ Do not delete inherited tests merely because they came from Hermes. Keep them wh
 ## Ordered remediation
 
 - [x] Add a lightweight Qubit-owned release-verifier test lane.
-- [ ] After PR #23 lands, add a **required** dashboard log-search regression lane; do not skip absent tests and report green.
+- [x] PR #23 adds a dashboard log-search regression workflow that fails if its tests are missing. Require its check in branch protection after it passes.
 - [ ] Add a dashboard acceptance suite against an installed server: authenticated chat, sessions, logs, env, model provider selection, WebSocket reconnect, and error cases.
 - [ ] Add Qubit voice acceptance with fake audio devices/providers and separate optional hardware qualification.
 - [ ] Add adapter contracts for Hermes plugin manifests, skill discovery, MCP registration and permission boundaries. Test current adapters, not hypothetical universal compatibility.
@@ -32,6 +32,10 @@ Do not delete inherited tests merely because they came from Hermes. Keep them wh
 - [ ] Add fresh-install, upgrade, rollback, persisted-state and dashboard-enabled release qualification.
 - [ ] Document required status checks in GitHub branch protection. A passing optional workflow is not an enforced merge gate.
 - [ ] Audit upstream-derived tests for stale Hermes paths, environment variables, names, mock-only assertions and false-positive skips.
+
+## Workflow security follow-up
+
+The repository's `.github/scripts/check_workflow_security.py` enforces immutable action references, least-privilege permissions, no PR-target triggers, no self-hosted PR runners and restricted secrets for managed workflows. Its explicit `LEGACY_WORKFLOWS` exemption currently includes `windows-ci.yml` and `windows-install-update-e2e.yml`. These workflows are **not** covered by the managed security policy and require manual review and eventual migration; exemption must not be mistaken for a clean security audit.
 
 ## CI operating rules
 
