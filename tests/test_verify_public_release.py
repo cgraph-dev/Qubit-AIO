@@ -629,3 +629,17 @@ def test_archive_scan_rejects_escaping_paths_and_links(tmp_path, name, linkname)
             tar.addfile(entry)
     report = verifier.scan_archive(archive)
     assert report["metadata"], (name, linkname)
+
+
+@pytest.mark.parametrize("entry_type", [tarfile.CHRTYPE, tarfile.BLKTYPE, tarfile.FIFOTYPE])
+def test_archive_scan_rejects_device_and_fifo_entries(tmp_path, entry_type):
+    verifier = _load()
+    archive = tmp_path / "special-entry.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        entry = tarfile.TarInfo("release/unsafe-device")
+        entry.type = entry_type
+        entry.devmajor = 1
+        entry.devminor = 3
+        tar.addfile(entry)
+    report = verifier.scan_archive(archive)
+    assert any("unsupported archive entry type" in item for item in report["metadata"])
