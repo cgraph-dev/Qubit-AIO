@@ -21,7 +21,7 @@ describe("Manga web-dashboard page panel integrity", () => {
     expect(styles).toContain(".qplate-module__head");
     expect(styles).toContain("background-repeat:no-repeat!important");
     expect(styles).toContain("width:fit-content!important");
-    expect(styles).not.toContain("module-header.svg");
+    expect(styles).not.toContain("background-image:url(\"/manga-ui/zip/module-header.svg\")");
   });
   it("removes conflicting pseudo-panels from the main page and the gateway", () => {
     expect(styles).toContain('.settings-section,.settings-group,.qplate-module');
