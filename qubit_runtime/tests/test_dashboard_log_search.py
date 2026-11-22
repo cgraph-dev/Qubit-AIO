@@ -69,6 +69,7 @@ def test_stateful_filter_is_fresh_on_second_pass(tmp_path):
     assert len(creations) == 2
 
 
+
 def test_pagination_is_exhaustive_without_duplicates(tmp_path):
     path = tmp_path / "agent.log"
     path.write_text("".join(f"hit {i}\n" for i in range(7)))
