@@ -26,7 +26,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test runner
-        run: python -m pip install --disable-pip-version-check pytest==8.4.2 PyYAML==6.0.2
+        run: python -m pip install --disable-pip-version-check pytest==8.4.2 PyYAML==6.0.2 uv==0.9.11
       - name: Verify release archive and clean-install gate contracts
         run: |
           python -m pytest -q \
