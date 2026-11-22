@@ -1,6 +1,6 @@
 # Qubit engineering plan
 
-Status: in progress. Owner: solo developer, assisted by AI. Updated: 2026-11-22.
+Status: in progress. Owner: solo developer, assisted by AI. Updated: 2026-11-23.
 
 ## Repository boundaries
 
@@ -17,7 +17,7 @@ A merged change is not equivalent to a verified deployment. Code changes must be
 - [x] Clarify repository roles in both READMEs (merged 2026-11-22).
 - [ ] P0: Establish an automated Linux release acceptance lane using a clean packaged installation, authenticated dashboard/API, agent session, streaming and cancellation, persistence, and service restart.
 - [ ] P0: Audit privileged tool boundaries, secret handling, and prompt-injection paths; add adversarial regression tests.
-- [ ] P1: Make release archive secret scanning fail closed when content cannot be fully inspected; add large-file and scan-budget tests.
+- [x] P1: Make release archive secret scanning fail closed when content cannot be fully inspected; add large-file and scan-budget tests (merged PR #36; dedicated archive security, CI and E2E passed 2026-11-23).
 - [ ] P1: Verify dashboard behavior at port 8890: /chat, /sessions, /logs, /env, keys, and model-provider views. Enumerate actual routes and test every supported action against real backend APIs; no hardcoded success fixtures as release proof.
 - [ ] P1: Add full dashboard-enabled clean install and model provisioning tests in addition to the existing minimal install gate.
 - [ ] P1: Exercise upgrade and rollback with real persisted user state.
@@ -26,6 +26,16 @@ A merged change is not equivalent to a verified deployment. Code changes must be
 - [ ] P2: Replace operator-specific release path checks with portable detection and regression tests.
 - [ ] P2: Audit existing documentation references, then publish one original Qubit documentation set in both repositories. Cover architecture, features and limits, installation, security, privacy, model providers, voice, web UI, troubleshooting, developer workflow, and release process.
 - [ ] P2: Compare public Hermes and OpenClaw documentation and interaction patterns for coverage only; do not copy their wording, artwork, or identity.
+
+## Recent validated integrations (2026-11-23)
+
+- PR #32: Qubit-owned regression CI and audit documentation (merged).
+- PR #33: Dashboard concurrent-session test stabilization (merged).
+- PR #34: Full-history dashboard log search and pagination regressions (merged).
+- PR #35: Windows workflow security hardening (merged).
+- PR #36: Fail-closed release archive scanning, unsafe tar-entry checks, and dedicated regressions (merged).
+
+These merges establish tested components, not end-to-end production acceptance or verification of a live dashboard on port 8890. The P0 acceptance and adversarial security work remain open.
 
 ## Work stages
 
