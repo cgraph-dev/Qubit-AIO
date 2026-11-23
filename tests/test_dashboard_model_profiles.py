@@ -97,6 +97,25 @@ def test_raw_secret_is_refused_and_never_persisted(tmp_path, monkeypatch):
     assert "raw-key" not in ids and "not-a-ref" not in ids
 
 
+def test_profile_reads_never_disclose_environment_credential(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    secret = "qubit-private-provider-value-" + "x" * 32
+    monkeypatch.setenv("QUBIT_PROFILE_READ_SECRET", secret)
+    created = _ops().create_model_profile(
+        cfg, profile_id="private-read", kind="api", provider="openai",
+        model="example-model", base_url="https://api.example/v1",
+        key_ref="env:QUBIT_PROFILE_READ_SECRET", confirm=True)
+    assert created["state"] == "OK", created
+    for read in (
+        _ops().list_model_profiles(cfg),
+        _ops().show_model_profile(cfg, "private-read"),
+        _ops().test_model_profile(cfg, "private-read", probe=False),
+        _dash(cfg, "list_model_profiles"),
+        _dash(cfg, "show_model_profile", {"profile_id": "private-read"}),
+    ):
+        assert secret not in json.dumps(read), read
+
+
 def test_session_select_and_clear_override(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
