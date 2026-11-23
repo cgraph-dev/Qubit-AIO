@@ -27,6 +27,47 @@ A merged change is not equivalent to a verified deployment. Code changes must be
 - [ ] P2: Audit existing documentation references, then publish one original Qubit documentation set in both repositories. Cover architecture, features and limits, installation, security, privacy, model providers, voice, web UI, troubleshooting, developer workflow, and release process.
 - [ ] P2: Compare public Hermes and OpenClaw documentation and interaction patterns for coverage only; do not copy their wording, artwork, or identity.
 
+## P0 acceptance implementation map (2026-11-23)
+
+The Linux artifact-install probe in `scripts/clean_install_rehearsal.py`
+currently exercises a built wheel with isolated state and a real HTTP listener.
+PRs #40-#43 added protected-route token rejection, authenticated plugin
+catalog reads, listener restart, and authenticated session-inventory reads.
+These are **partial** acceptance checks, not proof of a live agent turn or
+persisted conversation messages. PR #44 is tightening the session response
+envelope; do not count it as merged until its checks and merge complete.
+
+Implement the remaining P0 release acceptance as a coherent milestone rather
+than separate PRs for each assertion:
+
+1. **Real session lifecycle:** use the installed server's
+   `/agent/api/qubit/chat/sessions` create/show routes and the canonical
+   `voicebridge.chat_transport` store. Exercise a unique session ID in
+   isolated `QUBIT_HOME`; assert the returned ID, message transcript and
+   canonical `/agent/api/sessions` inventory agree. Avoid mock-only rows.
+2. **Turn execution:** drive a deterministic, explicitly configured fake
+   provider through the *real* chat transport and HTTP streaming route;
+   validate event ordering, final response, errors and cancellation. Never
+   require production credentials in untrusted PR CI.
+3. **Persistence and recovery:** stop the server, start a fresh process using
+   the same isolated state, and verify session metadata **and message contents**
+   by ID. Exercise an interrupted turn and its documented recovery contract.
+   The existing listener-only restart probe is insufficient.
+4. **Privilege and adversarial cases:** test unauthorized session mutations,
+   forged token variants, prompt-injection attempts to cross tool permissions,
+   secret redaction, path traversal and emergency-stop behavior. Assert typed
+   refusals and no host-home writes.
+5. **Release gate:** run the above against the *packaged wheel*, publish
+   structured PASS/FAIL/NOT_RUN evidence, and make required acceptance checks
+   explicit in branch protection. Keep provider/hardware-dependent tests in a
+   separate opt-in qualification tier.
+
+Other open work: dashboard routes for logs, env, keys and model providers;
+model provisioning; real upgrade/rollback; gateway reconnect/concurrency;
+macOS and Windows qualification; frontend dependency reproducibility; original
+Qubit documentation. None of these should be marked complete based solely on
+the current HTTP smoke tests.
+
 ## Recent validated integrations (2026-11-23)
 
 - PR #32: Qubit-owned regression CI and audit documentation (merged).
