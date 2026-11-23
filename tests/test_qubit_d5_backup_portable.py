@@ -131,6 +131,37 @@ def test_d5_backup_wrong_passphrase_and_tamper_are_typed(tmp_path,
     assert missing["code"], missing
 
 
+def test_d5_failed_restore_does_not_change_operator_state(tmp_path,
+                                                          monkeypatch):
+    """A failed authentication must never overwrite live user data."""
+    cfg = _cfg(tmp_path, monkeypatch)
+    _enroll(cfg)
+    from voicebridge import dashboard_ops as OPS
+
+    password = "correct portable archive password"
+    staged = OPS.run_op(cfg, "backup_create", {"label": "before-failure"},
+                        actor="dashboard:user", session="d5")
+    assert staged["state"] == "needs-confirm", staged
+    created = OPS.confirm_op(cfg, staged["confirmation_id"],
+                             actor="dashboard:user", session="d5",
+                             sensitive={"passphrase": password})
+    assert created["state"] == "executed", created
+    bundle = Path(created["receipt"]["result"]["path"])
+
+    sentinel = Path(cfg.state_dir()) / "operator-sentinel.txt"
+    sentinel.write_text("preserve this operator data\\n", encoding="utf-8")
+    before = sentinel.read_bytes()
+    refused = _op(cfg, "backup_restore",
+                  {"bundle": str(bundle), "apply": "true"},
+                  sensitive={"passphrase": "incorrect password"})
+    assert refused["state"] == "failed", refused
+    assert refused["code"] == "WrongPassphraseError", refused
+    assert sentinel.read_bytes() == before
+    assert bundle.exists()
+    assert password not in json.dumps(refused)
+    assert "incorrect password" not in _journal_text(cfg)
+
+
 def test_d5_backup_apply_requires_enrollment(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     pw = "d5 no-enroll passphrase"
