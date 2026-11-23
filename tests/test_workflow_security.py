@@ -261,6 +261,15 @@ def test_policy_rejects_a_promote_workflow_that_could_create_a_tag():
     assert any("--verify-tag" in error for error in errors), errors
 
 
+def test_operator_promotion_rejects_automatic_trigger_even_if_manual_present():
+    doc = {"on": {"workflow_dispatch": None, "push": {"branches": ["main"]}},
+           "jobs": {"draft": {"environment": "release", "steps": [{
+               "run": "gh release create v1.0.0 --draft --verify-tag"}]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_promote_shape(doc, Path("promote-release.yml"), errors)
+    assert any("workflow_dispatch only" in error for error in errors), errors
+
+
 def test_promote_public_is_manual_and_apply_is_environment_gated():
     path = WORKFLOWS / "promote-public.yml"
     doc = POLICY_MODULE.load(path)
