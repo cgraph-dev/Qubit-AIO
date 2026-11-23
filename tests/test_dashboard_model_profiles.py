@@ -143,8 +143,8 @@ def test_environment_secret_refs_require_valid_variable_names(tmp_path,
     assert R.is_secret_ref("env:VALID_KEY_2")
     assert R.is_secret_ref("file:credentials/provider.key")
     for invalid in ("env:1INVALID", "env:BAD.NAME", "env:BAD/NAME",
-                    "env:BAD-NAME", "env:", "env:VALID_KEY\\n",
-                    "env:VALID_KEY\\nother"):
+                    "env:BAD-NAME", "env:", "env:VALID_KEY\n",
+                    "env:VALID_KEY\nother"):
         assert not R.is_secret_ref(invalid), invalid
         refused = _ops().create_model_profile(
             cfg, profile_id="invalid-env", kind="api", provider="openai",

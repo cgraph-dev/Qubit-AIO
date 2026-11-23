@@ -90,7 +90,9 @@ ACTIVE_SCHEMA = "qubit-model-profile-active/1"
 TERMINAL_MIN_CONTEXT_TOKENS = 65536
 
 # A credential reference, never a credential value.
-_SECRET_REF_RE = re.compile(\n    r"(?:env:[A-Za-z_][A-Za-z0-9_]*|file:[A-Za-z0-9_./~-]+)\\Z"\n)
+_SECRET_REF_RE = re.compile(
+    r"(?:env:[A-Za-z_][A-Za-z0-9_]*|file:[A-Za-z0-9_./~-]+)"
+)
 _RAW_SECRET_HINTS = re.compile(
     r"^(sk-|sk_|ghp_|glpat-|xox[baprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{10,})")
 
@@ -108,7 +110,7 @@ class ResolverError(Exception):
 
 
 def is_secret_ref(value: str) -> bool:
-    return bool(_SECRET_REF_RE.match(str(value or "")))
+    return bool(_SECRET_REF_RE.fullmatch(str(value or "")))
 
 
 def looks_like_raw_secret(value: str) -> bool:

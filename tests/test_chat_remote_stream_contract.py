@@ -90,9 +90,11 @@ class RemoteStreamContractTests(unittest.TestCase):
                 time.sleep(0.005)
             return SimpleNamespace(ok=False, details={})
 
-        with patch.object(chat, "store", return_value=object()), \\
-             patch.object(chat, "_estop", return_value=False), \\
-             patch("voicebridge.providers.gateway.run_stream", side_effect=provider):
+        with (
+            patch.object(chat, "store", return_value=object()),
+            patch.object(chat, "_estop", return_value=False),
+            patch("voicebridge.providers.gateway.run_stream", side_effect=provider),
+        ):
             stream = self._stream(sid)
             self.assertEqual(next(stream), ("delta", "first chunk"))
             stream.close()
