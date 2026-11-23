@@ -593,6 +593,29 @@ try:
             "empty streaming turn returned success", rejected_stream_payload)
         assert rejected_stream_payload.get("code"), (
             "empty streaming refusal lacks typed code", rejected_stream_payload)
+        # Cancellation is a protected mutation too. A session with no
+        # in-flight turn must report a typed refusal, never fabricated success.
+        cancel_path = "/agent/api/qubit/chat/cancel"
+        cancel_body = json.dumps(
+            {"session": "nonexistent-release-probe-" + os.urandom(8).hex()}
+        ).encode()
+        denied_cancel, _, denied_cancel_body = raw(
+            cancel_path, {"Content-Type": "application/json"},
+            method="POST", body=cancel_body)
+        assert denied_cancel in (401, 403), (
+            "installed cancel accepted missing credentials",
+            denied_cancel, denied_cancel_body[:200])
+        idle_cancel, _, idle_cancel_body = raw(
+            cancel_path, {**session_headers, "Content-Type": "application/json"},
+            method="POST", body=cancel_body)
+        assert idle_cancel == 404, (
+            "cancel with no active turn returned unexpected status",
+            idle_cancel, idle_cancel_body[:200])
+        idle_cancel_payload = json.loads(idle_cancel_body)
+        assert idle_cancel_payload.get("ok") is False, idle_cancel_payload
+        assert idle_cancel_payload.get("code") == "NO_ACTIVE_TURN", (
+            "idle cancellation must return the real transport refusal",
+            idle_cancel_payload)
         session_denied, _, _ = raw(session_path)
         assert session_denied in (401, 403), (
             "session inventory exposed without authentication", session_denied)
