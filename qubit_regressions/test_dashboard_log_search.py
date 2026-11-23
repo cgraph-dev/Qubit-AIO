@@ -98,3 +98,36 @@ def test_invalid_utf8_and_bom_are_handled(tmp_path):
         accept_line_factory=lambda: (lambda _: True))
     assert page == ["hit first\n", "\ufffdhit second\n"]
     assert more is False
+
+
+def test_first_page_reads_log_only_once(tmp_path, monkeypatch):
+    """The dashboard's initial log page must not rescan a large file."""
+    from pathlib import Path
+
+    path = tmp_path / "agent.log"
+    path.write_text("".join(f"hit {i}\\n" for i in range(100)))
+    original_open = Path.open
+    opens = []
+
+    def counted_open(self, *args, **kwargs):
+        if self == path:
+            opens.append(True)
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", counted_open)
+    page, more = search_log_page(
+        path, needle="hit", offset=0, limit=5,
+        accept_line_factory=lambda: (lambda _: True))
+    assert page == [f"hit {i}\\n" for i in range(95, 100)]
+    assert more is True
+    assert len(opens) == 1
+
+
+def test_first_page_reports_no_older_page_when_exactly_full(tmp_path):
+    path = tmp_path / "agent.log"
+    path.write_text("hit first\\nhit second\\n")
+    page, more = search_log_page(
+        path, needle="hit", offset=0, limit=2,
+        accept_line_factory=lambda: (lambda _: True))
+    assert page == ["hit first\\n", "hit second\\n"]
+    assert more is False
