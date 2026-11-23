@@ -136,6 +136,26 @@ def test_secret_allowlist_is_exact_and_environment_gated():
                 assert job.get("environment"), (name, job_name)
 
 
+def test_secret_workflow_policy_rejects_automatic_triggers():
+    doc = {"on": {"pull_request": None}, "jobs": {
+        "publish": {"environment": "public-production", "steps": [
+            {"run": "echo ${{ secrets.QUBIT_PUBLIC_PUSH_TOKEN }}"}]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_secret_workflow_gate(
+        doc, Path("promote-public.yml"), errors)
+    assert any("manual-only" in error for error in errors), errors
+
+
+def test_secret_workflow_policy_rejects_missing_environment():
+    doc = {"on": {"workflow_dispatch": None}, "jobs": {
+        "publish": {"steps": [
+            {"run": "echo ${{ secrets.QUBIT_PUBLIC_PUSH_TOKEN }}"}]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_secret_workflow_gate(
+        doc, Path("promote-public.yml"), errors)
+    assert any("protected environment" in error for error in errors), errors
+
+
 def test_pull_request_workflows_are_hosted_read_only_and_bounded():
     for path in _managed_paths():
         doc = POLICY_MODULE.load(path)
