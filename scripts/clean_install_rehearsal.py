@@ -700,6 +700,28 @@ print(json.dumps({"ok": True, "session_id": sys.argv[2]}))
         assert child_result == {"ok": True, "session_id": persisted_id}, (
             "fresh process returned unexpected persistence result",
             child_result)
+        # A crash marker is the shared TUI/dashboard interrupted-turn
+        # authority. Write it in a separate interpreter to simulate a turn
+        # interrupted by process death, then verify the resumed dashboard
+        # exposes the pending prompt without executing it automatically.
+        interrupted_prompt = "resume-only-" + os.urandom(8).hex()
+        marker_writer = """
+import sys
+from voicebridge.config import Config
+from voicebridge import chat_transport
+cfg = Config.load(sys.argv[1])
+chat_transport._write_turn_marker(cfg, sys.argv[2], sys.argv[3])
+marker = chat_transport._pending_interrupted_turn(cfg, sys.argv[2])
+assert marker is not None, "shared turn marker not persisted"
+"""
+        marker_child = subprocess.run(
+            [sys.executable, "-c", marker_writer, str(p),
+             persisted_id, interrupted_prompt],
+            capture_output=True, text=True, timeout=30, check=False)
+        assert marker_child.returncode == 0, (
+            "fresh process could not persist interrupted-turn marker",
+            marker_child.returncode, marker_child.stdout[-400:],
+            marker_child.stderr[-400:])
         ui = WebUI(_F(), host="127.0.0.1", port=0, state_dir=state,
                    asr_factory=lambda: None)
         ui.start()
@@ -748,6 +770,12 @@ print(json.dumps({"ok": True, "session_id": sys.argv[2]}))
             "persisted session unreadable after restart",
             resumed_status, resumed_body[:200])
         resumed = json.loads(resumed_body)
+        interrupted = resumed.get("interrupted_turn")
+        assert isinstance(interrupted, dict), (
+            "restarted dashboard lost interrupted-turn marker", resumed)
+        assert interrupted_prompt in json.dumps(interrupted), (
+            "restarted dashboard returned wrong interrupted prompt",
+            interrupted)
         assert resumed.get("session", {}).get("id") == persisted_id, resumed
         assert any(m.get("content") == persisted_text
                    for m in resumed.get("messages", [])), (
