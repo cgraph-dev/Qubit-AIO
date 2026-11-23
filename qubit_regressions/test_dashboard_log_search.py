@@ -45,7 +45,7 @@ def test_huge_offset_does_not_allocate_offset_sized_buffer(tmp_path):
     assert (page, more) == ([], False)
 
 
-def test_stateful_filter_is_fresh_on_second_pass(tmp_path):
+def test_first_page_stateful_filter_runs_one_fresh_pass(tmp_path):
     path = tmp_path / "agent.log"
     path.write_text("hit first\nhit second\nhit third\n")
     creations = []
@@ -66,7 +66,7 @@ def test_stateful_filter_is_fresh_on_second_pass(tmp_path):
         accept_line_factory=factory)
     assert page == ["hit third\n"]
     assert more is True
-    assert len(creations) == 2
+    assert len(creations) == 1
 
 
 
@@ -105,7 +105,7 @@ def test_first_page_reads_log_only_once(tmp_path, monkeypatch):
     from pathlib import Path
 
     path = tmp_path / "agent.log"
-    path.write_text("".join(f"hit {i}\\n" for i in range(100)))
+    path.write_text("".join(f"hit {i}\n" for i in range(100)))
     original_open = Path.open
     opens = []
 
@@ -118,31 +118,31 @@ def test_first_page_reads_log_only_once(tmp_path, monkeypatch):
     page, more = search_log_page(
         path, needle="hit", offset=0, limit=5,
         accept_line_factory=lambda: (lambda _: True))
-    assert page == [f"hit {i}\\n" for i in range(95, 100)]
+    assert page == [f"hit {i}\n" for i in range(95, 100)]
     assert more is True
     assert len(opens) == 1
 
 
 def test_first_page_reports_no_older_page_when_exactly_full(tmp_path):
     path = tmp_path / "agent.log"
-    path.write_text("hit first\\nhit second\\n")
+    path.write_text("hit first\nhit second\n")
     page, more = search_log_page(
         path, needle="hit", offset=0, limit=2,
         accept_line_factory=lambda: (lambda _: True))
-    assert page == ["hit first\\n", "hit second\\n"]
+    assert page == ["hit first\n", "hit second\n"]
     assert more is False
 
 
 def test_filtered_history_finds_old_matches_without_search_text(tmp_path):
     """Level/component filters also require complete-history pagination."""
     path = tmp_path / "agent.log"
-    path.write_text("allowed old\\n" + "excluded\\n" * 2500 + "allowed new\\n")
+    path.write_text("allowed old\n" + "excluded\n" * 2500 + "allowed new\n")
     factory = lambda: (lambda line: line.startswith("allowed"))
     latest, more = search_log_page(
         path, needle="", offset=0, limit=1, accept_line_factory=factory)
-    assert latest == ["allowed new\\n"]
+    assert latest == ["allowed new\n"]
     assert more is True
     older, more = search_log_page(
         path, needle="", offset=1, limit=1, accept_line_factory=factory)
-    assert older == ["allowed old\\n"]
+    assert older == ["allowed old\n"]
     assert more is False
