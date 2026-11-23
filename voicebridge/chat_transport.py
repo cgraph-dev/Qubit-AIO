@@ -4473,18 +4473,20 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
     deadline = (started + float(timeout_s)) if timeout_s else None
     try:
         while True:
+            # A provider may send an endless stream of chunks; enforce the
+            # total deadline even when the queue never becomes empty.
+            if deadline is not None and time.monotonic() >= deadline:
+                ev.set()
+                _audit("turn_remote_timeout", session=sid,
+                       timeout_s=float(timeout_s))
+                yield ("outcome", {"ok": False, "state": "FAILED",
+                                  "code": "TURN_TIMEOUT",
+                                  "detail": "remote provider exceeded turn timeout",
+                                  "session_id": sid})
+                return
             try:
                 item = box.get(timeout=0.25)
             except queue.Empty:
-                if deadline is not None and time.monotonic() >= deadline:
-                    ev.set()
-                    _audit("turn_remote_timeout", session=sid,
-                           timeout_s=float(timeout_s))
-                    yield ("outcome", {"ok": False, "state": "FAILED",
-                                      "code": "TURN_TIMEOUT",
-                                      "detail": "remote provider exceeded turn timeout",
-                                      "session_id": sid})
-                    return
                 continue
             if item is finished:
                 break
@@ -5523,6 +5525,14 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     try:
         deadline = (time.monotonic() + float(timeout_s)) if timeout_s else None
         while True:
+            if deadline is not None and time.monotonic() >= deadline:
+                ev.set()
+                _audit("stream_timeout", session=sid,
+                       timeout_s=float(timeout_s))
+                yield {"event": "error", "code": "TURN_TIMEOUT",
+                       "detail": "provider exceeded the turn timeout",
+                       "session_id": sid}
+                return
             try:
                 # A blocking get() is how a stalled provider used to hang the
                 # caller forever: timeout_s was accepted and never applied, so
