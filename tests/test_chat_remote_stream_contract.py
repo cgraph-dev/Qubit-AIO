@@ -27,9 +27,9 @@ class RemoteStreamContractTests(unittest.TestCase):
             on_delta("world")
             return SimpleNamespace(ok=True, details={"streaming": True})
 
-        with patch.object(chat, "store", return_value=object()), \\
-             patch.object(chat, "_estop", return_value=False), \\
-             patch("voicebridge.providers.gateway.run_stream", side_effect=provider), \\
+        with patch.object(chat, "store", return_value=object()), \
+             patch.object(chat, "_estop", return_value=False), \
+             patch("voicebridge.providers.gateway.run_stream", side_effect=provider), \
              patch.object(chat, "_remote_outcome", return_value={
                  "ok": True, "reply": "hello world", "receipt": {}}):
             stream = self._stream(sid)
@@ -62,8 +62,8 @@ class RemoteStreamContractTests(unittest.TestCase):
                 time.sleep(0.005)
             return SimpleNamespace(ok=False, details={})
 
-        with patch.object(chat, "store", return_value=object()), \\
-             patch.object(chat, "_estop", return_value=False), \\
+        with patch.object(chat, "store", return_value=object()), \
+             patch.object(chat, "_estop", return_value=False), \
              patch("voicebridge.providers.gateway.run_stream", side_effect=provider):
             events = list(self._stream(sid, timeout_s=0.02))
             self.assertEqual(events[0][0], "outcome")
