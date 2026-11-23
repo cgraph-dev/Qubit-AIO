@@ -916,9 +916,6 @@ async def get_logs(
     offset = max(0, offset)
     empty = {"file": file, "lines": [], "offset": offset, "limit": cap,
              "returned": 0, "has_more": False, "next_offset": None}
-    if not log_path.exists():
-        return empty
-
     try:
         from qubit_logging import COMPONENT_PREFIXES
     except ImportError:
@@ -932,6 +929,9 @@ async def get_logs(
         if comp_prefixes is None:
             raise HTTPException(status_code=400, detail=f"Unknown component: {component}. "
                                 f"Available: {', '.join(sorted(COMPONENT_PREFIXES))}")
+    if not log_path.exists():
+        return empty
+
     # Free-text search must inspect the entire log; a fixed tail of 2000
     # lines silently hides older matches and breaks pagination.
     if (search or min_level or comp_prefixes is not None or offset > 0) and cap > 0:
