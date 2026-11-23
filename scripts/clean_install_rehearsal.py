@@ -625,6 +625,38 @@ try:
         assert idle_cancel_payload.get("code") == "NO_ACTIVE_TURN", (
             "idle cancellation must return the real transport refusal",
             idle_cancel_payload)
+        # Register a live cancellation event through the real transport's
+        # session registry. The HTTP handler must signal that exact event,
+        # and the registry must be released after the simulated turn exits.
+        # This tests cancellation signalling, not provider interruption.
+        from voicebridge import chat_transport as _chat_cancel
+        active_id = "active-cancel-" + os.urandom(8).hex()
+        active_event = _chat_cancel._cancel_event(active_id)
+        assert not active_event.is_set(), "new turn already cancelled"
+        active_body = json.dumps({"session": active_id}).encode()
+        try:
+            active_status, _, active_response = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=active_body)
+            assert active_status == 200, (
+                "authenticated cancellation did not signal active turn",
+                active_status, active_response[:200])
+            active_payload = json.loads(active_response)
+            assert active_payload.get("ok") is True, active_payload
+            assert active_payload.get("session_id") == active_id, active_payload
+            assert active_event.is_set(), (
+                "HTTP cancellation failed to signal transport stop event",
+                active_payload)
+        finally:
+            _chat_cancel._release_cancel(active_id, active_event)
+        released_status, _, released_body = raw(
+            cancel_path, {**session_headers,
+                          "Content-Type": "application/json"},
+            method="POST", body=active_body)
+        assert released_status == 404, (
+            "completed turn retained a cancellable session event",
+            released_status, released_body[:200])
         session_denied, _, _ = raw(session_path)
         assert session_denied in (401, 403), (
             "session inventory exposed without authentication", session_denied)
