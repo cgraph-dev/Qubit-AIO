@@ -173,7 +173,7 @@ def create_model_profile(
             base_url=str(base_url or "").strip() or RADIUS_BASE_URL,
             egress_consent=str(egress_consent or "deny").strip())
         try:
-            out = R.upsert_model_profile(cfg, prof, confirm=bool(confirm))
+            out = R.upsert_model_profile(cfg, prof, confirm=_as_bool(confirm))
         except ResolverError as exc:
             return _err(exc)
         return _state(out, "OK" if out.get("state") == "OK"
@@ -199,7 +199,7 @@ def create_model_profile(
         rollback_to=str(rollback_to or pid).strip() or pid,
     )
     try:
-        out = R.upsert_model_profile(cfg, prof, confirm=bool(confirm))
+        out = R.upsert_model_profile(cfg, prof, confirm=_as_bool(confirm))
     except ResolverError as exc:
         return _err(exc)
     return _state(out, "OK" if out.get("state") == "OK" else out.get("state"))
@@ -231,7 +231,7 @@ def create_radius_profile(
         base_url=str(base_url or "").strip() or RADIUS_BASE_URL,
         egress_consent=str(egress_consent or "deny").strip())
     try:
-        out = R.upsert_model_profile(cfg, prof, confirm=bool(confirm))
+        out = R.upsert_model_profile(cfg, prof, confirm=_as_bool(confirm))
     except ResolverError as exc:
         return _err(exc)
     return _state(out, "OK" if out.get("state") == "OK" else out.get("state"))
@@ -241,7 +241,7 @@ def clone_model_profile(cfg: Any, source_id: str, new_id: str, *,
                         confirm: bool = False) -> Dict[str, Any]:
     try:
         out = R.clone_model_profile(cfg, str(source_id), str(new_id),
-                                    confirm=bool(confirm))
+                                    confirm=_as_bool(confirm))
     except ResolverError as exc:
         return _err(exc)
     return _state(out, "OK" if out.get("state") == "OK" else out.get("state"))
@@ -251,7 +251,7 @@ def remove_model_profile(cfg: Any, profile_id: str, *,
                          confirm: bool = False) -> Dict[str, Any]:
     try:
         out = R.remove_model_profile(cfg, str(profile_id),
-                                     confirm=bool(confirm))
+                                     confirm=_as_bool(confirm))
     except ResolverError as exc:
         # Unknown / immutable are typed refusals, never a silent success.
         return _err(exc, "REFUSED")
@@ -266,7 +266,7 @@ def select_session_model(cfg: Any, session: str, profile_id: str, *,
     try:
         out = R.set_session_profile(cfg, str(session), str(profile_id),
                                     role=str(role or DEFAULT_ROLE),
-                                    confirm=bool(confirm))
+                                    confirm=_as_bool(confirm))
     except ResolverError as exc:
         return _err(exc)
     return _state(out, "OK" if out.get("state") == "OK" else out.get("state"))
@@ -274,7 +274,7 @@ def select_session_model(cfg: Any, session: str, profile_id: str, *,
 
 def clear_session_model(cfg: Any, session: str, *,
                         role: str = "*", confirm: bool = False) -> Dict[str, Any]:
-    if not confirm:
+    if not _as_bool(confirm):
         return {"state": "OK", "dry_run": True, "action": "would clear",
                 "session": str(session), "role": str(role or "*")}
     try:
@@ -303,7 +303,7 @@ def rollback_model_profile(cfg: Any, profile_id: str, *,
     try:
         out = R.set_session_profile(cfg, str(session), target,
                                     role=str(role or DEFAULT_ROLE),
-                                    confirm=bool(confirm))
+                                    confirm=_as_bool(confirm))
     except ResolverError as exc:
         return _err(exc)
     out["rollback_to"] = target
