@@ -589,6 +589,31 @@ try:
         assert session_payload["total"] >= len(session_payload["sessions"]), (
             "installed session inventory has inconsistent total", session_payload)
 
+        # Persist an actual canonical chat-store record and message (without
+        # invoking a model provider), then read them through the installed
+        # dashboard HTTP API. This tests shared storage and restart durability,
+        # not agent turn execution.
+        from voicebridge import chat_transport as _chat_transport
+        canonical = _chat_transport.store(cfg)
+        persisted_id = "release-acceptance-" + os.urandom(8).hex()
+        persisted_text = "isolated-restart-proof-" + os.urandom(8).hex()
+        created = canonical.create("release acceptance persistence",
+                                   session_id=persisted_id)
+        assert created.get("state") == "OK", created
+        appended = canonical.append(persisted_id, "user", persisted_text)
+        assert appended.get("state") == "OK", appended
+        show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
+        show_status, _, show_body = raw(show_path, session_headers)
+        assert show_status == 200, ("canonical session HTTP read failed",
+                                    show_status, show_body[:200])
+        show_payload = json.loads(show_body)
+        assert show_payload.get("ok") is True, show_payload
+        assert show_payload.get("session", {}).get("id") == persisted_id, (
+            "canonical session ID differs over HTTP", show_payload)
+        assert any(m.get("content") == persisted_text
+                   for m in show_payload.get("messages", [])), (
+            "canonical persisted message missing over HTTP", show_payload)
+
         # A fresh server instance must serve the same installed dashboard
         # against the same isolated state after a graceful listener restart.
         # This proves restart liveness, not agent-session persistence.
@@ -628,6 +653,19 @@ try:
         assert restarted_sessions["total"] >= len(restarted_sessions["sessions"]), (
             "restarted session inventory has inconsistent total",
             restarted_sessions)
+        assert any(s.get("id") == persisted_id
+                   for s in restarted_sessions["sessions"]), (
+            "canonical session missing from inventory after restart",
+            persisted_id, restarted_sessions)
+        resumed_status, _, resumed_body = raw(show_path, session_headers)
+        assert resumed_status == 200, (
+            "persisted session unreadable after restart",
+            resumed_status, resumed_body[:200])
+        resumed = json.loads(resumed_body)
+        assert resumed.get("session", {}).get("id") == persisted_id, resumed
+        assert any(m.get("content") == persisted_text
+                   for m in resumed.get("messages", [])), (
+            "persisted message lost across dashboard restart", resumed)
 finally:
     ui.stop()
 
