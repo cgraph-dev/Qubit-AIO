@@ -4301,9 +4301,7 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
         return {"ok": False, "state": "FAILED", "code": "MODEL_ERROR",
                 "detail": _redact(str(exc))[:300], "session_id": sid}
     finally:
-        # The HTTP generator can close before its provider worker finishes.
-        # Leave the cancellation handle registered until worker exit.
-        pass
+        _release_cancel(sid, ev)
     elapsed_ms = int((time.monotonic() - started) * 1000)
     return _remote_outcome(cfg, sid, routed, res, elapsed_ms,
                            context_meta=context_meta, decision=decision,
@@ -5552,7 +5550,10 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                        "detail": detail, "session_id": sid}
                 return
     finally:
-        _release_cancel(sid, ev)
+        # A disconnected client must not orphan a still-running provider.
+        # The worker releases the cancellation handle on completion.
+        if thread.is_alive():
+            ev.set()
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if _stopped():
         _audit("stream_cancelled", session=sid, elapsed_ms=elapsed_ms)
