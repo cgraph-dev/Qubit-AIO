@@ -39,5 +39,19 @@ class CancelRegistryTests(unittest.TestCase):
         self.assertEqual(chat.cancel(sid)["code"], "NO_ACTIVE_TURN")
 
 
+    def test_cancellation_does_not_cross_session_boundary(self):
+        first_id = "cancel-registry-session-a"
+        second_id = "cancel-registry-session-b"
+        first = chat._cancel_event(first_id)
+        second = chat._cancel_event(second_id)
+        try:
+            self.assertTrue(chat.cancel(first_id)["ok"])
+            self.assertTrue(first.is_set())
+            self.assertFalse(second.is_set())
+        finally:
+            chat._release_cancel(first_id, first)
+            chat._release_cancel(second_id, second)
+
+
 if __name__ == "__main__":
     unittest.main()
