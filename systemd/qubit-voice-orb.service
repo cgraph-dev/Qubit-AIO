@@ -15,6 +15,11 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
+# Position/drag needs X11 override-redirect geometry. Qt otherwise prefers
+# Wayland when WAYLAND_DISPLAY is exported, and Wayland ignores client
+# positioning (Hyprland centres the orb and drag no-ops). Keep the orb on
+# XWayland/xcb, matching this unit's X11-overlay contract.
+Environment=QT_QPA_PLATFORM=xcb
 # X11 overlay: needs the owner's graphical session. DISPLAY/XAUTHORITY are
 # deliberately NOT hardcoded here — the unit inherits the user manager's
 # session environment (import once after login if needed:
