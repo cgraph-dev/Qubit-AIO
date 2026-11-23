@@ -4301,7 +4301,9 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
         return {"ok": False, "state": "FAILED", "code": "MODEL_ERROR",
                 "detail": _redact(str(exc))[:300], "session_id": sid}
     finally:
-        _release_cancel(sid, ev)
+        # The HTTP generator can close before its provider worker finishes.
+        # Leave the cancellation handle registered until worker exit.
+        pass
     elapsed_ms = int((time.monotonic() - started) * 1000)
     return _remote_outcome(cfg, sid, routed, res, elapsed_ms,
                            context_meta=context_meta, decision=decision,
@@ -5491,6 +5493,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
             # so the crash marker must not survive: only a process death should
             # leave one behind for auto-continue to act on.
             _clear_turn_marker(cfg, sid)
+            _release_cancel(sid, ev)
             out.put(done)
 
     thread = threading.Thread(target=_worker, name=f"qubit-chat-stream-{sid}",
@@ -5511,6 +5514,9 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 item = out.get(timeout=0.25)
             except queue.Empty:
                 if deadline is not None and time.monotonic() > deadline:
+                    # Signal the still-running provider before returning the
+                    # terminal timeout. The worker owns cancellation cleanup.
+                    ev.set()
                     _audit("stream_timeout", session=sid,
                            timeout_s=float(timeout_s))
                     yield {"event": "error", "code": "TURN_TIMEOUT",
