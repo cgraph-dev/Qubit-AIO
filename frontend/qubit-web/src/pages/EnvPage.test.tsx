@@ -7,9 +7,10 @@
  * header tab jumps to its card. This pins the six-tab surface, not a page
  * load.
  */
-import { act } from "react";
+import { act, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
+import { ProfileContext } from "@/contexts/profile-context";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiMocks = vi.hoisted(() => ({
@@ -41,6 +42,18 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
   }
 }
 
+function TestProfile({ children }: { children: ReactNode }) {
+  const [profile, setProfile] = useState("");
+  return (
+    <ProfileContext.Provider value={{
+      profile, setProfile, currentProfile: "default", profiles: ["default", "work"],
+    }}>
+      <button onClick={() => setProfile("work")}>Use work profile</button>
+      {children}
+    </ProfileContext.Provider>
+  );
+}
+
 async function renderEnv() {
   const [{ default: EnvPage }, { I18nProvider }, { PageHeaderProvider }] =
     await Promise.all([
@@ -56,7 +69,7 @@ async function renderEnv() {
       <I18nProvider>
         <MemoryRouter initialEntries={["/env"]}>
           <PageHeaderProvider pluginTabs={[]}>
-            <EnvPage />
+            <TestProfile><EnvPage /></TestProfile>
           </PageHeaderProvider>
         </MemoryRouter>
       </I18nProvider>,
@@ -110,6 +123,23 @@ describe("EnvPage tab family (drift A22)", () => {
     ]) {
       expect(container.querySelector(`#${id}`)).not.toBeNull();
     }
+  });
+
+  it("reloads the key inventory when the management profile changes", async () => {
+    const row = {
+      is_set: true, redacted_value: null, description: "", custom: true,
+      category: "custom", is_password: true, tools: [],
+    };
+    apiMocks.getEnvVars.mockImplementation(async (profile: string) =>
+      profile === "work" ? { WORK_ONLY: row } : { DEFAULT_ONLY: row });
+    await renderEnv();
+    await waitFor(() => Boolean(container.textContent?.includes("DEFAULT_ONLY")));
+    const switcher = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Use work profile")!;
+    await act(async () => switcher.click());
+    await waitFor(() => Boolean(container.textContent?.includes("WORK_ONLY")));
+    expect(container.textContent).not.toContain("DEFAULT_ONLY");
+    expect(apiMocks.getEnvVars.mock.calls).toEqual([["current"], ["work"]]);
   });
 
   it("shows the real is_set state and never a value", async () => {

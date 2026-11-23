@@ -7,7 +7,7 @@ The engine is deliberately small and has four parts:
 * :class:`ForeignAdapter` — the data describing one foreign agent's naming.
 * :class:`ImportAliaser` — a ``sys.meta_path`` finder that resolves the foreign module names.
 * :class:`EnvAliaser` / :class:`SymbolAliaser` — environment and attribute aliasing.
-* :class:`SkillLoader` — enumerate the foreign agent's skill directories (``SKILL.md``).
+* :class:`SkillLoader` — enumerate foreign Markdown skills and declared pipeline manifests.
 * :class:`McpConfigLoader` — read the foreign agent's MCP server entries from its config.
 * :class:`AdapterRegistry` — holds adapters and answers "does this directory belong to one?"
 
@@ -18,10 +18,12 @@ from __future__ import annotations
 import importlib
 import importlib.abc
 import importlib.util
+import json
 import os
 import pathlib
 import sys
 import threading
+import tomllib
 import types
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
@@ -108,6 +110,12 @@ class ForeignAdapter:
     mcp_config_paths: Tuple[str, ...] = ()
     mcp_config_keys: Tuple[str, ...] = ()
     reserved: Tuple[str, ...] = ()
+    # Distinctive package-root manifests identify a format without loading any code.
+    manifest_filenames: Tuple[str, ...] = ()
+    mcp_enabled_key: str = ""
+    mcp_named_list: bool = False
+    mcp_json5: bool = False
+    skill_pipeline_filename: str = ""
 
     # ------------------------------------------------------------------ alias resolution
 
@@ -159,6 +167,7 @@ class ImportAliaser(importlib.abc.MetaPathFinder):
 
     def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
         self._adapters = tuple(adapters)
+        self._parent_bindings: Dict[Tuple[types.ModuleType, str], types.ModuleType] = {}
 
     # -- lookup
 
@@ -207,7 +216,20 @@ class ImportAliaser(importlib.abc.MetaPathFinder):
         # Both names -> one object. This is what keeps a foreign plugin's mutations visible.
         sys.modules[alias] = real
         sys.modules[target] = real
+        parent_name, _, child = alias.rpartition(".")
+        parent = sys.modules.get(parent_name)
+        if parent is not None and child not in vars(parent):
+            # Preloading skips importlib's normal parent-attribute binding.
+            # Publish the old child name for `from old_package import child`.
+            setattr(parent, child, real)
+            self._parent_bindings[(parent, child)] = real
         return real
+
+    def clear_parent_bindings(self) -> None:
+        for (parent, child), module in self._parent_bindings.items():
+            if vars(parent).get(child) is module:
+                delattr(parent, child)
+        self._parent_bindings.clear()
 
     def preload(self) -> List[str]:
         """Bind exact aliases AND discover prefix-family members up front.
@@ -368,28 +390,30 @@ class SymbolAliaser:
 class SkillEntry:
     """One foreign skill discovered on disk.
 
-    ``directory`` is the skill's own folder (the one holding ``SKILL.md``), ``name`` is the
-    frontmatter ``name`` (falling back to the folder name), and ``frontmatter`` is the parsed
-    mapping after ``skill_frontmatter_aliases`` were applied — so a caller sees the host's key
-    names, not the foreign agent's.
+    A Markdown name takes precedence over a pipeline name and the folder name.
+    ``frontmatter`` holds the Markdown metadata after aliases. A populated
+    ``pipeline`` distinguishes an available manifest from one that could not be parsed.
     """
 
     directory: pathlib.Path
     name: str
     frontmatter: Dict[str, object]
+    markdown: bool = True
+    pipeline: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class McpServerEntry:
     """One foreign MCP server read from the foreign agent's config.
 
-    ``name`` is the registry key and ``spec`` is the raw ``{command/url/...}`` mapping, kept
-    verbatim so the host can hand it to its own MCP loader without this layer interpreting it.
+    ``name`` is the registry key. ``spec`` carries the source settings and any explicit
+    global disable flag. The loader never launches the server.
     """
 
     name: str
     spec: Dict[str, object]
     source: pathlib.Path
+    adapter: str = ""
 
 
 def _read_frontmatter(text: str) -> Dict[str, object]:
@@ -422,10 +446,25 @@ def _read_frontmatter(text: str) -> Dict[str, object]:
     return data
 
 
+def _read_skill_frontmatter(path: pathlib.Path) -> Dict[str, object]:
+    """Read only the metadata required for discovery."""
+    with path.open(encoding="utf-8", errors="ignore") as stream:
+        first = stream.readline()
+        if not first.startswith("---"):
+            return {}
+        lines = [first]
+        for line in stream:
+            lines.append(line)
+            if line.startswith("---"):
+                return _read_frontmatter("".join(lines))
+    return {}
+
+
 class SkillLoader:
     """Enumerate a foreign agent's skills, applying foreign frontmatter key aliases.
 
-    A skill is a directory containing ``SKILL.md``. Foreign roots are scanned recursively
+    A skill is a directory containing ``SKILL.md`` or an adapter-declared pipeline manifest.
+    Foreign roots are scanned recursively
     (skills live at ``<root>/<name>`` and ``<root>/<category>/<name>`` in the wild), so the
     loader does not assume a depth. A **missing root is a graceful no-op** — an empty report,
     never an exception and never a fabricated entry: the foreign agent simply may not be
@@ -438,11 +477,14 @@ class SkillLoader:
     def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
         self._roots: List[pathlib.Path] = []
         self._aliases: Dict[str, str] = {}
+        self._pipeline_files: Dict[pathlib.Path, str] = {}
         for adapter in adapters:
             for root in adapter.skill_roots:
                 expanded = pathlib.Path(os.path.expanduser(root))
                 if expanded not in self._roots:
                     self._roots.append(expanded)
+                if adapter.skill_pipeline_filename:
+                    self._pipeline_files.setdefault(expanded, adapter.skill_pipeline_filename)
             for foreign, real in adapter.skill_frontmatter_aliases.items():
                 # An explicit real key already claimed by another adapter wins; first wins.
                 self._aliases.setdefault(foreign, real)
@@ -464,14 +506,33 @@ class SkillLoader:
         for root in self._roots:
             if not root.is_dir():
                 continue  # missing root: graceful no-op, never an error
-            for skill_md in sorted(root.rglob("SKILL.md")):
-                try:
-                    text = skill_md.read_text(errors="ignore")
-                except OSError:  # pragma: no cover - unreadable file mid-scan
-                    continue
-                fm = self._alias_frontmatter(_read_frontmatter(text))
-                name = str(fm.get("name") or skill_md.parent.name)
-                found.append(SkillEntry(directory=skill_md.parent, name=name, frontmatter=fm))
+            markdown = {p.parent: p for p in root.rglob("SKILL.md")}
+            pipeline_file = self._pipeline_files.get(root)
+            pipelines = {p.parent: p for p in root.rglob(pipeline_file)} if pipeline_file else {}
+            for directory in sorted(markdown.keys() | pipelines.keys()):
+                fm: Dict[str, object] = {}
+                pipeline = None
+                name = ""
+                skill_md = markdown.get(directory)
+                if skill_md is not None:
+                    try:
+                        fm = self._alias_frontmatter(_read_skill_frontmatter(skill_md))
+                    except OSError:  # unreadable file mid-scan
+                        skill_md = None
+                if directory in pipelines:
+                    try:
+                        with pipelines[directory].open("rb") as stream:
+                            metadata = tomllib.load(stream).get("skill")
+                        if not isinstance(metadata, dict):
+                            raise ValueError("pipeline manifest is missing the skill table")
+                        title = metadata.get("name")
+                        name = title.strip() if isinstance(title, str) else ""
+                        pipeline = "requires-runtime"
+                    except (OSError, ValueError):
+                        pipeline = "invalid-manifest"
+                if skill_md is not None or pipeline is not None:
+                    name = str(fm.get("name") or name or directory.name)
+                    found.append(SkillEntry(directory, name, fm, skill_md is not None, pipeline))
         return found
 
     def report(self) -> Dict[str, object]:
@@ -480,7 +541,8 @@ class SkillLoader:
         return {
             "roots": [str(r) for r in self._roots],
             "skills": [
-                {"name": s.name, "directory": str(s.directory), "frontmatter": s.frontmatter}
+                {"name": s.name, "directory": str(s.directory), "frontmatter": s.frontmatter,
+                 **({"pipeline": s.pipeline, "markdown": s.markdown} if s.pipeline else {})}
                 for s in skills
             ],
             "count": len(skills),
@@ -497,40 +559,34 @@ class McpConfigLoader:
 
     A **missing config path is a graceful no-op** (empty list), never an exception. A path that
     exists but cannot be parsed contributes nothing for that path and no fabricated entry.
-    JSON is parsed with the stdlib; a ``.yaml``/``.yml`` file is parsed with a minimal
-    top-level reader so this layer carries no YAML dependency.
+    JSON and TOML use the standard library. YAML uses the existing minimal reader.
+    A named-list adapter may reference a JSON file within the configuration directory.
     """
 
     def __init__(self, adapters: Sequence[ForeignAdapter]) -> None:
-        self._paths: List[pathlib.Path] = []
-        self._keys: Tuple[str, ...] = ()
-        keys: List[str] = []
-        for adapter in adapters:
-            for path in adapter.mcp_config_paths:
-                expanded = pathlib.Path(os.path.expanduser(path))
-                if expanded not in self._paths:
-                    self._paths.append(expanded)
-            for key in adapter.mcp_config_keys:
-                if key not in keys:
-                    keys.append(key)
-        self._keys = tuple(keys)
+        self._sources = [
+            (adapter, pathlib.Path(os.path.expanduser(path)))
+            for adapter in adapters for path in adapter.mcp_config_paths
+        ]
 
     def paths(self) -> List[pathlib.Path]:
         """The (expanded) config paths this loader will read."""
-        return list(self._paths)
+        return list(dict.fromkeys(path for _, path in self._sources))
 
-    def _load_mapping(self, path: pathlib.Path) -> Optional[Dict[str, object]]:
+    def _load_mapping(self, path: pathlib.Path, *, json5: bool) -> Optional[Dict[str, object]]:
         """Load a config file into a top-level mapping, or None if unreadable/unparseable."""
-        try:
-            text = path.read_text(errors="ignore")
-        except OSError:
-            return None
-        suffix = path.suffix.lower()
-        if suffix == ".json":
-            try:
-                import json
+        if json5:
+            if (pathlib.Path(__file__).resolve().parents[1] / "_data" / "qubit_runtime").is_dir():
+                from voicebridge._data.qubit_runtime.qubit_cli.foreign_config import load_openclaw_config
+            else:
+                from qubit_runtime.qubit_cli.foreign_config import load_openclaw_config
+            return load_openclaw_config(path)
 
-                data = json.loads(text)
+        text = path.read_text(encoding="utf-8-sig")
+        suffix = path.suffix.lower()
+        if suffix in (".json", ".toml"):
+            try:
+                data = tomllib.loads(text) if suffix == ".toml" else json.loads(text)
             except (ValueError, TypeError):
                 return None
             return data if isinstance(data, dict) else None
@@ -538,8 +594,6 @@ class McpConfigLoader:
             return _read_yaml_top_level(text)
         # Unknown extension: try JSON first (the MCP convention), then YAML.
         try:
-            import json
-
             data = json.loads(text)
             if isinstance(data, dict):
                 return data
@@ -547,39 +601,95 @@ class McpConfigLoader:
             pass
         return _read_yaml_top_level(text)
 
-    def _entries_from(self, mapping: Dict[str, object]) -> Dict[str, object]:
-        """Pick the server mapping out of a loaded config, honouring ``mcp_config_keys``."""
-        if not self._keys:
+    @staticmethod
+    def _value(mapping: Dict[str, object], key: str) -> object:
+        if key in mapping:
+            return mapping[key]
+        value: object = mapping
+        for part in key.split("."):
+            if not isinstance(value, dict):
+                return None
+            value = value.get(part)
+        return value
+
+    @staticmethod
+    def _named_servers(value: object, path: pathlib.Path) -> Dict[str, object]:
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                try:
+                    directory = path.parent.resolve()
+                    reference = (directory / value).resolve()
+                    if reference.suffix != ".json" or not reference.is_relative_to(directory):
+                        return {}
+                    value = json.loads(reference.read_text(encoding="utf-8"))
+                except (OSError, RuntimeError, ValueError):
+                    return {}
+        if isinstance(value, dict):
+            value = [value]
+        if not isinstance(value, list):
+            return {}
+        servers: Dict[str, object] = {}
+        for row in value:
+            if isinstance(row, dict) and isinstance(row.get("name"), str) and row["name"].strip():
+                servers.setdefault(row["name"], {key: item for key, item in row.items() if key != "name"})
+        return servers
+
+    def _entries_from(self, mapping: Dict[str, object], path: pathlib.Path,
+                      adapter: ForeignAdapter) -> Dict[str, object]:
+        if not adapter.mcp_config_keys:
             return mapping
-        for key in self._keys:
-            candidate = mapping.get(key)
+        for key in adapter.mcp_config_keys:
+            candidate = self._value(mapping, key)
+            if adapter.mcp_named_list and candidate is not None:
+                return self._named_servers(candidate, path)
             if isinstance(candidate, dict):
                 return candidate
         return {}
 
     def read(self) -> List[McpServerEntry]:
         """Return every MCP server entry found across the configured paths."""
+        entries, _ = self.read_with_errors()
+        return entries
+
+    def read_with_errors(self) -> Tuple[List[McpServerEntry], List[pathlib.Path]]:
+        """Return discovered servers and the paths of configs that could not be read."""
         entries: List[McpServerEntry] = []
         seen: set = set()
-        for path in self._paths:
-            if not path.is_file():
-                continue  # missing path: graceful no-op, never an error
-            mapping = self._load_mapping(path)
+        errors: List[pathlib.Path] = []
+        mappings: Dict[Tuple[pathlib.Path, bool], Optional[Dict[str, object]]] = {}
+        for adapter, path in self._sources:
+            parser_key = (path, adapter.mcp_json5)
+            if parser_key not in mappings:
+                try:
+                    mappings[parser_key] = self._load_mapping(path, json5=adapter.mcp_json5)
+                except FileNotFoundError:
+                    continue
+                except (OSError, ValueError, RecursionError):
+                    mappings[parser_key] = None
+                if mappings[parser_key] is None and path not in errors:
+                    errors.append(path)
+            mapping = mappings[parser_key]
             if mapping is None:
                 continue  # unparseable: contributes nothing, invents nothing
-            servers = self._entries_from(mapping)
+            servers = self._entries_from(mapping, path, adapter)
+            disabled = bool(adapter.mcp_enabled_key) and self._value(mapping, adapter.mcp_enabled_key) is False
             for name, spec in servers.items():
-                if name in seen or not isinstance(spec, dict):
+                key = (adapter.name, name)
+                if key in seen or not isinstance(spec, dict):
                     continue
-                seen.add(name)
-                entries.append(McpServerEntry(name=name, spec=spec, source=path))
-        return entries
+                seen.add(key)
+                if disabled:
+                    spec = {**spec, "enabled": False}
+                entries.append(McpServerEntry(name=name, spec=spec, source=path, adapter=adapter.name))
+        return entries, errors
 
     def report(self) -> Dict[str, object]:
         """A JSON-friendly summary: the paths read and the servers found."""
         servers = self.read()
         return {
-            "paths": [str(p) for p in self._paths],
+            "paths": [str(p) for p in self.paths()],
             "servers": [
                 {"name": s.name, "spec": s.spec, "source": str(s.source)} for s in servers
             ],
@@ -671,13 +781,16 @@ class AdapterRegistry:
     # -- detection
 
     def detect(self, directory: os.PathLike | str, *, scan_files: Optional[Iterable] = None):
-        """Return the adapter whose markers appear in *directory*'s source, or None.
+        """Identify a package from its root manifest or import markers.
 
         Detection reads IMPORT STATEMENTS, never prose. A README that merely says the
         foreign agent's name must not trigger an adapter — matching prose is exactly how the
         vendor sync corrupted URLs.
         """
         base = pathlib.Path(directory)
+        for adapter in self._adapters:
+            if any((base / name).is_file() for name in adapter.manifest_filenames):
+                return adapter
         targets = list(scan_files) if scan_files is not None else list(base.rglob("*.py"))
         for path in targets:
             try:
@@ -754,6 +867,7 @@ def uninstall() -> None:
         if _finder is not None and _finder in sys.meta_path:
             sys.meta_path.remove(_finder)
         if _finder is not None:
+            _finder.clear_parent_bindings()
             aliased = {
                 alias
                 for adapter in _finder._adapters  # noqa: SLF001 (same package)

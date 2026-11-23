@@ -135,6 +135,11 @@ function toolsetIcon(
 /* ------------------------------------------------------------------ */
 
 export default function SkillsPage() {
+  const { profile } = useProfileScope();
+  return <ProfileSkillsPage key={profile} selectedProfile={profile || "current"} />;
+}
+
+function ProfileSkillsPage({ selectedProfile }: { selectedProfile: string }) {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [toolsets, setToolsets] = useState<ToolsetInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,25 +158,13 @@ export default function SkillsPage() {
   const { t } = useI18n();
   const { setAfterTitle, setEnd } = usePageHeader();
 
-  // ── Profile scoping ──
-  // The write target comes from the GLOBAL profile switcher (sidebar) via
-  // ProfileContext — one selector for the whole dashboard, deep-linkable
-  // as ?profile=<name>. This page just consumes it: the fetchJSON layer
-  // appends the param automatically; we still pass it explicitly where the
-  // call signature supports it (clearer, and robust if a caller bypasses
-  // the auto-injection).
-  const {
-    profile: selectedProfile,
-  } = useProfileScope();
-
   useEffect(() => {
     // Promise-chain shape: setState fires only inside async callbacks so the
-    // effect body stays lint-clean (react-hooks/set-state-in-effect). On a
-    // profile switch the old list stays visible until the new one arrives.
+    // effect body stays lint-clean (react-hooks/set-state-in-effect).
     let cancelled = false;
     Promise.all([
-      api.getSkills(selectedProfile || undefined),
-      api.getToolsets(selectedProfile || undefined),
+      api.getSkills(selectedProfile),
+      api.getToolsets(selectedProfile),
     ])
       .then(([s, tsets]) => {
         if (cancelled) return;
@@ -194,7 +187,7 @@ export default function SkillsPage() {
       await api.toggleSkill(
         skill.name,
         !skill.enabled,
-        selectedProfile || undefined,
+        selectedProfile,
       );
       setSkills((prev) =>
         prev.map((s) =>
@@ -222,7 +215,7 @@ export default function SkillsPage() {
   /* ---- Refresh toolsets after a config change ---- */
   const refreshToolsets = async () => {
     try {
-      const tsets = await api.getToolsets(selectedProfile || undefined);
+      const tsets = await api.getToolsets(selectedProfile);
       setToolsets(tsets);
     } catch {
       /* non-fatal: the drawer already toasted on the failing write */
@@ -275,7 +268,7 @@ export default function SkillsPage() {
       // Reload the list so a newly created skill (or an edited description)
       // shows up immediately.
       api
-        .getSkills(selectedProfile || undefined)
+        .getSkills(selectedProfile)
         .then((next) => setSkills(next ?? []))
         .catch(() => {});
     },
@@ -663,14 +656,14 @@ export default function SkillsPage() {
               )}
             </>
           ) : (
-            <HubBrowser showToast={showToast} profile={selectedProfile || undefined} />
+            <HubBrowser showToast={showToast} profile={selectedProfile} />
           )}
         </div>
       </div>
       {configToolset && (
         <ToolsetConfigDrawer
           toolset={configToolset}
-          profile={selectedProfile || undefined}
+          profile={selectedProfile}
           onClose={() => setConfigToolset(null)}
           onChanged={() => void refreshToolsets()}
         />
@@ -678,7 +671,7 @@ export default function SkillsPage() {
       <SkillEditorDialog
         open={editorOpen}
         editName={editorSkill}
-        profile={selectedProfile || undefined}
+        profile={selectedProfile}
         onClose={() => setEditorOpen(false)}
         onSaved={handleEditorSaved}
       />

@@ -256,6 +256,7 @@ export interface DevicePairing {
   kind: string;
   state: string;
   manageable: boolean;
+  token_manageable?: boolean;
   manage_reason?: string;
   secret_set: boolean;
 }

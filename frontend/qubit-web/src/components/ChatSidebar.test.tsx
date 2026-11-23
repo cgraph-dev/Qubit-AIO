@@ -2,16 +2,18 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatTerminalModelResponse } from "@/lib/api";
 
 const apiMocks = vi.hoisted(() => ({
   getModelInfo: vi.fn(async () => ({
     capabilities: { supports_reasoning: false },
     model: "test/model",
   })),
-  patchChatSession: vi.fn(async (id: string, patch: { model?: string }) => ({
+  patchChatSession: vi.fn(async (id: string, patch: { model?: string; provider?: string }): Promise<ChatTerminalModelResponse> => ({
     ok: true,
-    session: { id, model: patch.model ?? null },
+    session: { id, model: patch.model ?? null, provider: patch.provider } as ChatTerminalModelResponse["session"],
   })),
+  getChatTerminalModel: vi.fn(),
   setModelAssignment: vi.fn(async () => ({
     ok: true,
     terminal_follows: true,
@@ -42,6 +44,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getModelInfo: apiMocks.getModelInfo,
     patchChatSession: apiMocks.patchChatSession,
+    getChatTerminalModel: apiMocks.getChatTerminalModel,
     setModelAssignment: apiMocks.setModelAssignment,
   },
   QUBIT_BASE_PATH: "",
@@ -393,15 +396,16 @@ describe("ChatSidebar SSE event feed", () => {
     await flushMicrotasks();
 
     stream.send(
-      'id: 7\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-live","session":{"id":"dashboard-live","model":"deepseek-v4.1-flash"}}}\n\n',
+      'id: 7\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-live","session":{"id":"dashboard-live","model":"deepseek-v4.1-flash","provider":"opencode-go"}}}\n\n',
     );
     await flushMicrotasks();
 
-    expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
+    expect(onSessionModelChange).toHaveBeenCalledWith({ model: "deepseek-v4.1-flash", provider: "opencode-go" });
   });
 
   it("ignores a live session.updated for a DIFFERENT session (no cross-talk)", async () => {
     const onSessionModelChange = vi.fn();
+    const onSessionTitleChange = vi.fn();
     const { ChatSidebar } = await import("./ChatSidebar");
 
     await render(
@@ -409,16 +413,18 @@ describe("ChatSidebar SSE event feed", () => {
         channel="chat-1"
         sessionId="dashboard-mine"
         onSessionModelChange={onSessionModelChange}
+        onSessionTitleChange={onSessionTitleChange}
       />,
     );
     await flushMicrotasks();
 
     stream.send(
-      'id: 8\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-other","session":{"id":"dashboard-other","model":"x"}}}\n\n',
+      'id: 8\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-other","session":{"id":"dashboard-other","model":"x","title":"Unrelated title"}}}\n\n',
     );
     await flushMicrotasks();
 
     expect(onSessionModelChange).not.toHaveBeenCalled();
+    expect(onSessionTitleChange).not.toHaveBeenCalled();
   });
 
   it("does not re-read the model for a journal replay of other sessions", async () => {
@@ -517,7 +523,51 @@ describe("ChatSidebar SSE event feed", () => {
       provider: "opencode-go",
     });
     expect(apiMocks.setModelAssignment).not.toHaveBeenCalled();
-    expect(onSessionModelChange).toHaveBeenCalledWith("deepseek-v4.1-flash");
+    expect(onSessionModelChange).toHaveBeenCalledWith({ model: "deepseek-v4.1-flash", provider: "opencode-go" });
+  });
+
+  it("keeps the attached terminal model active until its queued choice is applied", async () => {
+    const onTerminalModelApplied = vi.fn();
+    const { ChatSidebar } = await import("./ChatSidebar");
+    const choice = { id: "request-1", model: "shared-model", provider: "next-provider" };
+    apiMocks.patchChatSession.mockResolvedValueOnce({
+      ok: true, terminal_model_request: { ...choice, state: "queued" },
+    });
+    apiMocks.getChatTerminalModel
+      .mockResolvedValueOnce({ terminal_model_request: null })
+      .mockResolvedValueOnce({ terminal_model_request: { ...choice, state: "queued" } })
+      .mockResolvedValueOnce({
+        terminal_model_request: { ...choice, state: "applied" },
+        session: { id: "terminal-id", model: choice.model, provider: choice.provider },
+      });
+    vi.useFakeTimers();
+    try {
+      await render(
+        <ChatSidebar
+          channel="chat-1"
+          profile="profile-a"
+          sessionId="terminal-id"
+          terminalSession
+          terminalModel={{ model: choice.model, provider: "active-provider" }}
+          onTerminalModelApplied={onTerminalModelApplied}
+        />,
+      );
+      const button = container.querySelector('sakuga-button[title="active-provider/shared-model"]');
+      await act(async () => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+      await act(async () => {
+        await pickerMocks.lastProps?.onApply?.({ provider: choice.provider, model: choice.model });
+      });
+      expect(apiMocks.patchChatSession).toHaveBeenCalledWith("terminal-id", {
+        model: choice.model, provider: choice.provider, terminal_next_turn: true,
+      }, "profile-a");
+      expect(container.textContent).toContain("is queued for the next terminal turn");
+      expect(onTerminalModelApplied).not.toHaveBeenCalled();
+      await act(async () => { vi.advanceTimersByTime(2000); });
+      expect(onTerminalModelApplied).toHaveBeenCalledWith({ model: choice.model, provider: choice.provider });
+      expect(container.textContent).toContain("Terminal switched to shared-model");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the GLOBAL set path when no session is bound (/chat)", async () => {

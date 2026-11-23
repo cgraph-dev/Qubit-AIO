@@ -55,6 +55,9 @@ USAGE
 """
 from __future__ import annotations
 
+from pathlib import Path
+import sys
+
 from .framework import (
     AgentCompatUnresolved,
     ForeignAdapter,
@@ -147,6 +150,15 @@ class VendoredPluginProvider:
         """
         install(env=True)
         return [a.name for a in active_adapters()]
+
+    def cli_launch_prefix(self) -> tuple[str, ...]:
+        """Start the public runtime boundary in the current interpreter."""
+        return (
+            sys.executable, "-P", "-c",
+            "import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); "
+            "runpy.run_module('voicebridge', run_name='__main__')",
+            str(Path(__file__).resolve().parents[2]), "agent",
+        )
 
     def entry_point_groups(self) -> tuple:
         """Entry-point groups every registered adapter wants scanned."""

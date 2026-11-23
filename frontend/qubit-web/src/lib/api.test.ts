@@ -11,6 +11,7 @@ import {
   runMutationWithConfirm,
   setManagementProfile,
   settleConfirmation,
+  streamChatTurn,
   withApiPrefix,
 } from "./api";
 
@@ -97,6 +98,35 @@ describe("fetchJSON", () => {
     await expect(fetchJSON("/api/status")).resolves.toEqual({ ok: true });
 
     expect(reloadMocks.clearDashboardTokenReloadAttempt).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("streamChatTurn", () => {
+  it("reports an unconfirmed admission when the connection ends after a partial reply", async () => {
+    const onDelta = vi.fn();
+    const onDone = vi.fn();
+    const fetchMock = vi.fn(async () => new Response(
+      ': keep-alive\n\nevent: delta\ndata: {"event":"delta","text":"partial"}\n\n',
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(streamChatTurn({ text: "example", profile: "work" }, { onDelta, onDone }))
+      .rejects.toThrow("[CHAT_ADMISSION_UNCONFIRMED]");
+    expect(onDelta).toHaveBeenCalledWith("partial", expect.anything());
+    expect(onDone).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["done", "error", "cancelled"])("settles the stream with a %s frame", async (event) => {
+    const onTerminal = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      `: keep-alive\n\nevent: ${event}\ndata: ${JSON.stringify({ event })}\n\n`,
+    )));
+
+    await expect(streamChatTurn({ text: "example" }, {
+      onDone: onTerminal, onError: onTerminal, onCancelled: onTerminal,
+    })).resolves.toBeUndefined();
+    expect(onTerminal).toHaveBeenCalledExactlyOnceWith({ event });
   });
 });
 
@@ -469,6 +499,59 @@ describe("api.restartGateway confirmation", () => {
     expect(err).toBeInstanceOf(ConfirmRequiredError);
     // Only the staging call fired; no confirm-settled mutation was sent.
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.each([
+  ["pause", api.pauseCronJob],
+  ["resume", api.resumeCronJob],
+] as const)("cron %s", (action, mutate) => {
+  it("settles the staged change after the operator confirms it", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(confirmEnvelope("cnf-cron"), 409))
+      .mockResolvedValueOnce(jsonResponse({ enabled: action === "resume" }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    await expect(mutate("7", "work")).resolves.toEqual({ enabled: action === "resume" });
+
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("needs approval");
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      `/agent/api/cron/jobs/7/${action}?profile=work&confirmation_id=cnf-cron`,
+    );
+  });
+
+  it("leaves the staged change unsettled when the operator declines", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse(confirmEnvelope("cnf-cron"), 409));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    await expect(mutate("7")).rejects.toBeInstanceOf(ConfirmRequiredError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("api.instantiateAutomationBlueprint", () => {
+  it("confirms the same blueprint values in the owning profile", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(confirmEnvelope("cnf-blueprint"), 409))
+      .mockResolvedValueOnce(jsonResponse({ id: "job", profile: "work" }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const body = { blueprint: "custom-reminder", values: { time: "09:30" } };
+
+    await expect(api.instantiateAutomationBlueprint(body, "work")).resolves.toEqual({
+      id: "job", profile: "work",
+    });
+
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("needs approval");
+    const [url, request] = fetchMock.mock.calls[1];
+    expect(url).toBe("/agent/api/cron/blueprints/instantiate?profile=work&confirmation_id=cnf-blueprint");
+    expect(JSON.parse(String(request?.body))).toEqual({ ...body, confirmation_id: "cnf-blueprint" });
   });
 });
 

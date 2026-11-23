@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -16,8 +18,8 @@ SCRIPT_PATH = (
 )
 
 
-def load_module():
-    spec = importlib.util.spec_from_file_location("openclaw_to_hermes", SCRIPT_PATH)
+def load_module(script_path=SCRIPT_PATH):
+    spec = importlib.util.spec_from_file_location("openclaw_to_hermes", script_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -35,6 +37,111 @@ def load_skills_guard():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize("script_path", [
+    SCRIPT_PATH,
+    SCRIPT_PATH.parents[2] / "qubit-migration" / "scripts" / SCRIPT_PATH.name,
+], ids=["legacy", "canonical"])
+def test_migrate_mcp_preserves_openclaw_transport_timeouts_and_tool_filters(tmp_path, script_path):
+    from tools.mcp_tool_registration import _make_tool_filter
+
+    mod = load_module(script_path)
+    source = tmp_path / ".openclaw"
+    target = tmp_path / ".qubit"
+    source.mkdir()
+    target.mkdir()
+    migrator = mod.Migrator(
+        source_root=source,
+        target_root=target,
+        execute=True,
+        workspace_target=None,
+        overwrite=False,
+        migrate_secrets=False,
+        output_dir=target / "migration-report",
+    )
+
+    cert = tmp_path / "fixture-cert.pem"
+    key = tmp_path / "fixture-key.pem"
+    cert.write_text("Synthetic certificate path fixture")
+    key.write_text("Synthetic key path fixture")
+
+    migrator.migrate_mcp_servers({"mcp": {"servers": {
+        "secure": {
+            "type": "http",
+            "url": "https://example.invalid/mcp",
+            "sslVerify": True,
+            "clientCert": str(cert),
+            "clientKey": str(key),
+            "auth": "oauth",
+            "oauth": {"identity": "shared", "scope": "docs.read"},
+        },
+        "isolated-oauth": {
+            "url": "https://example.invalid/mcp",
+            "auth": "oauth",
+            "oauth": {"identity": "per-requester", "scope": "docs.read"},
+        },
+        "oauth-override": {
+            "url": "https://example.invalid/mcp",
+            "auth": "oauth",
+            "oauth": {"redirectUri": "https://example.invalid/callback"},
+        },
+        "unverified-tls": {
+            "url": "https://example.invalid/mcp",
+            "sslVerify": False,
+        },
+        "relative-cert": {
+            "url": "https://example.invalid/mcp",
+            "clientCert": "relative.pem",
+        },
+        "docs": {
+            "url": "https://example.invalid/sse",
+            "transport": "sse",
+            "requestTimeoutMs": 12500,
+            "connectionTimeoutMs": 3000,
+            "toolFilter": {"include": ["read_*"], "exclude": ["read_private"]},
+        },
+        "no-tools": {
+            "command": "unused-fixture",
+            "toolFilter": {"include": []},
+        },
+        "legacy": {
+            "command": "unused-fixture",
+            "tools": {"include": ["read_*"], "exclude": ["read_private"]},
+        },
+        "invalid-filter": {
+            "command": "unused-fixture",
+            "toolFilter": {"include": "read_*"},
+        },
+    }}})
+
+    servers = mod.load_yaml_file(target / "config.yaml")["mcp_servers"]
+    assert servers["docs"]["transport"] == "sse"
+    assert servers["docs"]["timeout"] == 12.5
+    assert servers["docs"]["connect_timeout"] == 3.0
+    accepts = _make_tool_filter("docs", servers["docs"])
+    assert accepts("read_public")
+    assert not accepts("read_private")
+    assert not accepts("write_note")
+    assert not _make_tool_filter("no-tools", servers["no-tools"])("read_public")
+    assert _make_tool_filter("legacy", servers["legacy"])("read_private")
+    assert "invalid-filter" not in servers
+    assert servers["secure"] == {
+        "transport": "streamable-http",
+        "url": "https://example.invalid/mcp",
+        "ssl_verify": True,
+        "client_cert": str(cert),
+        "client_key": str(key),
+        "auth": "oauth",
+        "oauth": {"scope": "docs.read"},
+    }
+    from tools.mcp_tool_errors import _resolve_client_cert
+
+    assert _resolve_client_cert("secure", servers["secure"]) == (str(cert), str(key))
+    for skipped in ("isolated-oauth", "oauth-override", "unverified-tls", "relative-cert"):
+        assert skipped not in servers
+        item = next(item for item in migrator.items if item.source == f"mcp.servers.{skipped}")
+        assert item.status == "skipped" and item.reason
 
 
 def test_extract_markdown_entries_promotes_heading_context():
@@ -165,7 +272,7 @@ def test_unreadable_config_is_refused_not_overwritten(tmp_path: Path):
     not parse; the config-mutating steps read, merge and write the whole
     mapping back, so a YAML syntax error meant every existing setting was
     replaced by just the merged section.  Same defect as the ported twin in
-    ``qubit_cli/agent_import.py``.
+    ``qubit_cli/agent_import_legacy.py``.
     """
     mod = load_module()
     migrator, config_path = _allowlist_migrator(
@@ -698,3 +805,39 @@ def test_messaging_settings_handles_invalid_utf8_in_telegram_allowlist(tmp_path:
 
 
 
+
+
+@pytest.mark.parametrize("script_path", [
+    SCRIPT_PATH,
+    SCRIPT_PATH.parents[2] / "qubit-migration" / "scripts" / SCRIPT_PATH.name,
+], ids=["legacy", "canonical"])
+def test_openclaw_config_json5_migration_and_primary_error(tmp_path, script_path):
+    mod = load_module(script_path)
+    source = tmp_path / ".openclaw"
+    target = tmp_path / ".qubit"
+    source.mkdir()
+    target.mkdir()
+
+    active = source / "openclaw.json"
+    active.write_text("""
+    {
+      // Typical OpenClaw configuration
+      mcp: {servers: {docs: {url: 'https://example.invalid/mcp', enabled: false,},},},
+    }
+    """, encoding="utf-8")
+    (source / "moltbot.json").write_text('{"mcp": {"servers": {"wrong-source": {"command": "fixture"}}}}')
+    opts = dict(source_root=source, target_root=target, execute=True, workspace_target=None,
+                overwrite=False, migrate_secrets=False, output_dir=None,
+                selected_options={"mcp-servers"})
+    mod.Migrator(**opts).migrate()
+    config = target / "config.yaml"
+    assert mod.load_yaml_file(config)["mcp_servers"] == {
+        "docs": {"url": "https://example.invalid/mcp", "enabled": False},
+    }
+
+    previous = config.read_bytes()
+    active.write_text("{bad: 'fixture-confidential-text")
+    with pytest.raises(mod.ConfigReadError, match="Cannot read openclaw.json") as error:
+        mod.Migrator(**opts).migrate()
+    assert "fixture-confidential-text" not in str(error.value)
+    assert config.read_bytes() == previous

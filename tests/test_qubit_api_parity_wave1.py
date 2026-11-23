@@ -196,8 +196,8 @@ WAVE1_ROUTES = [
     ("PUT", "/api/profiles/wave1/soul", "profile_soul_set"),
     ("GET", "/api/sessions/empty/count", "sess_empty"),
     ("GET", "/api/sessions/wave1-rec", "h_session_show"),
-    ("GET", "/api/sessions/wave1-rec/export", "h_session_show"),
-    ("GET", "/api/sessions/wave1-rec/latest-descendant", "h_session_show"),
+    ("GET", "/api/sessions/wave1-rec/export", "h_session_export"),
+    ("GET", "/api/sessions/wave1-rec/latest-descendant", "h_session_latest_descendant"),
     ("GET", "/api/sessions/wave1-rec/messages", "h_session_messages"),
     ("PATCH", "/api/sessions/wave1-rec", "h_session_patch"),
     # Ambiguity closure: real agent-plugin permission toggles, the local

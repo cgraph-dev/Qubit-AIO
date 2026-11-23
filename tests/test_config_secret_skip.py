@@ -242,3 +242,34 @@ def test_confirm_op_no_id_aggregate_confirms_config_write(tmp_path, monkeypatch)
     assert OPS._journal(cfg).get(cid).decision == "approve"
     code, live = HC.dispatch(cfg, "GET", "/api/config", {}, {})
     assert live["vad"]["enabled"] is False, live.get("vad")
+
+
+def test_named_settings_save_uses_own_config_and_approval(tmp_path, monkeypatch):
+    import yaml
+
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import qubit_compat as HC
+
+    root = tmp_path / "qubit"
+    home = root / "profiles" / "work"
+    home.mkdir(parents=True)
+    (root / "config.yaml").write_text("agent:\n  max_turns: 11\n")
+    (home / "config.yaml").write_text("agent:\n  max_turns: 23\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    cfg = _cfg(tmp_path, monkeypatch)
+    route = "/api/config"
+    scope = {"profile": "work"}
+    status, first = HC.dispatch(cfg, "GET", route, scope)
+    assert status == 200 and first["agent"]["max_turns"] == 23
+    patch = {"config": {"agent": {"max_turns": 31}}}
+    status, staged = HC.dispatch(cfg, "PUT", route, scope, patch)
+    assert status == 409 and staged["confirmation_id"], staged
+    status, _ = HC.dispatch(cfg, "PUT", route, {"profile": "default"},
+                            {**patch, "confirmation_id": staged["confirmation_id"]})
+    assert status == 409
+    outcome = OPS.confirm_op(cfg, staged["confirmation_id"], actor="dashboard:user", session="dashboard")
+    assert outcome["state"] == "executed", outcome
+    assert yaml.safe_load((home / "config.yaml").read_text())["agent"]["max_turns"] == 31
+    assert yaml.safe_load((root / "config.yaml").read_text())["agent"]["max_turns"] == 11
+    assert HC.dispatch(cfg, "GET", route, scope)[1]["agent"]["max_turns"] == 31
+    assert HC.dispatch(cfg, "PUT", route, {"profile": "missing"}, {**patch, "confirm": True})[0] == 404

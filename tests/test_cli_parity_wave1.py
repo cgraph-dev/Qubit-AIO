@@ -178,7 +178,6 @@ def test_confirm_flag_stripped_and_globals_ignored(monkeypatch):
 # ---------------------------------------------------------------------------
 REFUSED_ROUTES = (
     (["pause"], "ESTOP_QUBIT_OWNED"),
-    (["claw"], "QUBIT_CLAW_PLUGIN_REQUIRED"),
     (["bundles", "bogus"], "FORK_SUB_UNCLASSIFIED"),
     (["worktree", "add", "x"], "FORK_SUB_UNCLASSIFIED"),
     (["worktree", "remove"], "FORK_SUB_UNCLASSIFIED"),

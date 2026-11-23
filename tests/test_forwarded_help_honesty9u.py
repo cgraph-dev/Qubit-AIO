@@ -71,17 +71,11 @@ def test_canonical_journey_prog_still_journey():
 
 
 # ------------------------------------------------------------- claw migration
-def test_claw_is_install_gated_when_its_plugin_is_absent():
-    """`qubit claw` left core for the agent-importers plugin. The Qubit surface
-    must name the install command instead of advertising a command that cannot
-    run (the old forwarded help was captured from a plugin that is not shipped)."""
-    from voicebridge import cli_qubit_forward as HF
+def test_importer_help_keeps_the_literal_source_choice():
+    from voicebridge.branding.help_overlay import rebrand_help
 
-    route = HF.family_refusal(["claw"])
-    assert route is not None
-    assert route.code == "QUBIT_CLAW_PLUGIN_REQUIRED"
-    assert "qubit plugins install agent-importers" in route.detail
-    assert "qubit import-agent" in route.detail
+    rendered = rebrand_help("Use hermes import-agent openclaw from {openclaw,claude-code}")
+    assert rendered == "Use qubit import-agent openclaw from {openclaw,claude-code}"
 
 
 def test_rebrand_pure_migration_phrases():

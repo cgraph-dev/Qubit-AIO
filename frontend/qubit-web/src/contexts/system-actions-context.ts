@@ -14,5 +14,5 @@ export interface SystemActionsState {
   isBusy: boolean;
   isRunning: boolean;
   pendingAction: SystemAction | null;
-  runAction: (action: SystemAction) => Promise<void>;
+  runAction: (action: SystemAction, profile?: string) => Promise<void>;
 }

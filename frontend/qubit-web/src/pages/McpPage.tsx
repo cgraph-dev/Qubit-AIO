@@ -35,6 +35,7 @@ import {
   buildMcpServerCreate,
   type McpTransport,
 } from "@/lib/mcp-server-create";
+import { useProfileScope } from "@/contexts/useProfileScope";
 import { completeMcpDashboardOAuth } from "@/lib/mcp-dashboard-oauth";
 
 function isHttpUrl(value: string): boolean {
@@ -178,6 +179,11 @@ function capabilityLabel(item: unknown): { primary: string; secondary: string | 
 }
 
 export default function McpPage() {
+  const { profile } = useProfileScope();
+  return <ProfileMcpPage key={profile} profile={profile || "current"} />;
+}
+
+function ProfileMcpPage({ profile }: { profile: string }) {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [catalog, setCatalog] = useState<McpCatalogEntry[]>([]);
   const [diagnostics, setDiagnostics] = useState<McpCatalogDiagnostic[]>([]);
@@ -231,9 +237,9 @@ export default function McpPage() {
     setCapLoading((prev) => ({ ...prev, [serverName]: true }));
     setCapErrors((prev) => ({ ...prev, [serverName]: {} }));
     const settled = await Promise.allSettled([
-      api.getMcpServerResources(serverName),
-      api.getMcpServerPrompts(serverName),
-      api.getMcpServerResourceTemplates(serverName),
+      api.getMcpServerResources(serverName, profile),
+      api.getMcpServerPrompts(serverName, profile),
+      api.getMcpServerResourceTemplates(serverName, profile),
     ]);
     const keys = ["resources", "prompts", "templates"] as const;
     setCapData((prev) => {
@@ -253,7 +259,7 @@ export default function McpPage() {
       return { ...prev, [serverName]: next };
     });
     setCapLoading((prev) => ({ ...prev, [serverName]: false }));
-  }, []);
+  }, [profile]);
 
   const toggleCapabilities = useCallback(
     (serverName: string) => {
@@ -302,20 +308,20 @@ export default function McpPage() {
 
   const loadServers = useCallback(() => {
     return api
-      .getMcpServers()
+      .getMcpServers(profile)
       .then((res) => setServers(res?.servers ?? []))
       .catch((e) => showToast(`Error: ${e}`, "error"));
-  }, [showToast]);
+  }, [profile, showToast]);
 
   const loadCatalog = useCallback(() => {
     return api
-      .getMcpCatalog()
+      .getMcpCatalog(profile)
       .then((res) => {
         setCatalog(res?.entries ?? []);
         setDiagnostics(res?.diagnostics ?? []);
       })
       .catch((e) => showToast(`Error: ${e}`, "error"));
-  }, [showToast]);
+  }, [profile, showToast]);
 
   useEffect(() => {
     Promise.all([loadServers(), loadCatalog()]).finally(() =>
@@ -346,7 +352,7 @@ export default function McpPage() {
 
     setCreating(true);
     try {
-      await api.addMcpServer(body);
+      await api.addMcpServer(body, undefined, profile);
       showToast(
         transport === "http" && httpAuth === "oauth"
           ? "Added — authenticate with OAuth"
@@ -375,7 +381,7 @@ export default function McpPage() {
   const handleTest = async (server: McpServer) => {
     setTesting(server.name);
     try {
-      const result = await api.testMcpServer(server.name);
+      const result = await api.testMcpServer(server.name, profile);
       setTestResults((prev) => ({ ...prev, [server.name]: result }));
       if (result.ok) {
         showToast(`${server.name}: ${result.tools.length} tool(s)`, "success");
@@ -430,6 +436,7 @@ export default function McpPage() {
         tool,
         parsedArgs,
         () => true,
+        profile,
       );
       if (res.ok) {
         setInvokeResult(
@@ -459,14 +466,15 @@ export default function McpPage() {
     try {
       const result = await completeMcpDashboardOAuth({
         serverName: server.name,
-        start: api.authMcpServer,
-        status: api.getMcpOAuthFlow,
+        start: (name) => api.authMcpServer(name, profile),
+        status: (id) => api.getMcpOAuthFlow(id, profile),
         open: window.open.bind(window),
       });
       setTestResults((prev) => ({
         ...prev,
         [server.name]: { ok: true, tools: result.tools ?? [] },
       }));
+      await loadServers();
       showToast(`${server.name}: OAuth authentication complete`, "success");
       emitFx("success");
     } catch (e) {
@@ -486,7 +494,7 @@ export default function McpPage() {
     const next = !server.enabled;
     setTogglingName(server.name);
     try {
-      await api.setMcpServerEnabled(server.name, next);
+      await api.setMcpServerEnabled(server.name, next, undefined, profile);
       setServers((prev) =>
         prev.map((s) => (s.name === server.name ? { ...s, enabled: next } : s)),
       );
@@ -510,7 +518,7 @@ export default function McpPage() {
     onDelete: useCallback(
       async (serverName: string) => {
         try {
-          await api.removeMcpServer(serverName);
+          await api.removeMcpServer(serverName, undefined, profile);
           showToast(`Delete: "${truncateText(serverName, 30)}"`, "success");
           emitFx("warning");
           setTestResults((prev) => {
@@ -525,7 +533,7 @@ export default function McpPage() {
           throw e;
         }
       },
-      [loadServers, showToast],
+      [loadServers, profile, showToast],
     ),
   });
 
@@ -534,7 +542,7 @@ export default function McpPage() {
     async (entry: McpCatalogEntry, envMap: Record<string, string>) => {
       setInstallingName(entry.name);
       try {
-        const res = await api.installMcpCatalogEntry(entry.name, envMap, true);
+        const res = await api.installMcpCatalogEntry(entry.name, envMap, true, profile);
         if (res.background) {
           showToast("Installing in background…", "success");
         } else {
@@ -551,7 +559,7 @@ export default function McpPage() {
         setInstallingName(null);
       }
     },
-    [loadServers, loadCatalog, showToast],
+    [loadServers, loadCatalog, profile, showToast],
   );
 
   const handleInstallClick = (entry: McpCatalogEntry) => {
@@ -1017,7 +1025,8 @@ export default function McpPage() {
 
         {servers.map((server) => {
           const envCount = Object.keys(server.env ?? {}).length;
-          const result = testResults[server.name];
+          const configChanged = server.status === "config-changed";
+          const result = configChanged ? undefined : testResults[server.name];
 
           return (
             <Card key={server.name}>
@@ -1081,6 +1090,9 @@ export default function McpPage() {
                       </span>
                     )}
                   </div>
+                  {configChanged && server.error && (
+                    <p className="mt-2 text-xs text-warning">{server.error}</p>
+                  )}
                   {result && (
                     <div className="mt-2 text-xs">
                       {result.ok ? (
@@ -1107,7 +1119,7 @@ export default function McpPage() {
                       size="sm"
                       title="Authenticate with OAuth"
                       onClick={() => handleAuthenticate(server)}
-                      disabled={authenticating === server.name}
+                      disabled={authenticating === server.name || configChanged}
 
                     >
                       Authenticate
@@ -1133,7 +1145,7 @@ export default function McpPage() {
                     }
                     onClick={() => handleToggleEnabled(server)}
                     disabled={
-                      togglingName === server.name || server.editable === false
+                      togglingName === server.name || server.editable === false || configChanged
                     }
 
                     className={server.enabled ? "text-success" : undefined}
@@ -1148,6 +1160,7 @@ export default function McpPage() {
                     aria-label={`Capabilities for ${server.name}`}
                     aria-expanded={!!capOpen[server.name]}
                     onClick={() => toggleCapabilities(server.name)}
+                    disabled={configChanged}
                   >
                     Capabilities
                   </Button>
@@ -1158,6 +1171,7 @@ export default function McpPage() {
                     title="Invoke a tool"
                     aria-label="Invoke a tool"
                     onClick={() => openInvoke(server)}
+                    disabled={server.invocable === false}
                   >
                     <Play />
                   </Button>
@@ -1168,7 +1182,7 @@ export default function McpPage() {
                     title="Test connection"
                     aria-label="Test connection"
                     onClick={() => handleTest(server)}
-                    disabled={testing === server.name}
+                    disabled={testing === server.name || configChanged}
                   >
                     {testing === server.name ? <Spinner /> : <Zap />}
                   </Button>
@@ -1176,8 +1190,9 @@ export default function McpPage() {
                   <Button
               variant="secondary"
                     size="icon"
-                    title="Delete"
+                    title={server.editable === false ? "Edit this server in config.yaml" : "Delete"}
                     aria-label="Delete"
+                    disabled={server.editable === false || configChanged}
                     onClick={() => serverDelete.requestDelete(server.name)}
                   >
                     <Trash2 />

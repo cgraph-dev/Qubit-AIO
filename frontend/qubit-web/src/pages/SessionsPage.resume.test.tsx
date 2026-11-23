@@ -51,6 +51,7 @@ function LocationProbe() {
 
 let container: HTMLDivElement;
 let root: Root;
+const pendingFrames = new Set<ReturnType<typeof setTimeout>>();
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
@@ -156,9 +157,18 @@ beforeEach(() => {
   apiMocks.exportSessionUrl.mockReturnValue("/api/sessions/x/export");
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500 })));
   vi.stubGlobal("ResizeObserver", class { disconnect() {} observe() {} unobserve() {} });
-  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
-    setTimeout(() => cb(0), 0) as unknown as number);
-  vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    const handle = setTimeout(() => {
+      pendingFrames.delete(handle);
+      cb(performance.now());
+    }, 0);
+    pendingFrames.add(handle);
+    return handle;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (handle: ReturnType<typeof setTimeout>) => {
+    clearTimeout(handle);
+    pendingFrames.delete(handle);
+  });
   vi.stubGlobal("matchMedia", () => ({
     addEventListener() {},
     matches: false,
@@ -175,6 +185,8 @@ afterEach(async () => {
   // can wake against globals Vitest has already torn down.
   const { gsap } = await import("gsap");
   gsap.ticker.sleep();
+  for (const handle of pendingFrames) clearTimeout(handle);
+  pendingFrames.clear();
 });
 
 describe("SessionsPage resume routing", () => {

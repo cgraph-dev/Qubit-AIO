@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
 import {
   Download,
   RotateCcw,
@@ -35,6 +35,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { api, ConfirmRequiredError } from "@/lib/api";
+import { ProfileContext } from "@/contexts/profile-context";
 import { getNestedValue, setNestedValue } from "@/lib/nested";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
@@ -122,7 +123,35 @@ function typedErrorCode(e: unknown): string | null {
 
 type BrowserDetected = Awaited<ReturnType<typeof api.getBrowserDetected>>;
 
+function isSettingsRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function configChanges(
+  next: Record<string, unknown>,
+  base: Record<string, unknown>,
+  onto: Record<string, unknown> = {},
+): Record<string, unknown> {
+  let changes = onto;
+  for (const [key, value] of Object.entries(next)) {
+    const previous = base[key];
+    if (isSettingsRecord(value) && isSettingsRecord(previous)) {
+      const target = isSettingsRecord(onto[key]) ? onto[key] : {};
+      const nested = configChanges(value, previous, target);
+      if (nested !== target) changes = { ...changes, [key]: nested };
+    } else if (JSON.stringify(previous) !== JSON.stringify(value)) {
+      changes = { ...changes, [key]: value };
+    }
+  }
+  return changes;
+}
+
 export default function ConfigPage() {
+  const { profile } = useContext(ProfileContext);
+  return <ProfileSettings key={profile} profile={profile || "current"} />;
+}
+
+function ProfileSettings({ profile }: { profile: string }) {
   const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [schema, setSchema] = useState<Record<
     string,
@@ -133,6 +162,8 @@ export default function ConfigPage() {
     null,
   );
   const [saving, setSaving] = useState(false);
+  const savedConfig = useRef<Record<string, unknown>>({});
+  const mounted = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [configPath, setConfigPath] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("");
@@ -145,8 +176,7 @@ export default function ConfigPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   // Confirm gates for staged writes: the deferral for api.saveConfig's
   // confirm callback, plus the copy shown in the dialog.
-  const [confirmSave, setConfirmSave] = useState(false);
-  const [confirmSaveDetail, setConfirmSaveDetail] = useState("");
+  const [confirmation, setConfirmation] = useState<{ action: "save" | "restart"; detail: string } | null>(null);
   // Set on every real save: the dashboard record is live immediately, but
   // running processes read config at boot — the banner below says so and
   // offers the gateway restart. Cleared on reload.
@@ -155,6 +185,14 @@ export default function ConfigPage() {
   const [verifying, setVerifying] = useState(false);
   const [verifyNote, setVerifyNote] = useState("");
   const saveDecisionRef = useRef<((ok: boolean) => void) | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      saveDecisionRef.current?.(false);
+      saveDecisionRef.current = null;
+    };
+  }, []);
   const { toast, showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
@@ -199,12 +237,13 @@ export default function ConfigPage() {
   useEffect(() => {
     let live = true;
     setLoadError(null);
-    Promise.all([api.getConfig(), api.getSchema(), api.getDefaults()])
+    Promise.all([api.getConfig(profile), api.getSchema(profile), api.getDefaults(profile)])
       .then(([nextConfig, resp, nextDefaults]) => {
         if (!live) return;
         // The Plugins page owns memory-provider selection.
         const fields = { ...resp.fields } as Record<string, Record<string, unknown>>;
         delete fields["memory.provider"];
+        savedConfig.current = nextConfig;
         setConfig(nextConfig);
         setSchema(fields);
         setCategoryOrder(resp.category_order ?? []);
@@ -215,7 +254,7 @@ export default function ConfigPage() {
       if (live) setConfigPath(resp?.config_path ?? null);
     }).catch(() => {});
     return () => { live = false; };
-  }, [loadAttempt]);
+  }, [loadAttempt, profile]);
 
   // Set active category when categories load
   useEffect(() => {
@@ -227,7 +266,7 @@ export default function ConfigPage() {
   useEffect(() => {
     if (activeCategory !== "browser") return;
     let live = true;
-    api.getBrowserDetected().then((info) => {
+    api.getBrowserDetected(profile).then((info) => {
       if (!live) return;
       setBrowserDetected(info);
       setUseMyBrowser(Boolean(info.current.cdp_url));
@@ -246,7 +285,7 @@ export default function ConfigPage() {
       setBrowserProfileChoice(profile?.path ?? "");
     }).catch(() => { if (live) setBrowserMessage("Could not detect installed browsers."); });
     return () => { live = false; };
-  }, [activeCategory]);
+  }, [activeCategory, profile]);
 
   /* ---- Categories ---- */
   const categories = useMemo(() => {
@@ -307,57 +346,80 @@ export default function ConfigPage() {
   // CONFIRM_REQUIRED envelope. api.saveConfig owns the round-trip; the
   // in-app ConfirmDialog (not window.confirm) collects the human decision
   // through this deferred promise.
-  const commitConfig = async (next: Record<string, unknown>) => {
-    await api.saveConfig(next, undefined, false, (detail) => {
-      setConfirmSaveDetail(detail);
-      setConfirmSave(true);
-      return new Promise<boolean>((resolve) => {
-        saveDecisionRef.current = resolve;
-      });
+  const confirmAction = (action: "save" | "restart", detail: string) =>
+    new Promise<boolean>((resolve) => {
+      if (!mounted.current || saveDecisionRef.current) {
+        resolve(false);
+        return;
+      }
+      saveDecisionRef.current = resolve;
+      setConfirmation({ action, detail });
     });
-    showToast(t.config.configSaved, "success");
+
+  const commitConfig = async (next: Record<string, unknown>) => {
+    const result = await api.saveConfig(next, profile, false, (detail) => confirmAction("save", detail));
+    if (result?.applied_to_home === false) {
+      throw new Error("Settings were saved for this dashboard. The runtime configuration write failed.");
+    }
   };
 
-  const decideSave = (ok: boolean) => {
-    setConfirmSave(false);
+  const decideConfirmation = (ok: boolean) => {
+    setConfirmation(null);
     saveDecisionRef.current?.(ok);
     saveDecisionRef.current = null;
   };
 
+  const restartGateway = async () => {
+    setRestarting(true);
+    try {
+      await api.restartGateway((detail) => confirmAction("restart", detail), profile);
+      showToast("Gateway restarting…", "success");
+      setRestartNeeded(false);
+    } catch (error) {
+      if (!(error instanceof ConfirmRequiredError)) {
+        showToast(`Failed to restart: ${describeConfirmError(error)}`, "error");
+      }
+    } finally {
+      setRestarting(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!config) return;
+    const changes = configChanges(config, savedConfig.current);
+    if (Object.keys(changes).length === 0) {
+      showToast("Settings already up to date.", "success");
+      return;
+    }
     setSaving(true);
     try {
-      await commitConfig(config);
+      await commitConfig(changes);
       setRestartNeeded(true);
+      try {
+        const persisted = await api.getConfig(profile);
+        savedConfig.current = persisted;
+        setConfig((current) => current ? configChanges(current, config, persisted) : persisted);
+        showToast(t.config.configSaved, "success");
+      } catch {
+        showToast("Settings saved. Could not refresh the saved values.", "error");
+      }
       void emitFx("success");
     } catch (e) {
-      // CONFIG_NO_FIELDS means the server holds exactly what we sent (an
-      // unchanged whole-tree Save): converge on the server record and say so
-      // instead of reporting a failure.
       if (typedErrorCode(e) === "CONFIG_NO_FIELDS") {
         try {
-          setConfig(await api.getConfig());
+          const persisted = await api.getConfig(profile);
+          savedConfig.current = persisted;
+          setConfig((current) => current ? configChanges(current, config, persisted) : persisted);
         } catch {
-          /* keep the local tree when the read-back fails */
+          /* keep the local edits */
         }
         showToast("Settings already up to date.", "success");
         return;
       }
       showToast(`${t.config.failedToSave}: ${describeConfirmError(e)}`, "error");
       void emitFx("error");
-      return;
     } finally {
       setSaving(false);
-    }
-    // Read-back proof: the toast above says the server holds the values, so
-    // converge the form on what the server actually serves (it drops unchanged
-    // leaves and never persists redacted placeholders). Without this the form
-    // and a post-refresh render can disagree until the next reload.
-    try {
-      setConfig(await api.getConfig());
-    } catch {
-      /* the save succeeded; a failed read-back keeps the local tree */
     }
   };
 
@@ -437,11 +499,13 @@ export default function ConfigPage() {
         // unknown keys, so an optimistic setConfig(imported) can disagree
         // with the next refresh.
         try {
-          setConfig(await api.getConfig());
+          const persisted = await api.getConfig(profile);
+          savedConfig.current = persisted;
+          setConfig(persisted);
+          showToast(t.config.configImported, "success");
         } catch {
-          setConfig(imported);
+          showToast("Settings imported. Could not refresh the saved values.", "error");
         }
-        showToast(t.config.configImported, "success");
       } catch (err) {
         showToast(
           `${t.config.failedToSave}: ${describeConfirmError(err)}`,
@@ -578,18 +642,8 @@ export default function ConfigPage() {
             </div>
             <Button
               className="uppercase"
-              disabled={restarting}
-              onClick={() => {
-                setRestarting(true);
-                api
-                  .restartGateway()
-                  .then(() => {
-                    showToast("Gateway restarting…", "success");
-                    setRestartNeeded(false);
-                  })
-                  .catch((e) => showToast(`Failed to restart: ${e}`, "error"))
-                  .finally(() => setRestarting(false));
-              }}
+              disabled={restarting || saving}
+              onClick={() => void restartGateway()}
             >
               {restarting ? "Restarting…" : "Restart gateway"}
             </Button>
@@ -656,7 +710,7 @@ export default function ConfigPage() {
               buttonLabel={t.config.importConfig}
               accept=".json"
               showList={false}
-              inputProps={{ "data-testid": "config-import-input" } as Record<string, unknown>}
+              inputProps={{ "data-testid": "config-import-input", disabled: saving || restarting } as Record<string, unknown>}
               onFiles={handleImport}
             >
               <Upload />
@@ -674,6 +728,7 @@ export default function ConfigPage() {
               <HoverTooltip content={resetTitle}>
                 <Button
                   variant="secondary"
+                  disabled={saving || restarting}
                   onClick={handleReset}
                   title={resetTitle}
                   aria-label={resetTitle}
@@ -689,7 +744,7 @@ export default function ConfigPage() {
           <Button
             className="uppercase"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || restarting}
           >
             {saving ? t.common.saving : t.common.save}
           </Button>
@@ -887,7 +942,7 @@ export default function ConfigPage() {
                               port: 9222,
                             }).then((res) => {
                               setBrowserMessage(res.message);
-                              return api.getBrowserDetected();
+                              return api.getBrowserDetected(profile);
                             }).then((info) => {
                               setBrowserDetected(info);
                               if (info.current.cdp_url && config) {
@@ -905,7 +960,7 @@ export default function ConfigPage() {
                         <Button
                           variant="secondary"
                           onClick={() => {
-                            api.getBrowserDetected().then(setBrowserDetected).catch(() => {});
+                            api.getBrowserDetected(profile).then(setBrowserDetected).catch(() => {});
                           }}
                         >
                           Refresh
@@ -943,14 +998,12 @@ export default function ConfigPage() {
         confirmLabel={t.config.resetDefaults}
       />
       <ConfirmDialog
-        open={confirmSave}
-        onCancel={() => decideSave(false)}
-        onConfirm={() => decideSave(true)}
-        title="Apply these settings to Qubit?"
-        description={
-          confirmSaveDetail || "This stages a confirmed settings write."
-        }
-        confirmLabel={t.common.save}
+        open={confirmation !== null}
+        onCancel={() => decideConfirmation(false)}
+        onConfirm={() => decideConfirmation(true)}
+        title={confirmation?.action === "restart" ? "Restart the gateway?" : "Apply these settings to Qubit?"}
+        description={confirmation?.detail ?? ""}
+        confirmLabel={confirmation?.action === "restart" ? "Restart gateway" : t.common.save}
       />
     </div>
   );

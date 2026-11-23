@@ -208,11 +208,16 @@ export default function DevicesPage() {
     p: DevicePairing,
     wired: Array<{ key: string; label: string }>,
   ): DeviceCapability[] =>
-    wired.map((c) => ({
-      ...c,
-      wired: p.manageable,
-      reason: p.manageable ? undefined : p.manage_reason ?? "This pairing cannot be managed from the dashboard.",
-    }));
+    wired.map((c) => {
+      const tokenUnavailable = c.key.startsWith("token-") && p.token_manageable === false;
+      return {
+        ...c,
+        wired: p.manageable && !tokenUnavailable,
+        reason: tokenUnavailable
+          ? "No device token is associated with this pairing."
+          : p.manageable ? undefined : p.manage_reason ?? "This pairing cannot be managed from the dashboard.",
+      };
+    });
 
   const renderCapabilities = (caps: DeviceCapability[], scope: string) => (
     <ul className="device-capabilities" aria-label={`${scope} capabilities`}>
@@ -345,7 +350,8 @@ export default function DevicesPage() {
                   rotateDeviceToken(p.id, confirm),
                 )
               }
-              disabled={busy === `rotate:${p.id}`}
+              disabled={p.token_manageable === false || busy === `rotate:${p.id}`}
+              title={p.token_manageable === false ? "No device token is associated with this pairing." : undefined}
               aria-label={`Rotate token for ${p.id}`}
             >
               {busy === `rotate:${p.id}` ? <Spinner /> : "rotate token"}
@@ -358,7 +364,8 @@ export default function DevicesPage() {
                   revokeDeviceToken(p.id, confirm),
                 )
               }
-              disabled={busy === `revoke:${p.id}`}
+              disabled={p.token_manageable === false || busy === `revoke:${p.id}`}
+              title={p.token_manageable === false ? "No device token is associated with this pairing." : undefined}
               aria-label={`Revoke token for ${p.id}`}
             >
               {busy === `revoke:${p.id}` ? <Spinner /> : "revoke token"}

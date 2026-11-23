@@ -311,7 +311,9 @@ LARGE_MODEL_NOTICE_KEY = "model.large_notice"
 def _apply_model_switch(
     sid: str, session: dict, raw_input: str, *, confirm_expensive_model: bool = False,
     pin_session_override: bool = True, parsed_flags: Any | None = None,
-    persist_override: bool | None = None, count_switch: bool = True) -> dict:
+    persist_override: bool | None = None, count_switch: bool = True,
+    min_context_tokens: int = 0,
+) -> dict:
     """``count_switch=False``: an internal swap (config adoption, MoA one-shot and its restore), not a
     user's /model pick, so it stays out of the shared-metrics switch count."""
     from qubit_cli.model_switch import switch_model
@@ -337,6 +339,8 @@ def _apply_model_switch(
         custom_providers=custom_provs)
     if not result.success:
         raise ValueError(result.error_message or "model switch failed")
+    if min_context_tokens:
+        _check_terminal_switch_context(result, min_context_tokens, custom_provs)
     restore_snapshot = _snapshot_agent_model_runtime(agent) if (one_turn and agent) else None
     if agent:
         _merge_preflight_warning(result, agent, session, cfg, custom_provs)
@@ -393,6 +397,78 @@ def _apply_model_switch(
         "value": result.new_model, "warning": result.warning_message or "",
         "confirm_required": False,
         "scope": "once" if one_turn else ("global" if persist_global else "session")}
+
+
+class TerminalModelContextError(ValueError):
+    """The requested model could not meet the dashboard terminal's context floor."""
+
+
+def _check_terminal_switch_context(result, minimum: int, custom_providers) -> None:
+    from agent.model_metadata import DEFAULT_FALLBACK_CONTEXT
+    from qubit_cli.model_switch import resolve_display_context_length
+
+    context = resolve_display_context_length(
+        result.new_model, result.target_provider, base_url=result.base_url,
+        api_key=result.api_key, model_info=result.model_info, custom_providers=custom_providers)
+    if context == DEFAULT_FALLBACK_CONTEXT:
+        context = getattr(result.model_info, "context_window", None)
+    if not context or context < minimum:
+        raise TerminalModelContextError(f"The selected model has no verified context window of at least {minimum} tokens.")
+
+
+def _apply_dashboard_terminal_model(sid: str, session: dict) -> None:
+    """Adopt the latest dashboard choice between turns, in the owning profile."""
+    if os.environ.get("QUBIT_DASHBOARD_TERMINAL") != "1":
+        return
+    live = _live_session_agent_db(session)
+    if live is None:
+        return
+    agent, session_key, db = live
+    try:
+        request = db.read_terminal_model_request(session_key)
+    except Exception:
+        logger.warning("Could not read queued terminal model choice", exc_info=True)
+        return
+    if not request or request.get("state") != "queued":
+        return
+
+    from qubit_cli.model_switch import ModelSwitchRequest
+
+    model = request["model"]
+    provider = request["provider"]
+    state = "applied"
+    if (getattr(agent, "model", None), getattr(agent, "provider", None)) != (model, provider):
+        try:
+            result = _apply_model_switch(
+                sid, session, model,
+                parsed_flags=ModelSwitchRequest(raw=model, target=model, explicit_provider=provider,
+                                               is_session=True, scope="session"),
+                persist_override=False, min_context_tokens=int(request["min_context_tokens"]),
+                confirm_expensive_model=request["confirmed"] is True,
+            )
+            if result.get("confirm_required"):
+                state = "confirmation_required"
+        except TerminalModelContextError:
+            state = "context_refused"
+        except Exception:
+            logger.warning("Dashboard terminal model switch failed for session %s", session_key)
+            state = "failed"
+    else:
+        _persist_live_session_runtime(session)
+    try:
+        db.finish_terminal_model_request(session_key, request, state)
+    except Exception:
+        logger.warning("Could not settle queued terminal model choice", exc_info=True)
+    if state != "applied":
+        text = {
+            "confirmation_required": "The dashboard model change needs confirmation. Pick it in the terminal with /model.",
+            "context_refused": "The selected model could not meet the terminal context requirement. Keeping the current model.",
+            "failed": "The dashboard model change failed. This turn will use the current model.",
+        }[state]
+        _emit("notification.show", sid, {
+            "text": text, "level": "warn", "kind": "ttl", "ttl_ms": 12000,
+            "key": "model_switch.dashboard", "id": "model_switch.dashboard",
+        })
 
 
 def _apply_switch_reasoning(sid: str, session, agent, effort: str, *, persist_global: bool, one_turn: bool) -> None:

@@ -56,6 +56,7 @@ DEFAULT_PORT = 8890
 TIMEOUT_S = 15.0
 STATUS_TIMEOUT_S = 5.0
 DETACH_DELAY_S = 2.0
+CONTROL_OUTCOME_TIMEOUT_S = 45.0
 
 CONFIRM_CODE = "GATEWAY_CONFIRM_REQUIRED"
 ESTOP_CODE = "GATEWAY_ESTOP"
@@ -381,11 +382,22 @@ def query_daemon_control(home: Optional[Any] = None, verb: str = "status"
         return None
 
 
+def profile_service_unit(home: Path) -> str:
+    """Use the same profile unit name as the gateway CLI."""
+    from . import qubit_runtime
+    qubit_runtime.ensure_path()
+    from qubit_cli.gateway import get_service_name
+    from qubit_cli.web_server_profiles import _qubit_home_scope
+
+    with _qubit_home_scope(home):
+        return get_service_name() + ".service"
+
+
 def status(cfg: Any, *, runner: Optional[Runner] = None,
            probe: Optional[Callable[[str, int], bool]] = None,
            daemon_reader: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
            control_query: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
-           unit_override: str = ""
+           unit_override: str = "", home: Optional[Path] = None
            ) -> Dict[str, Any]:
     """Read-only gateway/service status. Never raises.
 
@@ -416,6 +428,9 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
         "failure": None, "healthy": False, "health": "UNKNOWN",
         "health_detail": "", "detail": "", "daemon": None, "control": None,
     }
+    if home is not None:
+        daemon_reader = daemon_reader or (lambda: daemon_runtime_status(home))
+        control_query = control_query or (lambda: query_daemon_control(home))
     out["daemon"] = _safe_daemon_read(daemon_reader)
     control = _safe_control_query(control_query)
     out["control"] = control
@@ -441,7 +456,7 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
     # from a merely stopped one.
     argv = _systemctl_argv(
         cfg, "show", unit, "--no-pager",
-        "--property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,"
+        "--property=LoadState,ActiveState,SubState,MainPID,ExecMainStartTimestamp,"
         "ActiveEnterTimestamp,NRestarts,ExecMainStatus,Environment")
     rc, stdout, stderr = _run(run, argv, STATUS_TIMEOUT_S)
     props: Dict[str, str] = {}
@@ -467,8 +482,12 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
     # host unit must not be reported as this QUBIT_HOME's gateway (a fresh
     # isolated install previously surfaced the live host daemon's pid/port).
     unit_home = _unit_env_qubit_home(props)
-    our_home = _resolved_home_path()
-    if unit_home and our_home is not None and not _same_home(unit_home, our_home):
+    our_home = home or _resolved_home_path()
+    foreign_unit = bool(unit_home and our_home is not None and not _same_home(unit_home, our_home))
+    if foreign_unit or (home is not None and not unit_home):
+        # Require positive ownership for a separately targeted unit. A stale
+        # or absent unit must never route a control to the listener's service.
+        out["control_available"] = False
         out["state"] = "NOT_INSTALLED"
         out["running"] = False
         out["pid"] = None
@@ -478,21 +497,26 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
         out["healthy"] = False
         out["health"] = "DOWN"
         out["detail"] = (
-            f"the active {unit} belongs to a different QUBIT_HOME "
-            f"({unit_home}); no gateway daemon is installed for this home "
-            f"({our_home})")
+            f"The {unit} service belongs to a different Qubit home." if foreign_unit
+            else f"No systemd service for this profile could be verified ({unit}).")
+        return out
+    system_error = (stderr or "").lower()
+    if props.get("LoadState") == "not-found" or "could not be found" in system_error:
+        out.update(state="NOT_INSTALLED", control_available=False, health="DOWN",
+                   detail=f"The {unit} service is not installed.")
+        return out
+    if "failed to connect to bus" in system_error or "has not been booted with systemd" in system_error:
+        out.update(state="UNAVAILABLE", control_available=False,
+                   detail="The systemd service manager is not reachable.")
         return out
     if rc != 0 and out["active_state"] == "unknown":
-        # The unit may simply not be installed; that is a typed state, not a
-        # crash. Surface the exact systemd message (redacted by the caller).
-        out["state"] = "NOT_INSTALLED" if "could not be found" in (
-            stderr or "").lower() else "DEGRADED"
+        out["state"] = "DEGRADED"
         out["detail"] = _redact(stderr or "systemctl returned no state").strip()[:300]
     # Bounded TCP health probe (never blocks the dashboard): connect_ex with a
     # sub-second timeout against the configured listener.
     t0 = time.perf_counter()
     try:
-        out["port_in_use"] = bool(check_port(host, port))
+        out["port_in_use"] = bool(check_port(host, port)) if home is None else False
     except Exception:  # noqa: BLE001
         out["port_in_use"] = False
     out["health_latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -509,14 +533,14 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
         out["detail"] = (out["detail"] or "") + (
             f" unit is in a failed state (ExecMainStatus="
             f"{out['exec_main_status']}, NRestarts={out['n_restarts']})")
-    out["healthy"] = bool(out["running"] and out["port_in_use"])
+    out["healthy"] = bool(out["running"] and (out["daemon_live"] if home is not None else out["port_in_use"]))
     if out["healthy"]:
         out["health"] = "OK"
     elif out["running"]:
         out["health"] = "STARTING"
-        out["health_detail"] = ("service active but the configured port is not "
-                                "accepting connections; the listener may still "
-                                "be starting")
+        out["health_detail"] = (
+            "The profile gateway has not answered its control socket." if home is not None
+            else "service active but the configured port is not accepting connections.")
     elif out["port_in_use"]:
         out["health"] = "STALE_PORT"
         out["health_detail"] = ("port is in use but the service is not active "
@@ -580,7 +604,9 @@ CONTROL_STATUS_NAME = "gateway_control_status.json"
 CONTROL_STATUS_SCHEMA = "qubit-gateway-control-status/1"
 
 
-def _control_status_path(cfg: Any) -> Path:
+def _control_status_path(cfg: Any, home: Optional[Path] = None) -> Path:
+    if home is not None:
+        return home / CONTROL_STATUS_NAME
     try:
         base = Path(cfg.state_dir())
     except Exception:  # noqa: BLE001
@@ -588,13 +614,14 @@ def _control_status_path(cfg: Any) -> Path:
     return base / CONTROL_STATUS_NAME
 
 
-def _record_control_status(cfg: Any, action: str, out: Dict[str, Any]) -> None:
+def _record_control_status(cfg: Any, action: str, out: Dict[str, Any],
+                           *, home: Optional[Path] = None) -> None:
     """Persist one control outcome (durable, redacted, best-effort; never raises)."""
     name = str(action or "").strip().lower()
     if not name or not isinstance(out, dict):
         return
     try:
-        path = _control_status_path(cfg)
+        path = _control_status_path(cfg, home)
         store: Dict[str, Any] = {}
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
@@ -605,6 +632,7 @@ def _record_control_status(cfg: Any, action: str, out: Dict[str, Any]) -> None:
         actions = store.get("actions")
         actions = dict(actions) if isinstance(actions, dict) else {}
         receipt = out.get("receipt")
+        before = out.get("status") or {}
         actions[name] = {
             "action": name, "state": str(out.get("state") or ""),
             "ok": bool(out.get("ok")), "code": str(out.get("code") or ""),
@@ -612,6 +640,8 @@ def _record_control_status(cfg: Any, action: str, out: Dict[str, Any]) -> None:
             "detached": bool(out.get("detached")), "noop": bool(out.get("noop")),
             "updated_at": time.time(),
             "receipt": receipt if isinstance(receipt, dict) else None,
+            "before": {key: before.get(key) for key in (
+                "pid", "started_at", "active_enter_timestamp", "active_state")},
         }
         store = {"schema": CONTROL_STATUS_SCHEMA, "actions": actions}
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -623,13 +653,13 @@ def _record_control_status(cfg: Any, action: str, out: Dict[str, Any]) -> None:
         pass
 
 
-def control_status(cfg: Any, action: str) -> Optional[Dict[str, Any]]:
+def control_status(cfg: Any, action: str, *, home: Optional[Path] = None) -> Optional[Dict[str, Any]]:
     """Read the durable last-control record for *action*, or ``None`` (never raises)."""
     name = str(action or "").strip().lower()
     if not name:
         return None
     try:
-        raw = json.loads(_control_status_path(cfg).read_text(encoding="utf-8"))
+        raw = json.loads(_control_status_path(cfg, home).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if not isinstance(raw, dict) or raw.get("schema") != CONTROL_STATUS_SCHEMA:
@@ -784,7 +814,7 @@ def control(cfg: Any, action: str, *, confirmed: bool = False,
             actor: str = "dashboard:user", runner: Optional[Runner] = None,
             spawner: Optional[Spawner] = None,
             probe: Optional[Callable[[str, int], bool]] = None,
-            unit_override: str = ""
+            unit_override: str = "", home: Optional[Path] = None
             ) -> Dict[str, Any]:
     """Perform an authorized gateway lifecycle transition and record its outcome.
 
@@ -800,8 +830,10 @@ def control(cfg: Any, action: str, *, confirmed: bool = False,
     out = _control_impl(cfg, action, confirmed=confirmed,
                         confirmation_id=confirmation_id, source=source,
                         actor=actor, runner=runner, spawner=spawner,
-                        probe=probe, unit_override=unit_override)
-    _record_control_status(cfg, action, out)
+                        probe=probe, unit_override=unit_override, home=home)
+    # Confirmation prompts must not replace the last dispatched action.
+    if out.get("state") != "CONFIRM_REQUIRED":
+        _record_control_status(cfg, action, out, home=home)
     return out
 
 
@@ -810,7 +842,7 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
                   actor: str = "dashboard:user", runner: Optional[Runner] = None,
                   spawner: Optional[Spawner] = None,
                   probe: Optional[Callable[[str, int], bool]] = None,
-                  unit_override: str = ""
+                  unit_override: str = "", home: Optional[Path] = None
                   ) -> Dict[str, Any]:
     """Perform an authorized gateway lifecycle transition.
 
@@ -854,9 +886,10 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
                            "environment (test guard); no service was touched")}
     run = runner or _default_runner
     spawn = spawner or _default_spawner
-    before = status(cfg, runner=run, probe=probe, unit_override=unit)
+    target = {"home": home} if home is not None else {}
+    before = status(cfg, runner=run, probe=probe, unit_override=unit, **target)
     unit = before["service_unit"]
-    if not before["available"]:
+    if not before["available"] or before.get("control_available") is False:
         return {"ok": False, "code": UNAVAILABLE_CODE, "state": "UNAVAILABLE",
                 "detail": before["detail"], "status": before, "receipt": receipt}
 
@@ -880,7 +913,7 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
 
     if clean == "start":
         rc, stdout, stderr = _run(run, _systemctl_argv(cfg, "start", unit))
-        after = status(cfg, runner=run, probe=probe)
+        after = status(cfg, runner=run, probe=probe, unit_override=unit, **target)
         if rc == 0:
             ok, code, state = True, "", "OK"
         elif rc == 124:

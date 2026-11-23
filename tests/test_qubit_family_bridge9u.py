@@ -989,3 +989,36 @@ def test_harness_gate_and_typed_rows(tmp_path, monkeypatch):
                             {}, {})
     assert code == 200, out
     assert out.get("code") == "NO_ACTIVE_PROJECT", out
+
+
+def test_dashboard_device_mint_from_approval_keeps_scopes_and_returns_only_metadata(tmp_path, monkeypatch):
+    """The shared approvals path preserves scopes and returns a redacted mint receipt."""
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    path = "/api/qubit/devices"
+    scopes = ["operator.read", "status.read"]
+    status, staged = HC.dispatch(cfg, "POST", path + "/setup-code-mint", {}, {
+        "label": "Audit companion", "scopes": scopes, "ttl_seconds": 600,
+    })
+    assert status == 409
+    status, settled = HC.dispatch(cfg, "POST", "/api/ops/confirm", {}, {
+        "confirmation_id": staged["confirmation_id"],
+    })
+    assert status == 200, settled
+    receipt = settled["receipt"]["results"][0]["result"]
+    assert receipt.get("scopes") == scopes
+    assert receipt.get("code_present") is True
+    assert set(receipt) <= {"ok", "id", "label", "scopes", "expires_at", "code_present"}
+
+    status, listing = HC.dispatch(cfg, "GET", path + "/pairings", {}, {})
+    assert status == 200
+    assert listing["pairings"] == [{
+        "id": receipt["id"], "label": "Audit companion", "kind": "setup",
+        "state": "pending", "manageable": True, "token_manageable": False,
+        "secret_set": True,
+    }]
+    status, failed = HC.dispatch(cfg, "POST", path + "/token-rotate", {}, {
+        "pairing_id": receipt["id"], "confirm": True,
+    })
+    assert status == 404 and failed["ok"] is False

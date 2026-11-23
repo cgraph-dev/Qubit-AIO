@@ -68,7 +68,7 @@ def offer_agent_import(qubit_home: Path) -> str:
     # The menu clears the screen, so the question carries what it refers to ("any of them").
     if not prompt_yes_no(f"Import your setup from {names}?", default=True,
                          description="\n".join(f"  {w}" for line in context for w in textwrap.wrap(line, 76))):
-        print_info(f"Skipped. Import later with: qubit plugins install {PLUGIN}, then qubit import-agent")
+        print_info(f"Skipped. Import later with: qubit agent plugins install {PLUGIN}, then qubit import-agent")
         return ""
     picked = _pick_sources(found)
     if not picked or not _ensure_plugin(qubit_home):
@@ -114,7 +114,7 @@ def _ensure_plugin(qubit_home: Path) -> bool:
             return True
     verb = "enabled" if present else "installed"
     print_warning(f"The '{PLUGIN}' plugin could not be {verb}, so nothing was imported. "
-                  f"Try again later with: qubit plugins {'enable' if present else 'install'} {PLUGIN}")
+                  f"Try again later with: qubit agent plugins {'enable' if present else 'install'} {PLUGIN}")
     return False
 
 
@@ -127,6 +127,7 @@ def _run_import(source: ImportSource, qubit_home: Path) -> bool:
     """``qubit import-agent <source>`` in a child process, so the freshly installed plugin's command
     is wired; it previews and asks before changing anything (and exits 0 on a no too). True when the
     run changed config.yaml or .env, which the setup sections after it read."""
+    from qubit_cli.plugins_discovery import foreign_cli_launch_prefix
     from qubit_cli.setup import print_header, print_warning
     from tools.environments.local import served_profile_child_env
     print_header(f"Importing from {source.label}", gap=True)
@@ -136,8 +137,8 @@ def _run_import(source: ImportSource, qubit_home: Path) -> bool:
     selector = [] if qubit_home.resolve().parent.name == "profiles" else ["--profile", "default"]
     # --from-setup: the plugin's import speaks as a step of this setup (no "run qubit setup" pointers,
     # Qubit's skipped items folded into one line).
-    argv = [sys.executable, "-P", "-m", "qubit_cli.main", *selector, "import-agent", source.name, *source.extra_args,
-            "--from-setup"]
+    launcher = foreign_cli_launch_prefix() or (sys.executable, "-P", "-m", "qubit_cli.main")
+    argv = [*launcher, *selector, "import-agent", source.name, *source.extra_args, "--from-setup"]
     env = served_profile_child_env(target_home=qubit_home)
     if os.environ.get("PYTHONPATH"):  # this same interpreter running Qubit: keep the source tree
         env["PYTHONPATH"] = os.environ["PYTHONPATH"]  # a checkout launched by path, which it strips
@@ -145,5 +146,5 @@ def _run_import(source: ImportSource, qubit_home: Path) -> bool:
     if subprocess.run(argv, env=env, check=False).returncode:
         # An install from before the plugin gained this importer, or --from-setup, refuses it (argparse, exit 2).
         print_warning(f"The {source.label} import did not run. If the error names an invalid choice or "
-                      f"unrecognized arguments, update the plugin first: qubit plugins update {PLUGIN}")
+                      f"unrecognized arguments, update the plugin first: qubit agent plugins update {PLUGIN}")
     return _snapshot(qubit_home) != before

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -93,14 +95,67 @@ def test_claw_is_not_advertised_as_a_core_family():
     assert "claw" not in parser.format_help().lower()
 
 
-def test_claw_returns_install_guidance_instead_of_a_dead_forward():
-    from voicebridge import cli_qubit_forward as HF
+def _run_plugin_cli(tmp_path, *argv):
+    env = dict(os.environ, QUBIT_HOME=str(tmp_path / "profile"), HOME=str(tmp_path),
+               XDG_CONFIG_HOME=str(tmp_path / "config"), XDG_STATE_HOME=str(tmp_path / "state"),
+               XDG_DATA_HOME=str(tmp_path / "data"))
+    return subprocess.run([sys.executable, "-m", "voicebridge", *argv],
+                          env=env, cwd=REPO_ROOT, capture_output=True, text=True, timeout=45)
 
-    route = HF.route(["claw"])
-    assert route is not None and route.kind == "refused"
-    assert route.code == "QUBIT_CLAW_PLUGIN_REQUIRED"
-    assert "qubit plugins install agent-importers" in route.detail
-    assert "qubit import-agent" in route.detail
+
+def test_claw_returns_install_guidance_with_no_plugin(tmp_path):
+    run = _run_plugin_cli(tmp_path, "claw", "--help")
+    assert run.returncode == 3, run.stdout + run.stderr
+    result = json.loads(run.stdout)
+    assert result["code"] == "QUBIT_CLAW_PLUGIN_REQUIRED"
+    assert "qubit agent plugins install agent-importers" in result["detail"]
+
+
+def test_importer_registers_after_shipping_legacy_helpers_and_previews_json5(tmp_path):
+    profile = tmp_path / "profile"
+    plugin = profile / "plugins" / "agent-importers"
+    plugin.mkdir(parents=True)
+    (profile / "config.yaml").write_text("plugins:\n  enabled: [agent-importers]\n")
+    (plugin / "plugin.yaml").write_text("name: agent-importers\nversion: 1.1.0\nkind: standalone\n")
+    (plugin / "__init__.py").write_text(
+        "from pathlib import Path\n"
+        "from hermes_cli import agent_import, claw, config\n"
+        "def setup(parser):\n"
+        "    migrate = parser.add_subparsers(dest='claw_action').add_parser('migrate')\n"
+        "    migrate.add_argument('--source')\n"
+        "    migrate.add_argument('--dry-run', action='store_true')\n"
+        "def register(ctx):\n"
+        "    core = Path(config.__file__).parent\n"
+        "    if not (core / 'claw.py').is_file() and not (core / 'agent_import.py').is_file():\n"
+        "        ctx.register_cli_command('claw', 'Fixture importer', setup, lambda args: 9)\n"
+    )
+    source = tmp_path / "openclaw"
+    source.mkdir()
+    (source / "openclaw.json").write_text("{mcp:{servers:{fixture:{url:'https://example.invalid',},},},}")
+    original = (profile / "config.yaml").read_bytes()
+    run = _run_plugin_cli(tmp_path, "claw", "migrate", "--source", str(source), "--dry-run")
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "mcp_servers.fixture" in run.stdout
+    assert (profile / "config.yaml").read_bytes() == original
+
+
+def test_importer_routing_preserves_preview_and_requires_confirmation(monkeypatch):
+    from voicebridge import cli_qubit_forward as forwarding
+
+    for argv in (["claw", "migrate"], ["import-agent", "openclaw"], ["import-agent", "--sync"]):
+        preview = forwarding.route([*argv, "--dry-run"])
+        assert preview.kind == "forward"
+        assert preview.argv == [*argv, "--dry-run"]
+        apply = forwarding.route([*argv, "--yes"])
+        assert apply.kind == "needs-confirm"
+        assert apply.code == "CONFIRM_REQUIRED"
+
+    monkeypatch.setattr(forwarding, "guard_confirm", lambda *args: None)
+    confirmed = forwarding.route(["claw", "migrate", "--yes", "--confirm"])
+    assert confirmed.kind == "forward"
+    assert confirmed.argv == ["claw", "migrate", "--yes"]
+    assert forwarding.route(["import-agent", "inspect"]) is None
+    assert forwarding.route(["import-agent", "import"]) is None
 
 
 # ── status hint ──────────────────────────────────────────────────────────────

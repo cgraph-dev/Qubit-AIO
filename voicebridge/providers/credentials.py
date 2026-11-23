@@ -9,6 +9,7 @@ reports, or telemetry.
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -110,25 +111,27 @@ def _env_file_value(name: str) -> str:
     if looks_like_browser_secret(low) or looks_like_opencode_private_db(low):
         return ""
     try:
-        if not path.is_file():
-            return ""
-        text = path.read_text(errors="replace")
+        from dotenv import dotenv_values
+
+        return dotenv_values(path, interpolate=False).get(name) or ""
     except Exception:  # noqa: BLE001 - unreadable .env -> typed missing
         return ""
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].strip()
-        key, sep, value = line.partition("=")
-        if not sep or key.strip() != name:
-            continue
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-            value = value[1:-1]
-        return value
-    return ""
+
+
+def _routed_profile_secret(name: str) -> Optional[str]:
+    """Return a routed profile's value (empty if absent), or None for the listener."""
+    constants = sys.modules.get("qubit_constants")
+    if constants is None:
+        return None
+    override = constants.get_qubit_home_override()
+    if not override or Path(override).resolve() == constants.get_routing_process_qubit_home().resolve():
+        return None
+    try:
+        from agent.secret_scope import build_profile_secret_scope
+
+        return build_profile_secret_scope(Path(override)).get(name) or ""
+    except Exception:  # noqa: BLE001 - a routed scope must never fall back to the listener
+        return ""
 
 
 def resolve_key(provider: str, ref: str) -> tuple[str, str]:
@@ -161,7 +164,9 @@ def resolve_key(provider: str, ref: str) -> tuple[str, str]:
         # 2026-10-05: the owner replaced a rate-limited OpenCode Go key and
         # every provider call kept 402ing). _env_file_value re-reads the file
         # each call, so a direct .env edit takes effect immediately.
-        val = _env_file_value(name) or os.environ.get(name, "")
+        val = _routed_profile_secret(name)
+        if val is None:
+            val = _env_file_value(name) or os.environ.get(name, "")
         return (val, "") if val else ("", "AUTH_MISSING")
     if ref.startswith("file:"):
         p = Path(ref[len("file:"):].strip()).expanduser()

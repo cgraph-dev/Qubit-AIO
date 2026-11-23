@@ -31,7 +31,7 @@ def sync_manifest_path(target_root: Path) -> Path:
 
 def _iter_sync_files(agent: str, source_root: Path) -> Iterator[Path]:
     """Yield the source files whose content determines the sync digest — exactly what
-    :class:`~qubit_cli.agent_import.AgentImporter` reads for ``agent``."""
+    :class:`~qubit_cli.agent_import_legacy.AgentImporter` reads for ``agent``."""
     if agent == "claude-code":
         # ~/.claude.json lives NEXT TO ~/.claude/ (see AgentImporter._run_claude_code)
         paths = [source_root / "CLAUDE.md", source_root / "settings.json",
@@ -130,7 +130,7 @@ def update_sync_manifest(agent: str, source_root: Path, target_root: Path,
 def sync_imported_agents(args) -> None:
     """Handle ``qubit import-agent --sync``: re-import every registered source whose digest
     changed. Prompt-free (cron-friendly); ``--dry-run`` previews without touching the manifest."""
-    from qubit_cli.agent_import import AgentImporter, print_import_report
+    from qubit_cli.agent_import_legacy import AgentImporter, print_import_report
     from qubit_cli.setup import print_error, print_header, print_info, print_success
     from qubit_constants import get_qubit_home
 

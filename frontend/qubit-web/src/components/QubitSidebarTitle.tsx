@@ -10,7 +10,7 @@ import { useId } from "react";
 export function QubitSidebarTitle({ label = "QUBIT AIO", index, className }: { label?: string; index?: string; className?: string }) {
   const uid = useId();
   return (
-    <div className={["qubit-sidebar-title", className].filter(Boolean).join(" ")}>
+    <span className={["qubit-sidebar-title", className].filter(Boolean).join(" ")}>
       <svg
         className="qubit-sidebar-title__art"
         viewBox="0 0 320 64"
@@ -75,6 +75,6 @@ export function QubitSidebarTitle({ label = "QUBIT AIO", index, className }: { l
       </svg>
 
       <span className="qubit-sidebar-title__label">{index ? <><span className="qubit-sidebar-title__index">{index}</span> <span className="qubit-sidebar-title__text">{label}</span></> : label}</span>
-    </div>
+    </span>
   );
 }

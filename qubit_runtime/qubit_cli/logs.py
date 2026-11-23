@@ -21,7 +21,10 @@ Usage examples::
     qubit logs --since 30m -f     # follow, starting 30 min ago
 """
 
+import os
 import re
+from collections import deque
+from itertools import islice
 import sys
 import time
 from datetime import datetime, timedelta
@@ -245,14 +248,116 @@ def tail_log(
         print("\n--- stopped ---")
 
 
+class LogSnapshotExpired(ValueError):
+    """The log file changed identity or was truncated between page requests."""
+
+
+def _reverse_snapshot_lines(stream, end: int):
+    """Yield physical lines from the end of an already opened log snapshot."""
+    pending = b""
+    tail = True
+    while end:
+        size = min(65536, end)
+        end -= size
+        stream.seek(end)
+        chunk = stream.read(size)
+        if len(chunk) != size:
+            raise LogSnapshotExpired
+        parts = (chunk + pending).split(b"\n")
+        pending = parts.pop(0)
+        if tail and parts and not parts[-1]:
+            parts.pop()
+        tail = False
+        for line in reversed(parts):
+            yield line.rstrip(b"\r").decode("utf-8", errors="replace") + "\n"
+    if not tail:
+        yield pending.decode("utf-8-sig", errors="replace") + "\n"
+
+
+def read_log_page(path: Path, *, limit: int, offset: int, snapshot: str = "",
+                  level: Optional[str] = None, component: Optional[str] = None,
+                  search: Optional[str] = None, redact=None) -> dict:
+    """Page through the same file extent while live log writes continue."""
+    from qubit_logging import COMPONENT_PREFIXES
+
+    min_level = level.upper() if level else None
+    if min_level == "ALL":
+        min_level = None
+    if min_level and min_level not in _LEVEL_ORDER:
+        raise ValueError(f"Unknown log level: {level}")
+    prefix = None
+    if component and component.lower() != "all":
+        prefix = COMPONENT_PREFIXES.get(component.lower())
+        if prefix is None:
+            raise ValueError(f"Unknown component: {component}")
+    page = {"lines": [], "offset": offset, "limit": limit, "returned": 0,
+            "has_more": False, "next_offset": None, "snapshot": None}
+    try:
+        stream = path.open("rb")
+    except FileNotFoundError:
+        if snapshot:
+            raise LogSnapshotExpired from None
+        return page
+
+    with stream:
+        st = os.fstat(stream.fileno())
+        identity = f"{st.st_dev:x}:{st.st_ino:x}:"
+        end = st.st_size
+        if snapshot:
+            try:
+                if not snapshot.startswith(identity):
+                    raise ValueError
+                end = int(snapshot[len(identity):], 16)
+                if end < 0 or end > st.st_size:
+                    raise ValueError
+            except ValueError:
+                raise LogSnapshotExpired from None
+        page["snapshot"] = f"{identity}{end:x}"
+        if not limit or offset >= end:
+            return page
+
+        if search or min_level or prefix:
+            from qubit_cli.log_search import newest_matching_page
+
+            needle = (search or "").casefold()
+
+            def matching_lines():
+                stream.seek(0)
+                keep = _LineFilter(min_level=min_level, component_prefixes=prefix)
+                remaining = end
+                while remaining:
+                    raw = stream.readline(remaining)
+                    if not raw:
+                        raise LogSnapshotExpired
+                    codec = "utf-8-sig" if remaining == end else "utf-8"
+                    remaining -= len(raw)
+                    line = raw.decode(codec, errors="replace").replace("\r\n", "\n")
+                    if keep(line):
+                        display = redact(line) if redact else line
+                        if not needle or needle in display.casefold():
+                            yield display
+
+            lines, has_more = newest_matching_page(matching_lines, offset=offset, limit=limit)
+        else:
+            newest = list(islice(_reverse_snapshot_lines(stream, end), offset, offset + limit + 1))
+            has_more = len(newest) > limit
+            lines = newest[:limit][::-1]
+            if redact:
+                lines = [redact(line) for line in lines]
+        page.update(lines=lines, returned=len(lines), has_more=has_more,
+                    next_offset=offset + len(lines) if has_more else None)
+        return page
+
+
 def _read_tail(path: Path, num_lines: int, *, has_filters: bool = False, **filters) -> list:
     """Read the last *num_lines* matching lines; ``filters`` are ``_matches_filters`` kwargs."""
+    if num_lines <= 0:
+        return []
     if not has_filters:
         return _read_last_n_lines(path, num_lines)
-    # Over-read so enough lines survive filtering.
-    raw_lines = _read_last_n_lines(path, max(num_lines * 20, 2000))
     keep = _LineFilter(**filters)
-    return [l for l in raw_lines if keep(l)][-num_lines:]
+    with path.open(encoding="utf-8-sig", errors="replace") as stream:
+        return list(deque((line for line in stream if keep(line)), maxlen=num_lines))
 
 
 def _read_all_lines(path: Path) -> list:

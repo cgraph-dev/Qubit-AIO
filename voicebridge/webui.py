@@ -69,6 +69,7 @@ OFFICE_APP_PREFIX = "/plugin-apps/"
 DASHBOARD_ASSET_PREFIXES: tuple[str, ...] = (
     "/assets/",
     "/fonts/",
+    "/fonts-dashboard/",
     "/fonts-terminal/",
     "/media/",
     "/plugins/",
@@ -1013,6 +1014,7 @@ QUBIT_READ_AUTHORITY: tuple = (
     # ``GET /api/health`` contract. The compat handler is the authority.
     "/api/health",
     "/api/cron/jobs",
+    "/api/logs",
     "/api/skills",
     "/api/tools/toolsets",
     # Model identity is a Qubit provider-routing concern: the canonical
@@ -1173,6 +1175,15 @@ def qubit_read_authority(path: str) -> bool:
     clean = path.split("?")[0]
     if len(clean) > 1:
         clean = clean.rstrip("/")
+    if clean in (
+        "/api/gateway",
+        "/api/gateway/status",
+        "/api/actions/gateway-start/status",
+        "/api/actions/gateway-stop/status",
+        "/api/actions/gateway-restart/status",
+        "/api/actions/gateway-recover/status",
+    ):
+        return True
     for prefix in QUBIT_READ_AUTHORITY:
         if clean == prefix or clean.startswith(prefix + "/"):
             return True
@@ -3551,7 +3562,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # is never accepted on the WebSocket URL; the browser mints a ticket
         # over this authenticated HTTP route and presents it once.
         if method == "POST" and api_path.rstrip("/") == "/api/auth/ws-ticket":
-            from .pty_ws import SCOPE_PTY
+            from .pty_ws import SCOPE_PTY, terminal_management_scope
             from .gateway.rpc_ws import SCOPE_RPC
             from .stt_ws import SCOPE_STT
             scope = str(body.get("scope", "") or SCOPE_PTY).strip().lower()
@@ -3564,12 +3575,21 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # The client's requested Qubit model profile is threaded through so
             # an unknown id is a typed refusal, never a silent substitution.
             requested_profile = str(body.get("profile", "") or "")
+            management_profile = (str(body.get("management_profile") or "").strip()
+                                  if scope == SCOPE_PTY else "")
             resume_session = str(
                 body.get("session", "") or body.get("resume", "") or "")
             guard: Optional[Dict[str, Any]] = None
             if scope == SCOPE_PTY:
-                guard = self.app.pty_ws._resolve_guard(
-                    requested_profile, session_id=resume_session)
+                from fastapi import HTTPException
+                try:
+                    with terminal_management_scope(management_profile):
+                        guard = self.app.pty_ws._resolve_guard(
+                            requested_profile, session_id=resume_session)
+                except HTTPException as exc:
+                    self._json({"ok": False, "code": "CHAT_PROFILE_INVALID",
+                                "detail": str(exc.detail)}, code=exc.status_code)
+                    return
                 if isinstance(guard, dict) and guard.get("ok") is False:
                     self.app.pty_ws.journal_context_refusal(
                         guard, requested_profile=requested_profile,
@@ -3603,7 +3623,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 scope=scope,
                 session=str(body.get("session", "") or ""),
                 owner=str(body.get("owner", "") or "dashboard:user"),
-                target=str(body.get("target", "") or ""))
+                target=str(body.get("target", "") or ""),
+                management_profile=management_profile,
+                model_profile=requested_profile,
+                resume=resume_session)
             # The ticket is returned exactly once and never logged or audited.
             # The non-secret model profile is surfaced so the terminal shows the
             # active model/context and a switch is visible.
@@ -3649,20 +3672,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
             _route = None
         if method == "POST" and _route is not None \
                 and _route.get("disposition") == "stream":
-            from . import chat_transport as CT
-            text = str(body.get("text", "") or "")
-            # One shared preflight (model/empty/e-stop) from chat_transport: a
-            # typed refusal fires BEFORE any SSE frame opens. The same helper
-            # backs stream_turn's own error events; no logic is duplicated.
-            status, refusal, _model = CT.stream_preflight(
-                self.app.orch.cfg, text, body.get("model"),
-                session=body.get("session"))
-            if refusal is not None:
-                payload = {k: v for k, v in refusal.items() if k != "event"}
-                payload["ok"] = False
-                payload.setdefault("state",
-                                   "UNAVAILABLE" if status == 403 else "FAILED")
-                self._json(payload, status)
+            status, frames = HC.prepare_chat_stream(self.app.orch.cfg, query, body)
+            if status != 200:
+                self._json(frames, status)
                 return
             # Streaming body: no Content-Length, so the response is delimited
             # by connection close and must never advertise keep-alive.
@@ -3678,11 +3690,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self.send_header(k, v)
             self.end_headers()
             try:
-                for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):
+                for frame in frames:
                     self.wfile.write(frame.encode("utf-8"))
                     self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
+            finally:
+                close = getattr(frames, "close", None)
+                if close is not None:
+                    close()
             return
         # Cutover stage 2b (docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md): non-gated
         # reads are proxy-first to the fork (the Qubit-owned Qubit runtime), so
@@ -3739,8 +3755,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                     # the Settings save round-trips.
                                     try:
                                         from . import qubit_compat as _HC
-                                        parsed = _HC._merge_config_overrides(
-                                            self.app.orch.cfg, parsed)
+                                        if _HC.settings_profile_home(self.app.orch.cfg, query) is None:
+                                            parsed = _HC._merge_config_overrides(self.app.orch.cfg, parsed)
                                     except Exception:
                                         pass
                                     # Serve Qubit-owned keys the fork payload
@@ -3805,30 +3821,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "code": "EXECUTOR_ERROR",
                         "detail": redact_obj(str(exc))[:200]}, 500)
             return
-        # Keys-page presence truth (audit 2026-09-23 D-4): the compat handler
-        # derived ``is_set`` only from the reference registry, so every catalog
-        # key read false even when present in Qubit's own runtime ``.env``.
-        # Upgrade presence here at the Qubit read boundary using names only
-        # (never a value); a provider-derived true is never downgraded and no
-        # secret material is read or returned.
-        #
-        # UI audit 2026-09-29 D1: this upgrade must use ``resolved_names`` (the
-        # credential actually resolves), NOT ``present_names`` (a registry row
-        # merely exists). ``present_names`` forced ``is_set:true`` for an
-        # ``env:``/``file:`` reference whose target is absent — a dishonest Keys
-        # surface. ``resolved_names`` preserves the D-4 intent (a real runtime
-        # ``.env``/process key is present) without advertising unresolvable
-        # references as set.
-        if method in ("GET", "HEAD") and api_path.rstrip("/") == "/api/env" \
-                and code == 200 and isinstance(out, dict):
-            try:
-                from . import env_store as _ES
-                resolved = _ES.resolved_names(self.app.orch.cfg)
-                for _k, _v in out.items():
-                    if isinstance(_v, dict) and _k in resolved:
-                        _v["is_set"] = True
-            except Exception:
-                pass
         out = correct_mcp_test_verdict(method, api_path, code, out)
         self._json(out, code)
 

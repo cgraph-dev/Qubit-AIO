@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO / "qubit_runtime"))
 # --------------------------------------------------------------- entry points
 def test_repo_canonical_script_resolves_first():
     """The real repo tree resolves the canonical `qubit-migration` script."""
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     found = claw._find_migration_script()
     assert found is not None, "migration script must resolve from the repo tree"
@@ -34,7 +34,7 @@ def test_repo_canonical_script_resolves_first():
 
 
 def test_canonical_wins_when_both_frames_exist(tmp_path, monkeypatch):
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     canon = tmp_path / "canon" / "openclaw_to_hermes.py"
     legacy = tmp_path / "legacy" / "openclaw_to_hermes.py"
@@ -54,7 +54,7 @@ def test_canonical_wins_when_both_frames_exist(tmp_path, monkeypatch):
 
 def test_legacy_frame_is_read_old_fallback_only(tmp_path, monkeypatch):
     """With no canonical copy, the retired frame is used (never deleted)."""
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     legacy = tmp_path / "legacy" / "openclaw_to_hermes.py"
     legacy.parent.mkdir(parents=True)
@@ -71,7 +71,7 @@ def test_legacy_frame_is_read_old_fallback_only(tmp_path, monkeypatch):
 
 
 def test_deprecation_note_names_canonical(capsys, tmp_path, monkeypatch):
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     legacy = tmp_path / "legacy" / "openclaw_to_hermes.py"
     legacy.parent.mkdir(parents=True)
@@ -86,7 +86,7 @@ def test_deprecation_note_names_canonical(capsys, tmp_path, monkeypatch):
 
 
 def test_canonical_frame_emits_no_deprecation(capsys, tmp_path, monkeypatch):
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     canon = tmp_path / "canon" / "openclaw_to_hermes.py"
     canon.parent.mkdir(parents=True)
@@ -182,7 +182,7 @@ def test_canonical_skill_frontmatter_is_qubit_named():
 
 def test_canonical_script_loads_and_is_functional(tmp_path):
     """The resolved canonical script loads as a module and runs a dry-run plan."""
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     script = claw._find_migration_script()
     assert script is not None and not claw._is_legacy_migration_script(script)

@@ -119,3 +119,90 @@ def test_mirror_failure_rolls_back_the_dashboard_store(tmp_path, monkeypatch):
 
     assert excinfo.value.code == "MCP_RUNTIME_SYNC_FAILED"
     assert _json_enabled(cfg, "delta") is before
+
+
+def test_native_drift_blocks_stale_broker_and_reports_disabled_state(tmp_path, monkeypatch):
+    import yaml
+
+    from voicebridge import mcp_servers as MS
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "runtime"))
+    cfg = _cfg(tmp_path, monkeypatch)
+    MS.upsert(cfg, "fixture", {"transport": "http", "url": "http://127.0.0.1:9/mcp",
+                               "enabled": True, "capabilities": ["echo"]})
+    config_path = MS.runtime_home(cfg) / "config.yaml"
+    native = yaml.safe_load(config_path.read_text())
+    native["mcp_servers"]["fixture"].update(enabled=False, url="http://127.0.0.1:8/changed")
+    config_path.write_text(yaml.safe_dump(native))
+    row = MS.list_servers(cfg)["servers"][0]
+    assert row["enabled"] is False and row["invocable"] is False
+    assert row["status"] == "config-changed" and row["invocation_code"] == MS.CONFIG_CHANGED
+
+    def no_connection(*args, **kwargs):
+        pytest.fail("A drifted registration must never connect")
+
+    monkeypatch.setattr(MS.MC, "call_server", no_connection)
+    monkeypatch.setattr(MS.MC, "discover_tools", no_connection)
+    with pytest.raises(MS.McpServerError, match="runtime MCP configuration changed"):
+        MS.invoke(cfg, "fixture", tool="echo", confirmed=True)
+    with pytest.raises(MS.McpServerError, match="runtime MCP configuration changed"):
+        MS.test(cfg, "fixture")
+    with pytest.raises(MS.McpServerError, match="runtime MCP configuration changed"):
+        MS.set_enabled(cfg, "fixture", True)
+    with pytest.raises(MS.McpServerError, match="runtime MCP configuration changed"):
+        MS.delete(cfg, "fixture")
+
+    native["mcp_servers"].pop("fixture")
+    config_path.write_text(yaml.safe_dump(native))
+    assert MS.list_servers(cfg)["servers"][0]["invocation_code"] == MS.CONFIG_CHANGED
+    MS.upsert(cfg, "fixture", {"url": "http://127.0.0.1:9/restored", "enabled": True})
+    assert MS.list_servers(cfg)["servers"][0]["invocable"] is True
+
+
+def test_manual_credentials_stay_out_of_journal_and_roll_back(tmp_path, monkeypatch):
+    import yaml
+
+    from voicebridge import mcp_servers as MS
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = tmp_path / "runtime"
+    work = root / "profiles" / "work"
+    work.mkdir(parents=True)
+    (work / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    q = {"profile": "work"}
+    url = "http://127.0.0.1:9/mcp"
+    bearer = {"name": "fixture-http", "transport": "http", "auth": "header", "url": url,
+              "bearer_token": "Bearer local-http-value"}
+    stdio = {"name": "fixture-stdio", "transport": "stdio", "command": "local-test-command",
+             "env": {"EXISTING": "env:EXISTING"}, "env_values": {"CUSTOM": "local-stdio-value"}}
+    for record in (bearer, stdio):
+        status, pending = HC.dispatch(cfg, "POST", "/api/mcp/servers", q, record)
+        assert status == 409 and not pending.get("confirmation_id"), pending
+        status, installed = HC.dispatch(cfg, "POST", "/api/mcp/servers", q, {**record, "confirm": True})
+        assert status == 200 and "local-http-value" not in repr(installed), installed
+        assert "local-stdio-value" not in repr(installed), installed
+    env_path = work / ".env"
+    env_path.write_bytes(b"\xef\xbb\xbf# fixture formatting\r\n" + env_path.read_bytes())
+    credential_bytes = env_path.read_bytes()
+    assert b"local-http-value" in credential_bytes and b"local-stdio-value" in credential_bytes
+    assert not (root / ".env").exists()
+    for path in (cfg.state_dir() / "approvals.jsonl", work / "mcp_servers.json", work / "config.yaml"):
+        if path.exists():
+            assert b"local-http-value" not in path.read_bytes()
+            assert b"local-stdio-value" not in path.read_bytes()
+    native = yaml.safe_load((work / "config.yaml").read_text())["mcp_servers"]
+    assert native["fixture-http"]["headers"]["Authorization"].startswith("Bearer ${env:QUBIT_MCP_")
+    assert native["fixture-stdio"]["env"]["CUSTOM"].startswith("${env:QUBIT_MCP_")
+
+    def fail_sync(*args, **kwargs):
+        raise RuntimeError("fixture runtime write failure")
+
+    monkeypatch.setattr(MS, "_sync_runtime_upsert", fail_sync)
+    status, result = HC.dispatch(cfg, "POST", "/api/mcp/servers", q, {
+        **bearer, "confirm": True, "bearer_token": "failed-replacement",
+    })
+    assert status == 400 and result["code"] == "MCP_RUNTIME_SYNC_FAILED"
+    assert env_path.read_bytes() == credential_bytes
+    assert "failed-replacement" not in repr(result)

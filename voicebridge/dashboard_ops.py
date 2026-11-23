@@ -884,9 +884,25 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             body: Dict[str, Any] = {"confirm": True}
-            if payload:
+            query: Dict[str, str] = {}
+            if isinstance(payload.get("config"), dict):
+                query["profile"] = str(payload.get("profile") or "")
+                body["config"] = payload["config"]
+            elif payload:
                 body["config"] = dict(payload)
-            return HC.config_save(cfg, {}, body, {})
+            return HC.config_save(cfg, query, body, {})
+        return _run
+    if action in ("sessions.prune", "sessions.bulk_delete", "sessions.delete_empty"):
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            handlers = {
+                "sessions.prune": HC.h_sessions_prune,
+                "sessions.bulk_delete": HC.h_sessions_bulk_delete,
+                "sessions.delete_empty": HC.h_sessions_empty_delete,
+            }
+            body = {**payload, "confirm": True}
+            return handlers[action](cfg, {"profile": str(payload.get("profile") or "")}, body, {})
         return _run
     if action == "memory.reset":
         def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
@@ -937,13 +953,14 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
+            query = {"profile": str(staged.get("profile") or "")}
             body: Dict[str, Any] = {"confirm": True,
                                     "skill_id": str(staged.get("skill_id", "") or ""),
                                     "instructions": staged.get("instructions", ""),
                                     "category": staged.get("category", "")}
-            return HC.skill_create(cfg, {}, body, {})
+            return HC.skill_create(cfg, query, body, {})
         return _run
-    if action in ("skills_update", "skills_delete"):
+    if action in ("skills_update", "skills_delete", "skills_toggle_profile"):
         # The skills editor's rewrite/delete stage through ``_compat_confirm``
         # with the validated scalar set (``skills_update`` carries the new
         # content; ``skills_delete`` the name). The pending-approvals banner's
@@ -953,14 +970,18 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
+            query = {"profile": str(staged.get("profile") or "")}
             sid = str(staged.get("skill_id") or staged.get("name") or "")
+            if action == "skills_toggle_profile":
+                return HC.h_skills_toggle(
+                    cfg, query, {"confirm": True, "name": sid, "enabled": staged.get("enabled")}, {})
             if action == "skills_update":
                 return HC.skill_update(
-                    cfg, {}, {"confirm": True, "skill_id": sid,
+                    cfg, query, {"confirm": True, "skill_id": sid,
                               "content": str(staged.get("content", ""))},
                     {"id": sid})
             return HC.skill_delete(
-                cfg, {}, {"confirm": True, "skill_id": sid, "name": sid}, {})
+                cfg, query, {"confirm": True, "skill_id": sid, "name": sid}, {})
         return _run
     if action in ("mcp_server_create", "mcp_server_delete",
                   "mcp_server_enabled", "mcp_server_auth"):
@@ -972,22 +993,23 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
+            query = {"profile": str(staged.get("profile") or "")}
             name = str(staged.get("name", "") or "")
             if action == "mcp_server_create":
                 fields = staged.get("fields")
                 body: Dict[str, Any] = {"confirm": True, "name": name}
                 if isinstance(fields, dict):
                     body.update(fields)
-                return HC.mcp_create(cfg, {}, body, {})
+                return HC.mcp_create(cfg, query, body, {})
             if action == "mcp_server_delete":
-                return HC.mcp_delete(cfg, {}, {"confirm": True, "name": name},
+                return HC.mcp_delete(cfg, query, {"confirm": True, "name": name},
                                      {})
             if action == "mcp_server_enabled":
                 return HC.mcp_set_enabled(
-                    cfg, {}, {"confirm": True, "name": name,
+                    cfg, query, {"confirm": True, "name": name,
                               "enabled": bool(staged.get("enabled"))}, {})
             return HC.mcp_auth(
-                cfg, {}, {"confirm": True, "name": name,
+                cfg, query, {"confirm": True, "name": name,
                           "reference": str(staged.get("reference", ""))}, {})
         return _run
     if action == "mcp.catalog_install":
@@ -999,20 +1021,21 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
+            query = {"profile": str(staged.get("profile") or "")}
+            if staged.get("env"):
+                return 409, {"ok": False, "code": "MCP_CATALOG_FORM_REQUIRED",
+                             "detail": "Confirm this installation again from its catalog form."}
             body: Dict[str, Any] = {
                 "confirm": True,
                 "name": str(staged.get("name", "") or ""),
                 "env": staged.get("env") or {},
                 "enable": bool(staged.get("enable", True)),
             }
-            return HC.h_mcp_catalog_install(cfg, {}, body, {})
+            return HC.h_mcp_catalog_install(cfg, query, body, {})
         return _run
     if action in ("cron.pause", "cron.resume", "cron.run_due"):
-        # The cron row actions (pause/resume/trigger) stage via
-        # ``_cron_mutate`` with ``payload={"id": job_id}``. Re-enter the same
-        # mutation with the staged id so the pending-approvals banner's id-only
-        # Confirm executes the real ``schedules`` backend exactly once, rather
-        # than failing ``CONFIRM_UNSUPPORTED``.
+        # Replay the persisted job id and owning profile through the same
+        # handler used by the original row action.
         fn_name = {"cron.pause": "pause", "cron.resume": "resume",
                    "cron.run_due": "run_due"}[action]
 
@@ -1020,36 +1043,27 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
-            return HC._cron_mutate(fn_name, cfg, {}, {"confirm": True},
+            query = {"profile": str(staged.get("profile") or "")}
+            return HC._cron_mutate(fn_name, cfg, query, {"confirm": True},
                                    {"id": str(staged.get("id", "") or "")})
         return _run
     if action in ("cron.create", "cron.update", "cron.delete"):
-        # Cron create/edit/delete stage through ``_compat_confirm`` with the
-        # validated scalar payload recorded at stage time. The pending-approvals
-        # banner's id-only Confirm re-enters the SAME compat handler so the
-        # schedule write applies exactly once (previously only pause/resume/
-        # trigger had a runner and create answered ``CONFIRM_UNSUPPORTED``).
         def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
+            query = {"profile": str(staged.pop("profile", "") or "")}
+            path = {"id": str(staged.pop("id", "") or "")}
+            body = {**staged, "confirm": True}
             if action == "cron.create":
-                if not staged.get("name") or not staged.get("when"):
+                if not (staged.get("schedule") or staged.get("when")):
                     return 400, {
                         "ok": False, "code": "CONFIRM_UNSUPPORTED",
-                        "detail": "cron.create confirmation is missing its "
-                                  "staged payload; cancel and retry."}
-                body = {"confirm": True,
-                        **{k: v for k, v in staged.items() if k != "id"}}
-                return HC.cron_create(cfg, {}, body, {})
+                        "detail": "Schedule is missing from the pending approval. Cancel it and retry."}
+                return HC.cron_create(cfg, query, body, {})
             if action == "cron.update":
-                body = {"confirm": True,
-                        **{k: v for k, v in staged.items() if k != "id"}}
-                return HC.cron_update(
-                    cfg, {}, body,
-                    {"id": str(staged.get("id", "") or "")})
-            return HC.cron_delete(cfg, {}, {"confirm": True},
-                                  {"id": str(staged.get("id", "") or "")})
+                return HC.cron_update(cfg, query, body, path)
+            return HC.cron_delete(cfg, query, body, path)
         return _run
     if action.startswith("webhook_"):
         # Webhook create/enable/delete/rotate/test/retry are staged by
@@ -1155,7 +1169,9 @@ def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
                 "detail": f"No executable Qubit backend for {action!r}; "
                           "cancel it instead."}
     payload = dict(meta.get("payload") or meta.get("args") or {})
-    if isinstance(supplied, dict):
+    if isinstance(supplied, dict) and not (
+            action.startswith(("cron.", "mcp_server_", "skills_", "sessions."))
+            or action in {"config.write", "mcp.catalog_install"}):
         payload.update(supplied)
     if _estop(cfg):
         try:

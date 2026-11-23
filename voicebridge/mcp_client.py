@@ -241,7 +241,16 @@ def _resolve_ref(ref: str) -> Optional[str]:
     if ref.startswith("oauth:"):
         return _resolve_oauth_token(ref[len("oauth:"):].strip())
     if ref.startswith("env:"):
-        return os.environ.get(ref[len("env:"):], "")
+        from .mcp_servers import profile_home
+        from .providers.credentials import resolve_key
+
+        home = profile_home()
+        if home is not None:
+            from agent.secret_scope import build_profile_secret_scope
+
+            return build_profile_secret_scope(home).get(ref[4:]) or None
+        value, code = resolve_key("mcp", ref)
+        return value if not code else None
     if ref.startswith("file:"):
         try:
             return Path(os.path.expanduser(ref[len("file:"):])).read_text(
@@ -267,9 +276,12 @@ def _resolve_oauth_token(server_name: str) -> Optional[str]:
     if not name:
         return None
     try:
-        from .qubit_runtime import default_home, ensure_path
+        from .qubit_runtime import ensure_path
+
         ensure_path()
-        token_dir = Path(str(default_home())) / "mcp-tokens"
+        from qubit_constants import get_qubit_home
+
+        token_dir = get_qubit_home() / "mcp-tokens"
         safe = "".join(c if (c.isalnum() or c in "-_.") else "_"
                        for c in name)[:64]
         data = _json.loads((token_dir / f"{safe}.json").read_text(
@@ -632,7 +644,14 @@ def _call_stdio(cfg: Any, record: Dict[str, Any], method: str,
     argv = [str(record.get("command"))] + \
            [str(a) for a in (record.get("args") or [])]
     overrides, secrets = resolve_env(record.get("env") or {})
-    child_env = dict(os.environ)
+    from .mcp_servers import profile_home
+    home = profile_home()
+    if home is not None:
+        from tools.environments.local import served_profile_child_env
+
+        child_env = served_profile_child_env(target_home=home, inherit_credentials=False)
+    else:
+        child_env = dict(os.environ)
     child_env.update(overrides)
     try:
         proc = subprocess.Popen(
@@ -747,19 +766,17 @@ def _call_http(cfg: Any, record: Dict[str, Any], method: str,
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    def _post(message: Dict[str, Any], session_id: str = "") -> Tuple[Any, str]:
-        send_headers = dict(headers)
-        if session_id:
-            send_headers["Mcp-Session-Id"] = session_id
+    def _post(message: Dict[str, Any]) -> Tuple[Any, str]:
         request = urllib.request.Request(
             url, data=json.dumps(message).encode("utf-8"),
-            headers=send_headers, method="POST")
+            headers=headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=timeout_s) as resp:
                 body = resp.read(MAX_OUTPUT_CHARS + 1).decode("utf-8", "replace")
                 sid = resp.headers.get("Mcp-Session-Id", "") or ""
                 ctype = resp.headers.get("Content-Type", "") or ""
         except urllib.error.HTTPError as exc:
+            exc.close()
             raise McpClientError(
                 CONNECT_CODE,
                 f"MCP http server returned HTTP {exc.code}") from exc
@@ -776,16 +793,40 @@ def _call_http(cfg: Any, record: Dict[str, Any], method: str,
         parsed = _parse_body(body, ctype, int(message.get("id") or 0))
         return parsed, sid
 
-    _post({"jsonrpc": "2.0", "id": 1, "method": "initialize",
-           "params": {"protocolVersion": "2024-11-05", "capabilities": {},
-                      "clientInfo": {"name": "qubit", "version": "1.0"}}})
+    offered_version = "2024-11-05"
+    initialized, session_id = _post({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {"protocolVersion": offered_version, "capabilities": {},
+                   "clientInfo": {"name": "qubit", "version": "1.0"}},
+    })
+    version = initialized.get("protocolVersion") if isinstance(initialized, dict) else None
+    if not isinstance(version, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", version, re.ASCII):
+        version = offered_version
+    headers["MCP-Protocol-Version"] = version
+    if session_id:
+        if not re.fullmatch(r"[!-~]+", session_id):
+            raise McpClientError(PROTOCOL_CODE, "MCP http returned an invalid session ID")
+        headers["Mcp-Session-Id"] = session_id
+        secrets.append(session_id)
+
     try:
-        _post({"jsonrpc": "2.0", "method": "notifications/initialized",
-               "params": {}})
-    except McpClientError:
-        pass
-    result, _ = _post({"jsonrpc": "2.0", "id": 2, "method": method,
-                       "params": params})
+        try:
+            _post({"jsonrpc": "2.0", "method": "notifications/initialized",
+                   "params": {}})
+        except McpClientError:
+            pass
+        result, _ = _post({"jsonrpc": "2.0", "id": 2, "method": method,
+                           "params": params})
+    finally:
+        if session_id:
+            request = urllib.request.Request(url, headers=headers, method="DELETE")
+            try:
+                with urllib.request.urlopen(request, timeout=min(timeout_s, 1.0)):
+                    pass
+            except urllib.error.HTTPError as exc:
+                exc.close()
+            except OSError:
+                pass
     return result, secrets
 
 

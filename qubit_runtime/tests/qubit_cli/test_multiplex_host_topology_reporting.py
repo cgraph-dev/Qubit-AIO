@@ -55,7 +55,7 @@ def test_cron_status_names_the_host_gateway_for_a_served_profile(served_host, ca
 
 
 def test_claw_warning_fires_for_a_served_profile(served_host, capsys, monkeypatch):
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
 
     (served_host / "gateway_state.json").write_text(json.dumps(
         {"served_profiles": ["default", "served"],

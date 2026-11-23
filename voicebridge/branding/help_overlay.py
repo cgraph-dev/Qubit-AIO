@@ -109,6 +109,13 @@ def rebrand_help(text: str) -> str:
             token = "\x00signing-identity\x00"
             line = line.replace(_SIGNING_IDENTITY, token)
             protected.append((token, _SIGNING_IDENTITY))
+        # Preserve the importer's literal source selector in examples and choices.
+        selector = _UPSTREAM_B.lower()
+        for spelling in (f"import-agent {selector}", f"{{{selector},"):
+            if spelling in line:
+                token = f"\x00importer-choice-{len(protected)}\x00"
+                line = line.replace(spelling, token)
+                protected.append((token, spelling))
         for src, dst in _LEGACY_PHRASES:
             line = line.replace(src, dst)
         line = _PRODUCT_RE.sub(_brand, line)

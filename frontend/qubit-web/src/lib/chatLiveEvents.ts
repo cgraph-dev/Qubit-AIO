@@ -34,6 +34,20 @@ export interface ChatSessionFrame {
   isModelChange: boolean;
 }
 
+export interface ChatModelSelection {
+  model: string;
+  provider?: string;
+}
+
+export function chatModelSelection(
+  session?: { model?: unknown; provider?: unknown } | null,
+): ChatModelSelection | null {
+  if (typeof session?.model !== "string" || !session.model) return null;
+  return typeof session.provider === "string" && session.provider
+    ? { model: session.model, provider: session.provider }
+    : { model: session.model };
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)

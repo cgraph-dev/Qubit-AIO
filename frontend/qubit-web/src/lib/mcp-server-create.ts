@@ -76,6 +76,12 @@ export function buildMcpServerCreate(draft: McpServerDraft): McpServerCreate {
   const args = parseArgs(draft.args);
   if (args.length) server.args = args;
   const env = parseEnv(draft.env);
-  if (Object.keys(env).length) server.env = env;
+  for (const [key, value] of Object.entries(env)) {
+    if (/^(env|vault|file):/.test(value)) {
+      (server.env ??= {})[key] = value;
+    } else {
+      (server.env_values ??= {})[key] = value;
+    }
+  }
   return server;
 }

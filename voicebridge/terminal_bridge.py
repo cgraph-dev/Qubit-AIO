@@ -223,7 +223,8 @@ def merge_mcp_servers(qubit_home: Any, cfg: Any) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # One canonical conversation
 # ---------------------------------------------------------------------------
-def canonical_terminal_session(cfg: Any, requested: Optional[str] = None
+def canonical_terminal_session(cfg: Any, requested: Optional[str] = None,
+                               *, runtime_home: Optional[Path] = None
                                ) -> Dict[str, Any]:
     """Resolve the ``/chat`` session to a resume target, or fresh when empty.
 
@@ -244,7 +245,12 @@ def canonical_terminal_session(cfg: Any, requested: Optional[str] = None
     try:
         from . import chat_transport
 
-        res = chat_transport.store(cfg).ensure(sid, identity="terminal:chat")
+        if runtime_home is None:
+            store = chat_transport.store(cfg)
+        else:
+            from .qubit_session_store import QubitSessionStore
+            store = QubitSessionStore(cfg, runtime_home=runtime_home)
+        res = store.ensure(sid, identity="terminal:chat")
         if res.get("state") == "OK":
             ensured = True
             sid = str((res.get("session") or {}).get("id") or sid)

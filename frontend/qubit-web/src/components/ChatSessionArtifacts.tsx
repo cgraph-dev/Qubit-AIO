@@ -19,7 +19,7 @@ import {
 
 type LoadState = "loading" | "ready" | "error";
 
-export function ChatSessionArtifacts({ sessionId }: { sessionId: string }) {
+export function ChatSessionArtifacts({ sessionId, profile }: { sessionId: string; profile?: string }) {
   const [state, setState] = useState<LoadState>(
     sessionId ? "loading" : "ready",
   );
@@ -36,11 +36,11 @@ export function ChatSessionArtifacts({ sessionId }: { sessionId: string }) {
       };
     }
     const call = <T,>(
-      fn: ((id: string) => Promise<T>) | undefined,
+      fn: ((id: string, limit?: number, profile?: string) => Promise<T>) | undefined,
       fallback: T,
     ): Promise<T> =>
       typeof fn === "function"
-        ? fn(sessionId).catch(() => fallback)
+        ? (profile ? fn(sessionId, 100, profile) : fn(sessionId)).catch(() => fallback)
         : Promise.resolve(fallback);
     Promise.all([
       call(api.getChatSessionDrafts, { drafts: [] as ChatDraftEntry[] }),
@@ -64,7 +64,7 @@ export function ChatSessionArtifacts({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [profile, sessionId]);
 
   const total = drafts.length + comments.length + ci.length;
 

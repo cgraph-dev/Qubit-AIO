@@ -1,4 +1,4 @@
-"""``qubit import-agent`` subcommand parser (logic lives in ``qubit_cli/agent_import.py``)."""
+"""``qubit import-agent`` subcommand parser (logic lives in ``qubit_cli/agent_import_legacy.py``)."""
 
 from __future__ import annotations
 

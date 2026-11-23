@@ -34,6 +34,7 @@ import {
   Brain,
 } from "lucide-react";
 import { api, runMutationWithConfirm } from "@/lib/api";
+import { useProfileScope } from "@/contexts/useProfileScope";
 import { formatSessionPruneResult } from "@/lib/session-prune";
 import { shouldRefreshSessions } from "@/lib/session-refresh";
 import { refusalOrError } from "@/lib/policy-refusal";
@@ -675,8 +676,7 @@ function SessionRow({
     }
     setRenameSaving(true);
     try {
-      await onRename(session.id, value);
-      setRenaming(false);
+      if (await onRename(session.id, value)) setRenaming(false);
     } finally {
       setRenameSaving(false);
     }
@@ -985,6 +985,11 @@ function SessionsPagination({
 }
 
 export default function SessionsPage() {
+  const { profile } = useProfileScope();
+  return <ProfileSessionsPage key={profile} profile={profile || "current"} />;
+}
+
+function ProfileSessionsPage({ profile }: { profile: string }) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1090,34 +1095,35 @@ export default function SessionsPage() {
   );
 
   const sessionQueryOptions = useMemo(() => {
+    const scope = { profile };
     if (selectedSources !== null) {
       if (selectedSources.length === 0) {
         return allSourceNames.length > 0
-          ? { excludeSources: allSourceNames }
-          : { source: NO_MATCHING_SESSION_SOURCE };
+          ? { ...scope, excludeSources: allSourceNames }
+          : { ...scope, source: NO_MATCHING_SESSION_SOURCE };
       }
       if (selectedSources.length === 1) {
-        return { source: selectedSources[0] };
+        return { ...scope, source: selectedSources[0] };
       }
       const selected = new Set(selectedSources);
       const excludedSources = allSourceNames.filter(
         (source) => !selected.has(source),
       );
-      return excludedSources.length > 0 ? { excludeSources: excludedSources } : {};
+      return excludedSources.length > 0 ? { ...scope, excludeSources: excludedSources } : scope;
     }
     if (sessionCategory === "chats") {
-      return { excludeSources: AUTOMATION_SESSION_SOURCES };
+      return { ...scope, excludeSources: AUTOMATION_SESSION_SOURCES };
     }
     if (sessionCategory === "automation") {
       const excludedSources = allSourceNames.filter(
         (source) => !isAutomationSource(source),
       );
       return excludedSources.length > 0
-        ? { excludeSources: excludedSources }
-        : { sources: AUTOMATION_SESSION_SOURCES };
+        ? { ...scope, excludeSources: excludedSources }
+        : { ...scope, sources: AUTOMATION_SESSION_SOURCES };
     }
-    return {};
-  }, [selectedSources, sessionCategory, allSourceNames]);
+    return scope;
+  }, [selectedSources, sessionCategory, allSourceNames, profile]);
 
   const categoryDefaultSources = useMemo(() => {
     return allSourceNames.filter((source) =>
@@ -1167,10 +1173,10 @@ export default function SessionsPage() {
 
   const refreshEmptyCount = useCallback(() => {
     api
-      .getEmptySessionsCount()
+      .getEmptySessionsCount(profile)
       .then((r) => setEmptyCount(r?.count ?? 0))
       .catch(() => {});
-  }, []);
+  }, [profile]);
 
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
@@ -1269,10 +1275,10 @@ export default function SessionsPage() {
 
   const loadStats = useCallback(() => {
     api
-      .getSessionStats()
+      .getSessionStats(profile)
       .then(setStats)
       .catch(() => {});
-  }, []);
+  }, [profile]);
 
   const handleImportSessions = useCallback(
     async (files: FileList | File[] | null) => {
@@ -1285,7 +1291,7 @@ export default function SessionsPage() {
         // The file picker is the operator action; settle any staged broker
         // confirmation immediately rather than prompting a second time.
         const result = await runMutationWithConfirm(
-          () => api.importSessions(importedSessions),
+          () => api.importSessions(importedSessions, profile),
           () => true,
         );
         showToast(`Import complete: ${importSummary(result)}`, "success");
@@ -1305,6 +1311,7 @@ export default function SessionsPage() {
       loadSessions,
       loadStats,
       page,
+      profile,
       refreshEmptyCount,
       showToast,
     ],
@@ -1461,50 +1468,48 @@ export default function SessionsPage() {
     clearSelection();
   }, [clearSelection, sessionCategory]);
 
-  // Debounced FTS search
+  // Stop superseded searches from replacing the results for a newer query.
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (!search.trim()) {
-      debounceRef.current = setTimeout(() => {
-        setSearchResults(null);
-        setSearching(false);
-      }, 0);
-      return;
-    }
-
+    let cancelled = false;
+    const query = search.trim();
     debounceRef.current = setTimeout(() => {
-      setSearching(true);
       setSearchResults(null);
-      api
-        .searchSessions(search.trim(), sessionQueryOptions)
-        .then((resp) => setSearchResults(resp.results ?? resp.sessions ?? []))
-        .catch(() => setSearchResults(null))
-        .finally(() => setSearching(false));
-    }, 300);
+      setSearching(Boolean(query));
+      if (!query) return;
+      api.searchSessions(query, sessionQueryOptions)
+        .then((resp) => {
+          if (!cancelled) setSearchResults(resp.results ?? resp.sessions ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults(null);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, query ? 300 : 0);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [search, sessionQueryOptions]);
 
-  // The profile a listed row was read from — the store that owns it. Every
-  // per-row request (delete, rename, export, messages) must go there, not to
-  // the global management profile, which lags the row (it stays "" while the
-  // sticky active profile equals the dashboard process's own, so the request
-  // hits the process store — a delete then "succeeds" as already_absent).
-  // Search rows carry no stamp: undefined falls back to the management profile.
   const rowProfile = useCallback(
-    (id: string) => sessions.find((s) => s.id === id)?.profile,
-    [sessions],
+    (id: string) => searchResults?.find((row) => row.id === id)?.profile
+      || sessions.find((row) => row.id === id)?.profile
+      || profile,
+    [profile, searchResults, sessions],
   );
 
   const sessionDelete = useConfirmDelete({
     onDelete: useCallback(
-      async (id: string) => {
+      async (session: SessionInfo) => {
+        const { id } = session;
         try {
-          await api.deleteSession(id, rowProfile(id));
+          await api.deleteSession(id, session.profile || profile);
           setSessions((prev) => prev.filter((s) => s.id !== id));
+          setSearchResults((prev) => prev?.filter((s) => s.id !== id) ?? null);
+          setOverviewSessions((prev) => prev.filter((s) => s.id !== id));
           setTotal((prev) => prev - 1);
           if (expandedId === id) setExpandedId(null);
           // Drop the deleted ID from any active bulk-select set — it
@@ -1528,8 +1533,8 @@ export default function SessionsPage() {
       },
       [
         expandedId,
+        profile,
         refreshEmptyCount,
-        rowProfile,
         showToast,
         loadStats,
         t.sessions.sessionDeleted,
@@ -1599,16 +1604,15 @@ export default function SessionsPage() {
     }
     setDeletingSelected(true);
     try {
-      // The selection comes from one listed page, so its rows share one
-      // owning profile; a mixed selection falls back to the management profile.
       const owners = new Set(ids.map(rowProfile));
+      if (owners.size !== 1) throw new Error("Select sessions from one profile.");
       // The Delete-selected dialog the operator already accepted IS the human
       // confirmation; settle any staged broker confirmation immediately.
       const resp = await runMutationWithConfirm(
         () =>
           api.bulkDeleteSessions(
             ids,
-            owners.size === 1 ? [...owners][0] : undefined,
+            [...owners][0],
           ),
         () => true,
       );
@@ -1626,6 +1630,8 @@ export default function SessionsPage() {
       // from later pages render in place.
       const deletedSet = new Set(ids);
       setSessions((prev) => prev.filter((s) => !deletedSet.has(s.id)));
+      setSearchResults((prev) => prev?.filter((s) => !deletedSet.has(s.id)) ?? null);
+      setOverviewSessions((prev) => prev.filter((s) => !deletedSet.has(s.id)));
       setTotal((prev) => Math.max(0, prev - resp.deleted));
       if (expandedId && deletedSet.has(expandedId)) setExpandedId(null);
       clearSelection();
@@ -1655,7 +1661,7 @@ export default function SessionsPage() {
       // The Delete-empty dialog the operator already accepted IS the human
       // confirmation; settle any staged broker confirmation immediately.
       const resp = await runMutationWithConfirm(
-        () => api.deleteEmptySessions(),
+        () => api.deleteEmptySessions(profile),
         () => true,
       );
       // Show count in the toast so users get confirmation of the actual
@@ -1686,6 +1692,7 @@ export default function SessionsPage() {
     page,
     refreshEmptyCount,
     showToast,
+    profile,
     t.sessions.emptySessionsDeleted,
     t.sessions.failedToDeleteEmpty,
   ]);
@@ -1700,10 +1707,15 @@ export default function SessionsPage() {
         setOverviewSessions((prev) =>
           prev.map((s) => (s.id === id ? { ...s, title } : s)),
         );
+        setSearchResults((prev) =>
+          prev?.map((s) => (s.id === id ? { ...s, title } : s)) ?? null,
+        );
         showToast("Session renamed", "success");
         loadStats();
+        return true;
       } catch {
         showToast("Failed to rename session", "error");
+        return false;
       }
     },
     [rowProfile, showToast, loadStats],
@@ -1716,7 +1728,7 @@ export default function SessionsPage() {
       // PATCH route (`PATCH /api/qubit/chat/sessions/{id} {archived:false}`).
       // The compat `/api/sessions/{id}` patch cannot see an archived row.
       try {
-        await api.patchChatSession(id, { archived: false });
+        await api.patchChatSession(id, { archived: false }, rowProfile(id));
         showToast("Session restored", "success");
         loadSessions(page, true);
         loadStats();
@@ -1724,7 +1736,7 @@ export default function SessionsPage() {
         showToast(refusalOrError(e, "Failed to restore session"), "error");
       }
     },
-    [loadSessions, loadStats, page, showToast],
+    [loadSessions, loadStats, page, rowProfile, showToast],
   );
 
   const handleExport = useCallback(
@@ -1765,7 +1777,7 @@ export default function SessionsPage() {
       // The Prune-old-sessions dialog the operator already accepted IS the
       // human confirmation; settle any staged broker confirmation immediately.
       const resp = await runMutationWithConfirm(
-        () => api.pruneSessions(days),
+        () => api.pruneSessions(days, undefined, profile),
         () => true,
       );
       showToast(formatSessionPruneResult(resp), "success");
@@ -1778,11 +1790,9 @@ export default function SessionsPage() {
     } finally {
       setPruning(false);
     }
-  }, [pruneDays, showToast, loadSessions, loadStats]);
+  }, [pruneDays, profile, showToast, loadSessions, loadStats]);
 
-  const pendingSession = sessionDelete.pendingId
-    ? sessions.find((s) => s.id === sessionDelete.pendingId)
-    : null;
+  const pendingSession = sessionDelete.pendingId;
 
   // Build snippet map from search results (session_id → snippet)
   const snippetMap = new Map<string, string>();
@@ -2349,7 +2359,7 @@ export default function SessionsPage() {
                   onSelectClick={(event) =>
                     handleSelectClick(event, index, filtered)
                   }
-                  onDelete={() => sessionDelete.requestDelete(s.id)}
+                  onDelete={() => sessionDelete.requestDelete(s)}
                   onRename={handleRename}
                   onExport={handleExport}
                   onRestore={handleRestore}
@@ -2417,7 +2427,7 @@ interface SessionRowProps {
   isSelected: boolean;
   onDelete: () => void;
   onExport: (id: string) => void;
-  onRename: (id: string, title: string) => Promise<void>;
+  onRename: (id: string, title: string) => Promise<boolean>;
   onRestore: (id: string) => void;
   onSelectClick: (event: React.MouseEvent) => void;
   onToggle: () => void;

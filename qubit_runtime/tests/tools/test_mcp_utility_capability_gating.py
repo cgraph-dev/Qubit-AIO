@@ -163,3 +163,49 @@ class TestLegacyFallback:
         server.session = MagicMock(spec=["list_resources"])
         selected = _select_utility_schemas("legacy-partial", server, {})
         assert _handler_keys(selected) == {"list_resources"}
+
+
+def test_openclaw_filter_applies_to_live_and_cached_utilities(monkeypatch):
+    from tools import mcp_tool_registration as registration
+    from tools.mcp_schema_cache import config_fingerprint
+
+    server = _make_fake_server(initialize_result=_make_init_result(resources=True, prompts=True))
+    native = registration._select_utility_schemas("fixture", server, {})
+    assert _handler_keys(native) == {"list_resources", "read_resource", "list_prompts", "get_prompt"}
+
+    config = {"tools": {
+        "include": ["resources_*"],
+        "exclude": ["resources_read"],
+        "exclude_overrides_include": True,
+    }}
+    assert _handler_keys(registration._select_utility_schemas("fixture", server, config)) == {"list_resources"}
+
+    seen = []
+
+    def capture(_name, candidates, **_kwargs):
+        seen.extend(candidate.registry_name for candidate in candidates)
+        return []
+
+    monkeypatch.setattr(registration, "_register_candidates", capture)
+    monkeypatch.setattr(registration, "_record_tool_trust_metadata", lambda *_: None)
+    registration._register_from_cache_sync("fixture", config, {"utility_tools": native})
+    assert seen == ["mcp__fixture__list_resources"]
+
+    empty = {"tools": {"include": [], "exclude_overrides_include": True}}
+    assert not registration._select_utility_schemas("fixture", server, empty)
+    assert config_fingerprint(empty) != config_fingerprint({"tools": {"exclude_overrides_include": True}})
+    assert config_fingerprint(config) != config_fingerprint({
+        "tools": {"include": ["resources_*"], "exclude": ["resources_read"]},
+    })
+
+
+def test_openclaw_filter_does_not_treat_literal_punctuation_as_globs():
+    from tools.mcp_tool_registration import _make_tool_filter
+
+    allows = _make_tool_filter("fixture", {"tools": {
+        "include": ["literal?", "data_[x]*", "get_*"],
+        "exclude": ["get_private?"],
+        "exclude_overrides_include": True,
+    }})
+    assert allows("literal?") and allows("data_[x]part") and allows("get_private1")
+    assert not allows("literala") and not allows("data_x") and not allows("get_private?")

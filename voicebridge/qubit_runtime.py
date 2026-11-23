@@ -376,6 +376,19 @@ def pin_qubit_home() -> Path:
     return home
 
 
+def artifact_profile_home() -> Optional[Path]:
+    """Home for an explicitly scoped artifact request or named CLI process."""
+    if "qubit_constants" not in sys.modules:
+        ensure_path()
+    from qubit_constants import get_qubit_home, get_qubit_home_override, profile_name_for_home
+
+    home = get_qubit_home()
+    name = profile_name_for_home(home)
+    if get_qubit_home_override() or (name and name != "default"):
+        return home
+    return None
+
+
 def runtime_home_for_cfg(cfg: Any = None) -> Path:
     """Resolve the runtime home for a specific ``Config`` (PRB-03).
 

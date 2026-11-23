@@ -22,10 +22,13 @@ import base64
 import copy
 import hashlib
 import json
+from contextlib import closing, contextmanager
+from functools import wraps
 import os
 import re
 import secrets
 import socket
+import sys
 import tempfile
 import threading
 import time
@@ -184,7 +187,8 @@ def _stage_compat_confirm(cfg: Any, action: str, detail: str,
 def _compat_confirm(cfg: Any, action: str, detail: str,
                     query: Optional[Dict[str, str]] = None,
                     body: Optional[Dict[str, Any]] = None,
-                    payload: Optional[Dict[str, Any]] = None
+                    payload: Optional[Dict[str, Any]] = None,
+                    *, match_payload: bool = False
                     ) -> Optional[Tuple[int, Dict[str, Any]]]:
     """Shared confirm contract for compat mutations without a canonical module.
 
@@ -218,10 +222,11 @@ def _compat_confirm(cfg: Any, action: str, detail: str,
             from . import voice_commands as VC
             journal = _journal(cfg)
             target = journal.get(cid)
-            if target is not None and target.state == "in_progress" \
-                    and str(target.capability) == "qubit." + str(action):
-                journal.respond(cid, "approve")
-                if VC._mark_executed(cfg, cid):
+            if (target is not None and target.state == "in_progress"
+                    and str(target.capability) == "qubit." + str(action)
+                    and (not match_payload or (target.meta or {}).get("payload") == payload)):
+                settled = journal.respond(cid, "approve")
+                if settled.state == "executing" and VC._mark_executed(cfg, cid):
                     return None
         except Exception:
             pass
@@ -861,6 +866,38 @@ def session_authority_contract() -> Dict[str, Any]:
     return AS.session_authority()
 
 
+def _session_history_profiled(handler):
+    """Route history and maintenance to the same selected profile."""
+    @wraps(handler)
+    def scoped(cfg, q, b, p):
+        query_profile = str(q.get("profile") or "").strip()
+        body_profile = str(b.get("profile") or "").strip()
+        if query_profile and body_profile and query_profile != body_profile:
+            return 400, {"ok": False, "code": "SESSION_PROFILE_CONFLICT",
+                         "detail": "The query and body specify different session profiles."}
+        query = {**q, "profile": query_profile or body_profile}
+        try:
+            home = settings_profile_home(cfg, query)
+            if home is not None:
+                from qubit_cli.web_server_profiles import _qubit_home_scope
+
+                with _qubit_home_scope(home):
+                    return handler(cfg, query, b, p)
+            return handler(cfg, query, b, p)
+        except Exception as exc:
+            status, error = _settings_profile_error(exc)
+            if error.get("code") == "SETTINGS_PROFILE_INVALID":
+                error["code"] = "SESSION_PROFILE_INVALID"
+            return status, error
+    return scoped
+
+
+def _session_history_home() -> Optional[Path]:
+    from . import qubit_runtime
+
+    return qubit_runtime.artifact_profile_home()
+
+
 def _chat_session_store(cfg: Any) -> Any:
     """Open the chat-transcript store named by the session authority.
 
@@ -877,6 +914,11 @@ def _chat_session_store(cfg: Any) -> Any:
             "session authority contract drift: chat_transcript is "
             f"{writable.get('chat_transcript')!r}, expected "
             f"{CHAT_SESSION_AUTHORITY!r}")
+    home = _session_history_home()
+    if home is not None:
+        from .qubit_session_store import QubitSessionStore
+
+        return QubitSessionStore(cfg, runtime_home=home)
     return CT.store(cfg)
 
 
@@ -894,7 +936,9 @@ def _receipt_session_store(cfg: Any) -> Any:
             "session authority contract drift: receipt_lifecycle is "
             f"{writable.get('receipt_lifecycle')!r}, expected "
             f"{RECEIPT_SESSION_AUTHORITY!r}")
-    return AS.session_store(cfg)
+    constants = sys.modules.get("qubit_constants")
+    override = constants.get_qubit_home_override() if constants is not None else None
+    return AS.SessionStore(Path(override)) if override else AS.session_store(cfg)
 
 
 def _chat_session_rows(cfg: Any, *, query: str = "",
@@ -921,6 +965,7 @@ def _chat_session_rows(cfg: Any, *, query: str = "",
     return {"sessions": rows, "total": int(res.get("total", len(rows)))}
 
 
+@_session_history_profiled
 def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     try:
@@ -1010,6 +1055,9 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     else:
         rows.sort(key=lambda r: r.get("last_active") or 0, reverse=True)
     page_rows = rows[offset:offset + limit]
+    profile = str(q.get("profile") or "")
+    if profile:
+        page_rows = [{**row, "profile": profile} for row in page_rows]
     # Reference envelope parity: ``web_routers/sessions.py::search_sessions``
     # returns ``{"results": [...]}``. The search route reuses this handler, so
     # emit the alias the SPA's ``SessionSearchResponse`` reads; ``sessions``
@@ -1021,6 +1069,7 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                + RECEIPT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     chat_items = _chat_session_rows(cfg).get("sessions", [])
@@ -1048,6 +1097,7 @@ def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                + RECEIPT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     rid = p.get("id", "")
@@ -1099,6 +1149,7 @@ def h_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                store_authority=RECEIPT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Rename / archive a session (canonical chat store, then receipts)."""
@@ -1162,11 +1213,12 @@ def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                   "session": res.get("session")}
 
 
+@_session_history_profiled
 def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Delete a session (canonical chat store, then receipt tombstone)."""
     rid = p.get("id", "")
-    confirm = bool(b.get("confirm", False))
+    confirm = _truthy(b.get("confirm", q.get("confirm")))
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
@@ -1219,6 +1271,7 @@ def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                   "session": res.get("session")}
 
 
+@_session_history_profiled
 def h_session_resume(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     rid = p.get("id", "")
@@ -1259,6 +1312,7 @@ def h_session_resume(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                       res.get("detail", ""))[:200]}
 
 
+@_session_history_profiled
 def h_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     rid = p.get("id", "")
@@ -1297,6 +1351,36 @@ def h_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                detail="Qubit receipt rows are audit receipts, not chat "
                       "transcripts; live conversation runs in Qubit Chat "
                       "(agent.turn)")
+
+
+@_session_history_profiled
+def h_session_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    _store, db, _sessions_dir = _chat_session_db(cfg)
+    if db is not None:
+        record = db.export_session(p.get("id", ""), include_inactive=True)
+        if record is not None:
+            return 200, _rebrand_nested(record)
+    return h_session_show(cfg, q, b, p)
+
+
+@_session_history_profiled
+def h_session_latest_descendant(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    _store, db, _sessions_dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    from qubit_cli.web_server_sessions import _session_latest_descendant
+
+    sid = p.get("id", "")
+    latest, path = _session_latest_descendant(sid, db)
+    if not latest:
+        status, record = h_session_show(cfg, q, b, p)
+        if status != 200 or record.get("source") != "qubit-receipts":
+            return 404, {"ok": False, "code": "NOT_FOUND", "detail": "Session not found."}
+        latest, path = sid, [sid]
+    return _ok(requested_session_id=path[0] if path else sid,
+               session_id=latest, path=path, changed=bool(path and latest != path[0]))
 
 
 def _config_field_type(value: Any) -> str:
@@ -1553,6 +1637,12 @@ def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ``terminal`` block (live /chat model slot) so the page can show both
     model slots honestly.
     """
+    try:
+        home = settings_profile_home(cfg, q)
+        if home is not None:
+            return 200, _redact_config_tree(_scoped_config_record(home))
+    except Exception as exc:
+        return _settings_profile_error(exc)
     cache_key = _config_read_key(cfg)
     cached = _rc.get(cache_key)
     if cached is not None:
@@ -2351,6 +2441,9 @@ def _h_model_options_uncached(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     try:
         _vendored_runtime(cfg)
         from qubit_cli.inventory import build_model_options_payload, load_picker_context  # type: ignore
+        from qubit_constants import get_process_qubit_home, get_qubit_home
+
+        secondary = get_qubit_home().resolve() != get_process_qubit_home().resolve()
 
         def _truthy(value: Any) -> bool:
             return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -2367,7 +2460,8 @@ def _h_model_options_uncached(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # Qubit-owned Ollama row (registered LOCAL profiles). The vendored
     # builder cannot see the Ollama tier; without this, /qubit-chat's MODEL
     # card offered no local model.
-    _merge_local_ollama_row(payload, cfg)
+    if not secondary:
+        _merge_local_ollama_row(payload, cfg)
     # Picker-surface guard: a refusal/error payload must never render as a
     # selectable provider or model row, and internal record names must never
     # reach the screen — failures degrade to a row NOTE (warning) or are
@@ -2378,6 +2472,10 @@ def _h_model_options_uncached(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             payload["providers"] = sanitize_model_options_providers(rows)
     except Exception:  # noqa: BLE001 - guard never breaks options
         pass
+    if secondary:
+        # Here the native catalogue already marks the selected profile's
+        # current model. The process profile's Qubit registry cannot override it.
+        return _ok(**_strip_provider_secret_fields(payload))
     # Single CURRENT authority: the canonical active profile. The vendored
     # builder marks current from the config slot while the Ollama row marks
     # from the active record — a slot/active disagreement (e.g. a slot-only
@@ -2420,12 +2518,30 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     runtime config/auth/profile files, so a config or login change is picked
     up. ``refresh=1`` always bypasses and re-warms the cache.
     """
+    profile = str(q.get("profile") or "").strip()
+    from fastapi import HTTPException
+    from . import qubit_runtime as QR
+
+    QR.ensure_path()
+    from qubit_cli.web_server_profiles import _config_profile_scope
+
+    try:
+        with _config_profile_scope(profile) as scoped_home:
+            return _read_model_options_cached(cfg, q, b, p, runtime_home=scoped_home)
+    except HTTPException as exc:
+        return exc.status_code, {"ok": False, "code": "MODEL_PROFILE_INVALID", "detail": exc.detail}
+
+
+def _read_model_options_cached(
+    cfg: Any, q: Dict[str, str], b: Dict[str, Any], p: Dict[str, str],
+    *, runtime_home: Optional[Path] = None,
+) -> Tuple[int, Dict[str, Any]]:
     refresh = str((q or {}).get("refresh", "")).strip().lower() in {
         "1", "true", "yes", "on"}
     try:
         from . import qubit_runtime as QR
 
-        home = Path(QR.runtime_home_for_cfg(cfg))
+        home = runtime_home or QR.runtime_home_for_cfg(cfg)
         stamps = _rc.stamp_of(home / "config.yaml", home / "auth.json",
                               home / "profiles.json")
         registry = Path(cfg.state_dir()) / "profiles.json"
@@ -2434,7 +2550,8 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         stamps = ()
     key = _rc.cfg_key(cfg, "model_options",
                       tuple(sorted((str(k), str(v))
-                                   for k, v in (q or {}).items())), stamps)
+                                   for k, v in (q or {}).items()
+                                   if k != "refresh")), stamps)
     if not refresh:
         hit = _rc.get(key)
         if hit is not None:
@@ -2967,6 +3084,23 @@ def h_profile_setup_command(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit agent profile`")
 
 
+def _artifact_profiled(handler: Handler) -> Handler:
+    """Bind artifact configuration, credentials and discovery to the selected profile."""
+    @wraps(handler)
+    def scoped(cfg, q, b, p):
+        from . import env_store
+        try:
+            home = settings_profile_home(cfg, q)
+            if home is None:
+                return handler(cfg, q, b, p)
+            with _settings_config_scope(home), env_store.profile_scope(home):
+                return handler(cfg, q, b, p)
+        except Exception as exc:
+            return _settings_profile_error(exc)
+    return scoped
+
+
+@_artifact_profiled
 def h_skills(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Any]:
     # SkillInfo[] wire shape (web/src/lib/api.ts). ONE read authority shared
@@ -2994,6 +3128,7 @@ def _skill_authority_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
     return _fail(exc)
 
 
+@_artifact_profiled
 def h_skill_content(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/skills/content -> raw SKILL.md for the dashboard editor.
@@ -3022,11 +3157,28 @@ def h_skill_content(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                origin=res.get("origin", ""))
 
 
+@_artifact_profiled
 def h_skills_toggle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
     name = str(b.get("name") or b.get("skill") or "")
     enable = bool(b.get("enabled", b.get("enable", True)))
+    from . import qubit_runtime, skill_catalog
+    profile = str(q.get("profile") or "")
+    if qubit_runtime.artifact_profile_home() is not None:
+        enable = _truthy(b.get("enabled", b.get("enable", True)))
+        guard = _compat_confirm(
+            cfg, "skills_toggle_profile", f"Change skill {name!r} in this profile?",
+            q, b, payload={"skill_id": name, "enabled": enable, "profile": profile},
+            match_payload=True)
+        if guard is not None:
+            return guard
+        try:
+            result = skill_catalog.set_skill_enabled(
+                cfg, name, enable, requested_by="dashboard:user", confirmed=True)
+        except Exception as exc:
+            return _skill_authority_error(exc)
+        return _ok(**result)
     out = OPS.run_op(cfg, "skills_enable" if enable else "skills_disable",
                      {"skill_id": name} if name else {},
                      actor="dashboard:user", session="dashboard")
@@ -3553,6 +3705,18 @@ def _cron_shape(j: Dict[str, Any], *, cfg: Any = None,
     }
 
 
+def _cron_failure(exc: Exception, *, read: bool = False) -> Tuple[int, Dict[str, Any]]:
+    from fastapi import HTTPException
+
+    if isinstance(exc, HTTPException):
+        return exc.status_code, {"ok": False, "code": "CRON_PROFILE_INVALID",
+                                 "detail": _redact(str(exc.detail))[:300]}
+    if read:
+        return _fail(exc)
+    code = getattr(exc, "code", None) or type(exc).__name__
+    return 400, {"ok": False, "code": code, "detail": _redact(str(exc))[:300]}
+
+
 def h_cron_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Any]:
     """GET /api/cron/jobs -> the REAL cron store's jobs.
@@ -3565,9 +3729,9 @@ def h_cron_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """
     from . import cron_bridge as CB
     try:
-        jobs = CB.list_jobs(cfg)
+        jobs = CB.list_jobs(cfg, profile=str(q.get("profile") or "").strip())
     except Exception as exc:
-        return _fail(exc)
+        return _cron_failure(exc, read=True)
     return 200, jobs
 
 
@@ -3577,9 +3741,13 @@ def h_cron_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     from . import cron_bridge as CB
     raw = str(p.get("id", "") or "")
     try:
-        job = CB.get_job(cfg, raw)
+        with CB.profile_scope(cfg, str(q.get("profile") or "").strip()) as profile:
+            job = CB.get_job(cfg, raw)
+            if job is not None and profile:
+                job.update(profile=profile, profile_name=profile,
+                           is_default_profile=profile == "default")
     except Exception as exc:
-        return _fail(exc)
+        return _cron_failure(exc, read=True)
     if job is None:
         return 404, {"ok": False, "code": "CRON_NOT_FOUND",
                      "detail": f"cron job {raw!r} not found"}
@@ -3601,9 +3769,10 @@ def h_cron_job_runs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except ValueError:
         limit = 20
     try:
-        shaped = CB.runs(cfg, raw, limit)
+        with CB.profile_scope(cfg, str(q.get("profile") or "").strip()):
+            shaped = CB.runs(cfg, raw, limit)
     except Exception as exc:
-        return _fail(exc)
+        return _cron_failure(exc, read=True)
     return _ok(runs=shaped, limit=limit, count=len(shaped), state="OK")
 
 
@@ -3626,109 +3795,72 @@ def _cron_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
     if not job_id:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "cron job id required"}
+    profile = str(q.get("profile") or "").strip()
+    if fn_name in ("pause", "resume"):
+        guard = _compat_confirm(
+            cfg, f"cron.{fn_name}",
+            f"cron job {fn_name} requires explicit confirmation",
+            q, b, payload={"id": job_id, "profile": profile}, match_payload=True)
+        if guard is not None:
+            return guard
+    elif _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; cron trigger refused"}
     try:
-        if fn_name in ("pause", "resume"):
-            guard = _compat_confirm(
-                cfg, f"cron.{fn_name}",
-                f"cron job {fn_name} requires explicit confirmation: "
-                "re-POST with {\"confirm\": true}", q, b,
-                payload={"id": job_id})
-            if guard is not None:
-                return guard
-            res = (CB.pause(cfg, job_id) if fn_name == "pause"
-                   else CB.resume(cfg, job_id))
-            if res is None:
-                return 404, {"ok": False, "code": "CRON_NOT_FOUND",
-                             "detail": f"cron job {job_id!r} not found"}
-            return _ok(ok=True, result=CB.shape_job(res),
-                       enabled=(fn_name == "resume"),
-                       qubit_counterpart="CLI `qubit cron pause|resume`")
-        res = CB.trigger(cfg, job_id)
+        with CB.profile_scope(cfg, profile) as selected:
+            if fn_name == "pause":
+                res = CB.pause(cfg, job_id)
+            elif fn_name == "resume":
+                res = CB.resume(cfg, job_id)
+            else:
+                res = CB.trigger(cfg, job_id)
+            if res is not None:
+                res = CB.shape_job(res, profile=selected)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
+        return _cron_failure(exc)
     if res is None:
         return 404, {"ok": False, "code": "CRON_NOT_FOUND",
                      "detail": f"cron job {job_id!r} not found"}
-    return _ok(ok=True, result=CB.shape_job(res),
-               qubit_counterpart="CLI `qubit cron run`")
+    if fn_name in ("pause", "resume"):
+        return _ok(result=res, enabled=(fn_name == "resume"),
+                   qubit_counterpart="CLI `qubit cron pause|resume`")
+    return _ok(result=res, qubit_counterpart="CLI `qubit cron run`")
 
 
 def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/logs -> full LogsResponse contract, no proxy required.
-
-    Degraded-mode fallback for the vendored ``get_logs`` reader: serves the
-    SAME wire shape (``{file, lines, offset, limit, returned, has_more,
-    next_offset}``) from the same journal files, so the Logs page keeps its
-    file/level/component/search filters and Older/Newer paging even when the
-    in-process proxy is down. Unknown file/component are typed 400s,
-    mirroring the primary. (The retired branch served 5 lines truncated to
-    160 chars with no pagination fields, which rendered the page nearly
-    empty whenever the proxy degraded.)
-    """
-    file = str(q.get("file", "agent") or "agent")
+    """Read the selected profile's log snapshot with the native filter engine."""
+    file = str(q.get("file") or "agent")
     try:
-        limit = max(1, min(int(q.get("limit", q.get("lines", "100")) or "100"), 500))
-    except ValueError:
-        limit = 100
-    try:
+        limit = max(0, min(int(q.get("limit", q.get("lines", "100")) or "100"), 500))
         offset = max(0, int(q.get("offset", "0") or "0"))
     except ValueError:
-        offset = 0
-    level = q.get("level") or None
-    component = q.get("component") or None
-    search = q.get("search") or None
-    profile = q.get("profile") or None
+        return 400, {"ok": False, "code": "LOG_PAGE_INVALID",
+                     "detail": "Log line count and offset must be integers."}
+    from . import qubit_runtime as QR
+    QR.ensure_path()
+    from qubit_cli.logs import LOG_FILES, ROOT_HOME_LOGS, LogSnapshotExpired, read_log_page
+
+    filename = LOG_FILES.get(file)
+    if filename is None:
+        return 400, {"ok": False, "code": "UNKNOWN_LOG_FILE", "detail": f"Unknown log file: {file}"}
     try:
-        from . import qubit_runtime as _HR
-        _HR.ensure_path()
-        from qubit_cli.logs import _read_tail, LOG_FILES
-        try:
-            from qubit_logging import COMPONENT_PREFIXES
-        except ImportError:
-            COMPONENT_PREFIXES = {}
-        log_name = LOG_FILES.get(file)
-        if not log_name:
-            return 400, {"ok": False, "code": "UNKNOWN_LOG_FILE",
-                         "detail": f"Unknown log file: {file}"}
-        try:
-            from qubit_cli.web_server_profiles import _config_profile_scope
-            from qubit_constants import get_qubit_home
-            with _config_profile_scope(profile):
-                log_path = get_qubit_home() / "logs" / log_name
-        except Exception:
-            log_path = _HR.runtime_home_for_cfg(cfg) / "logs" / log_name
-        empty = {"file": file, "lines": [], "offset": offset, "limit": limit,
-                 "returned": 0, "has_more": False, "next_offset": None}
-        if not log_path.exists():
-            return _ok(**empty)
-        min_level = level if level and level.upper() != "ALL" else None
-        comp_prefixes = None
-        if component and component.lower() != "all":
-            comp_prefixes = COMPONENT_PREFIXES.get(component)
-            if comp_prefixes is None:
-                return 400, {"ok": False, "code": "UNKNOWN_COMPONENT",
-                             "detail": f"Unknown component: {component}"}
-        # One matching line past the page proves has_more; never guessed.
-        read_n = 2000 if search else max(1, offset + limit + 1)
-        result = _read_tail(log_path, read_n,
-                            has_filters=bool(min_level or comp_prefixes or search),
-                            min_level=min_level,
-                            component_prefixes=comp_prefixes)
-        if search:
-            needle = search.lower()
-            result = [line for line in result if needle in line.lower()]
-        end = len(result) - offset
-        page = result[max(0, end - limit):end] if end > 0 else []
-        has_more = limit > 0 and (len(result) - offset - limit) > 0
-        lines = [_redact(line) for line in page]
-        return _ok(file=file, lines=lines, offset=offset, limit=limit,
-                   returned=len(page), has_more=has_more,
-                   next_offset=(offset + len(page)) if has_more else None)
+        home = settings_profile_home(cfg, q) or QR.runtime_home_for_cfg(cfg)
+        if file in ROOT_HOME_LOGS:
+            from qubit_constants import get_default_qubit_root
+            home = get_default_qubit_root()
+        return _ok(file=file, **read_log_page(
+            home / "logs" / filename, limit=limit, offset=offset,
+            level=q.get("level"), component=q.get("component"),
+            search=q.get("search"), snapshot=q.get("snapshot", ""), redact=_redact,
+        ))
+    except LogSnapshotExpired:
+        return 409, {"ok": False, "code": "LOG_SNAPSHOT_EXPIRED",
+                     "detail": "The log rotated or was truncated. Reload the latest lines."}
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "LOG_FILTER_INVALID", "detail": _redact(str(exc))}
     except Exception as exc:
-        return _fail(exc)
+        return _settings_profile_error(exc)
 
 
 def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -3806,6 +3938,7 @@ def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(**info)
 
 
+@_artifact_profiled
 def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp -> the real configured MCP inventory.
@@ -3854,6 +3987,7 @@ def _catalog_install_fields(entry: Any, *, inline: Dict[str, str],
     return fields
 
 
+@_artifact_profiled
 def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/catalog/install -> register a catalog server (real).
@@ -3915,15 +4049,23 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return 400, {"ok": False, "code": "MCP_ENV_REQUIRED",
                          "detail": f"invalid env name {str(key)[:60]!r}",
                          "qubit_counterpart": "GET /api/mcp/catalog"}
-    guard = _compat_confirm(
-        cfg, "mcp.catalog_install",
-        f"Install catalog MCP server {name!r}: register its transport and "
-        f"store {len(given)} credential(s) in the runtime .env?",
-        q, b, payload={"name": name,
-                       "env": {str(k): str(v) for k, v in given.items()},
-                       "enable": bool(b.get("enable", True))})
-    if guard is not None:
-        return guard
+    profile = str(q.get("profile") or "")
+    enable = _truthy(b.get("enable", True))
+    detail = f"Install catalog MCP server {name!r} in this profile?"
+    # Credential values stay with the submitting form. Approval history can
+    # record a catalog installation by name when there are no supplied values.
+    if given:
+        if _estop(cfg):
+            return 403, {"ok": False, "code": "EMERGENCY_STOP",
+                         "detail": "Emergency stop is latched."}
+        if not (_truthy(q.get("confirm")) or _truthy(b.get("confirm"))):
+            return 409, {"ok": False, "code": "CONFIRM_REQUIRED", "detail": detail}
+    else:
+        guard = _compat_confirm(
+            cfg, "mcp.catalog_install", detail, q, b,
+            payload={"name": name, "enable": enable, "profile": profile}, match_payload=True)
+        if guard is not None:
+            return guard
     secrets = {str(s.name) for s in specs if getattr(s, "secret", False)}
     refs: Dict[str, str] = {}
     inline: Dict[str, str] = {}
@@ -3945,8 +4087,7 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": _redact(str(exc))[:200],
                      "qubit_counterpart": "GET /api/mcp/catalog"}
     transport = str(getattr(entry.transport, "type", "") or "").lower()
-    enabled = _truthy(b.get("enable", True)) is not False
-    fields = _catalog_install_fields(entry, inline=inline, enabled=enabled)
+    fields = _catalog_install_fields(entry, inline=inline, enabled=enable)
     if refs:
         fields["env"] = refs
     try:
@@ -3969,6 +4110,7 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return 200, result
 
 
+@_artifact_profiled
 def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/servers -> real configured MCP inventory.
@@ -4031,6 +4173,7 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "live MCP discovery (tools/list) for each server")
 
 
+@_artifact_profiled
 def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/catalog -> the canonical catalog, installed-state reconciled.
@@ -4096,6 +4239,7 @@ def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             "entry's installed state is the Qubit registry")
 
 
+@_artifact_profiled
 def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str], ) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/servers/{name}/test -> the real validation/probe result.
@@ -4196,18 +4340,21 @@ def _mcp_capability_read(cfg: Any, p: Dict[str, str],
                **{key: items})
 
 
+@_artifact_profiled
 def h_mcp_server_resources(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/servers/{name}/resources -> real resources/list (read-only)."""
     return _mcp_capability_read(cfg, p, "resources")
 
 
+@_artifact_profiled
 def h_mcp_server_prompts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/servers/{name}/prompts -> real prompts/list (read-only)."""
     return _mcp_capability_read(cfg, p, "prompts")
 
 
+@_artifact_profiled
 def h_mcp_server_resource_templates(cfg: Any, q: Dict[str, str],
                                     b: Dict[str, Any], p: Dict[str, str]
                                     ) -> Tuple[int, Dict[str, Any]]:
@@ -4215,6 +4362,7 @@ def h_mcp_server_resource_templates(cfg: Any, q: Dict[str, str],
     return _mcp_capability_read(cfg, p, "resource-templates")
 
 
+@_artifact_profiled
 def mcp_invoke(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/servers/{name}/invoke -> real, confirm-gated tool call.
@@ -5743,7 +5891,35 @@ def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                entries=entries)
 
 
-def _gateway_read_key(cfg: Any) -> Any:
+def _gateway_target(cfg: Any, q: Dict[str, str]) -> Tuple[Optional[Path], str, Optional[int]]:
+    """Identify the profile's own service or a host gateway that serves it."""
+    from . import gateway_supervisor as GS
+
+    home = settings_profile_home(cfg, q)
+    if home is None:
+        from . import qubit_runtime
+        qubit_runtime.ensure_path()
+        from qubit_constants import get_process_qubit_home, profile_name_for_home
+
+        current_home = get_process_qubit_home()
+        name = profile_name_for_home(current_home)
+        if not name or name == "default":
+            return None, "", None
+        home = current_home
+    from gateway.status import multiplexer_liveness_for_profile
+    from qubit_cli.web_server_gateway import _has_own_gateway
+
+    host = multiplexer_liveness_for_profile(home)
+    if host is not None and not _has_own_gateway(home):
+        return home, "", host[0]
+    return home, GS.profile_service_unit(home), None
+
+
+def _shared_gateway_detail() -> str:
+    return "This profile uses a shared gateway. Open its host profile to manage the service."
+
+
+def _gateway_read_key(cfg: Any, home: Optional[Path] = None) -> Any:
     """Cache identity for the gateway status read.
 
     The status is a live process/systemd snapshot, not a store read, so the key
@@ -5755,18 +5931,18 @@ def _gateway_read_key(cfg: Any) -> Any:
     extra = []
     try:
         from . import qubit_runtime as QR
-        home = QR.runtime_home_for_cfg(cfg)
-        if home is not None:
-            extra.append(Path(home) / "gateway_state.json")
+        gateway_home = home or QR.runtime_home_for_cfg(cfg)
+        if gateway_home is not None:
+            extra.append(Path(gateway_home) / "gateway_state.json")
     except Exception:  # noqa: BLE001 - a resolution miss still needs a key
         pass
     try:
-        base = Path(cfg.state_dir())
+        base = home or Path(cfg.state_dir())
         extra.extend((base / "gateway_drain.json",
                       base / "gateway_control_status.json"))
     except Exception:  # noqa: BLE001
         pass
-    return _rc.cfg_key(cfg, "gateway", _rc.stamp_of(*extra))
+    return _rc.cfg_key(cfg, "gateway", str(home or ""), _rc.stamp_of(*extra))
 
 
 def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5774,16 +5950,28 @@ def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     from . import dashboard_ops as OPS
     from . import gateway_supervisor as GS
 
-    cache_key = _gateway_read_key(cfg)
+    try:
+        home, unit, host_pid = _gateway_target(cfg, q)
+    except Exception as exc:
+        return _settings_profile_error(exc)
+    if host_pid is not None:
+        return _ok(state="OK", supervision=f"{GS.UNAVAILABLE_CODE}: {_shared_gateway_detail()}",
+                   process={"running": True, "pid": host_pid, "state": "SHARED",
+                            "available": False, "control_available": False, "shared": True})
+    cache_key = _gateway_read_key(cfg, home)
     cached = _rc.get(cache_key)
     if cached is not None:
         return cached[0], cached[1]
-    out = OPS.run_op(cfg, "gateway", {}, actor="dashboard:user", session="dashboard")
-    st = GS.status(cfg)
+    if home is None:
+        out = OPS.run_op(cfg, "gateway", {}, actor="dashboard:user", session="dashboard")
+        st = GS.status(cfg)
+    else:
+        st = GS.status(cfg, unit_override=unit, home=home)
+        out = {"state": st["state"]}
     # ``supervision`` is the SPA's refusal signal: empty when the real
     # supervisor is available (Start/Stop/Restart enabled), and the typed
     # reason only when this host genuinely cannot supervise a service.
-    supervision = "" if st.get("available") else (
+    supervision = "" if st.get("available") and st.get("control_available") is not False else (
         f"{GS.UNAVAILABLE_CODE}: {st.get('detail', '')}")
     # Owner Decision #16: ``process`` reports the Qubit messaging-gateway daemon
     # (``qubit-gateway.service``) with its live runtime + control-socket answer
@@ -5806,6 +5994,12 @@ def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     removes it. It never starts/stops a process (supervision stays
     GATEWAY_NO_SUPERVISION) and is idempotent.
     """
+    try:
+        if settings_profile_home(cfg, q) is not None:
+            return 409, {"ok": False, "code": "GATEWAY_DRAIN_SCOPE",
+                         "detail": "The listener's drain control is available from its own profile."}
+    except Exception as exc:
+        return _settings_profile_error(exc)
     action = str(b.get("action", "drain") or "drain").strip().lower()
     if action not in ("drain", "cancel"):
         return 400, {"ok": False, "code": "MALFORMED",
@@ -5861,8 +6055,19 @@ def h_gateway_supervision(action: str) -> Handler:
         if not gw_id:
             from . import gateway_supervisor as GS
 
-            out = GS.control(cfg, action, confirmed=bool(b.get("confirm", False)),
-                             actor="dashboard:user")
+            try:
+                home, unit, host_pid = _gateway_target(cfg, q)
+            except Exception as exc:
+                return _settings_profile_error(exc)
+            if host_pid is not None:
+                return 503, {"ok": False, "code": GS.UNAVAILABLE_CODE,
+                             "detail": _shared_gateway_detail()}
+            target = {"unit_override": unit, "home": home} if home is not None else {}
+            confirmation_id = str(b.get("confirmation_id") or q.get("confirmation_id") or "")
+            if confirmation_id:
+                target["confirmation_id"] = confirmation_id
+            out = GS.control(cfg, action, confirmed=_truthy(b.get("confirm")),
+                             actor="dashboard:user", **target)
             # Start/stop/restart changes the unit state read by /api/gateway;
             # drop the snapshot even when the control was refused (a refusal
             # can still reflect a state transition already in flight).
@@ -7427,11 +7632,50 @@ def _reset_workspace_notes(cfg: Any) -> List[str]:
     return deleted
 
 
+def settings_profile_home(cfg: Any, q: Dict[str, str]) -> Optional[Path]:
+    """Resolve a named settings target without changing the listener's home."""
+    profile = str(q.get("profile") or "").strip()
+    if not profile or profile.lower() == "current":
+        return None
+    from . import qubit_runtime
+    qubit_runtime.ensure_path()
+    qubit_runtime.use_qubit_home(cfg)
+    from qubit_cli.web_server_profiles import _resolve_profile_dir
+    from qubit_constants import get_process_qubit_home
+
+    home = _resolve_profile_dir(profile).resolve()
+    qubit_runtime.assert_safe_test_home(home)
+    return None if home == get_process_qubit_home().resolve() else home
+
+
+def _settings_profile_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    from fastapi import HTTPException
+
+    if isinstance(exc, HTTPException):
+        return exc.status_code, {"ok": False, "code": "SETTINGS_PROFILE_INVALID",
+                                 "detail": _redact(str(exc.detail))[:300]}
+    return _fail(exc)
+
+
 def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import env_store
+
+    try:
+        home = settings_profile_home(cfg, q)
+        with env_store.profile_scope(home):
+            return _env_inventory(cfg, include_listener_providers=home is None)
+    except Exception as exc:
+        return _settings_profile_error(exc)
+
+
+def _env_inventory(cfg: Any, *, include_listener_providers: bool) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
-    out = OPS.run_op(cfg, "auth_status", {}, actor="dashboard:user", session="dashboard")
-    res = _res(out) or {}
+
+    res = {}
+    if include_listener_providers:
+        out = OPS.run_op(cfg, "auth_status", {}, actor="dashboard:user", session="dashboard")
+        res = _res(out) or {}
     # Record<string, EnvVarInfo> wire shape: references only, never values.
     # PRB-02: read the SAME canonical reference registry that ``env_write`` /
     # ``env_delete`` write (``qubit_env_refs.json``), so a set/delete through
@@ -7461,28 +7705,13 @@ def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # canonical store ``env_write``/``env_delete`` write (legacy-name fallback
     # included), so every accepted kind (``env:``/``vault:``/``file:``)
     # round-trips to ``is_set``.
-    try:
-        from . import env_store as _env_store
+    from . import env_store
 
-        refs = _env_store.load(cfg)
-        # ``is_set`` must reflect whether the referenced secret can actually
-        # resolve, not merely that a registry row exists (the old code hard-coded
-        # True). ``resolved_names`` is the honest union of process env, the
-        # runtime .env, and references that truly resolve; values are never read
-        # out. This mirrors the reference ``is_set=bool(value)`` from disk.
-        resolved = _env_store.resolved_names(cfg)
-
-        def _ref_is_set(ref: Any) -> bool:
-            return bool(_env_store.is_resolved(ref))
-    except Exception:
-        refs = _load_json_store(_env_refs_path(cfg))
-        resolved = set(refs) | set(os.environ.keys())
-
-        def _ref_is_set(ref: Any) -> bool:
-            return str(ref) in resolved
+    refs = env_store.load(cfg)
+    resolved = env_store.resolved_names(cfg)
     for key, ref in sorted(refs.items()):
         env[str(key)] = {
-            "is_set": _ref_is_set(ref),
+            "is_set": key in resolved,
             "redacted_value": None,
             "description": f"Qubit vault reference ({ref})",
             "url": None, "category": "references",
@@ -7518,6 +7747,14 @@ def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             }
     except Exception:  # noqa: BLE001 - catalog is additive, never fatal
         pass
+    for key in sorted(env_store.runtime_env_names(cfg) - env.keys()):
+        if env_store.valid_name(key):
+            env[key] = {
+                "is_set": key in resolved,
+                "redacted_value": None, "description": "", "url": None,
+                "category": "custom", "is_password": True, "tools": [],
+                "advanced": False, "channel_managed": False, "custom": True,
+            }
     return 200, env
 
 
@@ -8076,11 +8313,88 @@ def _chat_effective_reasoning(cfg: Any, session: str,
         return None
 
 
+def _chat_request_profile(cfg, q, b):
+    query_profile = str(q.get("profile") or "").strip()
+    body_profile = str(b.get("profile") or "").strip()
+    if query_profile and body_profile and query_profile != body_profile:
+        return None, (400, {"ok": False, "code": "CHAT_PROFILE_CONFLICT",
+                            "detail": "The query and body specify different chat profiles."})
+    try:
+        return settings_profile_home(cfg, {"profile": query_profile or body_profile}), None
+    except Exception as exc:
+        return None, _settings_profile_error(exc)
+
+
+def chat_execution_profile_refusal(cfg, q, b):
+    """Prevent unsupported operations from borrowing the listener's worker."""
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is not None:
+        return 409, {"ok": False, "code": "CHAT_PROFILE_WORKER_UNAVAILABLE",
+                     "detail": "Use this profile's /chat terminal for this action."}
+    return None
+
+
+def _named_chat_events(cfg, home, body):
+    from . import chat_transport as CT, profile_chat
+    from tui_gateway.owner_forward import OwnerUnavailable, discover_owner
+
+    if _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP", "detail": "Emergency stop is latched."}
+    session = str(body.get("session") or CT.DEFAULT_SESSION).strip()
+    text = str(body.get("text") or "").strip()
+    if not session or len(session) > 80 or not text or len(text) > CT.MAX_TEXT_CHARS:
+        return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat session or message."}
+    if body.get("model") or body.get("reasoning"):
+        return 400, {"ok": False, "code": "CHAT_TURN_OVERRIDE_UNSUPPORTED",
+                     "detail": "Set the model or reasoning on the gateway session before sending."}
+    from .qubit_session_store import QubitSessionStore
+
+    record = QubitSessionStore(cfg, runtime_home=home)._session(session)
+    if record is None or record.get("archived"):
+        return 404, {"ok": False, "code": "CHAT_SESSION_NOT_FOUND",
+                     "detail": "Open or create a chat in this profile before sending."}
+    try:
+        endpoint = discover_owner(home)
+    except (OwnerUnavailable, OSError, TimeoutError):
+        return 409, {"ok": False, "code": "CHAT_PROFILE_WORKER_UNAVAILABLE",
+                     "detail": "Start the gateway serving this profile or open it in /chat."}
+    return 200, profile_chat.events(home, endpoint, session, text)
+
+
+def _chat_execution_local(handler):
+    @wraps(handler)
+    def checked(cfg, q, b, p):
+        refusal = chat_execution_profile_refusal(cfg, q, b)
+        return refusal if refusal is not None else handler(cfg, q, b, p)
+    return checked
+
+
+def _chat_lifecycle_routed() -> bool:
+    constants = sys.modules.get("qubit_constants")
+    return bool(constants and constants.get_qubit_home_override())
+
+
 def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Qubit Chat (overlay): one persisted native agent turn, same module as
     CLI/voice. The turn is written to the Qubit chat-session store so the
     dashboard can reload it; nothing is fabricated on model failure."""
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is not None:
+        status, result = _named_chat_events(cfg, home, b)
+        if status != 200:
+            return status, result
+        with closing(result):
+            for event in result:
+                if event["event"] == "done":
+                    return 200, event
+                if event["event"] in ("error", "cancelled"):
+                    return 409, event
+        return _fail(RuntimeError("The profile gateway closed without a result."))
     from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
@@ -8109,6 +8423,7 @@ def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return status, res
 
 
+@_session_history_profiled
 def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions -> persisted chat sessions.
@@ -8126,7 +8441,6 @@ def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ``/chat``, the Sessions page and voice, and those surfaces must keep seeing
     every row (recovery and inspection depend on it). Only the picker curates.
     """
-    from . import chat_transport as CT
     try:
         limit = max(1, min(int(q.get("limit", "50") or "50"), 100))
     except ValueError:
@@ -8138,7 +8452,7 @@ def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     query = str(q.get("q", q.get("query", "")) or "")
     # Over-fetch so filtering does not shrink the page the caller asked for.
     fetch = min(limit * _CHAT_PICKER_OVERFETCH + offset, 1000)
-    res = CT.store(cfg).list(limit=fetch, offset=0, query=query)
+    res = _chat_session_store(cfg).list(limit=fetch, offset=0, query=query)
     total = int(res.get("total") or 0)
     rows = [_rebrand_chat_record(r) for r in res.get("sessions", [])]
     kept = [r for r in rows if not _is_chat_picker_noise(r)]
@@ -8148,7 +8462,7 @@ def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # window until enough real rows are kept (or the store is exhausted).
     seen = len(rows)
     while len(kept) < total and len(kept) < offset + limit and seen < 1000:
-        more = CT.store(cfg).list(limit=1000 - seen, offset=seen, query=query)
+        more = _chat_session_store(cfg).list(limit=1000 - seen, offset=seen, query=query)
         batch = more.get("sessions", []) or []
         if not batch:
             break
@@ -8193,6 +8507,7 @@ def publish_chat_session_event(cfg: Any, name: str,
         pass
 
 
+@_session_history_profiled
 def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import chat_transport as CT
@@ -8200,24 +8515,49 @@ def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; session create refused"}
-    routed = CT.resolve_model(cfg, b.get("model"))
-    if not routed.get("ok"):
-        return 400, routed
-    # No explicit model in the request -> let the canonical store apply the
-    # dashboard default (the configured local brain) instead of forcing the
-    # resolver's configured API default onto a fresh /qubit-chat row. An
-    # explicit request is still the operator's choice and is validated above.
     requested = str(b.get("model") or "").strip()
-    chosen_model = routed["model"] if requested else None
-    res = CT.store(cfg).create(str(b.get("name", "") or ""),
-                               session_id=b.get("id"), model=chosen_model)
+    if _chat_lifecycle_routed():
+        from qubit_cli.config import load_config_readonly
+
+        model = load_config_readonly().get("model")
+        chosen_model = str(model.get("default") or "") if isinstance(model, dict) else str(model or "")
+        if requested and requested != chosen_model:
+            return 400, {"ok": False, "code": "MODEL_NOT_ALLOWED",
+                         "detail": "Create the chat first, then select a model for this profile."}
+    else:
+        routed = CT.resolve_model(cfg, requested or None)
+        if not routed.get("ok"):
+            return 400, routed
+        chosen_model = routed["model"] if requested else None
+    store = _chat_session_store(cfg)
+    name = str(b.get("name") or "")
+    if _chat_lifecycle_routed() and not b.get("id") and not requested:
+        from . import profile_chat
+
+        try:
+            sid = profile_chat.create(_session_history_home(), name)
+        except Exception:
+            return 409, {"ok": False, "code": "CHAT_CREATE_UNCONFIRMED",
+                         "detail": "Refresh the selected profile's chat list before trying again."}
+        if sid:
+            res = store.show(sid)
+            if res.get("state") != "OK":
+                return 409, {"ok": False, "code": "CHAT_CREATE_UNCONFIRMED",
+                             "detail": "Refresh the selected profile's chat list before trying again."}
+            return _ok(session=_rebrand_chat_record(res["session"]), messages=[])
+    if _chat_lifecycle_routed():
+        # A profile gateway can adopt an unrouted native GUI draft when it starts.
+        res = store.create(name, session_id=b.get("id"), model=chosen_model, source="gui")
+    else:
+        res = store.create(name, session_id=b.get("id"), model=chosen_model)
     if res.get("state") == "OK":
         record = _rebrand_chat_record(res["session"])
         sid = str(res["session"].get("id") or b.get("id") or "")
         # Announce the create so an already-open SPA (session list, model card)
         # updates without a manual refresh (chat live-update contract).
-        _publish_chat_frame(cfg, "session.created",
-                            {"session_id": sid, "session": record})
+        if not _chat_lifecycle_routed():
+            _publish_chat_frame(cfg, "session.created",
+                                {"session_id": sid, "session": record})
         return _ok(session=record,
                    messages=res.get("messages", []))
     status = 409 if res.get("state") == "EXISTS" else 400
@@ -8225,15 +8565,16 @@ def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     "detail": res.get("detail", "")}
 
 
+@_session_history_profiled
 def h_chat_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import chat_transport as CT
-    res = CT.store(cfg).show(p.get("id", ""))
+    res = _chat_session_store(cfg).show(p.get("id", ""))
     if res.get("state") != "OK":
         return 404, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
     try:
-        meta = CT.store(cfg).meta_get(p.get("id", "")).get("meta", {})
+        meta = _chat_session_store(cfg).meta_get(p.get("id", "")).get("meta", {})
     except Exception:
         meta = {}
     return _ok(session=_rebrand_chat_record(res["session"]),
@@ -8241,20 +8582,22 @@ def h_chat_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                message_count=res.get("message_count", 0),
                # A turn cut short by a process death: the client offers to resume
                # it so the operator does not have to retype `continue`.
-               interrupted_turn=CT._pending_interrupted_turn(cfg, p.get("id", "")),
+               interrupted_turn=(None if _chat_lifecycle_routed()
+                                 else CT._pending_interrupted_turn(cfg, p.get("id", ""))),
                # A live staged action awaiting an explicit yes/no. The SPA reads
                # this same bounded signal from turn events to render the confirm
                # banner, so a page reload must carry it too (ChatPage
                # `extractPendingConfirm(info)`). Absent when nothing is pending,
                # so an idle session-show is byte-identical to before; redacted
                # and size-bounded by `_pending_event_field`.
-               **CT._pending_event_field(cfg, p.get("id", "")),
+               **({} if _chat_lifecycle_routed()
+                  else CT._pending_event_field(cfg, p.get("id", ""))),
                meta=meta if isinstance(meta, dict) else {})
 
 
+@_session_history_profiled
 def h_chat_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import chat_transport as CT
     try:
         limit = max(1, min(int(q.get("limit", "500") or "500"), 1000))
     except ValueError:
@@ -8263,7 +8606,7 @@ def h_chat_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         offset = max(0, int(q.get("offset", "0") or "0"))
     except ValueError:
         offset = 0
-    res = CT.store(cfg).messages(p.get("id", ""), limit=limit, offset=offset)
+    res = _chat_session_store(cfg).messages(p.get("id", ""), limit=limit, offset=offset)
     if res.get("state") != "OK":
         return 404, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
@@ -8291,6 +8634,7 @@ def _chat_store_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
                                       "(same store as chat)"}
 
 
+@_chat_execution_local
 def h_chat_session_activity(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/activity -> read-only projection."""
@@ -8309,10 +8653,13 @@ def h_chat_session_activity(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return (200 if ok else 400), {"ok": ok, **out}
 
 
+@_session_history_profiled
 def h_chat_session_drafts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/drafts -> per-session file drafts."""
     from . import chat_transport as CT
+
+    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
     try:
         limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
     except (TypeError, ValueError):
@@ -8325,7 +8672,7 @@ def h_chat_session_drafts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         q.get("include_content", "true") or "true").strip().lower() not in (
             "0", "false", "no", "off")
     try:
-        out = CT.draft_store(cfg).list(p.get("id", ""), limit=limit,
+        out = CT.draft_store(cfg, **scope).list(p.get("id", ""), limit=limit,
                                        offset=offset,
                                        include_content=include_content)
     except Exception as exc:
@@ -8333,18 +8680,21 @@ def h_chat_session_drafts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(**out)
 
 
+@_session_history_profiled
 def h_chat_session_draft_content(cfg: Any, q: Dict[str, str],
                                  b: Dict[str, Any],
                                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/draft?path=... -> one draft body."""
     from . import chat_transport as CT
+
+    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
     path = str(q.get("path", b.get("path", "")) or "")
     if not path:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "path is required",
                      "qubit_counterpart": "Qubit Chat file drafts"}
     try:
-        out = CT.draft_store(cfg).get(p.get("id", ""), path)
+        out = CT.draft_store(cfg, **scope).get(p.get("id", ""), path)
     except Exception as exc:
         return _chat_store_error(exc)
     if str(out.get("state")) != "OK":
@@ -8353,10 +8703,13 @@ def h_chat_session_draft_content(cfg: Any, q: Dict[str, str],
     return _ok(**out)
 
 
+@_session_history_profiled
 def h_chat_session_comments(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/comments -> operator comments."""
     from . import chat_transport as CT
+
+    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
     try:
         limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
     except (TypeError, ValueError):
@@ -8367,17 +8720,20 @@ def h_chat_session_comments(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         offset = 0
     target = str(q.get("target", "") or "")
     try:
-        out = CT.comment_store(cfg).list_comments(
+        out = CT.comment_store(cfg, **scope).list_comments(
             p.get("id", ""), limit=limit, offset=offset, target=target)
     except Exception as exc:
         return _chat_store_error(exc)
     return _ok(**out)
 
 
+@_session_history_profiled
 def h_chat_session_ci(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/ci -> structured CI-detail rows."""
     from . import chat_transport as CT
+
+    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
     try:
         limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
     except (TypeError, ValueError):
@@ -8388,7 +8744,7 @@ def h_chat_session_ci(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         offset = 0
     check = str(q.get("check", "") or "")
     try:
-        out = CT.comment_store(cfg).list_ci_details(
+        out = CT.comment_store(cfg, **scope).list_ci_details(
             p.get("id", ""), limit=limit, offset=offset, check=check)
     except Exception as exc:
         return _chat_store_error(exc)
@@ -8490,7 +8846,7 @@ def h_chat_vision(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 
 def _chat_session_provider_pair(cfg: Any, provider: str, model: str,
-                                   _payload: Any = None) -> Dict[str, Any]:
+                                   _payload: Any = None, *, scoped: bool = False) -> Dict[str, Any]:
     """Validate an explicit provider+model pick against the picker catalog.
 
     The model picker resolves WHAT the operator pointed at (a provider row +
@@ -8539,7 +8895,12 @@ def _chat_session_provider_pair(cfg: Any, provider: str, model: str,
     canon = str(row.get("slug") or slug)
     ep: Any = {}
     try:
-        ep = cfg.get("providers", canon, default={}) or {}
+        if scoped:
+            from qubit_cli.config import load_config
+
+            ep = (load_config().get("providers") or {}).get(canon) or {}
+        else:
+            ep = cfg.get("providers", canon, default={}) or {}
     except Exception:  # noqa: BLE001 - odd cfg objects degrade to registry read
         ep = {}
     if not isinstance(ep, dict):
@@ -8551,12 +8912,56 @@ def _chat_session_provider_pair(cfg: Any, provider: str, model: str,
 
 def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _with_chat_session_profile(cfg, q, b, p, _patch_chat_session)
+
+
+def h_chat_terminal_model_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _with_chat_session_profile(cfg, q, b, p, _chat_terminal_model_status)
+
+
+def _with_chat_session_profile(cfg, q, b, p, handler):
+    profile = str(q.get("profile") or "").strip()
+    # PTY links can target a different management profile from the dashboard
+    # process. Scope both session storage and the model catalogue for the
+    # request. Native scopes use contextvars, so simultaneous tabs stay isolated.
+    from fastapi import HTTPException
+    from . import qubit_runtime as QR
+    from .qubit_session_store import QubitSessionStore
+
+    QR.ensure_path()
+    from qubit_cli.web_server_profiles import _config_profile_scope
+    from qubit_constants import get_qubit_home
+
+    try:
+        with _config_profile_scope(profile) as scoped_home:
+            if scoped_home is None:
+                return handler(cfg, b, p)
+            store = QubitSessionStore(cfg, runtime_home=get_qubit_home())
+            return handler(cfg, b, p, store=store)
+    except HTTPException as exc:
+        return exc.status_code, {"ok": False, "code": "CHAT_PROFILE_INVALID", "detail": exc.detail}
+
+
+def _chat_terminal_model_status(cfg, _body, params, *, store=None):
+    from . import chat_transport as CT
+
+    st = store if store is not None else CT.store(cfg)
+    result = st.terminal_model_status(params.get("id", ""))
+    if result["state"] == "MISSING":
+        return 404, {"ok": False, "code": result["code"]}
+    return _ok(session=_rebrand_chat_record(result["session"]),
+               terminal_model_request=result["terminal_model_request"])
+
+
+def _patch_chat_session(cfg: Any, b: Dict[str, Any], p: Dict[str, str],
+                        *, store: Any = None) -> Tuple[int, Dict[str, Any]]:
     from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; session change refused"}
-    st = CT.store(cfg)
+    st = store if store is not None else CT.store(cfg)
     if "name" in b:
         res = st.rename(p.get("id", ""), str(b.get("name", "")))
     elif b.get("archived") is not None:
@@ -8589,37 +8994,34 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # session to another bill.
         requested = str(b.get("model") or "").strip()
         provider_req = str(b.get("provider") or "").strip()
+        terminal_next_turn = b.get("terminal_next_turn") is True
+        if terminal_next_turn and not provider_req:
+            return 400, {"ok": False, "code": "MALFORMED", "detail": "A terminal model pick requires a provider."}
         if provider_req:
-            pair = _chat_session_provider_pair(cfg, provider_req, requested)
+            pair = (
+                _chat_session_provider_pair(cfg, provider_req, requested, scoped=True)
+                if store is not None
+                else _chat_session_provider_pair(cfg, provider_req, requested)
+            )
             if not pair.get("ok"):
                 return 400, {"ok": False, "code": pair.get("code"),
                              "detail": pair.get("detail", "")}
+            if terminal_next_turn:
+                return _queue_terminal_model(cfg, st, p.get("id", ""), pair, b)
             res = st.set_model(p.get("id", ""), str(pair.get("model") or requested),
                                provider=str(pair.get("provider") or ""),
                                base_url=str(pair.get("base_url") or ""),
                                api_mode=str(pair.get("api_mode") or ""))
-            if res.get("state") == "MISSING":
-                return 404, {"ok": False, "code": res.get("code"),
-                             "detail": res.get("detail", "")}
-            if res.get("state") != "OK":
-                return 400, {"ok": False, "code": res.get("code"),
-                             "detail": res.get("detail", "")}
-            record = _rebrand_chat_record(res["session"])
-            _publish_chat_frame(cfg, "session.updated",
-                                {"session_id": str(res["session"].get("id")
-                                                   or p.get("id", "")),
-                                 "session": record})
-            return _ok(session=record)
-        routed = CT.resolve_route(cfg, requested)
-        if not routed.get("ok"):
-            return 400, {"ok": False, "code": routed.get("code",
-                                                         "MODEL_NOT_ALLOWED"),
-                         "detail": routed.get("detail", "")}
-        res = st.set_model(p.get("id", ""),
-                           str(routed.get("model") or requested),
-                           provider=str(routed.get("provider") or ""),
-                           base_url=str(routed.get("base_url") or ""),
-                           api_mode=str(routed.get("api_mode") or ""))
+        else:
+            routed = CT.resolve_route(cfg, requested)
+            if not routed.get("ok"):
+                return 400, {"ok": False, "code": routed.get("code", "MODEL_NOT_ALLOWED"),
+                             "detail": routed.get("detail", "")}
+            res = st.set_model(p.get("id", ""),
+                               str(routed.get("model") or requested),
+                               provider=str(routed.get("provider") or ""),
+                               base_url=str(routed.get("base_url") or ""),
+                               api_mode=str(routed.get("api_mode") or ""))
     else:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "patch needs name, archived, reasoning, or model"}
@@ -8634,28 +9036,44 @@ def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # reasoning change reaches an open SPA live (the model card repaints from
     # ``session.model``; the list refetches membership). This is what makes a
     # model switch show a visible effect without a page refresh.
-    _publish_chat_frame(cfg, "session.updated",
-                        {"session_id": str(res["session"].get("id")
-                                           or p.get("id", "")),
-                         "session": record})
+    # The current journal belongs to the process profile. Scoped callers
+    # receive the authoritative row directly in the response.
+    if store is None:
+        _publish_chat_frame(cfg, "session.updated",
+                            {"session_id": str(res["session"].get("id")
+                                               or p.get("id", "")),
+                             "session": record})
     return _ok(session=record)
 
 
+def _queue_terminal_model(cfg, store, sid, pair, body):
+    from qubit_cli.model_selection_guards import combined_selection_warning
+    from .providers.resolver import terminal_min_context_tokens
+
+    model, provider = pair["model"], pair["provider"]
+    confirmed = body.get("confirm_expensive_model") is True
+    if not confirmed:
+        warning = combined_selection_warning(model, provider=provider, base_url=pair.get("base_url") or None)
+        if warning is not None:
+            return 200, {"ok": False, "confirm_required": True, "confirm_message": warning.message}
+    result = store.queue_terminal_model(
+        sid, model=model, provider=provider, confirmed=confirmed,
+        min_context_tokens=terminal_min_context_tokens(cfg))
+    if result["state"] == "MISSING":
+        return 404, {"ok": False, "code": result["code"]}
+    return _ok(terminal_model_request=result["terminal_model_request"])
+
+
+@_session_history_profiled
 def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; session delete refused"}
-    # HTTP DELETE bodies are not parsed by ``webui._hermes_api`` (only
-    # POST/PUT/PATCH are), so a body-only ``confirm`` is unreachable from the
-    # listener. Honor the query string too so the documented confirmation
-    # actually settles the delete.
-    confirmed = bool(b.get("confirm", False)) or str(
-        q.get("confirm", "") or "").strip().lower() in (
-            "1", "true", "yes", "on")
-    res = CT.store(cfg).delete(p.get("id", ""), confirm=confirmed)
+    # Both the JSON body and the historical query flag can confirm an archive.
+    confirmed = _truthy(b.get("confirm", q.get("confirm")))
+    res = _chat_session_store(cfg).delete(p.get("id", ""), confirm=confirmed)
     if res.get("state") == "MISSING":
         return 404, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
@@ -8671,15 +9089,16 @@ def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     record = _rebrand_chat_record(res.get("session"))
     sid = str((record or {}).get("id") or p.get("id", ""))
     # Announce the delete so the open session list drops the row live.
-    _publish_chat_frame(cfg, "session.deleted",
-                        {"session_id": sid, "session": record})
+    if not _chat_lifecycle_routed():
+        _publish_chat_frame(cfg, "session.deleted",
+                            {"session_id": sid, "session": record})
     return _ok(state="OK", session=record)
 
 
+@_session_history_profiled
 def h_chat_session_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import chat_transport as CT
-    res = CT.store(cfg).export(p.get("id", ""))
+    res = _chat_session_store(cfg).export(p.get("id", ""))
     if res.get("state") != "OK":
         return 404, {"ok": False, "code": res.get("code"),
                      "detail": res.get("detail", "")}
@@ -8688,16 +9107,16 @@ def h_chat_session_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                exported_at=res["exported_at"])
 
 
+@_session_history_profiled
 def h_chat_session_import(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; session import refused"}
     payload = b.get("envelope") if isinstance(b.get("envelope"), dict) else b
-    res = CT.store(cfg).import_session(
-        payload, overwrite=bool(b.get("overwrite", False)))
+    res = _chat_session_store(cfg).import_session(
+        payload, overwrite=_truthy(b.get("overwrite")))
     if res.get("state") == "OK":
         return _ok(session=res.get("session"), imported=res.get("imported", 0))
     status = 409 if res.get("state") == "EXISTS" else 400
@@ -8710,10 +9129,18 @@ def h_chat_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """POST /api/qubit/chat/cancel -> stop the in-flight turn on a session."""
     from . import chat_transport as CT
     session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is not None:
+        from . import profile_chat
+
+        return profile_chat.cancel(home, session)
     res = CT.cancel(session)
     return (200 if res.get("ok") else 404), res
 
 
+@_chat_execution_local
 def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/qubit/chat/retry -> re-run the last unanswered user message.
@@ -8738,6 +9165,7 @@ def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return status, res
 
 
+@_chat_execution_local
 def h_chat_image(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/qubit/chat/image -> attach an image to a `/chat` session.
@@ -8961,6 +9389,37 @@ def h_chat_pty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return (200 if res.get("ok") else 400), res
 
 
+def _profile_chat_sse(events):
+    from .chat_transport import sse_encode
+
+    with closing(events):
+        for event in events:
+            if event["event"] == "heartbeat":
+                yield ": keep-alive\n\n"
+            else:
+                yield sse_encode(event)
+
+
+def prepare_chat_stream(cfg, q, b):
+    """Select the owning worker and complete validation before opening SSE."""
+    from . import chat_transport as CT
+
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is not None:
+        status, result = _named_chat_events(cfg, home, b)
+        return (200, _profile_chat_sse(result)) if status == 200 else (status, result)
+    status, error, _ = CT.stream_preflight(cfg, str(b.get("text") or ""), b.get("model"),
+                                           session=b.get("session"))
+    if error is not None:
+        payload = {key: value for key, value in error.items() if key != "event"}
+        payload["ok"] = False
+        payload.setdefault("state", "UNAVAILABLE" if status == 403 else "FAILED")
+        return status, payload
+    return 200, h_chat_stream(cfg, q, b, {})
+
+
 def h_chat_stream(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]):
     """Streaming chat handler for the ``disp="stream"`` route.
@@ -8973,6 +9432,14 @@ def h_chat_stream(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     the shared ``chat_transport.stream_preflight``.
     """
     from . import chat_transport as CT
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return iter((CT.sse_encode({"event": "error", **refusal[1]}),))
+    if home is not None:
+        status, result = _named_chat_events(cfg, home, b)
+        if status != 200:
+            return iter((CT.sse_encode({"event": "error", **result}),))
+        return _profile_chat_sse(result)
     text = str(b.get("text", "") or "")
     session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
     try:
@@ -11888,8 +12355,8 @@ _r("GET", r"/api/events", "h_events")
 _r("GET", r"/api/sessions", "h_sessions_list")
 _r("GET", r"/api/sessions/stats", "h_sessions_stats")
 _r("GET", r"/api/sessions/search", "h_sessions_list")
-_r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_show")
-_r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_show")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_export")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_latest_descendant")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
 # Durable timeline jump surface (reference sessions.py:619/641), served over
 # the canonical Qubit session DB by the W9 slice-0 ``qubit_state_timeline``.
@@ -12438,6 +12905,7 @@ _r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/export",
    "h_chat_session_export")
 _r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)", "h_chat_session_show")
 _r("PATCH", r"/api/qubit/chat/sessions/(?P<id>[^/]+)", "h_chat_session_patch")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/terminal-model", "h_chat_terminal_model_status")
 _r("DELETE", r"/api/qubit/chat/sessions/(?P<id>[^/]+)",
    "h_chat_session_delete")
 _r("POST", r"/api/qubit/chat/cancel", "h_chat_cancel")
@@ -12913,34 +13381,22 @@ def h_blueprints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     catalog is a pure read (never a mutation); instantiation remains the
     confirm-gated ``h_blueprint_instantiate`` on the same ``schedules`` store.
     """
-    from . import qubit_runtime
+    from . import cron_bridge as CB
+    profile = str(q.get("profile") or "").strip()
     try:
-        qubit_runtime.ensure_path()
-        try:
-            qubit_runtime.use_qubit_home(cfg)
-        except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
-            pass
-        from cron.blueprint_catalog import (  # type: ignore
-            CATALOG, blueprint_catalog_entry,
-        )
-        deliver_options = None
-        try:
-            from cron.scheduler_delivery import cron_delivery_targets  # type: ignore
-            platforms = [t["id"] for t in cron_delivery_targets() if t.get("id")]
-            deliver_options = ["origin", "local", *platforms]
-        except Exception:  # noqa: BLE001 - keep the static options, like upstream
-            deliver_options = None
-        entries = []
-        for r in CATALOG:
-            entry = blueprint_catalog_entry(r)
-            if deliver_options:
-                for f in entry.get("fields", []):
-                    if f.get("name") == "deliver":
-                        f["options"] = deliver_options
-            entries.append(entry)
+        targets = CB.delivery_targets(cfg, profile)
+        from cron.blueprint_catalog import blueprint_catalog_entry, list_blueprints
+
+        deliver_options = ["origin", "local", *(t["id"] for t in targets if t.get("id"))]
+        with CB.profile_settings_scope(cfg, profile):
+            entries = [blueprint_catalog_entry(blueprint) for blueprint in list_blueprints()]
+        for entry in entries:
+            for field in entry.get("fields", []):
+                if field.get("name") == "deliver":
+                    field["options"] = deliver_options
         return _ok(blueprints=entries)
     except Exception as exc:
-        return _fail(exc)
+        return _cron_failure(exc, read=True)
 
 
 def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -12957,17 +13413,11 @@ def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     targets: List[Dict[str, Any]] = [
         {"id": "local", "name": "Local (save only)",
          "home_target_set": True, "home_env_var": None}]
+    from . import cron_bridge as CB
     try:
-        from . import qubit_runtime
-        qubit_runtime.ensure_path()
-        try:
-            qubit_runtime.use_qubit_home(cfg)
-        except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
-            pass
-        from cron.scheduler_delivery import cron_delivery_targets  # type: ignore
-        targets.extend(cron_delivery_targets())
-    except Exception:  # noqa: BLE001 - keep the implicit local target
-        pass
+        targets.extend(CB.delivery_targets(cfg, str(q.get("profile") or "").strip()))
+    except Exception as exc:
+        return _cron_failure(exc, read=True)
     return _ok(targets=targets)
 
 
@@ -12996,6 +13446,7 @@ def _chat_session_db(cfg: Any) -> Tuple[Any, Any, Any]:
     return cs, db, sessions_dir
 
 
+@_session_history_profiled
 def h_sess_empty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/sessions/empty[/count] -> the empty-session sweep size.
@@ -13025,6 +13476,7 @@ def h_sess_empty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                store_authority=RECEIPT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_sessions_import(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/sessions/import -> real bulk import into the canonical store.
@@ -13070,6 +13522,7 @@ def h_sessions_import(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                store_authority=CHAT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_sessions_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/sessions/prune -> confirmed destructive prune of old sessions.
@@ -13115,7 +13568,8 @@ def h_sessions_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "sessions.prune",
         f"pruning sessions with no activity for {days:g}+ days is destructive; "
         "re-POST with {\"confirm\": true}", q, b,
-        payload={"older_than_days": days, "source": source or ""})
+        payload={"older_than_days": days, "source": source or "", "profile": q["profile"]},
+        match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -13130,6 +13584,7 @@ def h_sessions_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                store_authority=CHAT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_sessions_bulk_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/sessions/bulk-delete -> confirmed delete of selected sessions.
@@ -13159,7 +13614,7 @@ def h_sessions_bulk_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "sessions.bulk_delete",
         f"deleting {len(clean_ids)} selected session(s) is destructive; "
         "re-POST with {\"confirm\": true}", q, b,
-        payload={"ids": clean_ids})
+        payload={"ids": clean_ids, "profile": q["profile"]}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -13172,6 +13627,7 @@ def h_sessions_bulk_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                store_authority=CHAT_SESSION_AUTHORITY)
 
 
+@_session_history_profiled
 def h_sessions_empty_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """DELETE /api/sessions/empty -> confirmed one-transaction empty sweep.
@@ -13189,7 +13645,7 @@ def h_sessions_empty_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     guard = _compat_confirm(
         cfg, "sessions.delete_empty",
         "deleting every empty session is destructive; re-DELETE with "
-        "{\"confirm\": true}", q, b)
+        "{\"confirm\": true}", q, b, payload={"profile": q["profile"]}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -14284,7 +14740,8 @@ def record_action_status(name: str, out: Dict[str, Any]) -> None:
         _ACTION_STATUS.pop(next(iter(_ACTION_STATUS)))
 
 
-def _supervision_action_status(cfg: Any, name: str) -> Optional[Dict[str, Any]]:
+def _supervision_action_status(cfg: Any, name: str, *, home: Optional[Path] = None,
+                               unit: str = "") -> Optional[Tuple[int, Dict[str, Any]]]:
     """Derive a supervision action's status from its durable control record.
 
     Ported from the reference ``GET /api/actions/{name}/status``
@@ -14298,11 +14755,11 @@ def _supervision_action_status(cfg: Any, name: str) -> Optional[Dict[str, Any]]:
     from . import gateway_supervisor as GS
 
     action = name[len("gateway-"):] if name.startswith("gateway-") else name
-    rec = GS.control_status(cfg, action)
+    rec = GS.control_status(cfg, action, home=home) if home is not None else GS.control_status(cfg, action)
     if rec is None:
         return None
     try:
-        live = GS.status(cfg)
+        live = GS.status(cfg, home=home, unit_override=unit) if home is not None else GS.status(cfg)
     except Exception:  # noqa: BLE001 - never fail the status read
         live = {}
     state = str(rec.get("state") or "")
@@ -14313,14 +14770,27 @@ def _supervision_action_status(cfg: Any, name: str) -> Optional[Dict[str, Any]]:
     running, exit_code, status_state = False, None, state
     if state in ("RESTARTING", "STOPPING"):
         age = time.time() - float(rec.get("updated_at") or 0.0)
+        before = rec.get("before") or {}
+        new_identity = any(live.get(key) and live[key] != before.get(key)
+                           for key in ("pid", "started_at", "active_enter_timestamp"))
+        trusted = (live.get("control_available") is not False
+                   and live.get("state") not in {"UNAVAILABLE", "NOT_INSTALLED"})
+        completed = trusted and (
+            (state == "STOPPING" and active_state == "inactive")
+            or (state == "RESTARTING" and active_state == "active" and new_identity and bool(before))
+        )
         if age < GS.DETACH_DELAY_S + 1.0:
-            running, status_state = True, "in_progress"
-        elif active_state in ("activating", "deactivating", "reloading"):
             running, status_state = True, "in_progress"
         elif live.get("failed") or active_state == "failed":
             exit_code, status_state = 1, "failed"
-        else:
+        elif completed:
             exit_code, status_state = 0, "completed"
+        elif age < GS.CONTROL_OUTCOME_TIMEOUT_S:
+            running, status_state = True, "in_progress"
+        else:
+            exit_code, status_state = 1, "failed"
+            code = "GATEWAY_OUTCOME_UNVERIFIED"
+            detail = "The gateway did not report the requested service transition."
     elif state == "OK":
         exit_code, status_state = 0, "completed"
     elif state in ("FAILED", "TIMEOUT", "UNAVAILABLE"):
@@ -14343,24 +14813,26 @@ def h_action_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not name:
         return _gate("ACTION_NAME_REQUIRED", "an action name is required",
                      "run the action from /system or /operations", 400)
+    if name in _SUPERVISION_ACTION_NAMES:
+        try:
+            home, unit, _ = _gateway_target(cfg, q)
+        except Exception as exc:
+            return _settings_profile_error(exc)
+        durable = _supervision_action_status(cfg, name, home=home, unit=unit)
+        if durable is not None:
+            return durable
+        if home is not None:
+            return _ok(name=name, running=False, exit_code=None, pid=None,
+                       state="unknown", lines=[], detail="No recorded action for this profile.")
     rec = _ACTION_STATUS.get(name)
     if rec is None:
         if name in _SUPERVISION_ACTION_NAMES:
-            # Known action, no in-memory outcome: a gateway restart replaces
-            # the serving process, so the new listener's registry is empty.
-            # Report the durable control outcome (the reference's action-log
-            # equivalent) instead of a permanent ``unknown``.
-            durable = _supervision_action_status(cfg, name)
-            if durable is not None:
-                return durable
             return _ok(name=name, running=False, exit_code=None, pid=None,
-                       state="unknown", lines=[],
-                       detail="no gateway control dispatched on this host yet")
+                       state="unknown", lines=[], detail="No gateway control has been dispatched yet.")
         return _gate(
             "ACTION_NOT_TRACKED",
             f"no action named {name!r} has run on this listener",
-            "run the action from /system, /operations, or `qubit ops run`",
-            404)
+            "run the action from /system or /operations", 404)
     return _ok(**rec)
 
 
@@ -14834,6 +15306,14 @@ def _normalize_schedule_expr(when: str) -> str:
     return f"every {m.group(1)} {unit}"
 
 
+_CRON_EDIT_FIELDS = (
+    "name", "prompt", "deliver", "provider", "model", "base_url", "script",
+    "no_agent", "context_from", "enabled_toolsets", "workdir", "skills",
+    "repeat", "when", "schedule",
+)
+
+
+
 def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/cron/jobs -> create a job in the REAL cron store.
@@ -14870,37 +15350,31 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     skills = b.get("skills")
     if isinstance(skills, str):
         skills = [s.strip() for s in skills.split(",") if s.strip()]
-    detail = ("schedule create (unattended work) requires explicit "
-              "confirmation: re-POST with {\"confirm\": true}")
-    guard = _compat_confirm(cfg, "cron.create", detail, q, b,
-                            payload={"name": name, "task_text": task_text,
-                                     "when": when, "deliver": deliver})
+    profile = str(q.get("profile") or "").strip()
+    fields = dict(name=name, prompt=task_text, schedule=when, deliver=deliver,
+                  repeat=repeat, skills=skills if isinstance(skills, list) else None,
+                  provider=b.get("provider"), model=b.get("model"),
+                  base_url=b.get("base_url"), script=b.get("script"),
+                  no_agent=bool(b.get("no_agent")), context_from=b.get("context_from"),
+                  enabled_toolsets=b.get("enabled_toolsets"), workdir=b.get("workdir"))
+    guard = _compat_confirm(
+        cfg, "cron.create", "Schedule creation requires explicit confirmation",
+        q, b, payload={**fields, "profile": profile}, match_payload=True)
     if guard is not None:
         return guard
     try:
-        job = CB.create(
-            cfg, name=name, prompt=task_text, schedule=when, deliver=deliver,
-            repeat=repeat,
-            skills=skills if isinstance(skills, list) else None,
-            provider=b.get("provider"), model=b.get("model"),
-            base_url=b.get("base_url"), script=b.get("script"),
-            no_agent=bool(b.get("no_agent")),
-            context_from=b.get("context_from"),
-            enabled_toolsets=b.get("enabled_toolsets"),
-            workdir=b.get("workdir"))
+        with CB.profile_scope(cfg, profile) as selected:
+            job = CB.create(cfg, **fields)
+            return _ok(**CB.shape_job(job, profile=selected))
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
-    return _ok(**CB.shape_job(job))
-
+        return _cron_failure(exc)
 
 def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/cron/jobs/{job_id} -> real in-place edit on the REAL store.
 
-    The edit modal posts the full mutation (name/prompt/schedule/deliver/
-    skills/...) plus the current ``enabled`` flag. Without ``confirm`` the
+    The edit modal posts the editable fields (name/prompt/schedule/deliver/
+    skills/...). An explicit ``enabled`` is optional for API clients. Without ``confirm`` the
     write stages a typed 409 on the shared journal; with it ``cron.jobs``
     (the store the CLI/tool/scheduler share) applies the editable fields in
     place, and an ``enabled`` flip routes through ``pause_job``/``resume_job``
@@ -14911,34 +15385,24 @@ def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not job_id:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "cron job id required"}
-    enabled = b.get("enabled")
-    if enabled is None:
-        return _gate("CRON_UPDATE_IMMUTABLE",
-                     "cron job update requires the current enabled flag; "
-                     "re-POST the full mutation including enabled.",
-                     "CLI `qubit cron` (same cron store)")
-    enabled = bool(enabled)
-    detail = (f"cron job {'resume' if enabled else 'pause'} requires explicit "
-              "confirmation: re-POST with {\"confirm\": true}")
+    profile = str(q.get("profile") or "").strip()
+    fields = {k: b[k] for k in _CRON_EDIT_FIELDS if k in b}
+    if b.get("enabled") is not None:
+        fields["enabled"] = _truthy(b["enabled"])
     guard = _compat_confirm(
-        cfg, "cron.update", detail, q, b,
-        payload={"id": job_id, "enabled": enabled,
-                 **{k: v for k, v in b.items()
-                    if k != "confirm" and isinstance(v, (str, int, float,
-                                                         bool))}})
+        cfg, "cron.update", "Schedule edits require explicit confirmation",
+        q, b, payload={**fields, "id": job_id, "profile": profile}, match_payload=True)
     if guard is not None:
         return guard
     try:
-        job = CB.update(cfg, job_id, b)
+        with CB.profile_scope(cfg, profile) as selected:
+            job = CB.update(cfg, job_id, fields)
+            return _ok(**CB.shape_job(job, profile=selected))
     except KeyError:
         return 404, {"ok": False, "code": "CRON_NOT_FOUND",
                      "detail": f"cron job {job_id!r} not found"}
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
-    return _ok(**CB.shape_job(job))
-
+        return _cron_failure(exc)
 
 def cron_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
@@ -14953,22 +15417,23 @@ def cron_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     detail = ("cron job delete requires explicit confirmation: re-POST with "
               "{\"confirm\": true}")
     job_id = str(p.get("id", "") or "")
+    profile = str(q.get("profile") or "").strip()
     guard = _compat_confirm(cfg, "cron.delete", detail, q, b,
-                            payload={"id": job_id})
+                            payload={"id": job_id, "profile": profile}, match_payload=True)
     if guard is not None:
         return guard
     try:
-        removed = CB.delete(cfg, job_id)
+        with CB.profile_scope(cfg, profile):
+            removed = CB.delete(cfg, job_id)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
+        return _cron_failure(exc)
     if not removed:
         return 404, {"ok": False, "code": "CRON_NOT_FOUND",
                      "detail": f"cron job {job_id!r} not found"}
     return _ok(ok=True)
 
 
+@_artifact_profiled
 def skill_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/skills -> create a skill through the real skill-manager path.
@@ -14999,7 +15464,8 @@ def skill_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         f"creating skill {name!r} requires explicit confirmation: "
         "re-POST with {\"confirm\": true}", q, b,
         payload={"skill_id": name, "instructions": content,
-                 "category": category or ""})
+                 "category": category or "", "profile": str(q.get("profile") or "")},
+        match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -15013,6 +15479,7 @@ def skill_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit skills show` (same on-disk skill)")
 
 
+@_artifact_profiled
 def skill_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/skills/content -> replace a skill's SKILL.md (full rewrite).
@@ -15037,7 +15504,8 @@ def skill_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "skills_update",
         f"rewriting skill {name!r} requires explicit confirmation: "
         "re-POST with {\"confirm\": true}", q, b,
-        payload={"skill_id": name, "content": content})
+        payload={"skill_id": name, "content": content, "profile": str(q.get("profile") or "")},
+        match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -15051,6 +15519,7 @@ def skill_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit skills show` (same on-disk skill)")
 
 
+@_artifact_profiled
 def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """DELETE /api/skills -> delete an on-disk skill (confirm-gated).
@@ -15061,7 +15530,6 @@ def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     gated on the shared journal and audited.
     """
     from . import skill_catalog
-    from .permissions import permissions_store
 
     name = str(q.get("name", "") or b.get("name", b.get("skill_id", "")) or "")
     if not name:
@@ -15071,7 +15539,8 @@ def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "skills_delete",
         f"deleting skill {name!r} requires explicit confirmation: "
         "re-DELETE with {\"confirm\": true}", q, b,
-        payload={"skill_id": name, "name": name})
+        payload={"skill_id": name, "name": name, "profile": str(q.get("profile") or "")},
+        match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -15081,6 +15550,8 @@ def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return _ok(ok=True, success=True, skill_id=name,
                        message=str(out.get("message", "")),
                        qubit_counterpart="CLI `qubit skills` (same on-disk skill)")
+        from .permissions import permissions_store
+
         store = permissions_store(cfg)
         rec = store.skill(name)
         if rec is None:
@@ -15162,23 +15633,42 @@ def _mcp_fields_from_body(b: Dict[str, Any]) -> Dict[str, Any]:
     return fields
 
 
-def _mcp_current_enabled(cfg: Any, name: str) -> Optional[bool]:
-    """The enabled flag currently stored for ``name`` (None if not registered).
-
-    ``mcp_servers.upsert`` re-validates the merged record through
-    ``_validate``, which never re-emits ``enabled``; reading the stored flag
-    lets an edit preserve it instead of silently disabling the server.
-    """
+def _mcp_create_credentials(body: Dict[str, Any], name: str,
+                            fields: Dict[str, Any]) -> Dict[str, str]:
+    """Convert explicitly supplied form values to isolated environment references."""
+    from . import env_store as ES
     from . import mcp_servers as MS
-    try:
-        for row in MS.list_servers(cfg).get("servers", []):
-            if str(row.get("name")) == name:
-                return bool(row.get("enabled"))
-    except Exception:
-        pass
-    return None
+
+    supplied = body.get("env_values", {})
+    if not isinstance(supplied, dict) or len(supplied) > 64:
+        raise MS.McpServerError("MCP_BAD_INPUT", "Environment values must be an object of up to 64 entries.")
+    values = dict(supplied)
+    token = body.get("bearer_token")
+    if token is not None:
+        if fields.get("transport") != "http" or fields.get("auth") != "header" or not isinstance(token, str):
+            raise MS.McpServerError("MCP_BAD_INPUT", "A bearer token requires HTTP header authentication.")
+        token = re.sub(r"^Bearer\s+", "", token.strip(), flags=re.IGNORECASE)
+        values["MCP_AUTH"] = token
+    if not values:
+        return {}
+    if supplied and fields.get("transport", "stdio") != "stdio":
+        raise MS.McpServerError("MCP_BAD_INPUT", "Custom environment values require stdio transport.")
+    refs = dict(fields.get("env") or {})
+    secrets = {}
+    for key, value in values.items():
+        if (not ES.valid_name(key) or not isinstance(value, str) or not value
+                or any(char in value for char in ("\r", "\n", "\x00")) or len(value) > 8192
+                or key in refs):
+            raise MS.McpServerError("MCP_BAD_INPUT", "Invalid or duplicate MCP credential field.")
+        digest = hashlib.sha256(f"{name}\0{key}".encode()).hexdigest()[:20].upper()
+        env_name = f"QUBIT_MCP_{digest}"
+        refs[key] = f"env:{env_name}"
+        secrets[env_name] = value
+    fields["env"] = refs
+    return secrets
 
 
+@_artifact_profiled
 def mcp_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/servers -> register an MCP server (confirm-gated).
@@ -15187,37 +15677,41 @@ def mcp_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     No server is mounted, spawned, or contacted; credentials are references
     only.
     """
+    from . import env_store as ES
     from . import mcp_servers as MS
     name = str(b.get("name", "") or "")
     if not name:
         return 400, {"ok": False, "code": "MCP_BAD_INPUT",
                      "detail": "server name required"}
     try:
-        staged_fields = _jsonable(_mcp_fields_from_body(b))
-    except Exception:  # noqa: BLE001 - invalid fields are validated post-confirm
-        staged_fields = {}
-    guard = _compat_confirm(
-        cfg, "mcp_server_create",
-        f"registering MCP server {name!r} requires explicit confirmation: "
-        "re-POST with {\"confirm\": true}", q, b,
-        payload={"name": name, "fields": staged_fields})
-    if guard is not None:
-        return guard
-    existing_enabled = _mcp_current_enabled(cfg, name)
-    try:
         fields = _mcp_fields_from_body(b)
+        env = fields.get("env")
+        if env is not None and (not isinstance(env, dict) or any(
+                not isinstance(ref, str) or not MS._REF_RE.match(ref) for ref in env.values())):
+            raise MS.McpServerError("SECRET_WRITE_REFUSED", "MCP environment entries require references.")
+        name = MS._check_name(name)
+        secrets_to_store = _mcp_create_credentials(b, name, fields)
+    except Exception as exc:
+        return _mcp_error(exc)
+    detail = f"Confirm saving MCP server {name!r} in this profile."
+    if secrets_to_store:
+        if _estop(cfg):
+            return 403, {"ok": False, "code": "EMERGENCY_STOP", "detail": "Emergency stop is latched."}
+        if not (_truthy(q.get("confirm")) or _truthy(b.get("confirm"))):
+            return _staged(detail, "")
+    else:
+        guard = _compat_confirm(
+            cfg, "mcp_server_create", detail, q, b,
+            payload={"name": name, "fields": _jsonable(fields),
+                     "profile": str(q.get("profile") or "")}, match_payload=True)
+        if guard is not None:
+            return guard
+    try:
         if "enabled" in fields:
-            desired_enabled = _truthy(fields.pop("enabled"))
-        elif existing_enabled is not None:
-            desired_enabled = existing_enabled
-        else:
-            desired_enabled = False
-        out = MS.upsert(cfg, name, fields, confirmed=True)
-        # ``upsert`` merges then validates; ``_validate`` drops ``enabled``, so
-        # re-apply the intended flag (create-with-enabled must persist and an
-        # edit must preserve an enabled server's state).
-        if bool(out["server"].get("enabled")) != desired_enabled:
-            out = MS.set_enabled(cfg, name, desired_enabled)
+            fields["enabled"] = _truthy(fields["enabled"])
+        with ES.secret_value_transaction(cfg, secrets_to_store):
+            out = MS.upsert(cfg, name, fields, confirmed=True)
+        desired_enabled = out["server"]["enabled"]
     except Exception as exc:
         return _mcp_error(exc)
     _audit("mcp_server_create", "dashboard:user", {"name": name,
@@ -15232,6 +15726,7 @@ def mcp_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return mcp_create(cfg, q, b, p)
 
 
+@_artifact_profiled
 def mcp_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """DELETE /api/mcp/servers/{id} -> remove a registered server."""
@@ -15244,7 +15739,7 @@ def mcp_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "mcp_server_delete",
         f"removing MCP server {name!r} requires explicit confirmation: "
         "re-DELETE with {\"confirm\": true}", q, b,
-        payload={"name": name})
+        payload={"name": name, "profile": str(q.get("profile") or "")}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -15257,6 +15752,7 @@ def mcp_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit mcp servers`")
 
 
+@_artifact_profiled
 def mcp_set_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT/POST /api/mcp/servers/{id}/enabled -> persist the enabled flag."""
@@ -15270,7 +15766,8 @@ def mcp_set_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "mcp_server_enabled",
         f"changing MCP server {name!r} enabled state requires explicit "
         "confirmation: re-send with {\"confirm\": true}", q, b,
-        payload={"name": name, "enabled": enabled})
+        payload={"name": name, "enabled": enabled,
+                 "profile": str(q.get("profile") or "")}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -15284,6 +15781,7 @@ def mcp_set_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit mcp servers`")
 
 
+@_artifact_profiled
 def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/servers/{id}/auth -> record a credential reference.
@@ -15306,11 +15804,15 @@ def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ref = str(b.get("reference", b.get("token", b.get("value", ""))) or "")
     if not ref:
         return mcp_oauth_start(cfg, q, b, p)
+    if not MS._REF_RE.match(ref):
+        return 400, {"ok": False, "code": "SECRET_WRITE_REFUSED",
+                     "detail": "Authentication requires an env, vault, or file reference."}
     guard = _compat_confirm(
         cfg, "mcp_server_auth",
         f"recording a credential reference for {name!r} requires explicit "
         "confirmation: re-POST with {\"confirm\": true}", q, b,
-        payload={"name": name, "reference": ref})
+        payload={"name": name, "reference": ref,
+                 "profile": str(q.get("profile") or "")}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -15322,6 +15824,7 @@ def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit auth login` (references only)")
 
 
+@_artifact_profiled
 def mcp_auth_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/servers/{id}/auth -> reference presence, never a secret."""
@@ -15405,11 +15908,16 @@ def mcp_oauth_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not name:
         return 400, {"ok": False, "code": "MCP_BAD_INPUT",
                      "detail": "server name required"}
+    if _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP",
+                     "detail": "Emergency stop is latched."}
     row = next((s for s in MS.list_servers(cfg).get("servers", [])
                 if s.get("name") == name), None)
     if row is None:
         return 404, {"ok": False, "code": "MCP_NOT_FOUND",
                      "detail": f"no registered server {name!r}"}
+    if row.get("invocation_code") == MS.CONFIG_CHANGED:
+        return _mcp_error(MS.McpServerError(MS.CONFIG_CHANGED, MS._CONFIG_CHANGED_DETAIL))
     url = str(row.get("url") or "")
     if not url:
         return 400, {"ok": False, "code": "MCP_STDIO_NO_OAUTH",
@@ -15429,13 +15937,7 @@ def mcp_oauth_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception as exc:
         return _fail(exc)
     _gc_mcp_oauth_flows(flows, lock)
-    try:
-        flow_home = str(_HR.runtime_home_for_cfg(cfg))
-    except Exception:
-        try:
-            flow_home = str(_HR.default_home())
-        except Exception as exc:
-            return _fail(exc)
+    flow_home = str(MS.runtime_home(cfg).resolve())
     base = _OAUTH_PUBLIC_BASE or "http://127.0.0.1:8890"
     from urllib.parse import quote as _quote
     redirect_uri = (f"{base}/api/mcp/oauth/callback/{_quote(name, safe='')}")
@@ -15479,29 +15981,32 @@ def _bridge_mcp_oauth_ref(cfg: Any, name: str) -> bool:
     Returns True when a write happened.
     """
     from . import mcp_servers as MS
-    try:
-        data = MS._load(cfg)
-    except Exception:
-        return False
-    rec = (data.get("servers") or {}).get(name)
-    if not isinstance(rec, dict):
-        return False
-    want = f"oauth:{name}"
-    env = dict(rec.get("env") or {})
-    if env.get("MCP_AUTH") == want and rec.get("auth") == "oauth":
-        return False
-    env["MCP_AUTH"] = want
-    rec["env"] = env
-    rec["auth"] = "oauth"
-    rec["updated_at"] = time.time()
-    try:
-        MS._save(cfg, data)
-    except Exception:
-        return False
+    with MS.registry_write(cfg):
+        try:
+            data = MS._load(cfg)
+        except Exception:
+            return False
+        rec = (data.get("servers") or {}).get(name)
+        if not isinstance(rec, dict):
+            return False
+        want = f"oauth:{name}"
+        env = dict(rec.get("env") or {})
+        if env.get("MCP_AUTH") == want and rec.get("auth") == "oauth":
+            return False
+        env["MCP_AUTH"] = want
+        rec["env"] = env
+        rec["auth"] = "oauth"
+        rec["updated_at"] = time.time()
+        try:
+            MS._save(cfg, data)
+        except Exception:
+            return False
+    _rc.invalidate("mcp_servers")
     _audit("mcp_oauth_bridged", "dashboard:user", {"name": name})
     return True
 
 
+@_artifact_profiled
 def mcp_oauth_flows_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/oauth/flows -> live flow snapshots."""
@@ -15510,11 +16015,14 @@ def mcp_oauth_flows_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception as exc:
         return _fail(exc)
     _gc_mcp_oauth_flows(flows, lock)
+    from . import mcp_servers as MS
+    home = MS.runtime_home(cfg).resolve()
     with lock:
-        items = [_flow_snapshot(f) for f in flows.values()]
+        items = [_flow_snapshot(f) for f in flows.values() if Path(f.qubit_home).resolve() == home]
     return _ok(flows=items, count=len(items))
 
 
+@_artifact_profiled
 def mcp_oauth_flow_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/oauth/flows/{id} -> poll one flow.
@@ -15529,7 +16037,8 @@ def mcp_oauth_flow_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _fail(exc)
     _gc_mcp_oauth_flows(flows, lock)
     flow = flows.get(fid)
-    if flow is None:
+    from . import mcp_servers as MS
+    if flow is None or Path(flow.qubit_home).resolve() != MS.runtime_home(cfg).resolve():
         return 404, {"ok": False, "code": "MCP_OAUTH_GONE",
                      "detail": "OAuth flow not found or expired"}
     snap = _flow_snapshot(flow)
@@ -15567,6 +16076,7 @@ def mcp_oauth_callback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   "detail": text}
 
 
+@_artifact_profiled
 def mcp_oauth_flow_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """DELETE /api/mcp/oauth/flows/{id} -> cancel an in-flight flow."""
@@ -15576,7 +16086,8 @@ def mcp_oauth_flow_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception as exc:
         return _fail(exc)
     flow = flows.get(fid)
-    if flow is None:  # expired/GC'd is the goal state of a cancel
+    from . import mcp_servers as MS
+    if flow is None or Path(flow.qubit_home).resolve() != MS.runtime_home(cfg).resolve():
         return _ok(ok=True, status="expired")
     try:
         flow.mark_error("Cancelled by user", cancelled=True)
@@ -16934,6 +17445,51 @@ def h_browser_open(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     }
 
 
+@contextmanager
+def _settings_config_scope(home: Path):
+    from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
+    from qubit_cli.web_server_profiles import _qubit_home_scope
+
+    with _qubit_home_scope(home):
+        token = set_secret_scope(build_profile_secret_scope(home), profile_home=str(home))
+        try:
+            yield
+        finally:
+            reset_secret_scope(token)
+
+
+def _scoped_config_record(home: Path) -> Dict[str, Any]:
+    from qubit_cli.config import load_config
+    from qubit_cli.web_server_config import _normalize_config_for_web
+    from .webui import _fill_config_defaults
+
+    with _settings_config_scope(home):
+        record = _normalize_config_for_web(load_config())
+    return _fill_config_defaults({k: v for k, v in record.items() if not k.startswith("_")})
+
+
+def _save_scoped_config(home: Path, values: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    from qubit_cli.config import is_managed, save_config, _deep_merge, require_readable_config_before_write
+    from qubit_cli.web_server import _CONFIG_MUTATION_LOCK
+    from qubit_cli.web_server_config import _denormalize_config_from_web
+
+    if is_managed():
+        return 403, {"ok": False, "code": "CONFIG_READ_ONLY",
+                     "detail": "The installation manages configuration writes."}
+    patch: Dict[str, Any] = {}
+    for key, value in values.items():
+        _set_dotted(patch, key, value)
+    with _settings_config_scope(home), _CONFIG_MUTATION_LOCK:
+        raw = require_readable_config_before_write()
+        save_config(_deep_merge(raw, _denormalize_config_from_web(patch)))
+        actual = _flatten_config(_scoped_config_record(home))
+    if any(actual.get(key) != value for key, value in values.items()):
+        return 409, {"ok": False, "code": "CONFIG_READBACK_MISMATCH",
+                     "detail": "One or more settings did not take the requested value."}
+    return _ok(config=values, count=len(values), applied_to_home=True,
+               restart_required=["qubit-gateway"])
+
+
 def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/config -> real confirm-gated Qubit settings override write.
@@ -16960,6 +17516,10 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                f"{type(payload).__name__}"}
     if not isinstance(payload, dict):
         payload = b
+    try:
+        home = settings_profile_home(cfg, q)
+    except Exception as exc:
+        return _settings_profile_error(exc)
     values = _flatten_config(payload)
     if not values:
         return _gate("CONFIG_NO_FIELDS",
@@ -16989,24 +17549,29 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # ``voice.record_key`` or the Qubit ``hotkey.hold_key``). Unchanged served
     # leaves are not secret *writes*: drop them. A newly provided or actually
     # changed secret-shaped leaf is still refused.
-    served_records = [_config_live(cfg)]
-    try:
-        from . import qubit_asgi as _HA
-        _code, _, _body = _HA.call("GET", "/api/config")
-        if _code == 200:
-            served_records.append(json.loads(_body.decode("utf-8")))
-    except Exception:
-        pass
+    if home is not None:
+        served_records = [_scoped_config_record(home)]
+    else:
+        served_records = [_config_live(cfg)]
+        try:
+            from . import qubit_asgi as _HA
+            code, _, response = _HA.call("GET", "/api/config")
+            if code == 200:
+                served_records.append(json.loads(response.decode("utf-8")))
+        except Exception:
+            pass
     served_values: Dict[str, list] = {}
     for record in served_records:
         try:
-            record = _merge_config_overrides(cfg, record)
+            if home is None:
+                record = _merge_config_overrides(cfg, record)
         except Exception:
             pass
-        for key, value in _flatten_config(record).items():
-            bucket = served_values.setdefault(key, [])
-            if not any(value == existing for existing in bucket):
-                bucket.append(value)
+        for view in (record, _redact_config_tree(record)):
+            for key, value in _flatten_config(view).items():
+                bucket = served_values.setdefault(key, [])
+                if value not in bucket:
+                    bucket.append(value)
     # Reject unknown keys and mistyped values against the real schema instead of
     # persisting an arbitrary key and reporting fabricated success. This runs
     # BEFORE the secret-shape filter: a bogus key ending in ``_key``/``_token``
@@ -17056,7 +17621,8 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     for key, value in values.items():
         if any(value == served for served in served_values.get(key, ())):
             continue
-        if _is_secret_key(key):
+        if (_is_secret_key(key) or _redact_config_tree(value, key) != value
+                or isinstance(value, list) and "[REDACTED]" in json.dumps(value)):
             changed_secrets.append(key)
         else:
             remaining[key] = value
@@ -17094,12 +17660,18 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "settings value type mismatch: " +
                      ", ".join(sorted(mistyped)[:5]),
                      "GET /api/config/schema")
+    profile = str(q.get("profile") or "").strip()
+    staged = {"config": values, "profile": profile} if profile else values
     guard = _compat_confirm(
-        cfg, "config.write",
-        "config write stages through the Qubit settings console: re-POST with "
-        "{\"confirm\": true}", q, b, payload=values)
+        cfg, "config.write", "Confirm the settings change.",
+        q, b, payload=staged, match_payload=True)
     if guard is not None:
         return guard
+    if home is not None:
+        try:
+            return _save_scoped_config(home, values)
+        except Exception as exc:
+            return _settings_profile_error(exc)
     path = _config_overrides_path(cfg)
     try:
         previous = _load_json_store(_config_overrides_read_path(cfg))
@@ -17150,6 +17722,16 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                  "profiles")
 
 
+def _env_confirmation(cfg: Any, q: Dict[str, str], b: Dict[str, Any]):
+    if _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP",
+                     "detail": "Emergency stop is latched."}
+    if _truthy(q.get("confirm")) or _truthy(b.get("confirm")):
+        return None
+    return 409, {"ok": False, "code": "CONFIRM_REQUIRED",
+                 "detail": "Confirm the key change in the Keys page."}
+
+
 def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT/DELETE /api/env -> real confirm-gated reference registry.
@@ -17169,11 +17751,8 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         b, frozenset({"key", "name", "value", "ref", "confirm", "delete"}))
     if bad[0] != 200:
         return bad
-    deleting = bool(b.get("delete")) or bool(q.get("delete"))
-    guard = _compat_confirm(
-        cfg, "env_reference_write",
-        "env reference change stages through the Qubit vault: re-POST "
-        "with {\"confirm\": true}", q, b)
+    deleting = _truthy(b.get("delete")) or _truthy(q.get("delete"))
+    guard = _env_confirmation(cfg, q, b)
     if guard is not None:
         return guard
     name = str(b.get("name", b.get("key", "")) or "")
@@ -17185,9 +17764,14 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": "env reference name must match "
                                "^[A-Za-z_][A-Za-z0-9_]*$",
                      "qubit_counterpart": "CLI `qubit auth set <NAME> <ref>`"}
+    try:
+        home = settings_profile_home(cfg, q)
+    except Exception as exc:
+        return _settings_profile_error(exc)
     if deleting:
         try:
-            res = env_store.remove_ref(cfg, name)
+            with env_store.profile_scope(home):
+                res = env_store.remove_ref(cfg, name)
         except Exception as exc:
             return _fail(exc)
         return _ok(ok=True, name=name, removed=res["removed"],
@@ -17203,7 +17787,8 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # value is stored, never echoed or logged; ``is_set`` flips on the
         # next read. Confirm-gated + audited by the guard above.
         try:
-            res = env_store.write_secret(cfg, name, value)
+            with env_store.profile_scope(home):
+                env_store.write_secret(cfg, name, value)
         except ValueError as exc:
             return 400, {"ok": False, "code": "ENV_VALUE_INVALID",
                          "detail": _redact(str(exc))[:300]}
@@ -17212,7 +17797,8 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _ok(ok=True, name=name, state="SET",
                    qubit_counterpart="CLI `qubit auth status` (names only)")
     try:
-        res = env_store.set_ref(cfg, name, value)
+        with env_store.profile_scope(home):
+            res = env_store.set_ref(cfg, name, value)
     except ValueError as exc:
         return _gate("SECRET_WRITE_REFUSED", _redact(str(exc))[:300],
                      "CLI `qubit auth login` (manual-handoff enrollment)")
@@ -17235,10 +17821,7 @@ def env_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         b, frozenset({"key", "name", "confirm"}))
     if bad[0] != 200:
         return bad
-    guard = _compat_confirm(
-        cfg, "env_reference_delete",
-        "env reference removal stages through the Qubit vault: re-DELETE "
-        "with {\"confirm\": true}", q, b)
+    guard = _env_confirmation(cfg, q, b)
     if guard is not None:
         return guard
     name = str(b.get("key", b.get("name", "")) or "")
@@ -17253,10 +17836,15 @@ def env_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                "^[A-Za-z_][A-Za-z0-9_]*$",
                      "qubit_counterpart": "CLI `qubit auth unset <NAME>`"}
     try:
-        res = env_store.remove_ref(cfg, name)
-        secret = env_store.remove_secret(cfg, name)
+        home = settings_profile_home(cfg, q)
+        with env_store.profile_scope(home):
+            secret = env_store.remove_secret(cfg, name)
+            res = env_store.remove_ref(cfg, name)
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "ENV_WRITE_REFUSED",
+                     "detail": _redact(str(exc))[:300]}
     except Exception as exc:
-        return _fail(exc)
+        return _settings_profile_error(exc)
     return _ok(ok=True, name=name, removed=res["removed"] or secret["removed"],
                count=res["count"],
                qubit_counterpart="CLI `qubit auth status` (names only)")
@@ -19151,7 +19739,7 @@ def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """POST /api/cron/blueprints/instantiate -> real confirm-gated schedule.
 
     Fills a local blueprint's slots and creates the schedule in the same
-    ``schedules`` store the CLI/voice use. ``values`` (or top-level keys) carry
+    cron store the CLI and scheduler use. ``values`` (or top-level keys) carry
     ``name``/``prompt``/``when``. Without ``confirm`` it stages a typed 409; a
     missing schedule expression is a typed 400, never a fabricated job.
     """
@@ -19165,30 +19753,23 @@ def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # cron expression + prompt/name/deliver.
     blueprint_key = str(merged.get("blueprint") or "").strip()
     if blueprint_key:
+        from . import cron_bridge as CB
         try:
-            from . import qubit_runtime
-            qubit_runtime.ensure_path()
-            try:
-                qubit_runtime.use_qubit_home(cfg)
-            except Exception:  # noqa: BLE001
-                pass
-            from cron.blueprint_catalog import (  # type: ignore
-                BlueprintFillError, fill_blueprint, get_blueprint,
-            )
-            blueprint = get_blueprint(blueprint_key)
-            if blueprint is None:
-                return 404, {"ok": False, "code": "BLUEPRINT_NOT_FOUND",
-                             "detail": f"unknown blueprint {blueprint_key!r}",
-                             "qubit_counterpart": "CLI `qubit schedules`"}
-            try:
-                spec = fill_blueprint(blueprint, values)
-            except BlueprintFillError as exc:
-                return 400, {"ok": False, "code": "BLUEPRINT_BAD_FILL",
-                             "detail": _redact(str(exc))[:300],
-                             "qubit_counterpart": "CLI `qubit schedules create`"}
+            with CB.profile_settings_scope(cfg, str(q.get("profile") or "").strip()):
+                from cron.blueprint_catalog import BlueprintFillError, fill_blueprint, get_blueprint
+
+                blueprint = get_blueprint(blueprint_key)
+                if blueprint is None:
+                    return 404, {"ok": False, "code": "BLUEPRINT_NOT_FOUND",
+                                 "detail": f"unknown blueprint {blueprint_key!r}"}
+                try:
+                    spec = fill_blueprint(blueprint, values)
+                except BlueprintFillError as exc:
+                    return 400, {"ok": False, "code": "BLUEPRINT_BAD_FILL",
+                                 "detail": _redact(str(exc))[:300]}
             merged = {**spec, **merged, "name": spec.get("name", merged.get("name"))}
-        except Exception:  # noqa: BLE001 - fall through to the legacy path
-            pass
+        except Exception as exc:
+            return _cron_failure(exc)
     if not merged.get("name"):
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "blueprint name required",
@@ -19197,9 +19778,9 @@ def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "BLUEPRINT_BAD_FILL",
                      "detail": "a schedule expression (when) is required",
                      "qubit_counterpart": "CLI `qubit schedules create`"}
-    scalar = {k: v for k, v in merged.items()
-              if k != "confirm" and isinstance(v, (str, int, float, bool))}
-    return cron_create(cfg, q, {**scalar, "confirm": bool(b.get("confirm"))}, p)
+    fields = {k: v for k, v in merged.items() if k in _CRON_EDIT_FIELDS}
+    return cron_create(cfg, q, {**fields, "confirm": b.get("confirm"),
+                                "confirmation_id": b.get("confirmation_id")}, p)
 
 
 def h_plugin_kanban_attachment_download(
@@ -20210,6 +20791,7 @@ def _resolve_timeline_session(db: Any, session_id: str) -> Optional[str]:
         return sid
 
 
+@_session_history_profiled
 def h_session_timeline(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/sessions/{id}/timeline -> prompt metadata index (read-only).
@@ -20243,6 +20825,7 @@ def h_session_timeline(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(session_id=sid, store_authority=CHAT_SESSION_AUTHORITY, **out)
 
 
+@_session_history_profiled
 def h_session_messages_around(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/sessions/{id}/messages/around -> bounded display page.
@@ -20695,6 +21278,8 @@ HANDLERS: Dict[str, Handler] = {
     "h_health": h_health, "h_egress_status": h_egress_status,
     "h_sessions_list": h_sessions_list, "h_sessions_stats": h_sessions_stats,
     "h_session_show": h_session_show, "h_session_messages": h_session_messages,
+    "h_session_export": h_session_export,
+    "h_session_latest_descendant": h_session_latest_descendant,
     "h_session_timeline": h_session_timeline,
     "h_session_messages_around": h_session_messages_around,
     "h_config": h_config, "h_config_defaults": h_config_defaults,
@@ -20774,6 +21359,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_chat_session_show": h_chat_session_show,
     "h_chat_session_messages": h_chat_session_messages,
     "h_chat_session_patch": h_chat_session_patch,
+    "h_chat_terminal_model_status": h_chat_terminal_model_status,
     "h_chat_session_delete": h_chat_session_delete,
     "h_chat_session_export": h_chat_session_export,
     "h_chat_session_import": h_chat_session_import,
@@ -21665,12 +22251,49 @@ def _ensure_family_backends(registry: Any) -> None:
         registry.register(_name, _fn)
 
 
+def _device_dashboard_result(cfg: Any, action: str,
+                             result: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    """Project device RPC results onto the dashboard's metadata-only contract."""
+    if result.get("code") and result.get("state") != "OK":
+        return _qubit_family_http(result["code"]), {**result, "ok": False}
+    if action == "setup-code-mint":
+        return _ok(id=result["code_id"], label=result["label"],
+                   scopes=result["scopes"], expires_at=_epoch_to_iso(result["expires_at"]),
+                   code_present=bool(result.get("code")))
+    if action in ("setup-status", "pairings"):
+        now = time.time()
+        codes = [row for row in result.get("codes", [])
+                 if not row.get("revoked") and float(row.get("expires_at") or 0) > now]
+        if action == "setup-status":
+            paired = sum(bool(row.get("approved")) for row in codes)
+            return _ok(**result, enabled=not _estop(cfg),
+                       pending_codes=len(codes) - paired, paired_devices=paired)
+        pairings = [
+            {"id": row["id"], "label": row["label"], "kind": "setup",
+             "state": "active" if row.get("approved") else "pending",
+             "manageable": True, "token_manageable": False, "secret_set": True}
+            for row in codes
+        ]
+        pairings.extend(
+            {"id": f"dm:{row['account']}", "label": row["account"], "kind": "dm",
+             "state": "active", "manageable": False, "secret_set": False,
+             "manage_reason": "Manage this binding through its messaging channel."}
+            for row in result.get("pairings", [])
+        )
+        return _ok(**{**result, "pairings": pairings})
+    if action == "identity":
+        identity = result["identity"]
+        return _ok(**{**result, "identity": {**identity, "device_id": identity["id"]}})
+    return 200, result
+
+
 def _qubit_family_gateway_call(cfg: Any, entry: Dict[str, Any],
                                params: Dict[str, Any]
                                ) -> Tuple[int, Dict[str, Any]]:
     """Run one allowlisted gateway method; GatewayErrors become typed HTTP."""
     from .gateway.gateway_ws import GatewayError
     from .gateway.rpc import default_registry
+    from .pairing import PairingError
 
     method = str(entry["gateway"] or "")
     try:
@@ -21682,15 +22305,17 @@ def _qubit_family_gateway_call(cfg: Any, entry: Dict[str, Any],
                                    "registered; nothing was executed",
                          "gateway_method": method}
         result = registry.handle(cfg, method, params)
-    except GatewayError as exc:
+    except (GatewayError, PairingError) as exc:
         return _qubit_family_http(exc.code), {
             "ok": False, "code": exc.code,
-            "detail": _redact(exc.message)[:300],
+            "detail": _redact(str(exc) if isinstance(exc, PairingError) else exc.message)[:300],
             "gateway_method": method}
     except Exception as exc:
         return _fail(exc)
     if not isinstance(result, dict):
         result = {"result": result}
+    if entry.get("family") == "devices":
+        return _device_dashboard_result(cfg, str(entry["action"]), result)
     return 200, _jsonable(result)
 
 
@@ -21728,6 +22353,10 @@ def _qubit_family_dispatch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         if kind == "mutation":
             safe = {k: v for k, v in params.items()
                     if isinstance(v, (str, int, float, bool)) or v is None}
+            if family == "devices" and entry["action"] == "setup-code-mint":
+                scopes = params.get("scopes")
+                if isinstance(scopes, list) and all(isinstance(scope, str) for scope in scopes):
+                    safe["scopes"] = scopes
             # An empty CALLER body cannot be replayed: `_confirm_compat_one`
             # settles by re-issuing this action with the STAGED scalars, so
             # staging with nothing creates a Confirm button guaranteed to fail

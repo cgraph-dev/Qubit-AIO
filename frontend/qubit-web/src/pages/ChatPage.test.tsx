@@ -67,6 +67,7 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 const streamChatTurn = vi.hoisted(() => vi.fn());
+const profileScope = vi.hoisted(() => ({ profile: "", currentProfile: "default" }));
 
 // SakugaSelect is an ARIA combobox built from shadow-DOM controls that a node
 // test cannot upgrade. Swap only Select for a native <select> so the existing
@@ -158,7 +159,7 @@ vi.mock("@/contexts/usePageHeader", () => ({
   usePageHeader: () => ({ setEnd: vi.fn(), setTitle: vi.fn() }),
 }));
 vi.mock("@/contexts/useProfileScope", () => ({
-  useProfileScope: () => ({ profile: "" }),
+  useProfileScope: () => profileScope,
 }));
 vi.mock("@/i18n", () => ({
   useI18n: () => ({
@@ -308,6 +309,7 @@ async function typeAndSend(value: string) {
 }
 
 beforeEach(() => {
+  profileScope.profile = "";
   capturedSessionListProps.length = 0;
   capturedSidebarProps.length = 0;
   apiMocks.getModelInfo.mockClear();
@@ -362,6 +364,38 @@ afterEach(async () => {
 });
 
 describe("Qubit ChatPage", () => {
+  it("isolates the selected profile's transcript and terminal handoff", async () => {
+    profileScope.profile = "work";
+    localStorageMock.setItem("qubit.chat.transcript.dashboard-chat", JSON.stringify([
+      { role: "assistant", text: "listener cache only" },
+    ]));
+    apiMocks.getChatSessionMessages.mockResolvedValue({
+      session_id: "dashboard-chat",
+      messages: [{ role: "assistant", content: "named transcript" }],
+      total: 1,
+    });
+    await renderChatAt("/qubit-chat?profile=work&resume=dashboard-chat");
+    await vi.waitFor(() => expect(container.textContent).toContain("named transcript"));
+    expect(container.textContent).not.toContain("listener cache only");
+    expect(apiMocks.getChatSession).toHaveBeenCalledWith("dashboard-chat", "work");
+    expect(apiMocks.getChatSessionMessages).toHaveBeenCalledWith("dashboard-chat", 500, "work");
+    expect(container.querySelector('[aria-label="Continue this session in the /chat terminal"]')
+      ?.getAttribute("href")).toBe("/chat?resume=dashboard-chat&profile=work");
+
+    streamChatTurn.mockRejectedValueOnce(new Error(
+      '409: {"code":"CHAT_PROFILE_WORKER_UNAVAILABLE","detail":"Start the selected gateway."}',
+    ));
+    await typeAndSend("keep my draft");
+    expect(streamChatTurn).toHaveBeenCalledWith(
+      { text: "keep my draft", session: "dashboard-chat", profile: "work" },
+      expect.any(Object),
+      expect.anything(),
+    );
+    expect(textarea().value).toBe("keep my draft");
+    expect(container.textContent).toContain("Start the selected gateway.");
+    expect(localStorageMock.getItem("qubit.chat.transcript.dashboard-chat")).toContain("listener cache only");
+  });
+
   it("renders the empty state and the model line", async () => {
     await renderChat();
     await vi.waitFor(() =>

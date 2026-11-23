@@ -11,9 +11,12 @@ Two classes of test, deliberately separated:
 from __future__ import annotations
 
 import importlib
+import io
+import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -24,6 +27,7 @@ sys.path.insert(0, str(REPO / "qubit_runtime"))
 
 from voicebridge.agent_compat import framework as fw  # noqa: E402
 from voicebridge.agent_compat.adapters import hermes  # noqa: E402
+from voicebridge.agent_compat.adapters import openclaw, openjarvis, picoclaw  # noqa: E402
 
 PIN = Path.home() / ".cache/qubit-pins/hermes-agent"
 
@@ -94,6 +98,15 @@ def test_detection_picks_the_right_adapter(tmp_path):
     (d / "__init__.py").write_text("from fakeagent_cli.config import load_config\n")
 
     assert fw.registry.detect(d) is _FAKE
+
+
+def test_detects_native_openclaw_manifest_without_python_shims(tmp_path):
+    fw.registry.register(openclaw.ADAPTER)
+    (tmp_path / "openclaw.plugin.json").write_text('{"id":"audit-plugin"}')
+    (tmp_path / "index.ts").write_text("export default {};\n")
+
+    assert fw.registry.detect(tmp_path) is openclaw.ADAPTER
+    assert not openclaw.ADAPTER.module_aliases
 
 
 def test_entry_point_groups_are_collected_from_all_adapters():
@@ -408,6 +421,31 @@ def test_skill_loader_falls_back_to_folder_name_without_frontmatter(tmp_path):
     assert entry.frontmatter == {}
 
 
+def test_skill_discovery_stops_at_the_end_of_frontmatter(tmp_path, monkeypatch):
+    class MetadataOnly(io.StringIO):
+        def read(self, *_args):
+            pytest.fail("skill discovery tried to read the entire file")
+
+        def __next__(self):
+            line = super().__next__()
+            assert line != "skill body\n"
+            return line
+
+    _skill(tmp_path, "fixture", "---\nname: fixture\n---\nskill body\n")
+    path_open = Path.open
+
+    def open_fixture(path, *args, **kwargs):
+        if path == tmp_path / "fixture" / "SKILL.md":
+            return MetadataOnly("---\nname: fixture\n---\nskill body\n")
+        return path_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_fixture)
+
+    adapter = fw.ForeignAdapter(name="x", skill_roots=(str(tmp_path),))
+    (entry,) = fw.SkillLoader([adapter]).enumerate()
+    assert entry.frontmatter == {"name": "fixture"}
+
+
 def test_mcp_loader_reads_json_servers_file(tmp_path):
     """The ``mcpServers`` convention: a JSON file whose entries are read verbatim."""
     import json
@@ -489,6 +527,87 @@ def test_mcp_loader_ignores_entries_when_key_is_absent(tmp_path):
     assert fw.McpConfigLoader([adapter]).read() == []
 
 
+def test_mcp_loader_keeps_each_ecosystem_selector_and_server_identity(tmp_path):
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps({
+        "mcp_servers": {"shared": {"command": "hermes-fixture"}},
+        "mcp": {"servers": {"shared": {"command": "openclaw-fixture"}}},
+        "tools": {"mcp": {"enabled": False, "servers": {"shared": {"url": "https://example.invalid"}}}},
+    }))
+    adapters = [replace(a.ADAPTER, mcp_config_paths=(str(source),))
+                for a in (hermes, openclaw, picoclaw)]
+
+    entries = fw.McpConfigLoader(adapters).read()
+
+    assert [(e.adapter, e.name, e.spec) for e in entries] == [
+        ("hermes", "shared", {"command": "hermes-fixture"}),
+        ("openclaw", "shared", {"command": "openclaw-fixture"}),
+        ("picoclaw", "shared", {"url": "https://example.invalid", "enabled": False}),
+    ]
+
+
+@pytest.mark.parametrize("servers", [
+    "'[{\"name\":\"shared\",\"command\":\"openjarvis-fixture\"}]'",
+    '"servers.json"',
+])
+def test_openjarvis_inventory_reads_inline_or_relative_mcp_config(tmp_path, servers):
+    source = tmp_path / "config.toml"
+    source.write_text(f"[tools.mcp]\nenabled = true\nservers = {servers}\n")
+    (tmp_path / "servers.json").write_text('{"name":"shared","command":"openjarvis-fixture"}')
+    adapter = replace(openjarvis.ADAPTER, mcp_config_paths=(str(source),))
+
+    (entry,) = fw.McpConfigLoader([adapter]).read()
+
+    assert (entry.adapter, entry.name, entry.spec) == (
+        "openjarvis", "shared", {"command": "openjarvis-fixture"},
+    )
+
+
+def test_openjarvis_inventory_ignores_reference_outside_config_directory(tmp_path):
+    config_dir = tmp_path / "profile"
+    config_dir.mkdir()
+    source = config_dir / "config.toml"
+    source.write_text('[tools.mcp]\nservers = "../servers.json"\n')
+    (tmp_path / "servers.json").write_text('{"name":"outside","command":"fixture"}')
+    adapter = replace(openjarvis.ADAPTER, mcp_config_paths=(str(source),))
+
+    assert fw.McpConfigLoader([adapter]).read() == []
+
+
+def test_cli_inspect_source_reports_transport_without_connection_data(tmp_path):
+    source = tmp_path / "config.toml"
+    source.write_text(
+        "[tools.mcp]\nenabled = false\n"
+        "servers = '[{\"name\":\"fixture\",\"url\":\"https://example.invalid/private-fixture\"}]'\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "mcp", "inspect-source", "openjarvis",
+         "--source-config", str(source)],
+        cwd=REPO, capture_output=True, text=True, timeout=15, check=True,
+    )
+    assert json.loads(result.stdout) == {
+        "source": "openjarvis", "state": "DISCOVERED",
+        "servers": [{"name": "fixture", "transport": "http", "disabled": True}],
+    }
+    assert "private-fixture" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("source", ["hermes", "openclaw", "openjarvis", "picoclaw"])
+def test_cli_inspect_source_lists_markdown_skill_metadata(tmp_path, source):
+    directory = _skill(tmp_path, "fixture", "---\nname: sample\n---\nfixture instructions\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "skills", "inspect-source", source,
+         "--source-root", str(tmp_path)],
+        cwd=REPO, capture_output=True, text=True, timeout=15, check=True,
+    )
+    assert json.loads(result.stdout) == {
+        "source": source,
+        "state": "DISCOVERED",
+        "skills": [{"name": "sample", "directory": str(directory)}],
+    }
+    assert "fixture instructions" not in result.stdout + result.stderr
+
+
 def test_hermes_adapter_declares_measured_skill_and_mcp_fields():
     """The hermes adapter carries the measured fields (fails if a path was invented)."""
     assert hermes.ADAPTER.skill_roots, "hermes adapter must declare its skill root"
@@ -517,3 +636,84 @@ def test_hermes_skill_and_mcp_loaders_work_against_the_live_tree():
         servers = fw.McpConfigLoader([hermes.ADAPTER]).read()
         # The loader must not raise; whatever the file contains, each entry is a real mapping.
         assert all(isinstance(s.spec, dict) for s in servers)
+
+
+def test_openjarvis_inspect_reports_pipeline_requirements_without_templates(tmp_path):
+    for directory in ("mixed", "pipeline", "invalid"):
+        (tmp_path / directory).mkdir()
+    (tmp_path / "mixed" / "SKILL.md").write_text("---\nname: mixed-markdown\n---\n")
+    manifest = """[skill]
+name = "pipeline-name"
+
+[[skill.steps]]
+tool_name = "audit_calculator"
+arguments_template = "fixture-data-not-for-output"
+"""
+    for directory in ("mixed", "pipeline"):
+        (tmp_path / directory / "skill.toml").write_text(manifest)
+    (tmp_path / "invalid" / "skill.toml").write_text("[broken")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "skills", "inspect-source", "openjarvis",
+         "--source-root", str(tmp_path)],
+        cwd=REPO, capture_output=True, text=True, timeout=15, check=True,
+    )
+    assert "fixture-data-not-for-output" not in result.stdout + result.stderr
+    listing = json.loads(result.stdout)
+    assert listing["state"] == "DISCOVERED"
+    assert listing["skills"] == [
+        {"name": "invalid", "directory": str(tmp_path / "invalid"),
+         "pipeline": "invalid-manifest", "markdown": False},
+        {"name": "mixed-markdown", "directory": str(tmp_path / "mixed"),
+         "pipeline": "requires-runtime", "markdown": True},
+        {"name": "pipeline-name", "directory": str(tmp_path / "pipeline"),
+         "pipeline": "requires-runtime", "markdown": False},
+    ]
+
+
+def test_openclaw_inspect_source_reads_json5_and_honors_explicit_path(tmp_path, monkeypatch):
+    configured = tmp_path / "openclaw.json"
+    configured.write_text("""{
+      // Comments, unquoted keys, trailing commas and single quotes
+      mcp: { servers: {
+        docs: { url: 'https://example.invalid/fixture-credential', enabled: false, },
+      }, },
+    }
+    """, encoding="utf-8-sig")
+    monkeypatch.setenv("OPENCLAW_CONFIG_PATH", str(configured))
+
+    command = [sys.executable, "-m", "voicebridge", "mcp", "inspect-source", "openclaw"]
+    automatic = subprocess.run(command, cwd=REPO, capture_output=True, text=True,
+                               timeout=15, check=True)
+    assert "fixture-credential" not in automatic.stdout + automatic.stderr
+    assert json.loads(automatic.stdout)["servers"] == [
+        {"name": "docs", "transport": "http", "disabled": True},
+    ]
+
+    explicit = tmp_path / "override.json5"
+    explicit.write_text("{mcp: {servers: {local: {command: 'unused-fixture'}}}}")
+    selected = subprocess.run([*command, "--source-config", str(explicit)],
+                              cwd=REPO, capture_output=True, text=True,
+                              timeout=15, check=True)
+    assert json.loads(selected.stdout)["servers"] == [
+        {"name": "local", "transport": "stdio", "disabled": False},
+    ]
+
+
+@pytest.mark.parametrize("content, state", [
+    ("{ unmapped: 'fixture-confidential-text", "INVALID_SOURCE_CONFIG"),
+    ("[]", "INVALID_SOURCE_CONFIG"),
+    (None, "SOURCE_CONFIG_NOT_FOUND"),
+])
+def test_openclaw_inspect_source_reports_invalid_and_missing_configs(tmp_path, content, state):
+    source = tmp_path / "source.json5"
+    if content is not None:
+        source.write_text(content)
+    result = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "mcp", "inspect-source", "openclaw",
+         "--source-config", str(source)],
+        cwd=REPO, capture_output=True, text=True, timeout=15,
+    )
+    assert "fixture-confidential-text" not in result.stdout + result.stderr
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["state"] == state

@@ -18,7 +18,7 @@ calls the vendored store, and maps its records onto the dashboard ``CronJob`` /
 """
 from __future__ import annotations
 
-import time
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 
@@ -32,12 +32,46 @@ def _store(cfg: Any):
     """
     from . import qubit_runtime as QR
     QR.ensure_path()
-    try:
+    from qubit_constants import get_qubit_home_override
+    if not get_qubit_home_override():
         QR.use_qubit_home(cfg)
-    except Exception:  # noqa: BLE001 - a resolution miss must not break the read
-        pass
     from cron import jobs as J  # type: ignore
     return J
+
+
+@contextmanager
+def profile_scope(cfg: Any, profile: str):
+    """Use the native profile selector and cron store without changing process env."""
+    _store(cfg)
+    if not profile:
+        yield None
+        return
+
+    from qubit_cli.web_server_cron import _cron_profile_home, _cron_store_scope
+    name, home = _cron_profile_home(profile)
+    from .qubit_runtime import assert_safe_test_home
+
+    assert_safe_test_home(home)
+    with _cron_store_scope(home):
+        yield name
+
+
+@contextmanager
+def profile_settings_scope(cfg: Any, profile: str):
+    """Bind a profile's home and credentials for config and plugin reads."""
+    _store(cfg)
+    from qubit_cli.web_server_profiles import _config_profile_scope
+
+    with _config_profile_scope(profile):
+        yield
+
+
+def delivery_targets(cfg: Any, profile: str) -> List[Dict[str, Any]]:
+    """Report channels using the selected profile's config and secret scope."""
+    with profile_settings_scope(cfg, profile):
+        from cron.scheduler_delivery import cron_delivery_targets
+
+        return cron_delivery_targets()
 
 
 def _executions(cfg: Any):
@@ -46,7 +80,7 @@ def _executions(cfg: Any):
     return E
 
 
-def shape_job(job: Dict[str, Any]) -> Dict[str, Any]:
+def shape_job(job: Dict[str, Any], *, profile: Optional[str] = None) -> Dict[str, Any]:
     """Map a vendored cron job record onto the dashboard ``CronJob`` shape.
 
     The SPA reads ``schedule.expr`` (interval ``every 30m`` / 5-field cron /
@@ -82,8 +116,8 @@ def shape_job(job: Dict[str, Any]) -> Dict[str, Any]:
         retry_on = True
     return {
         "id": str(job.get("id", "")),
-        "profile": None, "profile_name": None,
-        "qubit_home": None, "is_default_profile": True,
+        "profile": profile, "profile_name": profile,
+        "qubit_home": None, "is_default_profile": profile in (None, "default"),
         "name": job.get("name"),
         "prompt": job.get("prompt"),
         "script": job.get("script"),
@@ -119,10 +153,19 @@ def shape_job(job: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def list_jobs(cfg: Any, *, include_disabled: bool = True) -> List[Dict[str, Any]]:
-    """All jobs in the real store, newest-record order preserved."""
+def list_jobs(cfg: Any, *, include_disabled: bool = True,
+              profile: str = "") -> List[Dict[str, Any]]:
+    """Jobs across all requested profiles, preserving each row's owner."""
     J = _store(cfg)
-    return [shape_job(j) for j in J.list_jobs(include_disabled=include_disabled)]
+    if profile == "all":
+        from qubit_cli.web_server_cron import _cron_profile_dicts
+
+        return [job for item in _cron_profile_dicts() if item.get("name")
+                for job in list_jobs(cfg, include_disabled=include_disabled,
+                                     profile=item["name"])]
+    with profile_scope(cfg, profile) as name:
+        return [shape_job(job, profile=name)
+                for job in J.list_jobs(include_disabled=include_disabled)]
 
 
 def get_job(cfg: Any, job_id: str) -> Optional[Dict[str, Any]]:
@@ -158,8 +201,10 @@ def _shape_run(row: Dict[str, Any]) -> Dict[str, Any]:
 
 def runs(cfg: Any, job_id: str, limit: int = 20) -> List[Dict[str, Any]]:
     """Execution history for one job, newest first."""
+    J = _store(cfg)
+    job = J.resolve_job_ref(str(job_id))
     E = _executions(cfg)
-    rows = E.list_executions(job_id=str(job_id), limit=max(1, min(int(limit), 100)))
+    rows = E.list_executions(job_id=str(job["id"]) if job else str(job_id), limit=max(1, min(int(limit), 100)))
     return [_shape_run(r) for r in rows]
 
 
@@ -221,12 +266,13 @@ def update(cfg: Any, job_id: str, mutation: Dict[str, Any]) -> Dict[str, Any]:
         if key in mutation:
             updates[key] = mutation[key]
     when = mutation.get("when") or mutation.get("schedule")
+    if isinstance(when, dict):
+        when = when.get("expr")
     if isinstance(when, str) and when.strip():
-        updates["schedule"] = when.strip()
-    elif isinstance(mutation.get("schedule"), dict):
-        expr = str(mutation["schedule"].get("expr") or "").strip()
-        if expr:
-            updates["schedule"] = expr
+        stored = current.get("schedule") or {}
+        original = stored.get("expr") or stored.get("run_at") or current.get("schedule_display")
+        if when.strip() != original:
+            updates["schedule"] = when.strip()
 
     if updates:
         J.update_job(canonical, updates)

@@ -86,6 +86,15 @@ _RESERVED = (
 
 ADAPTER = ForeignAdapter(
     name="openclaw",
+    manifest_filenames=("openclaw.plugin.json",),
+    skill_roots=("~/.openclaw/skills", "~/.openclaw/workspace/skills"),
+    mcp_config_paths=(
+        "~/.openclaw/openclaw.json",
+        "~/.clawdbot/clawdbot.json",
+        "~/.moltbot/moltbot.json",
+    ),
+    mcp_config_keys=("mcp.servers",),
+    mcp_json5=True,
     # -- EMPTY BY MEASUREMENT. OpenClaw is a TypeScript/npm monorepo; it has no Python module
     #    named `openclaw*` and no Python file importing one, so there is no module rename to
     #    express here. (Hermes, a Python agent, is the adapter with a populated table.)

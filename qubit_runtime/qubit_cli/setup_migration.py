@@ -241,11 +241,17 @@ def _print_migration_preview(report: dict):
 
 def _run_migrator(mod, openclaw_dir: Path, qubit_home: Path, selected, *, execute: bool, overwrite: bool):
     """Run a Migrator with the fixed first-time-setup options and return its report."""
-    return mod.Migrator(
+    migrator = mod.Migrator(
         source_root=openclaw_dir.resolve(), target_root=qubit_home.resolve(), execute=execute,
         workspace_target=None, overwrite=overwrite, migrate_secrets=True, output_dir=None,
         selected_options=selected, preset_name="full",
-    ).migrate()
+    )
+    if execute:
+        from qubit_cli.setup import get_config_path, load_config, save_config
+
+        if not get_config_path().exists():
+            save_config(load_config())
+    return migrator.migrate()
 
 
 _FAILED = object()
@@ -267,8 +273,7 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
     """Detect ~/.openclaw and offer to migrate during first-time setup: dry-run preview first,
     execute only after explicit confirmation. Returns True iff migration ran successfully."""
     from qubit_cli.setup import (
-        get_config_path, _info, load_config, print_header, print_info, print_success, print_warning, prompt_yes_no,
-        save_config
+        _info, print_header, print_info, print_success, print_warning, prompt_yes_no,
     )
     openclaw_dir = Path.home() / ".openclaw"
     if not openclaw_dir.is_dir() or _migration_script_path() is None:
@@ -280,9 +285,6 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
         print_info("Skipping migration. You can run it later with: qubit claw migrate --dry-run")
         return False
 
-    # Ensure config.yaml exists before migration tries to read it
-    if not get_config_path().exists():
-        save_config(load_config())
     mod = _migration_step("Could not load migration script", "OpenClaw migration module load error",
                           _load_openclaw_migration_module)
     if mod is None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import deque
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 
 
 def search_log_page(
@@ -28,25 +28,31 @@ def search_log_page(
                 if accept_line(line) and needle in line.lower():
                     yield line
 
-    # The dashboard's initial page is the common case. A single bounded
-    # streaming pass avoids rescanning large logs just to compute an offset
-    # that is already known to be zero. Keep one extra match to report
-    # whether an older page exists without retaining the whole history.
-    if offset == 0:
-        newest = deque(matching_lines(), maxlen=limit + 1)
-        has_older = len(newest) > limit
-        return list(newest)[-limit:], has_older
+    return newest_matching_page(matching_lines, offset=offset, limit=limit)
+
+
+def newest_matching_page(
+    matching_lines: Callable[[], Iterator[str]], *, offset: int, limit: int,
+) -> tuple[list[str], bool]:
+    """Page an oldest-to-newest line stream, retaining at most one page."""
+    if not limit:
+        return [], False
+    if not offset:
+        tail = deque(matching_lines(), maxlen=limit + 1)
+        has_more = len(tail) > limit
+        if has_more:
+            tail.popleft()
+        return list(tail), has_more
 
     count = sum(1 for _ in matching_lines())
     end = count - offset
     if end <= 0:
         return [], False
     start = max(0, end - limit)
-    # A deque bounds retained data even when the selected page is large.
-    page: deque[str] = deque(maxlen=limit)
+    page: list[str] = []
     for index, line in enumerate(matching_lines()):
         if index >= end:
             break
         if index >= start:
             page.append(line)
-    return list(page), start > 0
+    return page, start > 0

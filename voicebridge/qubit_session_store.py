@@ -362,9 +362,14 @@ class QubitSessionStore:
 
     BACKEND = "qubit_state.SessionDB"
 
-    def __init__(self, cfg: Any = None) -> None:
+    def __init__(self, cfg: Any = None, *, runtime_home: Optional[Path] = None) -> None:
         self._cfg = cfg
-        self._path = qubit_state_db_path(cfg)
+        if runtime_home is None:
+            self._path = qubit_state_db_path(cfg)
+        else:
+            from .qubit_runtime import assert_safe_test_home
+            assert_safe_test_home(runtime_home)
+            self._path = refuse_external_state_db(runtime_home / STATE_DB_FILENAME)
         self._db = _db_for(self._path)
 
     # -- io ----------------------------------------------------------------
@@ -381,11 +386,19 @@ class QubitSessionStore:
     # -- mapping -----------------------------------------------------------
     @staticmethod
     def _rec(s: Dict[str, Any]) -> Dict[str, Any]:
+        from qubit_state_sessions import _parse_model_config
+
         title = s.get("title") or s.get("display_name") or None
+        config = _parse_model_config(s.get("model_config"))
+        gateway = config.get("gateway_runtime")
+        provider = config.get("provider")
+        if not provider and isinstance(gateway, dict):
+            provider = gateway.get("provider")
         return {
             "id": s.get("id"),
             "name": title,
             "model": s.get("model"),
+            **({"provider": provider} if isinstance(provider, str) and provider else {}),
             "created_at": float(s.get("started_at") or 0),
             "updated_at": float(s.get("last_activity_at") or s.get("ended_at")
                                 or s.get("started_at") or 0),
@@ -519,6 +532,7 @@ class QubitSessionStore:
     def create(self, name: str = "", *, session_id: Optional[str] = None,
                model: Optional[str] = None,
                identity: str = "dashboard:user",
+               source: str = SOURCE,
                created_at: Optional[float] = None,
                updated_at: Optional[float] = None) -> Dict[str, Any]:
         sid = _bounded(session_id, 80).strip() if session_id else ""
@@ -534,14 +548,14 @@ class QubitSessionStore:
         # explicit ``model`` still wins, and the vendored ``/chat`` terminal
         # (``identity="terminal:chat"``) is never re-defaulted, so ``/chat``
         # behaviour and every EXISTING session's stored model are untouched.
-        if not model and str(identity) != _TERMINAL_IDENTITY:
+        if not model and source == SOURCE and str(identity) != _TERMINAL_IDENTITY:
             try:
                 from .chat_transport import local_brain_model
 
                 model = local_brain_model(self._cfg)
             except Exception:  # noqa: BLE001 - keep the shipped default
                 model = None
-        self._db.create_session(sid, source=SOURCE, model=model,
+        self._db.create_session(sid, source=source, model=model,
                                 display_name=title)
         if created_at or updated_at:
             self._set_times(sid, created_at, updated_at)
@@ -742,6 +756,30 @@ class QubitSessionStore:
         self._db.set_session_archived(sid, False)
         return {"state": "OK", "session": self._rec(self._session(sid) or rec)}
 
+    def queue_terminal_model(self, session_id: str, *, model: str, provider: str,
+                             confirmed: bool, min_context_tokens: int) -> Dict[str, Any]:
+        sid = _bounded(session_id, 80)
+        request = {"id": uuid.uuid4().hex, "state": "queued", "model": model,
+                   "provider": provider, "confirmed": confirmed, "min_context_tokens": min_context_tokens}
+        if not self._db.queue_terminal_model_request(sid, request):
+            return {"state": "MISSING", "code": "SESSION_NOT_FOUND"}
+        return {"state": "OK", "terminal_model_request": self._terminal_model_projection(request)}
+
+    @staticmethod
+    def _terminal_model_projection(request: dict) -> dict:
+        return {key: request[key] for key in ("id", "state", "model", "provider") if key in request}
+
+    def terminal_model_status(self, session_id: str) -> Dict[str, Any]:
+        sid = _bounded(session_id, 80)
+        row = self._session(sid)
+        if row is None or row.get("archived"):
+            return {"state": "MISSING", "code": "SESSION_NOT_FOUND"}
+        from qubit_state_sessions import _parse_model_config
+
+        request = _parse_model_config(row.get("terminal_model_request"))
+        return {"state": "OK", "session": self._rec(row),
+                "terminal_model_request": self._terminal_model_projection(request) if request else None}
+
     def set_model(self, session_id: str, model: str, *,
                     provider: str = "", base_url: str = "",
                     api_mode: str = "") -> Dict[str, Any]:
@@ -776,12 +814,14 @@ class QubitSessionStore:
             return {"state": "FAILED", "code": "MALFORMED",
                     "detail": "set_model needs a non-empty model"}
         try:
-            self._db.update_session_model(sid, clean)
-            route = {"provider": str(provider or "").strip() or None,
-                     "base_url": str(base_url or "").strip() or None,
-                     "api_mode": str(api_mode or "").strip() or None}
-            self._db.patch_session_model_config(
-                sid, {"gateway_runtime": dict(route), **route})
+            provider = str(provider or "").strip()
+            base_url = str(base_url or "").strip() or None
+            api_mode = str(api_mode or "").strip() or None
+            self._db.update_session_model(sid, clean, provider or None,
+                                          base_url=base_url, api_mode=api_mode)
+            if not provider:
+                route = {"provider": None, "base_url": base_url, "api_mode": api_mode}
+                self._db.patch_session_model_config(sid, {"gateway_runtime": dict(route), **route})
         except Exception as exc:  # noqa: BLE001 - a write failure is typed
             return {"state": "FAILED", "code": "MODEL_SET_FAILED",
                     "detail": str(exc)[:200]}

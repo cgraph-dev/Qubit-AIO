@@ -25,11 +25,13 @@ import json
 import os
 import re
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import mcp_client as MC
 from . import read_cache as RC
+from .qubit_runtime import artifact_profile_home as profile_home
 
 SCHEMA = "qubit-mcp-servers/1"
 STORE_NAME = "mcp_servers.json"
@@ -55,6 +57,11 @@ INVOKE_READY_CODE = "MCP_INVOCATION_READY"
 INVOKE_ESTOP_CODE = "MCP_ESTOP"
 INVOKE_CONFIRM_CODE = "MCP_CONFIRM_REQUIRED"
 INVOKE_NOT_FOUND_CODE = "MCP_NOT_FOUND"
+CONFIG_CHANGED = "MCP_CONFIG_CHANGED"
+_CONFIG_CHANGED_DETAIL = (
+    "The runtime MCP configuration changed. Review the server definition "
+    "and save the intended settings before connecting from the dashboard."
+)
 INVOKE_REASON = ("MCP_NOT_CONNECTED_NO_CLIENT_INVOCATION: this server is not "
                  "explicitly enabled with a declared tool allowlist; Qubit "
                  "opens no MCP connection and exposes no client tool "
@@ -101,8 +108,24 @@ class McpServerError(Exception):
         self.detail = detail
 
 
+def runtime_home(cfg: Any) -> Path:
+    from . import qubit_runtime as QR
+
+    return profile_home() or Path(QR.runtime_home_for_cfg(cfg))
+
+
+@contextmanager
+def registry_write(cfg: Any):
+    """Serialize registry read-modify-write with any paired config publication."""
+    path = _store_path(cfg)
+    from qubit_cli.config import _env_write_lock
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _env_write_lock(path):
+        yield
+
+
 def _store_path(cfg: Any) -> Path:
-    return Path(cfg.state_dir()) / STORE_NAME
+    return (profile_home() or Path(cfg.state_dir())) / STORE_NAME
 
 
 def _load(cfg: Any) -> Dict[str, Any]:
@@ -123,14 +146,9 @@ def _load(cfg: Any) -> Dict[str, Any]:
 def _save(cfg: Any, data: Dict[str, Any]) -> None:
     path = _store_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2, sort_keys=True),
-                   encoding="utf-8")
-    try:
-        os.chmod(tmp, 0o600)
-    except OSError:
-        pass
-    os.replace(tmp, path)
+    from qubit_cli.config import _write_env_lines
+
+    _write_env_lines(path, [json.dumps(data, indent=2, sort_keys=True)], preserve_mode=False)
 
 
 # ── Runtime store sync ──────────────────────────────────────────────────────
@@ -151,19 +169,17 @@ def _load_runtime_config(cfg: Any) -> Dict[str, Any]:
     runtime home (never the operator's external home), then ``ensure_path`` makes
     the fork importable.
     """
-    from . import qubit_runtime as QR
+    home = runtime_home(cfg)
+    from qubit_cli.config import require_readable_config_before_write
 
-    QR.runtime_home_for_cfg(cfg)
-    QR.ensure_path()
-    from qubit_cli.config import load_config
-
-    config = load_config()
-    return config if isinstance(config, dict) else {}
+    return require_readable_config_before_write(home / "config.yaml")
 
 
 def _save_runtime_config(config: Dict[str, Any]) -> None:
-    from qubit_cli.config import save_config
+    from qubit_cli.config import is_managed, save_config
 
+    if is_managed():
+        raise McpServerError("MCP_CONFIG_MANAGED", "The runtime config is managed by the installation.")
     save_config(config)
 
 
@@ -174,9 +190,9 @@ def _runtime_entry(record: Dict[str, Any], enabled: bool) -> Dict[str, Any]:
     non-secret OAuth marker (``auth: oauth`` plus an optional pre-registered
     ``oauth`` block). The marker is not a credential: without it the runtime
     never builds a provider, so a remote OAuth server (Airtable, Notion, …)
-    installed from the dashboard would 401 forever. Credential ``env:``
-    references and the dashboard-only capability allowlist stay the brokered
-    client's concern; an existing runtime entry is never rewritten with them.
+    installed from the dashboard would 401 forever. Valid environment
+    references become native interpolation templates. Raw credential values
+    and the dashboard-specific capability allowlist stay out of this mirror.
     """
     entry: Dict[str, Any] = {"enabled": bool(enabled)}
     if str(record.get("transport") or "stdio").lower() == "http":
@@ -192,39 +208,78 @@ def _runtime_entry(record: Dict[str, Any], enabled: bool) -> Dict[str, Any]:
             entry["command"] = str(record["command"])
         if record.get("args"):
             entry["args"] = [str(arg) for arg in record["args"]]
+    from .env_store import valid_name
+
+    env = {key: "${env:" + ref[4:] + "}" for key, ref in (record.get("env") or {}).items()
+           if isinstance(ref, str) and ref.startswith("env:") and valid_name(ref[4:])}
+    if env and "url" not in entry:
+        entry["env"] = env
+    if "url" in entry and record.get("auth") == "header" and env.get("MCP_AUTH"):
+        entry["headers"] = {"Authorization": "Bearer " + env["MCP_AUTH"]}
     return entry
 
 
-def _sync_runtime_upsert(cfg: Any, name: str, record: Dict[str, Any]) -> None:
-    """Mirror *record*'s enabled state (and connectivity, for a new entry) into config.yaml."""
-    config = _load_runtime_config(cfg)
-    servers = config.get("mcp_servers")
-    if not isinstance(servers, dict):
-        servers = {}
-        config["mcp_servers"] = servers
-    mirror = _runtime_entry(record, bool(record.get("enabled", False)))
-    existing = servers.get(name)
-    if isinstance(existing, dict):
-        merged = dict(existing)
-        merged["enabled"] = mirror["enabled"]
-        for key, value in mirror.items():
-            if key != "enabled" and key not in merged:
-                merged[key] = value
-        servers[name] = merged
-    else:
-        servers[name] = mirror
-    _save_runtime_config(config)
+def _sync_runtime_upsert(cfg: Any, name: str, record: Dict[str, Any],
+                         changed: Optional[set[str]] = None,
+                         previous: Optional[Dict[str, Any]] = None) -> None:
+    """Mirror explicitly edited transport fields and preserve native metadata."""
+    from qubit_cli.config import _CONFIG_LOCK
+    from qubit_cli.web_server_profiles import _qubit_home_scope
+
+    with _qubit_home_scope(runtime_home(cfg)), _CONFIG_LOCK:
+        config = _load_runtime_config(cfg)
+        servers = config.get("mcp_servers")
+        if not isinstance(servers, dict):
+            servers = {}
+            config["mcp_servers"] = servers
+        mirror = _runtime_entry(record, bool(record.get("enabled", False)))
+        existing = servers.get(name)
+        if not isinstance(existing, dict):
+            servers[name] = mirror
+        else:
+            merged = {**existing, "enabled": mirror["enabled"]}
+            changed = changed or set()
+            if "transport" in changed and bool(existing.get("url")) != ("url" in mirror):
+                obsolete = ("command", "args") if "url" in mirror else ("url", "auth", "oauth", "headers")
+                for key in obsolete:
+                    merged.pop(key, None)
+                changed = changed | set(mirror)
+            for key in ("url", "command", "args", "auth", "oauth"):
+                if key in mirror and (key in changed or key not in merged):
+                    merged[key] = mirror[key]
+                elif key in changed:
+                    merged.pop(key, None)
+            if "auth" in changed and "oauth" not in mirror:
+                merged.pop("oauth", None)
+            if {"env", "auth", "transport"} & changed:
+                prior_mirror = _runtime_entry(previous, False) if previous else {}
+                for field in ("env", "headers"):
+                    entries = dict(merged.get(field) or {})
+                    for key, value in prior_mirror.get(field, {}).items():
+                        if entries.get(key) == value:
+                            entries.pop(key)
+                    entries.update(mirror.get(field, {}))
+                    if entries:
+                        merged[field] = entries
+                    else:
+                        merged.pop(field, None)
+            servers[name] = merged
+        _save_runtime_config(config)
 
 
 def _sync_runtime_remove(cfg: Any, name: str) -> None:
-    """Drop *name* from the runtime config's ``mcp_servers`` map, if present."""
-    config = _load_runtime_config(cfg)
-    servers = config.get("mcp_servers")
-    if isinstance(servers, dict) and name in servers:
-        del servers[name]
-        if not servers:
-            config.pop("mcp_servers", None)
-        _save_runtime_config(config)
+    """Drop one server without rewriting other native configuration."""
+    from qubit_cli.config import _CONFIG_LOCK
+    from qubit_cli.web_server_profiles import _qubit_home_scope
+
+    with _qubit_home_scope(runtime_home(cfg)), _CONFIG_LOCK:
+        config = _load_runtime_config(cfg)
+        servers = config.get("mcp_servers")
+        if isinstance(servers, dict) and name in servers:
+            del servers[name]
+            if not servers:
+                config.pop("mcp_servers", None)
+            _save_runtime_config(config)
 
 
 def _commit(cfg: Any, data: Dict[str, Any], runtime_sync: Any) -> None:
@@ -242,7 +297,8 @@ def _commit(cfg: Any, data: Dict[str, Any], runtime_sync: Any) -> None:
                 pass
         else:
             try:
-                path.write_bytes(prior)
+                from qubit_cli.config import _write_env_lines
+                _write_env_lines(path, [prior.decode("utf-8")], preserve_mode=False)
             except OSError:
                 pass
         raise McpServerError(
@@ -495,9 +551,7 @@ def _runtime_config_path(cfg: Any) -> Optional[Path]:
     resolver only publishes the home into the environment (no file writes).
     """
     try:
-        from . import qubit_runtime as QR
-
-        return Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+        return runtime_home(cfg) / "config.yaml"
     except Exception:  # noqa: BLE001 - inventory is best-effort
         return None
 
@@ -512,11 +566,11 @@ def _runtime_config_servers(cfg: Any) -> Dict[str, Dict[str, Any]]:
     path = _runtime_config_path(cfg)
     if path is None or not path.is_file():
         return {}
-    try:
-        import yaml
+    import yaml
 
+    try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError, yaml.YAMLError):
         return {}
     servers = raw.get("mcp_servers") if isinstance(raw, dict) else None
     if not isinstance(servers, dict):
@@ -547,6 +601,15 @@ def _runtime_config_servers(cfg: Any) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def _runtime_changed(record: Dict[str, Any], native: Optional[Dict[str, Any]]) -> bool:
+    """Detect transport or enabled-state drift without adopting a new endpoint."""
+    if native is None:
+        return bool(record.get("runtime_mirrored"))
+    fields = ("transport", "command", "url", "args", "enabled")
+    return any((record.get(key) or None) != (native.get(key) or None)
+               for key in fields)
+
+
 def _config_get(cfg: Any, *path: str, default: Any = None) -> Any:
     """Read a dotted path from a dict or config object (kwargs-safe)."""
     if isinstance(cfg, dict):
@@ -570,7 +633,9 @@ def _config_get(cfg: Any, *path: str, default: Any = None) -> Any:
     return default
 
 
-def config_server_records(cfg: Any) -> Dict[str, Dict[str, Any]]:
+def config_server_records(cfg: Any, *,
+                          native: Optional[Dict[str, Dict[str, Any]]] = None
+                          ) -> Dict[str, Dict[str, Any]]:
     """Operator-declared MCP servers with their real transport + enabled state.
 
     The MCP CLIENT reads the runtime home's top-level ``mcp_servers`` key
@@ -583,8 +648,8 @@ def config_server_records(cfg: Any) -> Dict[str, Dict[str, Any]]:
     remains inventory-only (the runtime client does not load it). PRB-01:
     read-only; never written, never a second authority.
     """
-    records = _runtime_config_servers(cfg)
-    legacy = _config_get(cfg, "mcp", "servers", default=None)
+    records = _runtime_config_servers(cfg) if native is None else dict(native)
+    legacy = None if profile_home() else _config_get(cfg, "mcp", "servers", default=None)
     if isinstance(legacy, dict):
         for name, entry in legacy.items():
             name = str(name or "").strip()
@@ -644,7 +709,11 @@ def _cached_runtime_status(configured: Dict[str, Dict[str, Any]]
         QR.ensure_path()
         from tools.mcp_tool_discovery import get_mcp_status  # type: ignore
 
-        rows = get_mcp_status(dict(configured), include_runtime=True)
+        from qubit_constants import get_qubit_home_override, get_process_qubit_home
+
+        target = get_qubit_home_override()
+        include_runtime = target is None or Path(target) == get_process_qubit_home()
+        rows = get_mcp_status(dict(configured), include_runtime=include_runtime)
     except Exception:  # noqa: BLE001 - status is best-effort, never a gate
         return {}
     out: Dict[str, Dict[str, Any]] = {}
@@ -736,25 +805,27 @@ def _list_servers_uncached(cfg: Any) -> Dict[str, Any]:
     # connection per row; a server whose live tools/list was recorded reads
     # connected, everything else stays honestly disconnected).
     discovered = _discovered_servers()
-    config_records = config_server_records(cfg)
+    native_records = _runtime_config_servers(cfg)
+    config_records = config_server_records(cfg, native=native_records)
+    changed = set()
     for name, rec in sorted(data["servers"].items()):
         if not isinstance(rec, dict):
             continue
-        rows.append(_public(rec, connected=name in discovered))
+        row = _public(rec, connected=name in discovered)
+        native = native_records.get(name)
+        if _runtime_changed(rec, native):
+            changed.add(name)
+            row.update(enabled=bool(native and native["enabled"]), connected=False,
+                       invocable=False, invocation_code=CONFIG_CHANGED,
+                       status="config-changed", error=_CONFIG_CHANGED_DETAIL)
+        rows.append(row)
         seen.add(name)
     for name, rec in sorted(config_records.items()):
         if name in seen:
             continue
         row = _public(rec, connected=name in discovered)
         row["source"] = "qubit-config"
-        # PRB-01: a config.yaml-declared server is READ-ONLY inventory here.
-        # ``set_enabled`` writes the canonical registry store only, so an
-        # enable/disable on this row would raise MCP_NOT_FOUND; and the runtime
-        # MCP client (``tools/mcp_tool_config._load_mcp_config``) loads every
-        # ``mcp_servers`` entry without consulting ``enabled`` at all, so
-        # persisting a flag would not switch anything. Mark the row
-        # non-editable so the dashboard offers no toggle instead of a control
-        # that cannot act. The operator edits config.yaml.
+        # Operator-declared rows keep their native configuration authority.
         row["editable"] = False
         rows.append(row)
         seen.add(name)
@@ -766,7 +837,10 @@ def _list_servers_uncached(cfg: Any) -> Dict[str, Any]:
            if isinstance(rec, dict) and name not in config_records})
     if runtime:
         for row in rows:
-            status_row = runtime.get(str(row.get("name")))
+            name = str(row.get("name"))
+            if name in changed:
+                continue
+            status_row = runtime.get(name)
             if not status_row:
                 continue
             status = str(status_row.get("status") or "")
@@ -786,6 +860,8 @@ def _list_servers_uncached(cfg: Any) -> Dict[str, Any]:
     # token cache, never a connection or a fabricated login result.
     catalog_oauth = _catalog_oauth_urls()
     for row in rows:
+        if row["name"] in changed:
+            continue
         if row.get("connected") or not bool(row.get("enabled", False)):
             continue
         name = str(row.get("name") or "")
@@ -829,16 +905,14 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
     :func:`delete`, :func:`set_enabled` and discovery also invalidate eagerly.
     """
     try:
-        from . import qubit_runtime as QR
-
-        runtime_cfg = Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
-        schema_cache = (Path(QR.runtime_home_for_cfg(cfg)) / "cache"
-                        / "mcp_schema_cache.json")
+        home = runtime_home(cfg)
+        runtime_cfg = home / "config.yaml"
+        schema_cache = home / "cache" / "mcp_schema_cache.json"
     except Exception:  # noqa: BLE001 - still cacheable by config identity
         runtime_cfg = None
         schema_cache = None
     key = RC.cfg_key(
-        cfg, "mcp_servers",
+        cfg, "mcp_servers", _store_path(cfg), runtime_cfg,
         RC.stamp_of(_store_path(cfg), runtime_cfg, schema_cache))
     hit = RC.get(key)
     if hit is not None:
@@ -880,43 +954,67 @@ def sanitize_catalog_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
 def upsert(cfg: Any, name: str, fields: Dict[str, Any],
            confirmed: bool = False) -> Dict[str, Any]:
     clean = _check_name(name)
-    data = _load(cfg)
-    servers = data["servers"]
-    if clean not in servers and len(servers) >= MAX_SERVERS:
-        raise McpServerError("MCP_LIMIT", f"server limit ({MAX_SERVERS}) reached")
-    existing = servers.get(clean) if isinstance(servers.get(clean), dict) else {}
-    merged = {**existing, **fields, "name": clean}
-    merged["enabled"] = bool(fields.get("enabled", existing.get("enabled",
-                                                               False)))
-    merged.pop("confirm", None)
-    clean_record = _validate(merged)
-    clean_record["name"] = clean
-    clean_record["updated_at"] = time.time()
-    servers[clean] = clean_record
-    _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, clean_record))
-    return {"state": "OK", "server": _public(clean_record)}
+    with registry_write(cfg):
+        data = _load(cfg)
+        servers = data["servers"]
+        if clean not in servers and len(servers) >= MAX_SERVERS:
+            raise McpServerError("MCP_LIMIT", f"server limit ({MAX_SERVERS}) reached")
+        existing = servers.get(clean) if isinstance(servers.get(clean), dict) else {}
+        merged = {**existing, **fields, "name": clean}
+        if "auth_type" in fields and "auth" not in fields:
+            merged["auth"] = fields["auth_type"]
+        if "auth" in merged and merged["auth"] != "oauth" and "oauth" not in fields:
+            merged.pop("oauth", None)
+        merged["enabled"] = bool(fields.get("enabled", existing.get("enabled",
+                                                                   False)))
+        merged.pop("confirm", None)
+        clean_record = _validate(merged)
+        clean_record["name"] = clean
+        clean_record["runtime_mirrored"] = True
+        clean_record["updated_at"] = time.time()
+        servers[clean] = clean_record
+        changed = set(fields)
+        if not existing and clean_record["transport"] == "stdio":
+            # A new registration owns its argument vector, including an empty one.
+            changed.add("args")
+        if "auth_type" in changed:
+            changed.add("auth")
+        _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, clean_record, changed, existing))
+        return {"state": "OK", "server": _public(clean_record)}
 
 
 def delete(cfg: Any, name: str) -> Dict[str, Any]:
     clean = _check_name(name)
-    data = _load(cfg)
-    existed = clean in data["servers"]
-    data["servers"].pop(clean, None)
-    if existed:
-        _commit(cfg, data, lambda: _sync_runtime_remove(cfg, clean))
-    return {"state": "OK", "name": clean, "removed": existed}
+    with registry_write(cfg):
+        data = _load(cfg)
+        existed = clean in data["servers"]
+        if not existed and clean in config_server_records(cfg):
+            raise McpServerError("MCP_CONFIG_READ_ONLY", "Edit the server in its runtime configuration.")
+        if existed:
+            native = _runtime_config_servers(cfg).get(clean)
+            record = data["servers"][clean]
+            if native is not None and isinstance(record, dict) and _runtime_changed(record, native):
+                raise McpServerError(CONFIG_CHANGED, _CONFIG_CHANGED_DETAIL)
+        data["servers"].pop(clean, None)
+        if existed:
+            _commit(cfg, data, lambda: _sync_runtime_remove(cfg, clean))
+        return {"state": "OK", "name": clean, "removed": existed}
 
 
 def set_enabled(cfg: Any, name: str, enabled: bool) -> Dict[str, Any]:
     clean = _check_name(name)
-    data = _load(cfg)
-    rec = data["servers"].get(clean)
-    if not isinstance(rec, dict):
-        raise McpServerError("MCP_NOT_FOUND", f"no registered server {clean!r}")
-    rec["enabled"] = bool(enabled)
-    rec["updated_at"] = time.time()
-    _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, rec))
-    return {"state": "OK", "server": _public(rec)}
+    with registry_write(cfg):
+        data = _load(cfg)
+        rec = data["servers"].get(clean)
+        if not isinstance(rec, dict):
+            raise McpServerError("MCP_NOT_FOUND", f"no registered server {clean!r}")
+        if _runtime_changed(rec, _runtime_config_servers(cfg).get(clean)):
+            raise McpServerError(CONFIG_CHANGED, _CONFIG_CHANGED_DETAIL)
+        rec["enabled"] = bool(enabled)
+        rec["runtime_mirrored"] = True
+        rec["updated_at"] = time.time()
+        _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, rec))
+        return {"state": "OK", "server": _public(rec)}
 
 
 def _redact_probe(text: object) -> str:
@@ -1029,8 +1127,7 @@ def test(cfg: Any, name: str, *, probe: bool = True,
     (``MCP_NOT_CONNECTED``).
     """
     clean = _check_name(name)
-    data = _load(cfg)
-    rec = data["servers"].get(clean)
+    rec = _stored_record(cfg, clean)
     if not isinstance(rec, dict):
         # A server declared only in the operator's config is still real
         # inventory: validate it locally rather than 404ing.
@@ -1106,7 +1203,7 @@ def discover(cfg: Any, name: str, *, persist: bool = False,
     no tool is ever invented.
     """
     clean = _check_name(name)
-    _authorize(cfg, "mcp.discover", confirmed=confirmed,
+    _authorize(cfg, "mcp.discover", name=clean, confirmed=confirmed,
                confirmation_id=confirmation_id, requested_by=requested_by)
     rec = _stored_record(cfg, clean)
     if not isinstance(rec, dict):
@@ -1126,11 +1223,12 @@ def discover(cfg: Any, name: str, *, persist: bool = False,
     tools = [t for t in result["tools"] if _CAP_RE.match(str(t))]
     tools = tools[:MAX_CAPABILITIES]
     if persist:
-        data = _load(cfg)
-        stored = data["servers"].get(clean)
-        if isinstance(stored, dict):
-            stored["capabilities"] = tools
-            stored["updated_at"] = time.time()
+        with registry_write(cfg):
+            stored = _stored_record(cfg, clean)
+            if stored != rec:
+                raise McpServerError(CONFIG_CHANGED, _CONFIG_CHANGED_DETAIL)
+            data = _load(cfg)
+            data["servers"][clean] = {**stored, "capabilities": tools, "updated_at": time.time()}
             _save(cfg, data)
             RC.invalidate("mcp_servers")
     _audit("discover", requested_by,
@@ -1167,24 +1265,29 @@ def set_auth_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
     it is written only by the approved-flow bridge (``qubit_compat``).
     """
     clean = _check_name(name)
-    data = _load(cfg)
-    rec = data["servers"].get(clean)
-    if not isinstance(rec, dict):
-        raise McpServerError("MCP_NOT_FOUND", f"no registered server {clean!r}")
-    value = _bounded(ref, 256)
-    if not _REF_RE.match(value):
-        raise McpServerError("SECRET_WRITE_REFUSED",
-                             "auth accepts a vault:/env:/file: reference only, "
-                             "never a raw token")
-    env = dict(rec.get("env") or {})
-    env["MCP_AUTH"] = value
-    rec["env"] = env
-    rec["auth"] = "header"
-    rec["updated_at"] = time.time()
-    _save(cfg, data)
-    RC.invalidate("mcp_servers")
-    return {"state": "OK", "name": clean, "reference": value,
-            "reference_set": True, "auth": "header"}
+    with registry_write(cfg):
+        data = _load(cfg)
+        rec = data["servers"].get(clean)
+        if not isinstance(rec, dict):
+            raise McpServerError("MCP_NOT_FOUND", f"no registered server {clean!r}")
+        if _runtime_changed(rec, _runtime_config_servers(cfg).get(clean)):
+            raise McpServerError(CONFIG_CHANGED, _CONFIG_CHANGED_DETAIL)
+        value = _bounded(ref, 256)
+        if not _REF_RE.match(value):
+            raise McpServerError("SECRET_WRITE_REFUSED",
+                                 "auth accepts a vault:/env:/file: reference only, "
+                                 "never a raw token")
+        prior = dict(rec)
+        env = dict(rec.get("env") or {})
+        env["MCP_AUTH"] = value
+        rec["env"] = env
+        rec["auth"] = "header"
+        rec["runtime_mirrored"] = True
+        rec.pop("oauth", None)
+        rec["updated_at"] = time.time()
+        _commit(cfg, data, lambda: _sync_runtime_upsert(cfg, clean, rec, {"auth", "env"}, prior))
+        return {"state": "OK", "name": clean, "reference": value,
+                "reference_set": True, "auth": "header"}
 
 
 def auth_status(cfg: Any, name: str) -> Dict[str, Any]:
@@ -1235,43 +1338,43 @@ def _approval_journal(cfg: Any):
                            default_ttl_s=120.0)
 
 
-def _consume_journal_approval(cfg: Any, capability: str,
-                              confirmation_id: str) -> bool:
-    from .approvals import ABORTED, COMPLETE, DENIED, EXECUTING, IN_PROGRESS
+def _consume_journal_approval(cfg: Any, capability: str, confirmation_id: str,
+                              scope: Dict[str, str]) -> bool:
+    from .approvals import EXECUTING, IN_PROGRESS
+    from qubit_cli.config import _env_write_lock
 
-    try:
+    path = Path(cfg.state_dir()) / "approvals.jsonl"
+    with _env_write_lock(path):
         journal = _approval_journal(cfg)
-        item = journal.get(str(confirmation_id or "").strip())
-    except Exception:
-        return False
-    if item is None or item.capability != capability:
-        return False
-    if item.decision not in (None, "approve"):
-        return False
-    if item.state == IN_PROGRESS:
-        if item.expires_at <= time.time():
-            journal.abort(item.id)
+        item = journal.get(confirmation_id.strip())
+        if item is None or item.capability != capability or item.decision not in (None, "approve"):
             return False
-        item = journal.respond(item.id, "approve")
-    if item.state == EXECUTING:
+        bound_scope = (item.meta or {}).get("mcp_target")
+        if bound_scope != scope and (bound_scope is not None or profile_home() is not None):
+            return False
+        if item.state == IN_PROGRESS:
+            item = journal.respond(item.id, "approve")
+        if item.state != EXECUTING or item.expires_at <= time.time():
+            return False
         journal.finish(item.id)
         return True
-    if item.state in (COMPLETE, ABORTED, DENIED):
-        return False
-    return False
 
 
-def _authorize(cfg: Any, capability: str, *, confirmed: bool,
-               confirmation_id: str, requested_by: str) -> None:
+def _authorize(cfg: Any, capability: str, *, name: str, tool: str = "",
+               confirmed: bool, confirmation_id: str, requested_by: str) -> None:
     """One gate: e-stop -> shared durable journal confirmation, fail closed."""
     if _estop(cfg):
         raise McpServerError(INVOKE_ESTOP_CODE, "emergency stop is latched")
+    scope = {"home": str(runtime_home(cfg).resolve()), "server": name, "tool": tool}
     if confirmation_id:
-        if not _consume_journal_approval(cfg, capability, confirmation_id):
+        try:
+            accepted = _consume_journal_approval(cfg, capability, confirmation_id, scope)
+        except Exception:
+            accepted = False
+        if not accepted:
             raise McpServerError(
                 INVOKE_CONFIRM_CODE,
-                "confirmation id is unknown, expired, already used, or for "
-                "another capability")
+                "confirmation is unavailable for this profile, server or operation")
         return
     if not confirmed:
         raise McpServerError(
@@ -1281,7 +1384,7 @@ def _authorize(cfg: Any, capability: str, *, confirmed: bool,
         journal = _approval_journal(cfg)
         actor = _bounded(requested_by, 64)
         item = journal.create(capability, f"{capability} via {actor}",
-                              ttl_s=120.0, session="mcp", actor=actor)
+                              ttl_s=120.0, session="mcp", actor=actor, mcp_target=scope)
         journal.respond(item.id, "approve")
         journal.finish(item.id)
     except Exception as exc:  # noqa: BLE001 - fail closed at the boundary
@@ -1345,8 +1448,12 @@ def invocation_status(cfg: Any, name: str) -> Dict[str, Any]:
 
 
 def _stored_record(cfg: Any, name: str) -> Optional[Dict[str, Any]]:
-    rec = _load(cfg).get("servers", {}).get(name)
-    return rec if isinstance(rec, dict) else None
+    rec = _load(cfg)["servers"].get(name)
+    if not isinstance(rec, dict):
+        return None
+    if _runtime_changed(rec, _runtime_config_servers(cfg).get(name)):
+        raise McpServerError(CONFIG_CHANGED, _CONFIG_CHANGED_DETAIL)
+    return rec
 
 
 def _capability_disposition(name: str, method: str, code: str,
@@ -1460,9 +1567,9 @@ def invoke(cfg: Any, name: str, *, tool: str = "",
     code (``MCP_CONNECT_FAILED`` / ``MCP_TIMEOUT`` / ``MCP_PROTOCOL_ERROR`` /
     ``MCP_TOOL_NOT_ALLOWED`` / ``MCP_SECRET_UNRESOLVED``).
     """
-    _authorize(cfg, "mcp.invoke", confirmed=confirmed,
-               confirmation_id=confirmation_id, requested_by=requested_by)
     clean = _check_name(name)
+    _authorize(cfg, "mcp.invoke", name=clean, tool=tool, confirmed=confirmed,
+               confirmation_id=confirmation_id, requested_by=requested_by)
     rec = _stored_record(cfg, clean)
     if isinstance(rec, dict) and _invocable(rec):
         if timeout_s is None:
@@ -1542,7 +1649,7 @@ def invoke_method(cfg: Any, name: str, method: str, *,
     if op not in OPERATION_METHODS:
         raise McpServerError("MCP_BAD_INPUT",
                              f"method {op!r} is not a sanctioned client method")
-    _authorize(cfg, f"mcp.{op}", confirmed=confirmed,
+    _authorize(cfg, f"mcp.{op}", name=clean, confirmed=confirmed,
                confirmation_id=confirmation_id, requested_by=requested_by)
     rec = _stored_record(cfg, clean)
     if not isinstance(rec, dict):

@@ -223,7 +223,7 @@ describe("SessionsPage archived rows", () => {
     await act(async () => click(restore));
     expect(apiMocks.patchChatSession).toHaveBeenCalledWith("sid-archived", {
       archived: false,
-    });
+    }, "current");
   });
 });
 

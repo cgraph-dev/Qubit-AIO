@@ -20,7 +20,8 @@ export function SystemActionsProvider({
   children: React.ReactNode;
 }) {
   const [pendingAction, setPendingAction] = useState<SystemAction | null>(null);
-  const [activeAction, setActiveAction] = useState<SystemAction | null>(null);
+  const [actionRun, setActionRun] = useState<{ action: SystemAction; profile?: string } | null>(null);
+  const activeAction = actionRun?.action ?? null;
   const [actionStatus, setActionStatus] = useState<ActionStatusResponse | null>(
     null,
   );
@@ -34,13 +35,16 @@ export function SystemActionsProvider({
   }, [toast]);
 
   useEffect(() => {
-    if (!activeAction) return;
-    const name = ACTION_NAMES[activeAction];
+    if (!actionRun) return;
+    const name = ACTION_NAMES[actionRun.action];
     let cancelled = false;
+    let failures = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const poll = async () => {
       try {
-        const resp = await api.getActionStatus(name);
+        const resp = await api.getActionStatus(name, undefined, actionRun.profile);
+        failures = 0;
         if (cancelled) return;
         setActionStatus(resp);
         if (!resp.running) {
@@ -54,19 +58,25 @@ export function SystemActionsProvider({
           return;
         }
       } catch {
-        // transient fetch error; keep polling
+        if (!cancelled && ++failures > 8) {
+          const message = "The dashboard could not verify the action outcome.";
+          setActionStatus({ name, running: false, exit_code: null, pid: null, lines: [message] });
+          setToast({ type: "error", message });
+          return;
+        }
       }
-      if (!cancelled) setTimeout(poll, 1500);
+      if (!cancelled) timer = setTimeout(poll, 1500);
     };
 
     poll();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [activeAction, t.status.actionFinished, t.status.actionFailed]);
+  }, [actionRun, t.status.actionFinished, t.status.actionFailed]);
 
   const runAction = useCallback(
-    async (action: SystemAction) => {
+    async (action: SystemAction, profile?: string) => {
       setPendingAction(action);
       setActionStatus(null);
       try {
@@ -75,8 +85,8 @@ export function SystemActionsProvider({
           // collected the human decision before calling runAction, so the
           // confirm-gated API round-trip must carry that consent explicitly —
           // otherwise the default window.confirm prompt fires a second time.
-          await api.restartGateway(() => true);
-          setActiveAction(action);
+          await api.restartGateway(() => true, profile);
+          setActionRun({ action, profile });
         } else {
           const resp = await api.updateQubit();
           // Some installs cannot apply updates from inside the dashboard. The
@@ -94,7 +104,7 @@ export function SystemActionsProvider({
             });
             return;
           }
-          setActiveAction(action);
+          setActionRun({ action });
         }
       } catch (err) {
         // Dashboard self-update / process-supervision refusals are expected,
@@ -118,7 +128,7 @@ export function SystemActionsProvider({
   );
 
   const dismissLog = useCallback(() => {
-    setActiveAction(null);
+    setActionRun(null);
     setActionStatus(null);
   }, []);
 

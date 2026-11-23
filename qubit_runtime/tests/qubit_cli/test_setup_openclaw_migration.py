@@ -31,6 +31,24 @@ class TestOfferOpenclawMigration:
         ):
             assert setup_mod._offer_openclaw_migration(tmp_path / ".hermes") is False
 
+    def test_invalid_source_leaves_new_profile_unwritten(self, tmp_path, monkeypatch, capsys):
+        source = tmp_path / ".openclaw"
+        source.mkdir()
+        (source / "openclaw.json").write_text("{bad: 'fixture-secret")
+        target = tmp_path / ".qubit"
+
+        monkeypatch.setattr(setup_mod.Path, "home", lambda: tmp_path)
+        monkeypatch.setattr(setup_mod, "get_config_path", lambda: target / "config.yaml")
+        confirm = MagicMock(return_value=True)
+        monkeypatch.setattr(setup_mod, "prompt_yes_no", confirm)
+
+        assert setup_mod._offer_openclaw_migration(target) is False
+        assert confirm.call_count == 1
+        assert not target.exists()
+        output = capsys.readouterr()
+        assert "Cannot read openclaw.json" in output.out
+        assert "fixture-secret" not in output.out + output.err
+
     def test_runs_migration_when_user_accepts(self, tmp_path):
         """Should run dry-run preview first, then execute after confirmation."""
         openclaw_dir = tmp_path / ".openclaw"

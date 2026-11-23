@@ -1,4 +1,4 @@
-"""Tests for qubit_cli.agent_import — ``hermes import-agent``.
+"""Tests for qubit_cli.agent_import_legacy — ``hermes import-agent``.
 
 Covers: source detection, Claude Code and Codex parsing, mapping into the
 real Hermes stores (memories/MEMORY.md, config.yaml command_allowlist /
@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import qubit_yaml as yaml
 
-from qubit_cli.agent_import import (
+from qubit_cli.agent_import_legacy import (
     ENTRY_DELIMITER,
     AgentImporter,
     claude_rule_to_command_pattern,
@@ -653,7 +653,7 @@ class TestExistingConfigPreserved:
     def test_failed_write_does_not_truncate_the_existing_config(
             self, qubit_home, config_path, monkeypatch):
         """An interrupted dump leaves the previous file complete."""
-        from qubit_cli import agent_import
+        from qubit_cli import agent_import_legacy as agent_import
 
         config_path.write_text(EXISTING_CONFIG, encoding="utf-8")
         before = config_path.read_bytes()
@@ -688,7 +688,7 @@ class TestCliWiring:
             self, claude_tree, qubit_home, capsys):
         """End-to-end through import_agent_command with --dry-run."""
         import types
-        from qubit_cli.agent_import import import_agent_command
+        from qubit_cli.agent_import_legacy import import_agent_command
 
         args = types.SimpleNamespace(
             agent="claude-code", source=str(claude_tree), dry_run=True,
@@ -712,7 +712,7 @@ class TestCliWiring:
 class TestSyncManifest:
     def _run_command(self, agent, source, dry_run=False, sync=False):
         import types
-        from qubit_cli.agent_import import import_agent_command
+        from qubit_cli.agent_import_legacy import import_agent_command
 
         import_agent_command(types.SimpleNamespace(
             agent=agent, source=str(source) if source else None,

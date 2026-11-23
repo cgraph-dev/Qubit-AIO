@@ -726,16 +726,6 @@ export default function CronPage() {
   }, []);
 
   useEffect(() => {
-    api
-      .getCronDeliveryTargets()
-      .then((res) => setDeliveryTargets(normalizeDeliveryTargets(res)))
-      .catch(() =>
-        // Fall back to local-only so the modal still works if the endpoint fails.
-        setDeliveryTargets(LOCAL_DELIVERY_TARGETS),
-      );
-  }, []);
-
-  useEffect(() => {
     jobsActiveRef.current = true;
     selectedProfileRef.current = selectedProfile;
     loadJobs(selectedProfile);
@@ -755,13 +745,15 @@ export default function CronPage() {
       api.getSkills(resourceProfile).catch(() => []),
       api.getToolsets(resourceProfile).catch(() => []),
       api.getModelOptions(resourceProfile).catch(() => null),
-    ]).then(([skills, toolsets, options]) => {
+      api.getCronDeliveryTargets(resourceProfile).catch(() => undefined),
+    ]).then(([skills, toolsets, options, targets]) => {
       if (cancelled) return;
       const skillList = Array.isArray(skills) ? skills : [];
       const toolsetList = Array.isArray(toolsets) ? toolsets : [];
       setAvailableSkills([...skillList].sort((a, b) => a.name.localeCompare(b.name)));
       setAvailableToolsets([...toolsetList].sort((a, b) => a.name.localeCompare(b.name)));
       setModelOptions(options);
+      setDeliveryTargets(normalizeDeliveryTargets(targets));
     });
     return () => {
       cancelled = true;
@@ -815,14 +807,9 @@ export default function CronPage() {
     }
     setSaving(true);
     try {
-      // ``cron_update`` requires the ``enabled`` field (it repurposed PUT for
-      // the enable/disable transition); the edit form does not change it, so
-      // carry the current value through. The store then applies the editable
-      // fields in place.
-      const update = { ...payload, enabled: editJob.enabled };
       await api.updateCronJob(
         editJob.id,
-        update,
+        payload,
         getJobProfile(editJob),
       );
       showToast("Saved changes ✓", "success");
@@ -864,7 +851,7 @@ export default function CronPage() {
 
   const handleTrigger = async (job: CronJob) => {
     const jobKey = getJobKey(job);
-    const label = `${t.cron.triggerNow}: "${truncateText(getJobTitle(job), 30)}"`;
+    const label = truncateText(getJobTitle(job), 30);
     const viewProfile = selectedProfile;
     const controller = triggerControllerRef.current;
 
@@ -886,7 +873,7 @@ export default function CronPage() {
         !result.started
       ) return;
 
-      showToast(`${label} ✓`, "success");
+      showToast(`Queued “${label}”`, "success");
       emitFx("success");
       loadJobs(viewProfile);
     } catch (e) {
@@ -1151,7 +1138,11 @@ export default function CronPage() {
                   label: profileLabel(profile.name),
                 })),
               ]}
-              onChange={(v) => setSelectedProfile(v)}
+              onChange={(v) => {
+                if (v === selectedProfile) return;
+                setJobs([]);
+                setSelectedProfile(v);
+              }}
             />
           </div>
         </div>

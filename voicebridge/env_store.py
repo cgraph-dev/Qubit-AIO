@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 import os
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -40,7 +42,31 @@ MAX_REF_CHARS = 512
 _ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+_SCOPED_HOME: ContextVar[Path | None] = ContextVar("keys_home", default=None)
+
+
+@contextmanager
+def profile_scope(home: Path | None):
+    """Use the routed profile's native .env and its own reference registry."""
+    token = _SCOPED_HOME.set(home)
+    try:
+        yield
+    finally:
+        _SCOPED_HOME.reset(token)
+
+
+def _native_config():
+    from . import qubit_runtime
+    qubit_runtime.ensure_path()
+    from qubit_cli import config
+
+    return config
+
+
 def _base(cfg: Any) -> Path:
+    home = _SCOPED_HOME.get()
+    if home is not None:
+        return home
     try:
         return Path(cfg.state_dir())
     except Exception:  # noqa: BLE001 - a config-less caller gets a safe temp
@@ -65,13 +91,19 @@ def read_path(cfg: Any) -> Path:
     return legacy if legacy.exists() else new
 
 
-def load(cfg: Any) -> Dict[str, str]:
+def load(cfg: Any, *, for_update: bool = False) -> Dict[str, str]:
     """Read the registry (values are reference strings only)."""
     try:
         raw = json.loads(read_path(cfg).read_text())
+    except FileNotFoundError:
+        return {}
     except (OSError, ValueError):
+        if for_update:
+            raise
         return {}
     if not isinstance(raw, dict):
+        if for_update:
+            raise ValueError("The environment reference registry must be a JSON object.")
         return {}
     return {str(k): str(v) for k, v in raw.items()}
 
@@ -90,27 +122,15 @@ def runtime_env_names(cfg: Any) -> set:
     returns the dotenv-style variable NAMES only; values are never read out,
     cached, or returned. Any read error yields the empty set (fail closed).
     """
+    return set(_file_values(cfg))
+
+def _file_values(cfg: Any) -> Dict[str, str | None]:
+    from dotenv import dotenv_values
+
     try:
-        from . import config as _config
-        path = Path(_config.canonical_runtime_env_path())
-    except Exception:  # noqa: BLE001 - unresolvable home -> no names
-        return set()
-    try:
-        text = path.read_text(errors="replace")
+        return dict(dotenv_values(_runtime_env_path(cfg), interpolate=False))
     except OSError:
-        return set()
-    found: set = set()
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].strip()
-        key, sep, _value = line.partition("=")
-        key = key.strip()
-        if sep and key:
-            found.add(key)
-    return found
+        return {}
 
 
 def present_names(cfg: Any) -> set:
@@ -145,6 +165,8 @@ def reference_present(cfg: Any, ref: str) -> bool:
     if not kind:
         return False
     if kind in RESOLVABLE_REF_KINDS:
+        if _SCOPED_HOME.get() is not None:
+            return is_resolved(text)
         try:
             from .providers.credentials import resolve_key
 
@@ -165,6 +187,12 @@ def is_resolved(ref: str) -> bool:
     never read out, cached, logged, or returned. Fail-closed on any error.
     """
     try:
+        home = _SCOPED_HOME.get()
+        text = str(ref or "").strip()
+        if home is not None and text.startswith("env:"):
+            from agent.secret_scope import build_profile_secret_scope
+
+            return bool(build_profile_secret_scope(home).get(text[4:].strip()))
         from .providers.credentials import resolve_key
 
         value, code = resolve_key("env-ref", str(ref or ""))
@@ -180,10 +208,21 @@ def resolved_names(cfg: Any) -> set:
     registry references that truly resolve. This is the honest replacement for
     conflating "a registry row exists" with "the credential is present".
     """
-    out = set(runtime_env_names(cfg))
-    out |= set(os.environ.keys())
+    home = _SCOPED_HOME.get()
+    if home is None:
+        out = {key for key, value in _file_values(cfg).items() if value}
+        out.update(key for key, value in os.environ.items() if value)
+    else:
+        from agent.secret_scope import build_profile_secret_scope
+
+        out = {key for key, value in build_profile_secret_scope(home).items() if value}
+    env_names = frozenset(out)
     for name, ref in load(cfg).items():
-        if is_resolved(ref):
+        if home is not None and ref.startswith("env:"):
+            present = ref[4:].strip() in env_names
+        else:
+            present = is_resolved(ref)
+        if present:
             out.add(str(name))
     return out
 
@@ -191,18 +230,11 @@ def resolved_names(cfg: Any) -> set:
 def _save(cfg: Any, data: Dict[str, str]) -> None:
     path = store_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
-    try:
-        os.chmod(tmp, 0o600)
-    except OSError:
-        pass
+    writer = _native_config()._write_env_lines
     if path.exists():
-        try:
-            path.with_suffix(path.suffix + ".bak").write_bytes(path.read_bytes())
-        except OSError:
-            pass
-    os.replace(tmp, path)
+        writer(path.with_suffix(path.suffix + ".bak"),
+               [path.read_text(encoding="utf-8")], preserve_mode=False)
+    writer(path, [json.dumps(data, indent=2, sort_keys=True)], preserve_mode=False)
 
 
 def reference_kind(value: str) -> str:
@@ -301,9 +333,12 @@ def set_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
     ok, detail = validate_reference(value)
     if not ok:
         raise ValueError(detail)
-    data = load(cfg)
-    data[clean] = value
-    _save(cfg, data)
+    path = store_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _native_config()._env_write_lock(path):
+        data = load(cfg, for_update=True)
+        data[clean] = value
+        _save(cfg, data)
     return {"name": clean, "count": len(data)}
 
 
@@ -312,16 +347,22 @@ def remove_ref(cfg: Any, name: str) -> Dict[str, Any]:
     clean = str(name or "").strip()
     if not clean:
         raise ValueError("env reference name required")
-    data = load(cfg)
-    existed = clean in data
-    data.pop(clean, None)
-    if existed:
-        _save(cfg, data)
+    path = store_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _native_config()._env_write_lock(path):
+        data = load(cfg, for_update=True)
+        existed = clean in data
+        if existed:
+            del data[clean]
+            _save(cfg, data)
     return {"name": clean, "removed": existed, "count": len(data)}
 
 
 def _runtime_env_path(cfg: Any) -> Path:
     """The canonical runtime ``.env`` this install's process/children read."""
+    home = _SCOPED_HOME.get()
+    if home is not None:
+        return home / ".env"
     from . import config as _config
     return Path(_config.canonical_runtime_env_path())
 
@@ -346,40 +387,51 @@ def write_secret(cfg: Any, name: str, value: str) -> Dict[str, Any]:
         raise ValueError("secret value is empty or malformed")
     path = _runtime_env_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines: List[str] = []
-    if path.exists():
+    native = _native_config()
+    native.require_env_writable(clean, "set")
+    with native._env_write_lock(path):
+        lines = native._read_env_lines(path) if path.exists() else []
+        remaining = [line for line in lines if not native._env_line_defines_key(line, clean)]
+        if remaining and not remaining[-1].endswith("\n"):
+            remaining[-1] += "\n"
+        remaining.append(f"{clean}={native._quote_env_value(secret)}\n")
+        native._write_env_lines(path, remaining, preserve_mode=False)
+        if _SCOPED_HOME.get() is None:
+            os.environ[clean] = secret
+    native.invalidate_env_cache()
+    return {"name": clean, "stored": "env", "replaced": len(remaining) <= len(lines)}
+
+
+@contextmanager
+def secret_value_transaction(cfg: Any, values: Dict[str, str]):
+    """Write form credentials and restore the prior values if registration fails."""
+    if not values:
+        yield
+        return
+    path = _runtime_env_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    native = _native_config()
+    from utils import atomic_write_bytes
+
+    with native._env_write_lock(path):
+        prior = path.read_bytes() if path.exists() else None
+        prior_env = {name: os.environ.get(name) for name in values} if _SCOPED_HOME.get() is None else {}
         try:
-            lines = path.read_text(errors="replace").splitlines()
-        except OSError:
-            lines = []
-    replaced = False
-    out: List[str] = []
-    for line in lines:
-        stripped = line.strip()
-        key = stripped[len("export "):].strip() if stripped.startswith("export ") else stripped
-        k, sep, _v = key.partition("=")
-        if sep and k.strip() == clean:
-            out.append(f"{clean}={secret}")
-            replaced = True
-        else:
-            out.append(line)
-    if not replaced:
-        out.append(f"{clean}={secret}")
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text("\n".join(out) + "\n")
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, path)
-    # The vendored runtime dotenv-loads the canonical .env into os.environ at
-    # import, so a key rotated here was shadowed by the stale in-process copy
-    # until a full restart (live 2026-10-05: the owner replaced a rate-limited
-    # OpenCode Go key and every provider call kept failing until the service
-    # restarted). Keep the process env in step with the canonical store the
-    # moment it changes — never logged, never echoed.
-    try:
-        os.environ[clean] = secret
-    except Exception:
-        pass
-    return {"name": clean, "stored": "env", "replaced": replaced}
+            for name, value in values.items():
+                write_secret(cfg, name, value)
+            yield
+        except BaseException:
+            if prior is None:
+                path.unlink(missing_ok=True)
+            else:
+                atomic_write_bytes(path, prior, mode=0o600)
+            for name, value in prior_env.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+            native.invalidate_env_cache()
+            raise
 
 
 def remove_secret(cfg: Any, name: str) -> Dict[str, Any]:
@@ -390,30 +442,18 @@ def remove_secret(cfg: Any, name: str) -> Dict[str, Any]:
     path = _runtime_env_path(cfg)
     if not path.exists():
         return {"name": clean, "removed": False}
-    try:
-        lines = path.read_text(errors="replace").splitlines()
-    except OSError:
-        return {"name": clean, "removed": False}
-    out: List[str] = []
-    removed = False
-    for line in lines:
-        stripped = line.strip()
-        key = stripped[len("export "):].strip() if stripped.startswith("export ") else stripped
-        k, sep, _v = key.partition("=")
-        if sep and k.strip() == clean:
-            removed = True
-            continue
-        out.append(line)
+    native = _native_config()
+    native.require_env_writable(clean, "remove")
+    with native._env_write_lock(path):
+        if not path.exists():
+            return {"name": clean, "removed": False}
+        lines = native._read_env_lines(path)
+        remaining = [line for line in lines if not native._env_line_defines_key(line, clean)]
+        removed = len(remaining) < len(lines)
+        if removed:
+            native._write_env_lines(path, remaining, preserve_mode=False)
+            if _SCOPED_HOME.get() is None:
+                os.environ.pop(clean, None)
     if removed:
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text("\n".join(out) + ("\n" if out else ""))
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
-        # Keep the in-process env in step with the canonical store (same
-        # reason as write_secret): a removed key must stop resolving without
-        # a service restart.
-        try:
-            os.environ.pop(clean, None)
-        except Exception:
-            pass
+        native.invalidate_env_cache()
     return {"name": clean, "removed": removed}

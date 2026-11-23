@@ -290,7 +290,7 @@ def claw_command(args):
     """Route qubit claw subcommands."""
     action = getattr(args, "claw_action", None)
     if action == "migrate":
-        _cmd_migrate(args)
+        return _cmd_migrate(args)
     elif action in {"cleanup", "clean"}:
         _cmd_cleanup(args)
     else:
@@ -302,24 +302,30 @@ def claw_command(args):
 
 def _cmd_migrate(args):
     """Run the OpenClaw → Qubit migration: preflight, preview, confirm, back up, apply."""
-    opts = SimpleNamespace(**{k: getattr(args, k, d) for k, d in _MIGRATE_ARG_DEFAULTS})
+    opts = SimpleNamespace(**{key: default if getattr(args, key, None) is None else getattr(args, key)
+                              for key, default in _MIGRATE_ARG_DEFAULTS})
     # Explicit --source, else first existing of current + legacy names; default to ~/.openclaw.
     opts.source_dir = (Path(opts.source) if opts.source
                        else next(iter(_find_openclaw_dirs()), Path.home() / ".openclaw"))
     _print_banner("OpenClaw Migration")
     if not opts.source_dir.is_dir():
-        return _error_block(
+        _error_block(
             f"OpenClaw directory not found: {opts.source_dir}",
             "Make sure your OpenClaw installation is at the expected path.",
             "You can specify a custom path: qubit claw migrate --source /path/to/.openclaw")
+        return 2
     script_path = _find_migration_script()
     if not script_path:
-        return _error_block(
+        _error_block(
             "Migration script not found.", "Expected at one of:",
             *(f"  {candidate}" for candidate in _migration_script_candidates()),
             "Make sure the qubit-migration skill is installed.")
+        return 2
     _warn_legacy_migration_script(script_path)
     opts.qubit_home = get_qubit_home()
+    if opts.source_dir.resolve() == opts.qubit_home.resolve():
+        _error_block("The OpenClaw source and Qubit target must be different profiles.")
+        return 2
     print()
     print_header("Migration Settings")
     _info(f"Source:      {opts.source_dir}", f"Target:      {opts.qubit_home}",
@@ -332,17 +338,19 @@ def _cmd_migrate(args):
     # Migrating tokens while OpenClaw or the gateway is active causes conflicts (e.g. Telegram 409).
     _warn_if_openclaw_running(opts.yes)
     _warn_if_gateway_running(opts.yes)
-    # Ensure config.yaml exists before migration tries to read it
-    if not get_config_path().exists():
-        save_config(load_config())
     run_migrator = _load_migrator(script_path, opts)
-    if run_migrator is None or not _preview_migration(run_migrator, opts):
-        return
+    if run_migrator is None:
+        return 2
+    should_apply = _preview_migration(run_migrator, opts)
+    if should_apply is None:
+        return 2
+    if not should_apply:
+        return 0
     print()
     if _confirm(opts.yes, "Proceed with migration?", default=True, declined="Migration cancelled.",
                 non_tty=("Non-interactive session — preview only.",
-                         "To execute, re-run with: qubit claw migrate --yes")):
-        _apply_migration(run_migrator, opts)
+                         "To execute, re-run with: qubit claw migrate --confirm --yes")):
+        return _apply_migration(run_migrator, opts)
     # Source directory is left untouched — archiving is `qubit claw cleanup`'s job.
 
 
@@ -357,20 +365,27 @@ def _load_migrator(script_path: Path, opts: SimpleNamespace) -> Optional[Callabl
         return print_error("Could not load migration script.")
     selected = mod.resolve_selected_options(None, None, preset=opts.preset)
     ws_target = Path(opts.workspace_target).resolve() if opts.workspace_target else None
-    return lambda execute: mod.Migrator(
-        source_root=opts.source_dir.resolve(), target_root=opts.qubit_home.resolve(),
-        execute=execute, workspace_target=ws_target, overwrite=opts.overwrite,
-        migrate_secrets=opts.migrate_secrets, output_dir=None, selected_options=selected,
-        preset_name=opts.preset, skill_conflict_mode=opts.skill_conflict).migrate()
+
+    def run(execute: bool) -> dict:
+        migrator = mod.Migrator(
+            source_root=opts.source_dir.resolve(), target_root=opts.qubit_home.resolve(),
+            execute=execute, workspace_target=ws_target, overwrite=opts.overwrite,
+            migrate_secrets=opts.migrate_secrets, output_dir=None, selected_options=selected,
+            preset_name=opts.preset, skill_conflict_mode=opts.skill_conflict)
+        if execute and not get_config_path().exists():
+            save_config(load_config())
+        return migrator.migrate()
+
+    return run
 
 
-def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace) -> bool:
-    """Always preview first; return True only if the run should proceed to apply."""
+def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace) -> Optional[bool]:
+    """Return whether to apply, or None when preview failed or apply was refused."""
     try:
         preview_report = run_migrator(False)
     except Exception as e:
         _error_block(f"Migration preview failed: {e}", debug="OpenClaw migration preview error")
-        return False
+        return None
     summary = preview_report.get("summary", {})
     count, conflicts = summary.get("migrated", 0), summary.get("conflict", 0)
     # "Nothing to migrate" means nothing migrated AND nothing blocked by conflicts. With
@@ -384,6 +399,8 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
         print_header(f"Migration Preview — {what}")
         print_info("No changes have been made yet. Review the list below:")
     _print_migration_report(preview_report, dry_run=True)
+    if summary.get("error"):
+        return None
     if opts.dry_run or (count == 0 and conflicts == 0):
         return False
     # Modelled on OpenClaw's assertConflictFreePlan(): apply is a safe no-op on conflicts unless
@@ -396,11 +413,11 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
             "Re-run with --overwrite to replace conflicting targets (item-level "
             "backups are written to the migration report directory).",
             "Or re-run with --dry-run to review the full plan.")
-        return False
+        return None
     return True
 
 
-def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace) -> None:
+def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace) -> int:
     """Take a pre-migration backup (unless --no-backup), execute, and print the report. The backup
     shares the pre-update backup's implementation (exclusions, SQLite safe-copy, zip) so it is
     restorable with `qubit import`: one restore point before any mutation, pruned to the last 5."""
@@ -421,10 +438,11 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
                               "failed, or it was incomplete); if incomplete, a partial "
                               "pre-migration-*.incomplete.zip may exist in the backups dir.")
         except Exception as e:
-            return _error_block(
+            _error_block(
                 f"Could not create pre-migration backup: {e}",
                 "Re-run with --no-backup to skip, or free up disk space under the Qubit home.",
                 debug="Pre-migration backup error")
+            return 2
     try:
         report = run_migrator(True)
     except Exception as e:
@@ -432,8 +450,9 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
         if backup_archive:
             _info(f"A pre-migration backup is available at: {backup_archive}",
                   f"Restore with: qubit import {backup_archive.name}")
-        return
+        return 2
     _print_migration_report(report, dry_run=False)
+    return 2 if report.get("summary", {}).get("error") else 0
 
 
 def _cmd_cleanup(args):

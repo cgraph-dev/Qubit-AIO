@@ -54,7 +54,8 @@ def _fork_scope(cfg: Any) -> None:
     # runtime home explicitly (idempotent once a non-external QUBIT_HOME is
     # set; a no-op in tests that set QUBIT_HOME to a sandbox).
     try:
-        qubit_runtime.use_qubit_home(cfg)
+        if qubit_runtime.artifact_profile_home() is None:
+            qubit_runtime.use_qubit_home(cfg)
     except Exception:  # noqa: BLE001 - a failed resolution must not hide the store set
         pass
 
@@ -353,17 +354,21 @@ def catalog_entries(cfg: Any) -> List[Dict[str, Any]]:
     in-process writes additionally call :func:`clear_skills_prompt_cache`,
     which invalidates this namespace eagerly.
     """
+    home = None
     try:
         from . import qubit_runtime as QR
 
-        runtime_cfg = Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+        home = QR.artifact_profile_home() or Path(QR.runtime_home_for_cfg(cfg))
+        runtime_cfg = home / "config.yaml"
     except Exception:  # noqa: BLE001 - still cacheable by config identity
         runtime_cfg = None
     try:
-        permissions = Path(cfg.state_dir()) / "permissions.json"
+        permissions = Path(cfg.get("permissions", "state_path", default="")
+                           or (cfg.state_dir() / "permissions.json")).expanduser()
     except Exception:  # noqa: BLE001
         permissions = None
-    key = RC.cfg_key(cfg, "skills", RC.stamp_of(runtime_cfg, permissions))
+    skills_dir = home / "skills" if home is not None else None
+    key = RC.cfg_key(cfg, "skills", home, RC.stamp_of(runtime_cfg, permissions, skills_dir))
     hit = RC.get(key)
     if hit is not None:
         return hit

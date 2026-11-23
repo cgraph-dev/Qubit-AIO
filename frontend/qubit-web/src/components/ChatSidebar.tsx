@@ -42,7 +42,7 @@ import {
   isEventsFeedMessage,
 } from "@/lib/events-reconnect";
 import { titleFromSessionInfoPayload } from "@/lib/chat-title";
-import { chatLiveFrame } from "@/lib/chatLiveEvents";
+import { chatLiveFrame, chatModelSelection, type ChatModelSelection } from "@/lib/chatLiveEvents";
 
 import "./ChatSidebar.manga.css";
 import { cn } from "@/lib/utils";
@@ -85,7 +85,7 @@ interface ChatSidebarProps {
    * `model.default` role. `/qubit-chat` omits it and keeps the default-role
    * read from `/api/model/info`.
    */
-  terminalModel?: { provider?: string; model: string; contextTokens?: number } | null;
+  terminalModel?: { provider?: string; model: string; contextTokens?: number; pending?: boolean } | null;
   /**
    * The chat session this panel belongs to. When present, a model pick writes
    * the PER-SESSION model (``PATCH /api/qubit/chat/sessions/:id {model}``) —
@@ -96,7 +96,9 @@ interface ChatSidebarProps {
    */
   sessionId?: string;
   /** Notified with the session's new model after a per-session pick succeeds. */
-  onSessionModelChange?: (model: string) => void;
+  onSessionModelChange?: (selection: ChatModelSelection) => void;
+  terminalSession?: boolean;
+  onTerminalModelApplied?: (selection: ChatModelSelection) => void;
   /**
    * Notified with the model just applied on EITHER write path (per-session or
    * the global ``model.default``). `/chat` needs this for the global branch:
@@ -104,7 +106,7 @@ interface ChatSidebarProps {
    * without this a fresh-chat pick applied but the badge stayed stale until a
    * page reload.
    */
-  onAppliedModel?: (model: string) => void;
+  onAppliedModel?: (selection: ChatModelSelection) => void;
   className?: string;
   onDashboardNewSessionRequest?: () => void;
   onSessionTitleChange?: (title: string | null) => void;
@@ -132,6 +134,8 @@ export function ChatSidebar({
   sessionId,
   onSessionModelChange,
   onAppliedModel,
+  terminalSession = false,
+  onTerminalModelApplied,
   className,
   onDashboardNewSessionRequest,
   onSessionTitleChange,
@@ -164,8 +168,10 @@ export function ChatSidebar({
   // session booting from the just-saved config), 1:1 with the reference's
   // ChatSidebar. Null when the confirm dialog is closed.
   const [pendingReloadModel, setPendingReloadModel] = useState<string | null>(null);
+  const modelInfoRequest = useRef(0);
 
   const refreshEffectiveModel = useCallback(() => {
+    const request = ++modelInfoRequest.current;
     // When the terminal grant names the model this session actually runs, read
     // ITS capabilities (the reasoning gate must match the displayed model, not
     // the default role).
@@ -175,6 +181,7 @@ export function ChatSidebar({
     void api
       .getModelInfo(profile, target)
       .then((r) => {
+        if (request !== modelInfoRequest.current) return;
         if (r?.model) setEffectiveModel(String(r.model));
         setSupportsReasoning(!!r?.capabilities?.supports_reasoning);
         // Bump so ReasoningPicker re-reads the saved effort for the new model.
@@ -221,6 +228,55 @@ export function ChatSidebar({
     },
     [],
   );
+
+  const sessionHandlersRef = useRef({ sessionId, onSessionModelChange, onSessionTitleChange });
+  sessionHandlersRef.current = { sessionId, onSessionModelChange, onSessionTitleChange };
+
+  const [terminalWatchVersion, setTerminalWatchVersion] = useState(0);
+  const terminalAppliedRef = useRef(onTerminalModelApplied);
+  terminalAppliedRef.current = onTerminalModelApplied;
+  useEffect(() => {
+    if (!terminalSession || !sessionId) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let queued = false;
+    let attempts = 0;
+    const readStatus = async () => {
+      try {
+        const result = await api.getChatTerminalModel(sessionId, profile, controller.signal);
+        if (controller.signal.aborted) return;
+        const request = result.terminal_model_request;
+        if (!request) return;
+        attempts = 0;
+        queued = request.state === "queued";
+        if (queued) {
+          setModelNotice(`${request.model} is queued for the next terminal turn.`);
+        } else if (request.state === "applied") {
+          const applied = chatModelSelection(result.session);
+          if (applied) terminalAppliedRef.current?.(applied);
+          if (applied?.model === request.model && applied.provider === request.provider) {
+            setModelNotice(`Terminal switched to ${request.model}.`);
+          }
+        } else if (request.state === "confirmation_required") {
+          setModelNotice("This switch needs confirmation for the current transcript. Use /model in the terminal.");
+        } else if (request.state === "context_refused") {
+          setModelNotice("The selected model could not meet the terminal context requirement. The current model is still active.");
+        } else {
+          setModelNotice("The terminal kept its current model. Check the terminal for the switch result.");
+        }
+      } catch {
+        attempts += 1;
+      }
+      if (!controller.signal.aborted && (queued || attempts > 0) && attempts < 3) {
+        timer = setTimeout(readStatus, 2000);
+      }
+    };
+    void readStatus();
+    return () => {
+      controller.abort();
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [terminalSession, sessionId, profile, terminalWatchVersion]);
 
   // Profile or chat channel change tears down the stream. Bump `version` (same
   // path as the manual Reconnect button) so the SSE reader resubscribes —
@@ -343,7 +399,7 @@ export function ChatSidebar({
       if (type === "session.info") {
         const title = titleFromSessionInfoPayload(payload);
         if (title !== undefined) {
-          onSessionTitleChange?.(title);
+          sessionHandlersRef.current.onSessionTitleChange?.(title);
         }
         return;
       }
@@ -365,20 +421,13 @@ export function ChatSidebar({
         return;
       }
       if (live.isSession) {
-        const isOurs =
-          !!live.sessionId && !!sessionId && live.sessionId === sessionId;
-        // Our own session changed (a per-session model pick writes
-        // session.updated): relay the new model to the host and re-read the
-        // effective model so the card repaints.
+        const current = sessionHandlersRef.current;
+        const isOurs = !!live.sessionId && live.sessionId === current.sessionId;
         if (isOurs) {
-          const m = live.session ? String(live.session.model || "") : "";
-          if (m) onSessionModelChange?.(m);
-        }
-        const title = live.session
-          ? titleFromSessionInfoPayload(live.session)
-          : undefined;
-        if (title !== undefined) {
-          onSessionTitleChange?.(title);
+          const selection = chatModelSelection(live.session);
+          if (selection) current.onSessionModelChange?.(selection);
+          const title = live.session ? titleFromSessionInfoPayload(live.session) : undefined;
+          if (title !== undefined) current.onSessionTitleChange?.(title);
         }
         // Only OUR session (or a broadcast without a session id) can change
         // the model card. The journal replay is mostly other sessions; reading
@@ -525,7 +574,7 @@ export function ChatSidebar({
       }
       controller?.abort();
     };
-  }, [channel, onDashboardNewSessionRequest, onSessionTitleChange, version]);
+  }, [channel, onDashboardNewSessionRequest, version]);
 
   // Seed the badge on mount and re-read it whenever the reader is rebuilt
   // (a profile/channel switch bumps `version`).
@@ -556,8 +605,8 @@ export function ChatSidebar({
   // a resolved PTY grant means the terminal session runs that model, even
   // while the SSE reader is still (re)connecting. Without a grant (qubit-chat)
   // the reader state is all we have.
-  const badgeLabel = terminalModelName ? "live" : STATE_LABEL[state];
-  const badgeTone = terminalModelName ? "success" : STATE_TONE[state];
+  const badgeLabel = terminalModel?.pending ? "saved" : terminalModelName ? "live" : STATE_LABEL[state];
+  const badgeTone = terminalModel?.pending ? "secondary" : terminalModelName ? "success" : STATE_TONE[state];
   const modelLabel = modelName.split("/").slice(-1)[0] ?? "—";
   const banner = error;
 
@@ -649,11 +698,10 @@ export function ChatSidebar({
 
       {modelOpen && (
         <ModelPickerDialog
-          // Same path the Models page uses (REST /api/model/set), not the
-          // sidecar config.set RPC, which didn't reliably land in the
-          // config.yaml the agent boots from. Always persisted (alwaysGlobal).
-          loader={() => api.getModelOptions(profile)}
-          alwaysGlobal
+          key={`${profile ?? ""}/${sessionId ?? ""}`}
+          loader={(options) => api.getModelOptions({ profile, ...options })}
+          alwaysGlobal={!sessionId}
+          sessionOnly={!!sessionId}
           // Header shows what this terminal session actually runs (the PTY
           // grant), not the global picker context — otherwise the dialog
           // disagrees with the MODEL card above it.
@@ -675,30 +723,24 @@ export function ChatSidebar({
             // with no reload. Falling through to the global branch here is
             // why a session model could not be switched.
             if (sessionId) {
-              try {
-                // Send the picker's own provider alongside the model: a bare
-                // id re-enters first-match routing server-side, so an explicit
-                // cheapvibecode pick could land on another provider's same-named
-                // model. The pair is validated against the picker catalog.
-                const res = await api.patchChatSession(sessionId, {
-                  model,
-                  ...(provider ? { provider } : {}),
-                });
-                const applied = String(res?.session?.model || model);
-                onSessionModelChange?.(applied);
-                onAppliedModel?.(applied);
-                setModelNotice(
-                  `Model set to ${applied.split("/").slice(-1)[0]} for this session.`,
-                );
-                // Re-read the card from the server's authoritative row.
-                refreshEffectiveModel();
-              } catch (e) {
-                setError(
-                  e instanceof Error
-                    ? e.message
-                    : "failed to set this session's model",
-                );
+              // The same model ID can appear in several providers' catalogs.
+              if (terminalSession) {
+                const response = await api.patchChatSession(sessionId, {
+                  model, provider, terminal_next_turn: true,
+                  confirm_expensive_model: confirmExpensiveModel,
+                }, profile);
+                if (response.confirm_required) return response;
+                if (response.terminal_model_request?.state !== "queued") {
+                  throw new Error("The terminal did not queue the model change.");
+                }
+                setModelNotice(`${response.terminal_model_request.model} is queued for the next terminal turn.`);
+                setTerminalWatchVersion((version) => version + 1);
+                return response;
               }
+              const res = await api.patchChatSession(sessionId, { model, provider });
+              const applied = chatModelSelection(res.session) ?? { model, provider };
+              onSessionModelChange?.(applied);
+              setModelNotice(`Model set to ${applied.model.split("/").slice(-1)[0]} for this session.`);
               return undefined;
             }
             const result = await api.setModelAssignment(
@@ -717,9 +759,6 @@ export function ChatSidebar({
               // Report the applied model so a host whose card reads the PTY
               // grant (i.e. /chat) can repaint immediately instead of waiting
               // for a reconnect/reload.
-              onAppliedModel?.(
-                String((result as { model?: string }).model || model),
-              );
               // The backend reports whether /chat follows the pick: when it
               // kept its pinned model (pick below the /chat context floor),
               // say so instead of claiming a switch the terminal did not take.
@@ -729,6 +768,10 @@ export function ChatSidebar({
                     "Main model set. /chat keeps its current model.",
                 );
               } else {
+                onAppliedModel?.({
+                  model: result.model || model,
+                  provider: result.provider || provider,
+                });
                 // A main-slot write persists to config.yaml, but the RUNNING
                 // chat keeps its model until its session is rebuilt. Confirm
                 // and reload — a fresh PTY session boots its agent from the

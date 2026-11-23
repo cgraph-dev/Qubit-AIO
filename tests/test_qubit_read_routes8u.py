@@ -215,3 +215,38 @@ def test_pre_existing_routes_not_shadowed(tmp_path, monkeypatch):
         code, out = HC.dispatch(cfg, "GET", path, {}, {})
         assert code == 200, (path, code, str(out)[:200])
         assert out.get("ok") is True, (path, out)
+
+
+def test_log_pages_keep_sparse_matches_stable_across_append_and_reject_rotation(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as HC
+
+    root = tmp_path / "qubit"
+    home = root / "profiles" / "audit"
+    (home / "logs").mkdir(parents=True)
+    (home / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    cfg = _cfg(tmp_path, monkeypatch)
+    log = home / "logs" / "agent.log"
+    prefix = "2026-11-23 10:00:00 INFO fixture: "
+    old = prefix + "sparse oldest\n"
+    recent = prefix + "sparse newest\n"
+    log.write_text(old + (prefix + "filler\n") * 4500 + recent)
+    params = {"profile": "audit", "search": "sparse", "lines": "1"}
+
+    code, first = HC.dispatch(cfg, "GET", "/api/logs", params)
+    assert code == 200 and first["lines"] == [recent]
+    assert first["has_more"] and first["next_offset"] == 1
+    with log.open("a") as stream:
+        stream.write(prefix + "sparse appended\n")
+    older = {**params, "snapshot": first["snapshot"], "offset": "1"}
+    code, page = HC.dispatch(cfg, "GET", "/api/logs", older)
+    assert code == 200 and page["lines"] == [old] and not page["has_more"]
+
+    code, root_page = HC.dispatch(cfg, "GET", "/api/logs", {**params, "profile": "default"})
+    assert code == 200 and root_page["lines"] == []
+    log.rename(log.with_suffix(".previous"))
+    log.write_text(prefix + "sparse rotated\n")
+    code, expired = HC.dispatch(cfg, "GET", "/api/logs", older)
+    assert code == 409 and expired["code"] == "LOG_SNAPSHOT_EXPIRED"
+    code, latest = HC.dispatch(cfg, "GET", "/api/logs", {**params, "search": ""})
+    assert code == 200 and latest["lines"] == [prefix + "sparse rotated\n"]

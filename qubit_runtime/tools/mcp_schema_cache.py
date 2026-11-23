@@ -34,6 +34,10 @@ def config_fingerprint(config: dict) -> str:
         "transport": config.get("transport"),
         "tools_include": sorted(tools_filter.get("include") or []),
         "tools_exclude": sorted(tools_filter.get("exclude") or [])}
+    if tools_filter.get("exclude_overrides_include") is True:
+        payload["openclaw_filter"] = True
+    if isinstance(tools_filter.get("include"), (list, tuple, set)) and not tools_filter["include"]:
+        payload["empty_tool_allowlist"] = True
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 

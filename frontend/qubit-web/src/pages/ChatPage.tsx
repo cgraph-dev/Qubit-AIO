@@ -65,6 +65,7 @@ const ChatSidebar = lazy(() =>
   import("@/components/ChatSidebar").then((m) => ({ default: m.ChatSidebar })));
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { useProfileScope } from "@/contexts/useProfileScope";
+import { sessionResumeHref } from "@/lib/session-resume-href";
 import { useI18n } from "@/i18n";
 import {
   api,
@@ -87,7 +88,7 @@ import { useTranscriptionController } from "@/hooks/useTranscriptionController";
 import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
 import { useChatActivity } from "@/hooks/useChatActivity";
 import { useChatLiveEvents } from "@/hooks/useChatLiveEvents";
-import { type ChatSessionFrame } from "@/lib/chatLiveEvents";
+import { chatModelSelection, type ChatModelSelection, type ChatSessionFrame } from "@/lib/chatLiveEvents";
 import { shouldRemountSessionList } from "@/components/chatLiveListPolicy";
 import { ChatWorkPanel } from "@/components/ChatWorkPanel";
 import { ContextRing } from "@/components/chat/ContextRing";
@@ -475,9 +476,18 @@ function SandboxedHtmlPreview({ html }: { html: string }) {
 const MAX_PALETTE_REPORTS = 50;
 
 export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
+  const { profile, currentProfile } = useProfileScope();
+  const routed = Boolean(profile && profile !== "current" && profile !== currentProfile);
+  return <ProfileChatPage key={profile} isActive={isActive} scopedProfile={profile} routed={routed} />;
+}
+
+function ProfileChatPage({ isActive, scopedProfile, routed }: {
+  isActive: boolean;
+  scopedProfile: string;
+  routed: boolean;
+}) {
   const { setTitle } = usePageHeader();
   const { t } = useI18n();
-  const { profile: scopedProfile } = useProfileScope();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const resumeParam = searchParams.get("resume");
@@ -487,10 +497,17 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // now, not the value captured when the request started.
   const resumeParamRef = useRef<string | null>(null);
   resumeParamRef.current = resumeParam;
+  const scopePrefix = scopedProfile ? `${encodeURIComponent(scopedProfile)}/` : "";
+  const pointerKey = SESSION_KEY + (scopePrefix ? `.${scopePrefix}` : "");
   const session = useMemo(
-    () => (resumeParam || storageGet(SESSION_KEY) || DEFAULT_SESSION).slice(0, 80),
-    [resumeParam],
+    () => (resumeParam || storageGet(pointerKey) || DEFAULT_SESSION).slice(0, 80),
+    [pointerKey, resumeParam],
   );
+  const transcriptKey = scopePrefix + session;
+  const readMessages = useCallback((id: string, limit?: number) => {
+    if (scopedProfile) return api.getChatSessionMessages(id, limit ?? 500, scopedProfile);
+    return limit === undefined ? api.getChatSessionMessages(id) : api.getChatSessionMessages(id, limit);
+  }, [scopedProfile]);
   // The transcription controller is created once; this ref lets the local/
   // terminal adapter read the *current* session id for the STT request without
   // recreating the controller on every session change.
@@ -526,7 +543,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const transcriptReadyRef = useRef(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    loadTranscript(session),
+    loadTranscript(transcriptKey),
   );
   const [transcriptSession, setTranscriptSession] = useState(session);
   const [transcriptState, setTranscriptState] = useState<
@@ -603,7 +620,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // per session — like ``/chat`` (which passes its PTY grant) — so the side
   // panel must show THIS session's model, not the config default. Read from
   // ``GET /api/qubit/chat/sessions/:id`` on session load and after a pick.
-  const [sessionModel, setSessionModel] = useState<string>("");
+  const [sessionModel, setSessionModel] = useState<ChatModelSelection | null>(null);
   // Whether the active model actually supports a reasoning budget, served by
   // `GET /api/model/info` (`capabilities.supports_reasoning`). The selector is
   // gated on this real capability — offering it for a non-reasoning model would
@@ -710,8 +727,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // Keep the session pointer stable in storage so a reload lands back on the
   // same conversation even without a ?resume= param.
   useEffect(() => {
-    if (resumeParam) storageSet(SESSION_KEY, resumeParam);
-  }, [resumeParam]);
+    if (resumeParam) storageSet(pointerKey, resumeParam);
+  }, [pointerKey, resumeParam]);
 
   // A real resolved session id means we are no longer on a deliberate fresh
   // chat, so the panel may highlight it again. Keyed on `resumeParam` (not the
@@ -759,7 +776,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // and outrank this (older) read.
     const appendsAtStart = localAppendRef.current;
     // Instant paint from the cache; the server load below replaces it.
-    setMessages(loadTranscript(session));
+    setMessages(loadTranscript(transcriptKey));
     setTranscriptSession(session);
     setStreamingText("");
     setError(null);
@@ -784,22 +801,22 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // independent of the LIST read, so a slow or failing list can no longer
     // strand the transcript — the reported "reload shows a blank chat until I
     // click a session in the right rail" defect.
-    const loadMessages = withBackoff(() => api.getChatSession(session), {
+    const loadMessages = withBackoff(() => scopedProfile ? api.getChatSession(session, scopedProfile) : api.getChatSession(session), {
       shouldStop: () => loadReqRef.current !== myReq,
     })
       .then((info) => {
         if (loadReqRef.current !== myReq) return;
         setReasoning(normalizeReasoning(info.meta?.reasoning));
-        setSessionModel(String(info.session?.model || ""));
+        setSessionModel(chatModelSelection(info.session));
         setPendingConfirm(extractPendingConfirm(info));
-        return withBackoff(() => api.getChatSessionMessages(session), {
+        return withBackoff(() => readMessages(session), {
           shouldStop: () => loadReqRef.current !== myReq,
         }).then((res) => {
           if (loadReqRef.current !== myReq) return;
           const loaded = (res.messages ?? []).map(toChatMessage);
           setMessages(loaded);
           setTranscriptSession(session);
-          saveTranscript(session, loaded);
+          saveTranscript(transcriptKey, loaded);
           setTranscriptState("ready");
           // The loaded rows are what a live-voice poll diffs against.
           voiceSyncedRef.current = loaded.length;
@@ -844,8 +861,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // Auxiliary list read (never gates the transcript): the newest live voice
     // session for the one-click jump. Foreign-id detection is owned by the
     // probe above, so this read never sets it (two writers would race).
-    const loadList = api
-      .listChatSessions(100, 0)
+    const loadList = (scopedProfile
+      ? api.listChatSessions(100, 0, "", scopedProfile)
+      : api.listChatSessions(100, 0))
       .then((list) => {
         if (loadReqRef.current !== myReq) return;
         setNewestVoiceSession(pickNewestVoiceSession(list.sessions));
@@ -864,7 +882,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       setTranscriptState("error");
       setError(reason instanceof Error ? reason.message : String(reason ?? "load failed"));
     });
-  }, [session]);
+    return () => { loadReqRef.current += 1; };
+  }, [readMessages, scopedProfile, session, transcriptKey]);
 
   // Live voice follow: while the open session is a `voice-*` session (and
   // following has not been turned off), re-read the persisted transcript on a
@@ -880,8 +899,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     const sync = () => {
       if (voiceSyncBusyRef.current || !transcriptReadyRef.current) return;
       voiceSyncBusyRef.current = true;
-      api
-        .getChatSessionMessages(session)
+      readMessages(session)
         .then((res) => {
           if (!alive) return;
           const mapped = (res.messages ?? []).map(toChatMessage);
@@ -910,7 +928,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       clearInterval(interval);
       window.removeEventListener("focus", sync);
     };
-  }, [followLiveVoice, session]);
+  }, [followLiveVoice, readMessages, session]);
 
   // Read the voice-session namespace + retention from the settings view so the
   // live control can show the real policy. Only fetched for a `voice-*`
@@ -945,22 +963,24 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   }, [isVoiceSession, session]);
 
   // Keep the read-through cache in step with the rendered transcript.
-  useEffect(() => saveTranscript(session, messages), [session, messages]);
+  useEffect(() => {
+    if (transcriptSession === session) saveTranscript(transcriptKey, messages);
+  }, [messages, session, transcriptKey, transcriptSession]);
 
   // Progress is stored by canonical session id, independently of the visible
   // transcript window, so returning to this session restores its highest run.
   useEffect(() => {
     if (transcriptSession !== session) return;
-    const saved = loadSessionProgress(session);
+    const saved = loadSessionProgress(transcriptKey);
     const userTurns = messages.filter(
       (message) => message.role === "user" && message.kind !== "tool",
     ).length;
     const toolRuns = messages.filter((message) => message.kind === "tool").length;
-    saveSessionProgress(session, {
+    saveSessionProgress(transcriptKey, {
       userTurns: Math.max(saved.userTurns, userTurns),
       toolRuns: Math.max(saved.toolRuns, toolRuns),
     });
-  }, [messages, session, transcriptSession]);
+  }, [messages, session, transcriptKey, transcriptSession]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -1028,8 +1048,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           // The active session's own model follows whenever the updated row is
           // ours, regardless of whether a remount was warranted.
           if (frame.session && frame.sessionId === session) {
-            const m = String(frame.session.model || "");
-            if (m) setSessionModel(m);
+            const selection = chatModelSelection(frame.session);
+            if (selection) setSessionModel(selection);
           }
           return;
         }
@@ -1091,6 +1111,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       // The transcription controller (and its adapter/capture) is disposed by
       // the hook's own unmount effect.
       abortRef.current?.abort();
+      freshMintSeqRef.current += 1;
     };
   }, []);
 
@@ -1128,7 +1149,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       // The reasoning selector rides along (null = session preference, which
       // the server resolves from the persisted session metadata).
       streamChatTurn(
-        reasoning ? { text, session, reasoning } : { text, session },
+        { text, session, ...(reasoning ? { reasoning } : {}), ...(scopedProfile ? { profile: scopedProfile } : {}) },
         {
           onDelta: (delta, event) => {
             if (controller.signal.aborted) return;
@@ -1255,7 +1276,13 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             setError(
               `[${event.code ?? "TURN_FAILED"}] ${event.detail ?? "turn failed"}`,
             );
-            setRetryText(text);
+            if (routed && (event.code === "CHAT_GATEWAY_REFUSED"
+                || event.code === "CHAT_SESSION_MOVED" || event.code === "CHAT_SESSION_BUSY")) {
+              setInput(text);
+              setMessages((rows) => rows.slice(0, -1));
+            } else if (!routed) {
+              setRetryText(text);
+            }
             setStreamingText("");
             void emitFx("error", { target: composerRef.current });
             // A failed turn may still have touched the session row (it was
@@ -1280,16 +1307,35 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       )
         .catch((err: unknown) => {
           if (controller.signal.aborted) return;
-          setError(parseTurnError(err));
-          setRetryText(text);
+          const failure = parseTurnError(err);
+          if (failure.startsWith("[CHAT_ADMISSION_UNCONFIRMED]")) {
+            setError(failure);
+          } else if (routed) {
+            if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OVERRIDE_UNSUPPORTED|MALFORMED|EMERGENCY_STOP)\]/.test(failure)) {
+              setInput(text);
+              setMessages((rows) => rows.slice(0, -1));
+              setError(failure);
+            } else {
+              setError(`${failure} Reload the chat before sending again.`);
+            }
+          } else {
+            setError(failure);
+            setRetryText(text);
+          }
           setStreamingText("");
         })
         .finally(() => {
           if (!controller.signal.aborted) setBusy(false);
         });
     },
-    [busy, session, reasoning, followLiveVoice],
+    [busy, session, reasoning, followLiveVoice, routed, scopedProfile],
   );
+
+  const stopProfileTurn = useCallback(() => {
+    void api.cancelProfileChatTurn(session, scopedProfile).catch((failure: unknown) => {
+      setError(parseTurnError(failure));
+    });
+  }, [scopedProfile, session]);
 
   // Publish the sender for the load effect (which runs before `send` exists) so
   // an interrupted turn detected on load can be re-issued automatically.
@@ -1304,13 +1350,13 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     (id: string) => {
       const level = id === "" ? null : id;
       setReasoning(level);
-      api
-        .patchChatSession(session, { reasoning: level })
+      const patch = { reasoning: level };
+      (scopedProfile ? api.patchChatSession(session, patch, scopedProfile) : api.patchChatSession(session, patch))
         .catch(() => {
           /* session may not exist yet; per-turn send still applies */
         });
     },
-    [session],
+    [scopedProfile, session],
   );
 
   // Persist the voice engine selection on the canonical config
@@ -1490,14 +1536,17 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // `is_active` row for the whole round-trip, so the previous conversation
     // stays highlighted right after pressing New chat.
     setFreshChat(true);
-    api
-      .createChatSession()
-      .then((res) => {
+    const removeUnused = (id: string) => {
+      const result = scopedProfile ? api.deleteChatSession(id, true, scopedProfile) : api.deleteChatSession(id);
+      void result.catch(() => {});
+    };
+    const mint = scopedProfile ? api.createChatSession("", scopedProfile) : api.createChatSession();
+    mint.then((res) => {
         const newId = res?.session?.id;
         if (mintSeq !== freshMintSeqRef.current) {
           // Superseded by a newer mint: discard the row it created so a
           // double press cannot leave an orphan conversation behind.
-          if (newId) void api.deleteChatSession(newId).catch(() => {});
+          if (newId) removeUnused(newId);
           return;
         }
         if (!newId) {
@@ -1509,17 +1558,17 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           // A session row was picked while this mint was in flight. Keep the
           // operator's selection on screen (a stale create response must
           // never yank the URL back) and remove the now-unused fresh row.
-          void api.deleteChatSession(newId).catch(() => {});
+          removeUnused(newId);
           return;
         }
         // Persist first so a reload lands on the fresh session even before the
         // URL effect runs; the `?resume=` param then drives the session memo.
-        storageSet(SESSION_KEY, newId);
+        storageSet(pointerKey, newId);
         // Seed THIS session's model from the create response so the side panel
         // shows the fresh session's model immediately (the transcript effect
         // also reads it, but that is async — this avoids a one-frame stale
         // card).
-        setSessionModel(String(res?.session?.model || ""));
+        setSessionModel(chatModelSelection(res?.session));
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev);
@@ -1542,14 +1591,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           freshMintPendingRef.current = false;
         }
       });
-  }, [setSearchParams]);
+  }, [pointerKey, scopedProfile, setSearchParams]);
 
   // One-click "follow the live voice session": point the surface at the newest
   // `voice-*` row the chat store exposed, so the live poll above starts. Uses
   // the same `?resume=`/storage path as New chat — no new backend call.
   const openVoiceSession = useCallback(
     (id: string) => {
-      storageSet(SESSION_KEY, id);
+      storageSet(pointerKey, id);
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -1559,7 +1608,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         { replace: false },
       );
     },
-    [setSearchParams],
+    [pointerKey, setSearchParams],
   );
 
   const copyLast = useCallback(() => {
@@ -1585,8 +1634,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const summarizeSession = useCallback(() => {
     if (busy) return;
     setError(null);
-    api
-      .getChatSessionMessages(session, 100)
+    readMessages(session, 100)
       .then((res) => {
         const rows = Array.isArray(res?.messages) ? res.messages : [];
         const lines = rows
@@ -1611,7 +1659,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           `[SUMMARIZE] ${err instanceof Error ? err.message : String(err)}`,
         );
       });
-  }, [api, busy, send, session, setError]);
+  }, [busy, readMessages, send, session]);
 
   // A43: load the canonical runtime inventory + agent logs for the overlay.
   const loadDebug = useCallback(() => {
@@ -1658,6 +1706,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     (file: File) => {
       // A turn is already in flight: never start a concurrent image turn.
       if (busy) return;
+      if (routed) {
+        setAttachError("Open this profile in /chat to submit an image to its own worker.");
+        setAttachState("error");
+        return;
+      }
       setAttachState("describing");
       setAttachError(null);
       const reader = new FileReader();
@@ -1688,8 +1741,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         // The server persists these rows too; advance the merge counter so a
         // live-voice poll does not re-append them as "new".
         if (followLiveVoice) voiceSyncedRef.current += 1;
-        api
-          .submitChatImage(dataUrl, session, prompt)
+        (scopedProfile
+          ? api.submitChatImage(dataUrl, session, prompt, scopedProfile)
+          : api.submitChatImage(dataUrl, session, prompt))
           .then((res) => {
             const reply = (res.reply ?? "").trim();
             if (!reply) {
@@ -1725,7 +1779,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       };
       reader.readAsDataURL(file);
     },
-    [busy, input, session, followLiveVoice],
+    [busy, input, session, followLiveVoice, routed, scopedProfile],
   );
 
   // A36: documents keep the review-before-send contract — extract and hand the
@@ -2137,7 +2191,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     (message) => message.role === "user" && message.kind !== "tool",
   ).length;
   const transcriptToolRuns = activeTranscript.filter((message) => message.kind === "tool").length;
-  const savedSessionProgress = loadSessionProgress(session);
+  const savedSessionProgress = loadSessionProgress(transcriptKey);
   const sessionUserTurns = Math.max(savedSessionProgress.userTurns, transcriptUserTurns);
   const sessionToolRuns = Math.max(savedSessionProgress.toolRuns, transcriptToolRuns);
   const sessionLevel = Math.floor(sessionUserTurns / 5) + 1;
@@ -2315,7 +2369,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {" "}/chat session, not a Qubit Chat session.
               </span>
               <a
-                href={`/chat?resume=${encodeURIComponent(foreignSession)}`}
+                href={sessionResumeHref(foreignSession, scopedProfile)}
                 className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-midground hover:bg-midground/10"
               >
                 open in /chat
@@ -3097,6 +3151,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {voiceState === "listening" ? "Stop" : "Voice"}
               </Button>
             </HoverTooltip>
+            {routed && busy ? (
+              <Button type="button" onClick={stopProfileTurn} aria-label="Stop turn">
+                Stop
+              </Button>
+            ) : (
             <Button
               type="button"
               disabled={busy || !input.trim()}
@@ -3106,6 +3165,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <Send className="h-4 w-4" />
               Send
             </Button>
+            )}
           </form>
 
           <div className="qchat__session-actions mt-2 flex items-center justify-between gap-2">
@@ -3136,7 +3196,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               summarize
             </Button>
             <a
-              href={`/chat?resume=${encodeURIComponent(session)}`}
+              href={sessionResumeHref(session, scopedProfile)}
               aria-label="Continue this session in the /chat terminal"
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-midground hover:bg-midground/10"
             >
@@ -3186,9 +3246,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   // THIS session's model instead of the global default — the
                   // "independent panels" requirement — and selects the
                   // per-session write when the operator picks a model.
-                  terminalModel={
-                    sessionModel ? { model: sessionModel } : null
-                  }
+                  terminalModel={sessionModel}
                   sessionId={session}
                   onSessionModelChange={setSessionModel}
                 />
@@ -3209,7 +3267,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               />
             </section>
             <section className="qchat__artifacts shrink-0">
-              <ChatSessionArtifacts key={session} sessionId={session} />
+              <ChatSessionArtifacts key={session} sessionId={session} profile={scopedProfile} />
             </section>
             <section
               aria-labelledby="qchat-module-sessions"

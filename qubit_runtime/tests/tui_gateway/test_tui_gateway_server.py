@@ -23535,3 +23535,86 @@ def test_session_save_writes_under_qubit_home_with_system_prompt(monkeypatch, tm
     assert payload["started_at"] == datetime(2026, 1, 1, 12, 0, 0).timestamp()
     assert payload["system_prompt"] == "You are Qubit."
     assert payload["messages"] == history
+
+
+@pytest.mark.parametrize("context_window, confirmed, expected_provider, expected_status", [
+    (131072, True, "target-provider", "applied"),
+    (4096, True, "current-provider", "context_refused"),
+    (131072, False, "current-provider", "confirmation_required"),
+])
+def test_dashboard_queue_applies_before_next_prompt_in_same_session(
+    tmp_path, monkeypatch, context_window, confirmed, expected_provider, expected_status,
+):
+    from qubit_state import SessionDB
+
+    class Agent:
+        model = "shared-model"
+        provider = "current-provider"
+        base_url = ""
+        api_key = ""
+        api_mode = "chat_completions"
+
+        def switch_model(self, *, new_model, new_provider, **_):
+            self.model, self.provider = new_model, new_provider
+
+        def run_conversation(self, prompt, conversation_history=None, **_):
+            routed.append(self.provider)
+            return {"final_response": "reply", "messages": [
+                *(conversation_history or []), {"role": "user", "content": prompt},
+                {"role": "assistant", "content": "reply"},
+            ]}
+
+    class ImmediateThread:
+        def __init__(self, target=None, **_):
+            self.target = target
+
+        def start(self):
+            self.target()
+
+    routed = []
+    db = SessionDB(db_path=tmp_path / "state.db")
+    try:
+        agent = Agent()
+        agent._session_db = db
+        sid = "dashboard-terminal-key"
+        db.create_session(sid, "tui", model=agent.model)
+        db.update_session_model(sid, agent.model, agent.provider)
+        request = {"id": "1", "state": "queued", "model": agent.model, "provider": "target-provider",
+                   "confirmed": confirmed, "min_context_tokens": 65536}
+        assert db.queue_terminal_model_request(sid, request)
+        # An in-flight turn can save old session metadata without dropping a choice.
+        db.update_session_meta(sid, '{"provider":"current-provider"}', agent.model)
+        assert agent.provider == "current-provider"
+        marker = {"role": "user", "content": "existing history"}
+        server._sessions["sid"] = _session(agent=agent, session_key=sid, history=[marker])
+        result = types.SimpleNamespace(
+            success=True, new_model=agent.model, target_provider="target-provider", base_url="",
+            api_key="", api_mode=agent.api_mode, model_info=None, warning_message="",
+        )
+        monkeypatch.setenv("QUBIT_DASHBOARD_TERMINAL", "1")
+        monkeypatch.setattr("qubit_cli.model_switch.switch_model", lambda **_: result)
+        monkeypatch.setattr("qubit_cli.model_switch.resolve_display_context_length", lambda *a, **k: context_window)
+        monkeypatch.setattr(server, "_expensive_model_confirm", lambda *a: {"confirm_required": True})
+        monkeypatch.setattr(server.threading, "Thread", ImmediateThread)
+        for name in ("_sync_agent_model_with_config", "_merge_preflight_warning", "_restart_slash_worker",
+                     "_persist_live_session_system_prompt", "_emit_session_info", "_stage_onboarding_turn_note"):
+            monkeypatch.setattr(server, name, lambda *a, **k: None)
+        monkeypatch.setattr(server, "_emit", lambda *a: None)
+        monkeypatch.setattr(server, "_get_usage", lambda _a: {})
+        monkeypatch.setattr(server, "render_message", lambda *_a: "")
+
+        server.handle_request({
+            "id": "1", "method": "prompt.submit", "params": {"session_id": "sid", "text": "next turn"},
+        })
+        assert routed == [expected_provider]
+        assert db.read_terminal_model_request(sid)["state"] == expected_status
+        assert db.get_session_model_config_value(sid, "provider") == expected_provider
+        assert server._sessions["sid"]["history"][0] == marker
+
+        replacement = {**request, "id": "2", "provider": "newer-pick"}
+        assert db.queue_terminal_model_request(sid, replacement)
+        db.finish_terminal_model_request(sid, request, "applied")
+        assert db.read_terminal_model_request(sid) == replacement
+    finally:
+        server._sessions.pop("sid", None)
+        db.close()

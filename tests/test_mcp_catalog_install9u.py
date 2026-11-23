@@ -135,3 +135,35 @@ def test_install_inlines_non_secret_url_template(tmp_path, monkeypatch):
     assert code == 200, out
     assert seen["fields"]["url"] == "https://n8n.example.com/mcp", seen
     assert "${" not in seen["fields"]["url"]
+
+
+def test_catalog_values_stay_in_selected_profile_env(tmp_path, monkeypatch):
+    import yaml
+
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = tmp_path / "qhome"
+    work = root / "profiles" / "work"
+    work.mkdir(parents=True)
+    (work / "config.yaml").write_text("{}\n")
+    secret = "local-approval-fixture-73f9"
+    request = {"name": "asana", "enable": False,
+               "env": {"ASANA_CLIENT_ID": "fixture-id", "ASANA_CLIENT_SECRET": secret}}
+    query = {"profile": "work"}
+
+    status, pending = HC.dispatch(cfg, "POST", "/api/mcp/catalog/install", query, request)
+    assert status == 409 and pending["code"] == "CONFIRM_REQUIRED", pending
+    assert not pending.get("confirmation_id")
+    assert not (work / ".env").exists()
+    status, installed = HC.dispatch(cfg, "POST", "/api/mcp/catalog/install", query,
+                                    {**request, "confirm": True})
+    assert status == 200, installed
+    assert secret in (work / ".env").read_text()
+    assert not (root / ".env").exists()
+    journal = cfg.state_dir() / "approvals.jsonl"
+    assert not journal.exists() or secret not in journal.read_text()
+    assert secret not in repr(installed)
+    assert secret not in (work / "mcp_servers.json").read_text()
+    native = yaml.safe_load((work / "config.yaml").read_text())["mcp_servers"]["asana"]
+    assert native["enabled"] is False and secret not in repr(native)

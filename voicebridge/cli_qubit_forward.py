@@ -305,11 +305,6 @@ NATIVE_REFUSALS = {
     "send": ("QUBIT_NATIVE_SEND",
              "qubit send reuses gateway credentials and is not forwarded: use "
              "`qubit msg send`"),
-    "claw": ("QUBIT_CLAW_PLUGIN_REQUIRED",
-             "qubit claw moved out of core into the `agent-importers` plugin, "
-             "which is not installed. Install it with `qubit plugins install "
-             "agent-importers`, then re-run `qubit claw ...`; `qubit "
-             "import-agent` remains the native importer"),
     "whatsapp": ("QUBIT_NATIVE_WHATSAPP",
                  "qubit whatsapp is an interactive pairing flow and is not "
                  "forwarded: configure it through `qubit channels`"),
@@ -735,6 +730,34 @@ def confirm_pair(argv: list, cfg=None) -> Optional[FamilyRoute]:
     return FamilyRoute("forward", [*mapped, *args])
 
 
+def importer_route(argv: list, cfg=None) -> Optional[FamilyRoute]:
+    """Keep native inventory and route the catalog importer's explicit commands."""
+    family, *tail = argv
+    if family == "claw":
+        subcommand = tail[0] if tail else ""
+        can_write = bool(tail)
+    elif family == "import-agent" and tail and tail[0] in {
+        "openclaw", "claude-code", "codex", "cursor", "--sync",
+    }:
+        subcommand = tail[0]
+        can_write = True
+    else:
+        return None
+
+    forwarded = [family, *_strip_family_globals(tail)]
+    read_only = any(flag in tail for flag in ("--dry-run", "--help", "-h"))
+    if can_write and not read_only:
+        if "--confirm" not in tail:
+            return FamilyRoute(
+                "needs-confirm", forwarded, code="CONFIRM_REQUIRED",
+                detail=f"qubit {family} {subcommand} requires --confirm. Use --dry-run to preview.",
+            )
+        denied = guard_confirm(argv, family, subcommand, cfg)
+        if denied is not None:
+            return denied
+    return FamilyRoute("forward", forwarded)
+
+
 def chat_route(argv: list) -> Optional[FamilyRoute]:
     """Resolve ``qubit chat [...]`` to the vendored interactive chat, or ``None``.
 
@@ -808,7 +831,7 @@ def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
     raw = list(argv or [])
     if len(raw) >= 2 and ((raw[0], raw[1]) in NATIVE_MCP_READS or
                           (raw[0] == "mcp" and raw[1] in
-                           {"remove", "rm", "delete", "disable"})):
+                           {"remove", "rm", "delete", "disable", "inspect-source"})):
         # Native canonical MCP read (``voicebridge.mcp_servers``); never the
         # fork's second ``config.yaml mcp_servers`` store.
         return None
@@ -816,6 +839,9 @@ def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
     if resolved is not None:
         return resolved
     resolved = confirm_pair(argv, cfg=cfg)
+    if resolved is not None:
+        return resolved
+    resolved = importer_route(raw, cfg=cfg) if raw else None
     if resolved is not None:
         return resolved
     resolved = family_refusal(argv)

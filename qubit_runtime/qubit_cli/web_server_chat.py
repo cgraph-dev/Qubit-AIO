@@ -580,8 +580,13 @@ def _resolve_chat_argv(
     argv, cwd = _make_tui_argv(PROJECT_ROOT / "ui-tui", tui_dev=False)
     # Secrets kept — the spawned agent needs provider creds.  An explicit profile
     # scope overrides QUBIT_HOME before config is bridged into the env.
-    from tools.environments.local import build_subprocess_env
-    env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
+    from tools.environments.local import build_subprocess_env, served_profile_child_env
+    if profile_dir is None:
+        env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
+    else:
+        env = served_profile_child_env(target_home=profile_dir, inherit_credentials=True)
+        env.pop("HERMES_TUI_GATEWAY_URL", None)
+        env.pop("QUBIT_TUI_GATEWAY_URL", None)
     # The dashboard/gateway runs as a systemd user service and inherits no DISPLAY, so xclip in
     # the spawned TUI fails with "Can't open display: (null)" and every /chat image paste
     # reports "No image found in clipboard". Resolve the seat's reachable display into the child

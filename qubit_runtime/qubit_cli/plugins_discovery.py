@@ -96,6 +96,15 @@ def install_foreign_adapters() -> int:
     return activated
 
 
+def foreign_cli_launch_prefix() -> tuple[str, ...]:
+    """Use the registered host launcher for a new process that loads foreign plugins."""
+    for provider in tuple(_foreign_providers):
+        prefix = _provider_call(provider, "cli_launch_prefix")
+        if prefix:
+            return tuple(prefix)
+    return ()
+
+
 def foreign_entry_point_groups() -> tuple:
     """Entry-point groups the registered providers want scanned, IN ADDITION to ours.
 

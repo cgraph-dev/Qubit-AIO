@@ -27,12 +27,12 @@ REPO = Path(__file__).resolve().parents[1]
 #: not merely deleted.
 CASES = (
     (
-        "qubit_runtime/qubit_cli/agent_import.py",
+        "qubit_runtime/qubit_cli/agent_import_legacy.py",
         "add them to ~/.hermes/.env",
         "{display_qubit_home()}/.env",
     ),
     (
-        "qubit_runtime/qubit_cli/agent_import.py",
+        "qubit_runtime/qubit_cli/agent_import_legacy.py",
         "via 'qubit setup' or ~/.hermes/.env",
         "{display_qubit_home()}/.env",
     ),
@@ -140,7 +140,7 @@ CASES = (
 
 #: Every owned CLI file in this wave (scan scope proof).
 OWNED_FILES = (
-    "qubit_runtime/qubit_cli/agent_import.py",
+    "qubit_runtime/qubit_cli/agent_import_legacy.py",
     "qubit_runtime/qubit_cli/gateway_setup_wizard.py",
     "qubit_runtime/qubit_cli/auth_spotify.py",
     "qubit_runtime/qubit_cli/memory_setup.py",

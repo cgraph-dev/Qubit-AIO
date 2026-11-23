@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ExternalLink,
   KeyRound,
@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { EnvVarInfo } from "@/lib/api";
-import { removeDeletedEnvVarFromState } from "@/lib/env-state";
+import { ProfileContext } from "@/contexts/profile-context";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
@@ -118,12 +118,13 @@ function EnvVarRow({
 }) {
   const { t } = useI18n();
   const isEditing = edits[varKey] !== undefined;
+  const canClear = info.is_set || (info.custom && info.category === "references");
   // Qubit never serves secret values (SECRET_NEVER_SERVED), so there is no
   // Reveal affordance; only the redacted placeholder / reference name shows.
   const displayValue = info.redacted_value ?? "---";
 
   // Compact inline row for unset, non-editing keys (used inside provider groups)
-  if (compact && !info.is_set && !isEditing) {
+  if (compact && !canClear && !isEditing) {
     return (
       <div className="flex items-center justify-between gap-3 py-1.5 min-w-0 overflow-hidden text-text-secondary hover:text-foreground transition-colors">
         <div className="flex items-center gap-2 min-w-0">
@@ -158,7 +159,7 @@ function EnvVarRow({
   }
 
   // Non-compact unset row
-  if (!info.is_set && !isEditing) {
+  if (!canClear && !isEditing) {
     return (
       <div className="flex items-center justify-between gap-3 border border-border/50 px-4 py-2.5 min-w-0 overflow-hidden text-text-secondary hover:text-foreground transition-colors">
         <div className="flex items-center gap-3 min-w-0">
@@ -244,12 +245,12 @@ function EnvVarRow({
             {info.is_set ? t.common.replace : t.common.set}
           </Button>
 
-          {info.is_set && (
+          {canClear && (
             <Button
               size="sm"
               variant="secondary"
               onClick={() => onClear(varKey)}
-              disabled={saving === varKey || clearDialogOpen}
+              disabled={saving !== null || clearDialogOpen}
             >
               {saving === varKey ? "..." : t.common.clear}
             </Button>
@@ -260,9 +261,10 @@ function EnvVarRow({
       {isEditing && (
         <div className="flex items-center gap-2">
           <Input
-            type="text"
+            type={info.is_password ? "password" : "text"}
             label={varKey}
             value={edits[varKey]}
+            disabled={saving === varKey}
             onChange={(value) =>
               setEdits((prev) => ({ ...prev, [varKey]: value }))
             }
@@ -279,13 +281,14 @@ function EnvVarRow({
           <Button
             size="sm"
             onClick={() => onSave(varKey)}
-            disabled={saving === varKey || !edits[varKey]}
+            disabled={saving !== null || !edits[varKey]}
           >
             {saving === varKey ? "..." : t.common.save}
           </Button>
           <Button
             size="sm"
             variant="secondary"
+            disabled={saving === varKey}
             onClick={() => onCancelEdit(varKey)}
           >
             {t.common.cancel}
@@ -557,9 +560,15 @@ function CustomKeysCard({
 /* ------------------------------------------------------------------ */
 
 export default function EnvPage() {
+  const { profile } = useContext(ProfileContext);
+  return <ProfileKeys key={profile} profile={profile || "current"} />;
+}
+
+function ProfileKeys({ profile }: { profile: string }) {
   const [vars, setVars] = useState<Record<string, EnvVarInfo> | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const mutationInFlight = useRef(false);
   const [showAdvanced, setShowAdvanced] = useState(true); // Show all providers by default
   const { toast, showToast } = useToast();
   const { t } = useI18n();
@@ -569,10 +578,10 @@ export default function EnvPage() {
   useEffect(() => {
     let live = true;
     setLoadError(null);
-    api.getEnvVars().then((next) => { if (live) setVars(next); })
+    api.getEnvVars(profile).then((next) => { if (live) setVars(next); })
       .catch(() => { if (live) setLoadError("Failed to load keys."); });
     return () => { live = false; };
-  }, [loadAttempt]);
+  }, [loadAttempt, profile]);
 
   // Scroll-to sub-nav in the page body. Every section is structural (the
   // Qubit OAUTH/PROVIDERS/TOOLS/GATEWAY/SETTINGS/CUSTOM KEYS tab family), so
@@ -605,33 +614,32 @@ export default function EnvPage() {
 
   const handleSave = async (key: string) => {
     const value = edits[key];
-    if (!value) return;
+    if (!value || mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setSaving(key);
     try {
-      await api.setEnvVar(key, value);
-      setVars((prev) =>
-        prev
-          ? {
-              ...prev,
-              [key]: {
-                ...prev[key],
-                is_set: true,
-                redacted_value: value.slice(0, 4) + "..." + value.slice(-4),
-              },
-            }
-          : prev,
-      );
+      await api.setEnvVar(key, value, profile);
+      const saved = (await api.getEnvVars(profile).catch(() => undefined))?.[key];
+      if (saved) {
+        setVars((prev) => ({ ...prev, [key]: saved }));
+      }
       setEdits((prev) => {
         const n = { ...prev };
         delete n[key];
         return n;
       });
-      showToast(`${key} ${t.common.save.toLowerCase()}d`, "success");
-      emitFx("success");
+      if (saved) {
+        showToast(`${key} ${t.common.save.toLowerCase()}d`, "success");
+        emitFx("success");
+      } else {
+        showToast(`Saved ${key}. Refreshing its status…`, "error");
+        setLoadAttempt((attempt) => attempt + 1);
+      }
     } catch (e) {
       showToast(`${t.config.failedToSave} ${key}: ${e}`, "error");
       emitFx("error");
     } finally {
+      mutationInFlight.current = false;
       setSaving(null);
     }
   };
@@ -639,26 +647,33 @@ export default function EnvPage() {
   const keyClear = useConfirmDelete({
     onDelete: useCallback(
       async (key: string) => {
+        if (mutationInFlight.current) throw new Error("A key change is already in progress.");
+        mutationInFlight.current = true;
         setSaving(key);
         try {
-          await api.deleteEnvVar(key);
-          setVars((prev) => removeDeletedEnvVarFromState(prev, key));
+          await api.deleteEnvVar(key, profile);
+          const next = await api.getEnvVars(profile).catch(() => undefined);
+          if (next) setVars(next);
+          else setLoadAttempt((attempt) => attempt + 1);
           setEdits((prev) => {
             const n = { ...prev };
             delete n[key];
             return n;
           });
-          showToast(`${key} ${t.common.removed}`, "success");
+          if (!next) showToast(`Removed ${key}. Refreshing its status…`, "error");
+          else if (next[key]?.is_set) showToast(`${key} is still supplied by the environment.`, "error");
+          else showToast(`${key} ${t.common.removed}`, "success");
           emitFx("warning");
         } catch (e) {
           showToast(`${t.common.failedToRemove} ${key}: ${e}`, "error");
           emitFx("error");
           throw e;
         } finally {
+          mutationInFlight.current = false;
           setSaving(null);
         }
       },
-      [showToast, t.common.removed, t.common.failedToRemove],
+      [profile, showToast, t.common.removed, t.common.failedToRemove],
     ),
   });
 

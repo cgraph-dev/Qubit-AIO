@@ -127,7 +127,10 @@ def resolve(path: str) -> Optional[Path]:
     # request too (``/wb/static`` -> ``static/index.html``) — EXCEPT a bare
     # notice file (``LICENSE``, ``NOTICE``), which has no suffix by design and
     # must NOT be turned into ``LICENSE/index.html``.
-    if not parts:
+    # The Workbench writes session URLs into browser history. A direct visit
+    # or reload must load the same document, which restores the session via API.
+    session_page = re.fullmatch(r"/?session/[^/]+/?", rel)
+    if not parts or session_page:
         parts = ["static", "index.html"]
     elif "." not in parts[-1] and parts[-1].lower() not in _NOTICE_NAMES:
         parts = parts + ["index.html"]

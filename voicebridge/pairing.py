@@ -293,6 +293,7 @@ def create(cfg: Any, label: str, scopes: List[str], *, account: str = "",
             "account_bound": bool(account)})
     return {"state": "OK", "code": code,
             "code_id": code_id, "expires_at": rec["expires_at"],
+            "label": clean_label, "scopes": clean_scopes,
             "join_url": join_url(cfg, code),
             "qr": qr_payload(cfg, code),
             "warning": "shown once: deliver it out-of-band; it is never "

@@ -103,7 +103,7 @@ def test_runtime_config_servers_carry_transport_and_enabled(tmp_path,
     assert "sk-live" not in json.dumps(rows)
 
 
-def test_config_inventory_is_read_only_and_store_still_wins(tmp_path,
+def test_inventory_read_preserves_the_runtime_mirror(tmp_path,
                                                             monkeypatch):
     from voicebridge import mcp_servers as MS
 
@@ -111,11 +111,11 @@ def test_config_inventory_is_read_only_and_store_still_wins(tmp_path,
     MS.upsert(cfg, "rea", {"transport": "stdio", "command": "rea-local",
                            "enabled": True})
 
-    # The writable registry is authoritative for a same-name server.
+    path = tmp_path / "qhome" / "config.yaml"
+    raw = path.read_bytes()
+    assert b"command: rea-local\n" in raw
     assert _rows(cfg)["rea"]["command"] == "rea-local"
-    # The runtime config file was never rewritten by the read.
-    raw = (tmp_path / "qhome" / "config.yaml").read_text(encoding="utf-8")
-    assert "command: rea\n" in raw
+    assert path.read_bytes() == raw
 
 
 def test_legacy_nested_shape_stays_inventory_only(tmp_path, monkeypatch):
@@ -258,3 +258,14 @@ def test_served_wire_row_carries_editable(tmp_path, monkeypatch):
     status, body = HC.dispatch(cfg, "GET", "/api/mcp/servers")
     rows = {r["name"]: r for r in body["servers"]}
     assert rows["rea"]["editable"] is True, rows["rea"]
+
+
+def test_delete_of_native_only_server_refuses_without_mutation(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    path = tmp_path / "qhome" / "config.yaml"
+    original = path.read_bytes()
+    status, result = HC.dispatch(cfg, "DELETE", "/api/mcp/servers/rea", {}, {"confirm": True})
+    assert status == 400 and result["code"] == "MCP_CONFIG_READ_ONLY", result
+    assert path.read_bytes() == original

@@ -106,6 +106,7 @@ const PROFILE_SCOPED_PREFIXES = [
   "/api/status",
   "/api/gateway",
   "/api/analytics",
+  "/api/logs",
   "/api/skills",
   "/api/tools/toolsets",
   "/api/config",
@@ -859,12 +860,14 @@ export const api = {
     profileId?: string,
     scope?: "pty" | "rpc" | "stt",
     resume?: string,
+    managementProfile?: string,
   ): Promise<WsTicketGrant> => {
     const res = await authedFetch("/api/auth/ws-ticket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...(profileId ? { profile: profileId } : {}),
+        ...(managementProfile ? { management_profile: managementProfile } : {}),
         ...(scope ? { scope } : {}),
         // A resumed /chat must report the STORED session model in its grant
         // (the server overlays `sessions.model`), not the config default —
@@ -1098,14 +1101,14 @@ export const api = {
       },
     ),
   bulkDeleteSessions: (ids: string[], profile = getManagementProfile()) =>
-    fetchJSON<{ ok: boolean; deleted: number }>("/api/sessions/bulk-delete", {
+    fetchJSON<{ ok: boolean; deleted: number }>(appendProfileParam("/api/sessions/bulk-delete", profile), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids, profile: profile || undefined }),
     }),
   renameSession: (id: string, title: string, profile = getManagementProfile()) =>
     fetchJSON<{ ok: boolean; title: string }>(
-      `/api/sessions/${encodeURIComponent(id)}`,
+      appendProfileParam(`/api/sessions/${encodeURIComponent(id)}`, profile),
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1124,7 +1127,7 @@ export const api = {
     sessions: Array<Record<string, unknown>>,
     profile = getManagementProfile(),
   ) =>
-    fetchJSON<SessionImportResponse>("/api/sessions/import", {
+    fetchJSON<SessionImportResponse>(appendProfileParam("/api/sessions/import", profile), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessions, profile: profile || undefined }),
@@ -1135,7 +1138,7 @@ export const api = {
     profile = getManagementProfile(),
   ) =>
     fetchJSON<{ ok: boolean; removed: number; skipped_open: number }>(
-      "/api/sessions/prune",
+      appendProfileParam("/api/sessions/prune", profile),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1151,19 +1154,19 @@ export const api = {
    * receipts `getSessions` store above; the Chat sidebar and transcript use
    * these so a reload restores the real server transcript.
    */
-  listChatSessions: (limit = 50, offset = 0, query = "") => {
+  listChatSessions: (limit = 50, offset = 0, query = "", profile?: string) => {
     const q = query ? `&q=${encodeURIComponent(query)}` : "";
     return fetchJSON<ChatStoreSessionsResponse>(
-      `/api/qubit/chat/sessions?limit=${limit}&offset=${offset}${q}`,
+      appendProfileParam(`/api/qubit/chat/sessions?limit=${limit}&offset=${offset}${q}`, profile),
     );
   },
-  getChatSession: (id: string) =>
+  getChatSession: (id: string, profile?: string) =>
     fetchJSON<ChatStoreSessionResponse>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}`,
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}`, profile),
     ),
-  getChatSessionMessages: (id: string, limit = 500) =>
+  getChatSessionMessages: (id: string, limit = 500, profile?: string) =>
     fetchJSON<ChatStoreMessagesResponse>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}/messages?limit=${limit}&offset=0`,
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}/messages?limit=${limit}&offset=0`, profile),
     ),
   /**
    * Unified slash catalog for the `/qubit-chat` composer
@@ -1180,24 +1183,35 @@ export const api = {
    * the canonical session store (`PATCH /api/qubit/chat/sessions/:id`).
    * The preference is reloaded with the session, so it survives refresh.
    */
-  patchChatSession: (id: string, patch: Record<string, unknown>) =>
-    fetchJSON<{ ok: boolean; session?: ChatStoreSession }>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}`,
+  patchChatSession: (id: string, patch: Record<string, unknown>, profile?: string) =>
+    fetchJSON<ChatTerminalModelResponse>(
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}`, profile),
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       },
     ),
-  createChatSession: (name = "") =>
-    fetchJSON<ChatStoreCreateResponse>("/api/qubit/chat/sessions", {
+  getChatTerminalModel: (id: string, profile?: string, signal?: AbortSignal) =>
+    fetchJSON<ChatTerminalModelResponse>(
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}/terminal-model`, profile),
+      { signal },
+    ),
+  createChatSession: (name = "", profile?: string) =>
+    fetchJSON<ChatStoreCreateResponse>(appendProfileParam("/api/qubit/chat/sessions", profile), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     }),
-  deleteChatSession: (id: string, confirm = true) =>
+  cancelProfileChatTurn: (session: string, profile: string) =>
+    fetchJSON<{ ok: boolean }>(appendProfileParam("/api/qubit/chat/cancel", profile), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session }),
+    }),
+  deleteChatSession: (id: string, confirm = true, profile?: string) =>
     fetchJSON<{ ok: boolean; session?: ChatStoreSession }>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}?confirm=${confirm ? "true" : "false"}`,
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}?confirm=${confirm ? "true" : "false"}`, profile),
       { method: "DELETE" },
     ),
   /**
@@ -1205,17 +1219,17 @@ export const api = {
    * the same store the CLI uses; these surface drafts, operator comments, and
    * structured CI details for the active session (read-only).
    */
-  getChatSessionDrafts: (id: string, limit = 100) =>
+  getChatSessionDrafts: (id: string, limit = 100, profile?: string) =>
     fetchJSON<ChatDraftsResponse>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}/drafts?limit=${limit}`,
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}/drafts?limit=${limit}`, profile),
     ),
-  getChatSessionComments: (id: string, limit = 100) =>
+  getChatSessionComments: (id: string, limit = 100, profile?: string) =>
     fetchJSON<ChatCommentsResponse>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}/comments?limit=${limit}`,
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}/comments?limit=${limit}`, profile),
     ),
-  getChatSessionCi: (id: string, limit = 100) =>
+  getChatSessionCi: (id: string, limit = 100, profile?: string) =>
     fetchJSON<ChatCiResponse>(
-      `/api/qubit/chat/sessions/${encodeURIComponent(id)}/ci?limit=${limit}`,
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(id)}/ci?limit=${limit}`, profile),
     ),
   /** A35: describe a pasted chat image through the canonical vision backend. */
   describeChatImage: (dataUrl: string, prompt = "") =>
@@ -1239,8 +1253,8 @@ export const api = {
    * tool) does the work; its reply is returned and persisted server-side, so a
    * transcript reload restores it.
    */
-  submitChatImage: (dataUrl: string, session: string, prompt = "") =>
-    fetchJSON<ChatImageTurnResponse>("/api/qubit/chat/image", {
+  submitChatImage: (dataUrl: string, session: string, prompt = "", profile?: string) =>
+    fetchJSON<ChatImageTurnResponse>(appendProfileParam("/api/qubit/chat/image", profile), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1387,8 +1401,12 @@ export const api = {
         body: JSON.stringify(payload),
       },
     ),
-  getDefaults: () => fetchJSON<Record<string, unknown>>("/api/config/defaults"),
-  getSchema: () => fetchJSON<{ fields: Record<string, unknown>; category_order: string[] }>("/api/config/schema"),
+  getDefaults: (profile?: string) =>
+    fetchJSON<Record<string, unknown>>(appendProfileParam("/api/config/defaults", profile)),
+  getSchema: (profile?: string) =>
+    fetchJSON<{ fields: Record<string, unknown>; category_order: string[] }>(
+      appendProfileParam("/api/config/schema", profile),
+    ),
   getModelInfo: (
     profile = getManagementProfile(),
     model?: { provider?: string; model?: string },
@@ -1532,7 +1550,7 @@ export const api = {
     // straight through, preserving the legacy signature).
     runMutationWithConfirm(
       () =>
-        fetchJSON<{ ok: boolean }>(appendProfileParam("/api/config", profile), {
+        fetchJSON<{ ok: boolean; applied_to_home?: boolean }>(appendProfileParam("/api/config", profile), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(confirm ? { config: writable, confirm: true } : { config: writable }),
@@ -1545,9 +1563,10 @@ export const api = {
   // (SECRET_NEVER_SERVED): the reference endpoint serves full plaintext secrets,
   // so no wrapper is offered. The structured ConfigPage form (`PUT /api/config`)
   // is the supported editor; secret values go through the Keys reference store.
-  getEnvVars: () => fetchJSON<Record<string, EnvVarInfo>>("/api/env"),
-  setEnvVar: (key: string, value: string) =>
-    fetchJSON<{ ok: boolean }>("/api/env", {
+  getEnvVars: (profile?: string) =>
+    fetchJSON<Record<string, EnvVarInfo>>(appendProfileParam("/api/env", profile)),
+  setEnvVar: (key: string, value: string, profile?: string) =>
+    fetchJSON<{ ok: boolean }>(appendProfileParam("/api/env", profile), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       // B-08: env writes are confirm-gated. A pasted raw secret is written to
@@ -1555,8 +1574,8 @@ export const api = {
       // `env:`/`vault:`/`file:` reference is stored in the reference registry.
       body: JSON.stringify({ key, value, confirm: true }),
     }),
-  deleteEnvVar: (key: string) =>
-    fetchJSON<{ ok: boolean }>("/api/env", {
+  deleteEnvVar: (key: string, profile?: string) =>
+    fetchJSON<{ ok: boolean }>(appendProfileParam("/api/env", profile), {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key, confirm: true }),
@@ -1571,8 +1590,11 @@ export const api = {
   // Cron jobs
   getCronJobs: (profile = "all") =>
     fetchJSON<CronJob[]>(`/api/cron/jobs?profile=${encodeURIComponent(profile)}`),
-  getCronDeliveryTargets: () =>
-    fetchJSON<{ targets: CronDeliveryTarget[] }>("/api/cron/delivery-targets"),
+  getCronDeliveryTargets: (profile?: string) =>
+    fetchJSON<{ targets: CronDeliveryTarget[] }>(
+      profile ? `/api/cron/delivery-targets?profile=${encodeURIComponent(profile)}`
+        : "/api/cron/delivery-targets",
+    ),
   // ``cron_create`` reads the schedule as ``when`` (or ``schedule.expr``);
   // the editor models it as a display string, so map it and let the shared
   // confirm round-trip re-issue with ``confirm: true``.
@@ -1597,7 +1619,12 @@ export const api = {
       confirm,
     ),
   pauseCronJob: (id: string, profile = "default") =>
-    fetchJSON<CronJob>(`/api/cron/jobs/${encodeURIComponent(id)}/pause?profile=${encodeURIComponent(profile)}`, { method: "POST" }),
+    runMutationWithConfirm(() =>
+      fetchJSON<CronJob>(
+        `/api/cron/jobs/${encodeURIComponent(id)}/pause?profile=${encodeURIComponent(profile)}`,
+        { method: "POST" },
+      ),
+    ),
   updateCronJob: (
     id: string,
     updates: CronJobMutation,
@@ -1618,7 +1645,12 @@ export const api = {
       confirm,
     ),
   resumeCronJob: (id: string, profile = "default") =>
-    fetchJSON<CronJob>(`/api/cron/jobs/${encodeURIComponent(id)}/resume?profile=${encodeURIComponent(profile)}`, { method: "POST" }),
+    runMutationWithConfirm(() =>
+      fetchJSON<CronJob>(
+        `/api/cron/jobs/${encodeURIComponent(id)}/resume?profile=${encodeURIComponent(profile)}`,
+        { method: "POST" },
+      ),
+    ),
   triggerCronJob: (id: string, profile = "default") =>
     fetchJSON<CronJob>(`/api/cron/jobs/${encodeURIComponent(id)}/trigger?profile=${encodeURIComponent(profile)}`, { method: "POST" }),
   // ``cron_delete`` is confirm-gated; the helper retries with confirm on both
@@ -1638,17 +1670,22 @@ export const api = {
     ),
 
   // Automation Blueprints — parameterized automation blueprints
-  getAutomationBlueprints: () =>
-    fetchJSON<{ blueprints: AutomationBlueprint[] }>("/api/cron/blueprints"),
+  getAutomationBlueprints: (profile?: string) =>
+    fetchJSON<{ blueprints: AutomationBlueprint[] }>(
+      profile ? `/api/cron/blueprints?profile=${encodeURIComponent(profile)}`
+        : "/api/cron/blueprints",
+    ),
   instantiateAutomationBlueprint: (
     body: { blueprint: string; values: Record<string, string> },
     profile = "default",
   ) =>
-    fetchJSON<CronJob>(`/api/cron/blueprints/instantiate?profile=${encodeURIComponent(profile)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+    runMutationWithConfirm(() =>
+      fetchJSON<CronJob>(`/api/cron/blueprints/instantiate?profile=${encodeURIComponent(profile)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
 
   // Profiles
   getProfiles: () =>
@@ -2123,8 +2160,8 @@ export const api = {
     ),
 
   // Gateway / update actions
-  getGatewayStatus: () =>
-    fetchJSON<GatewayStatusResponse>("/api/gateway"),
+  getGatewayStatus: (profile?: string) =>
+    fetchJSON<GatewayStatusResponse>(appendProfileParam("/api/gateway", profile)),
   // Qubit's gateway supervisor confirms-gates every lifecycle transition
   // (start/stop/restart), so a bare POST stages a typed 409
   // GATEWAY_CONFIRM_REQUIRED instead of executing. The shared round-trip
@@ -2135,10 +2172,10 @@ export const api = {
   // then `reissueToSettle` injects `confirm: true`. The optional `confirm`
   // callback defers the human decision; without it the same refuse-on-409
   // behavior is preserved for non-UI callers.
-  restartGateway: (confirm?: (detail: string) => boolean | Promise<boolean>) =>
+  restartGateway: (confirm?: (detail: string) => boolean | Promise<boolean>, profile?: string) =>
     runMutationWithConfirm(
       () =>
-        fetchJSON<ActionResponse>("/api/gateway/restart", {
+        fetchJSON<ActionResponse>(appendProfileParam("/api/gateway/restart", profile), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
@@ -2161,9 +2198,9 @@ export const api = {
     fetchJSON<UpdateCheckResponse>(
       `/api/qubit/update/check${force ? "?force=true" : ""}`,
     ),
-  getActionStatus: (name: string, lines = 200) =>
+  getActionStatus: (name: string, lines = 200, profile?: string) =>
     fetchJSON<ActionStatusResponse>(
-      `/api/actions/${encodeURIComponent(name)}/status?lines=${lines}`,
+      appendProfileParam(`/api/actions/${encodeURIComponent(name)}/status?lines=${lines}`, profile),
     ),
 
   // Dashboard plugins
@@ -2307,57 +2344,61 @@ export const api = {
     }),
 
   // ── Admin: MCP servers ──────────────────────────────────────────────
-  getMcpServers: () => fetchJSON<{ servers: McpServer[] }>("/api/mcp/servers"),
+  getMcpServers: (profile?: string) =>
+    fetchJSON<{ servers: McpServer[] }>(appendProfileParam("/api/mcp/servers", profile)),
   // ``mcp_create`` stages a typed 409 with a real ``confirmation_id`` without
   // ``confirm``; the shared round-trip re-issues the same request to settle it.
   addMcpServer: (
     body: McpServerCreate,
     confirm?: (detail: string) => boolean | Promise<boolean>,
+    profile?: string,
   ) =>
     runMutationWithConfirm(
       () =>
-        fetchJSON<McpServer>("/api/mcp/servers", {
+        fetchJSON<McpServer>(appendProfileParam("/api/mcp/servers", profile), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         }),
       confirm,
     ),
-  authMcpServer: (name: string) =>
+  authMcpServer: (name: string, profile?: string) =>
     fetchJSON<McpOAuthFlow>(
-      `/api/mcp/servers/${encodeURIComponent(name)}/auth`,
+      appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/auth`, profile),
       { method: "POST" },
     ),
-  getMcpOAuthFlow: (flowId: string) =>
+  getMcpOAuthFlow: (flowId: string, profile?: string) =>
     fetchJSON<McpOAuthFlow>(
-      `/api/mcp/oauth/flows/${encodeURIComponent(flowId)}`,
+      appendProfileParam(`/api/mcp/oauth/flows/${encodeURIComponent(flowId)}`, profile),
     ),
   removeMcpServer: (
     name: string,
     confirm?: (detail: string) => boolean | Promise<boolean>,
+    profile?: string,
   ) =>
     runMutationWithConfirm(
       () =>
         fetchJSON<{ ok: boolean }>(
-          `/api/mcp/servers/${encodeURIComponent(name)}`,
+          appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}`, profile),
           { method: "DELETE" },
         ),
       confirm,
     ),
-  testMcpServer: (name: string) =>
+  testMcpServer: (name: string, profile?: string) =>
     fetchJSON<McpTestResult>(
-      `/api/mcp/servers/${encodeURIComponent(name)}/test`,
+      appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/test`, profile),
       { method: "POST" },
     ),
   setMcpServerEnabled: (
     name: string,
     enabled: boolean,
     confirm?: (detail: string) => boolean | Promise<boolean>,
+    profile?: string,
   ) =>
     runMutationWithConfirm(
       () =>
         fetchJSON<{ ok: boolean; name: string; enabled: boolean }>(
-          `/api/mcp/servers/${encodeURIComponent(name)}/enabled`,
+          appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/enabled`, profile),
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -2366,17 +2407,18 @@ export const api = {
         ),
       confirm,
     ),
-  getMcpCatalog: () =>
+  getMcpCatalog: (profile?: string) =>
     fetchJSON<{ entries: McpCatalogEntry[]; diagnostics: McpCatalogDiagnostic[] }>(
-      "/api/mcp/catalog",
+      appendProfileParam("/api/mcp/catalog", profile),
     ),
   installMcpCatalogEntry: (
     name: string,
     env: Record<string, string> = {},
     enable = true,
+    profile?: string,
   ) =>
     fetchJSON<{ ok: boolean; name: string; background: boolean; action?: string }>(
-      "/api/mcp/catalog/install",
+      appendProfileParam("/api/mcp/catalog/install", profile),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2395,11 +2437,12 @@ export const api = {
     tool: string,
     args: Record<string, unknown> = {},
     confirm?: (detail: string) => boolean | Promise<boolean>,
+    profile?: string,
   ) =>
     runMutationWithConfirm(
       () =>
         fetchJSON<McpInvokeResult>(
-          `/api/mcp/servers/${encodeURIComponent(name)}/invoke`,
+          appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/invoke`, profile),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2414,17 +2457,17 @@ export const api = {
   // still apply server-side. A real drained list resolves verbatim; an
   // inventory-only / gated / unknown / transport-failed server resolves to a
   // typed `{ok:false, code, detail}` disposition — never a fabricated list.
-  getMcpServerResources: (name: string) =>
+  getMcpServerResources: (name: string, profile?: string) =>
     fetchJSON<McpCapabilityResult>(
-      `/api/mcp/servers/${encodeURIComponent(name)}/resources`,
+      appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/resources`, profile),
     ),
-  getMcpServerPrompts: (name: string) =>
+  getMcpServerPrompts: (name: string, profile?: string) =>
     fetchJSON<McpCapabilityResult>(
-      `/api/mcp/servers/${encodeURIComponent(name)}/prompts`,
+      appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/prompts`, profile),
     ),
-  getMcpServerResourceTemplates: (name: string) =>
+  getMcpServerResourceTemplates: (name: string, profile?: string) =>
     fetchJSON<McpCapabilityResult>(
-      `/api/mcp/servers/${encodeURIComponent(name)}/resource-templates`,
+      appendProfileParam(`/api/mcp/servers/${encodeURIComponent(name)}/resource-templates`, profile),
     ),
 
   // ── Admin: Pairing ──────────────────────────────────────────────────
@@ -2669,20 +2712,20 @@ export const api = {
   // Confirm-gated exactly like restartGateway (the supervisor refuses an
   // unconfirmed transition with 409 GATEWAY_CONFIRM_REQUIRED); the shared
   // round-trip re-issues the same JSON body with `confirm: true`.
-  startGateway: (confirm?: (detail: string) => boolean | Promise<boolean>) =>
+  startGateway: (confirm?: (detail: string) => boolean | Promise<boolean>, profile?: string) =>
     runMutationWithConfirm(
       () =>
-        fetchJSON<ActionResponse>("/api/gateway/start", {
+        fetchJSON<ActionResponse>(appendProfileParam("/api/gateway/start", profile), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         }),
       confirm,
     ),
-  stopGateway: (confirm?: (detail: string) => boolean | Promise<boolean>) =>
+  stopGateway: (confirm?: (detail: string) => boolean | Promise<boolean>, profile?: string) =>
     runMutationWithConfirm(
       () =>
-        fetchJSON<ActionResponse>("/api/gateway/stop", {
+        fetchJSON<ActionResponse>(appendProfileParam("/api/gateway/stop", profile), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
@@ -2924,15 +2967,21 @@ export interface PowerActionResponse {
   code?: string;
 }
 
-/** GET /api/gateway — gateway records plus the supervision policy string.
- *  Qubit refuses process supervision, so `supervision` carries a typed
- *  `GATEWAY_NO_SUPERVISION: …` explanation the dashboard renders instead of
- *  offering start/stop/restart controls that can only fail. */
+/** Gateway status for the selected profile and any service-control refusal. */
 export interface GatewayStatusResponse {
   ok?: boolean;
   gateway?: { state?: string; gateways?: unknown[] };
   state?: string;
   supervision?: string;
+  process?: {
+    running?: boolean;
+    pid?: number | null;
+    state?: string;
+    daemon_state?: string;
+    service_unit?: string;
+    detail?: string;
+    shared?: boolean;
+  };
 }
 
 export interface DebugShareResponse {
@@ -3085,12 +3134,9 @@ export interface McpServer {
   invocation_code?: string | null;
   /** Which store the row was read from (`qubit-registry`). */
   source?: string;
-  /** Whether this row's enable/disable control can act. A `qubit-config` row is
-   *  read-only inventory (PRB-01): `set_enabled` writes the canonical registry
-   *  store only, and the runtime MCP client loads every `mcp_servers` entry
-   *  without consulting `enabled`, so toggling it would neither persist nor
-   *  switch anything. Edit `config.yaml` instead. */
+  /** Whether the registration can be changed through dashboard controls. */
   editable?: boolean;
+  error?: string | null;
   /** The mount policy attached to the row (Qubit never auto-mounts). */
   policy?: string;
 }
@@ -3137,6 +3183,7 @@ export interface McpServerCreate {
   env?: Record<string, string>;
   auth?: McpHttpAuth;
   bearer_token?: string;
+  env_values?: Record<string, string>;
 }
 
 export interface McpTestResult {
@@ -3736,10 +3783,24 @@ export interface PaginatedSessions {
  * authority for `/chat` — distinct from the receipts `GET /api/sessions`
  * store used by the Sessions page.
  */
+export interface ChatTerminalModelResponse {
+  ok: boolean;
+  session?: ChatStoreSession;
+  confirm_required?: boolean;
+  confirm_message?: string;
+  terminal_model_request?: {
+    id: string;
+    model: string;
+    provider: string;
+    state: "queued" | "applied" | "failed" | "confirmation_required" | "context_refused";
+  } | null;
+}
+
 export interface ChatStoreSession {
   id: string;
   source?: string | null;
   model?: string | null;
+  provider?: string;
   title?: string | null;
   name?: string | null;
   archived?: boolean;
@@ -3998,7 +4059,7 @@ export const CHAT_REASONING_LEVELS = [
 ] as const;
 
 export async function streamChatTurn(
-  body: { text: string; session?: string; model?: string; reasoning?: string },
+  body: { text: string; session?: string; model?: string; reasoning?: string; profile?: string },
   handlers: ChatStreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -4015,10 +4076,19 @@ export async function streamChatTurn(
   const reader = res.body?.getReader();
   if (!reader) throw new Error("STREAM_UNSUPPORTED: no response body");
   const decoder = new TextDecoder();
+  const interrupted = "[CHAT_ADMISSION_UNCONFIRMED] Reload the chat before sending again.";
+  let settled = false;
   let buffer = "";
   for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
+    const { value, done } = await reader.read().catch((cause: unknown) => {
+      if (signal?.aborted) throw cause;
+      if (settled) return { done: true, value: undefined } as const;
+      throw new Error(interrupted, { cause });
+    });
+    if (done) {
+      if (!settled && !signal?.aborted) throw new Error(interrupted);
+      return;
+    }
     buffer += decoder.decode(value, { stream: true });
     let idx = buffer.indexOf("\n\n");
     while (idx >= 0) {
@@ -4037,12 +4107,15 @@ export async function streamChatTurn(
             handlers.onProgress?.(event);
             break;
           case "done":
+            settled = true;
             handlers.onDone?.(event);
             break;
           case "cancelled":
+            settled = true;
             handlers.onCancelled?.(event);
             break;
           case "error":
+            settled = true;
             handlers.onError?.(event);
             break;
           default:

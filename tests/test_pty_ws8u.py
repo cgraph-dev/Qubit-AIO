@@ -147,6 +147,101 @@ def test_handshake_and_echo_roundtrip(tmp_path):
         ui.stop()
 
 
+def test_named_profile_ticket_resumes_only_its_own_terminal(tmp_path, monkeypatch):
+    from voicebridge import qubit_runtime
+
+    qubit_runtime.ensure_path()
+    from qubit_cli import main_tui_launch, profiles, pty_bridge
+    from voicebridge.qubit_session_store import QubitSessionStore, close_cached_db
+
+    root = tmp_path / "runtime"
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    monkeypatch.setattr(profiles, "_get_default_qubit_home", lambda: root)
+    monkeypatch.setenv("OPENAI_API_KEY", "launch-test-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "launch-only-test-key")
+    monkeypatch.setenv("HERMES_TUI_GATEWAY_URL", "ws://localhost:1/launch")
+    monkeypatch.setattr(
+        main_tui_launch, "_make_tui_argv", lambda *a, **kw: (["fake-ink"], root))
+    homes = {name: root / "profiles" / name for name in ("team-a", "team-b")}
+    for name, home in homes.items():
+        home.mkdir(parents=True)
+        (home / ".env").write_text(f"OPENAI_API_KEY={name}-test-key\n")
+        (home / "config.yaml").write_text(f"model: {name}-model\n")
+        store = QubitSessionStore(runtime_home=home)
+        store.create(session_id="shared-session", model=f"{name}-model")
+        store.set_model("shared-session", f"{name}-model", provider="openai")
+        store.create(session_id="different-session", model="different-model")
+
+    children = []
+
+    def fake_pty_spawn(_argv, *, cwd, env, cols, rows):
+        child = FakeBridge()
+        children.append((child, env))
+        return child
+
+    monkeypatch.setattr(pty_bridge.PtyBridge, "spawn", fake_pty_spawn)
+    ui, port = _start(tmp_path)
+    srv = ui.pty_ws
+    srv._spawn = srv._production_spawn
+    seen_model_profiles = []
+
+    def guard(_cfg, *, profile_id):
+        seen_model_profiles.append(profile_id)
+        return {"ok": True, "profile_id": profile_id, "model": "launch-model",
+                "provider": "openai", "context_tokens": 128000}
+
+    srv._context_guard = guard
+
+    def open_session(name, token, session="shared-session"):
+        status, grant = _mint(port, body={
+            "management_profile": name, "profile": "catalog-model",
+            "resume": session,
+        })
+        assert status == 200, grant
+        url = _ws_url(port, grant["ticket"], attach=token,
+                      profile="ignored-query-profile", resume="different-session")
+        return grant, ws_connect(url, open_timeout=8)
+
+    def wait_for_detach():
+        deadline = time.monotonic() + 5
+        while srv.active_count and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert srv.active_count == 0
+
+    try:
+        status, refusal = _mint(port, body={"management_profile": "missing"})
+        assert status == 404 and refusal["code"] == "CHAT_PROFILE_INVALID"
+        for name in homes:
+            grant, socket = open_session(name, "same-token")
+            assert grant["model"] == f"{name}-model"
+            with socket as ws:
+                ws.send(name.encode())
+                assert ws.recv(timeout=8) == b"ECHO:" + name.encode()
+            wait_for_detach()
+        assert len(children) == 2
+        for name, (_child, env) in zip(homes, children):
+            assert env["QUBIT_HOME"] == str(homes[name])
+            assert env["QUBIT_TUI_RESUME"] == "shared-session"
+            assert env["HERMES_MODEL"] == f"{name}-model"
+            assert env["OPENAI_API_KEY"] == f"{name}-test-key"
+            assert "ANTHROPIC_API_KEY" not in env
+            assert "HERMES_TUI_GATEWAY_URL" not in env
+            assert (homes[name] / "config.yaml").read_text() == f"model: {name}-model\n"
+        # A different attach token must fall back to the same-profile session.
+        for name, token in (("team-b", "same-token"), ("team-a", "new-token")):
+            _, socket = open_session(name, token)
+            with socket as ws:
+                assert ws.recv(timeout=8) == b"ECHO:" + name.encode()
+            wait_for_detach()
+        assert len(children) == 2
+        assert set(seen_model_profiles) == {"catalog-model"}
+        assert not (root / "state.db").exists()
+    finally:
+        ui.stop()
+        for home in homes.values():
+            close_cached_db(home / "state.db")
+
+
 def test_ticket_is_single_use_and_scoped(tmp_path):
     ui, port = _start(tmp_path)
     try:

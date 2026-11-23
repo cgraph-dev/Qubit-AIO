@@ -124,7 +124,6 @@ export const FONT_CHOICES: FontChoice[] = [
     label: "JetBrains Mono",
     category: "mono",
     stack: `"JetBrains Mono", ${SYSTEM_MONO}`,
-    fontUrl: GF("JetBrains+Mono:wght@400;500;700"),
   },
   {
     id: "ibm-plex-mono",

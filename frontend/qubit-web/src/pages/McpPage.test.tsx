@@ -182,6 +182,7 @@ describe("McpPage tool invocation", () => {
       "graft_find_code",
       { query: "x" },
       expect.any(Function),
+      "current",
     );
   });
 
@@ -203,10 +204,11 @@ describe("McpPage tool invocation", () => {
     await waitFor(
       () => apiMocks.getMcpServerResourceTemplates.mock.calls.length > 0,
     );
-    expect(apiMocks.getMcpServerResources).toHaveBeenCalledWith("cgraph-graft");
-    expect(apiMocks.getMcpServerPrompts).toHaveBeenCalledWith("cgraph-graft");
+    expect(apiMocks.getMcpServerResources).toHaveBeenCalledWith("cgraph-graft", "current");
+    expect(apiMocks.getMcpServerPrompts).toHaveBeenCalledWith("cgraph-graft", "current");
     expect(apiMocks.getMcpServerResourceTemplates).toHaveBeenCalledWith(
       "cgraph-graft",
+      "current",
     );
 
     // Real drained resource renders verbatim; the typed prompts disposition
@@ -239,4 +241,27 @@ describe("McpPage tool invocation", () => {
     );
     expect(container.textContent).toContain("MCP_READ_FAILED");
   });
+  it("shows a config edit and disables controls that cannot operate on the row", async () => {
+    apiMocks.getMcpServers.mockResolvedValue({
+      servers: [{
+        name: "native-mcp",
+        transport: "stdio",
+        command: "fixture",
+        args: [],
+        enabled: false,
+        editable: false,
+        invocable: false,
+        status: "config-changed",
+        error: "The runtime configuration changed.",
+      }],
+    });
+
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("The runtime configuration changed.") === true);
+    for (const label of ["Delete", "Invoke a tool", "Test connection", "Capabilities for native-mcp"]) {
+      const control = container.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+      expect(control?.disabled, label).toBe(true);
+    }
+  });
+
 });

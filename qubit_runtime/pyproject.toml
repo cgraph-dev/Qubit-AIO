@@ -730,6 +730,7 @@ include = [
 
 [tool.setuptools.package-data]
 qubit_cli = [
+  "_vendor/json5/LICENSE",
   "observability/schemas/*.json",
   "data/*.json",
   "local_runtime/*.json",

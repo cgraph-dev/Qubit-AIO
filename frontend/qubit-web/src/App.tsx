@@ -261,6 +261,11 @@ function RootRedirect() {
   return <Navigate to="/chat" replace />;
 }
 
+function DashboardRouteAlias({ pathname, hash }: { pathname: string; hash?: string }) {
+  const location = useLocation();
+  return <Navigate to={{ pathname, search: location.search, hash: hash ?? location.hash }} replace />;
+}
+
 function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
   if (pluginsLoading) {
     // Render nothing during the plugin-load window — a spinner here would just flash.
@@ -336,6 +341,10 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/files": FilesPage,
   "/analytics": AnalyticsPage,
   "/models": ModelsPage,
+  "/model": () => <DashboardRouteAlias pathname="/models" />,
+  "/providers": () => <DashboardRouteAlias pathname="/models" />,
+  "/model-providers": () => <DashboardRouteAlias pathname="/models" />,
+  "/models/providers": () => <DashboardRouteAlias pathname="/models" />,
   "/logs": LogsPage,
   "/cron": CronPage,
   "/skills": SkillsPage,
@@ -345,11 +354,13 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/channels": ChannelsPage,
   "/webhooks": WebhooksPage,
   "/system": SystemPage,
+  "/gateway": () => <DashboardRouteAlias pathname="/system" hash="#gateway" />,
   "/agents": AgentsPage,
   "/profiles": ProfilesPage,
   "/profiles/new": ProfileBuilderPage,
   "/config": ConfigPage,
   "/env": EnvPage,
+  "/keys": () => <DashboardRouteAlias pathname="/env" />,
   "/docs": DocsPage,
   "/guide": GuidePage,
   "/voice-edit": VoiceEditPage,
@@ -864,8 +875,16 @@ export default function App() {
   // section instead of disappearing.
   const useMangaNavigation = isMangaThemeName(theme.name) && mangaRouteEligible(pathname);
   const sidebarSections = useMemo(
-    () => sectionizeNav(sidebarNav.coreItems, useMangaNavigation ? MANGA_SIDEBAR_SECTIONS : undefined),
-    [sidebarNav, useMangaNavigation],
+    () => sectionizeNav(
+      sidebarNav.coreItems,
+      useMangaNavigation ? MANGA_SIDEBAR_SECTIONS : undefined,
+    ).map((group) => ({
+      ...group,
+      label: useMangaNavigation
+        ? group.section.label
+        : (t.app.sections?.[group.section.id] ?? group.section.label),
+    })),
+    [sidebarNav, t.app.sections, useMangaNavigation],
   );
   // Rail brand-row status chip: the one always-visible health readout.
   const brandTone = useMemo(() => {
@@ -1106,9 +1125,9 @@ export default function App() {
               className="qagent-sidebar__nav min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden py-2"
               aria-label={t.app.navigation}
             >
-              {sidebarSections.map(({ section, entries }, sectionIndex) => (
+              {sidebarSections.map(({ section, entries, label }, sectionIndex) => (
                 <div
-                  aria-labelledby={`qubit-sidebar-section-${section.id}`}
+                  aria-label={label}
                   className="qagent-sidebar__section"
                   key={section.id}
                   role="group"
@@ -1118,9 +1137,8 @@ export default function App() {
                     useMangaNavigation && !collapsed ? (
                       <span
                         className="qagent-sidebar__section-head qm-section-titleplate"
-                        id={`qubit-sidebar-section-${section.id}`}
                       >
-                        <QubitSidebarTitle index={section.index} label={section.label.toUpperCase()} />
+                        <QubitSidebarTitle index={section.index} label={label.toUpperCase()} />
                       </span>
                     ) : (
                       <span
@@ -1128,11 +1146,10 @@ export default function App() {
                           "qagent-sidebar__section-head",
                           collapsed && "lg:justify-center",
                         )}
-                        id={`qubit-sidebar-section-${section.id}`}
                       >
                         <span className="qagent-sidebar__section-index">{section.index}</span>
                         <span className={cn(collapsed && "lg:hidden")}>
-                          {t.app.sections?.[section.id] ?? section.label}
+                          {label}
                         </span>
                         {!collapsed && (
                           <>
@@ -1598,6 +1615,8 @@ function SidebarSystemActions({
 }: SidebarSystemActionsProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { profile } = useProfileScope();
+  const restartProfile = useRef("current");
   const { activeAction, isBusy, isRunning, pendingAction, runAction } =
     useSystemActions();
   const canUpdateQubit = status?.can_update_qubit === true;
@@ -1628,20 +1647,10 @@ function SidebarSystemActions({
   useEffect(() => {
     let cancelled = false;
     const probe = () => {
-      measureLatency(() => api.getGatewayStatus())
+      measureLatency(() => api.getGatewayStatus(profile || "current"))
         .then(({ value: res, ms }) => {
           if (cancelled) return;
-          const supervision = res?.supervision ?? "";
-          setGatewayRefusal(
-            // Any non-empty supervision disables the action. Accept both the
-            // legacy GATEWAY_NO_SUPERVISION token and the real supervisor's
-            // GATEWAY_SUPERVISION_UNAVAILABLE.
-            supervision &&
-              (supervision.includes("GATEWAY_NO_SUPERVISION") ||
-                supervision.includes("GATEWAY_SUPERVISION_UNAVAILABLE"))
-              ? supervision
-              : null,
-          );
+          setGatewayRefusal(res?.supervision || null);
           latencySampler.record(ms);
           setLatencyMs(latencySampler.stats.latestMs);
         })
@@ -1658,7 +1667,7 @@ function SidebarSystemActions({
       cancelled = true;
       clearInterval(id);
     };
-  }, [latencySampler]);
+  }, [latencySampler, profile]);
 
   useEffect(() => {
     if (!canUpdateQubit) return;
@@ -1786,6 +1795,7 @@ function SidebarSystemActions({
     if (action === "update" && updateBlockedReason) return;
     if (action === "restart" && gatewayRefusal) return;
     if (action === "restart") {
+      restartProfile.current = profile || "current";
       setRestartConfirmOpen(true);
       return;
     }
@@ -1800,7 +1810,7 @@ function SidebarSystemActions({
 
   const confirmRestart = () => {
     setRestartConfirmOpen(false);
-    void runAction("restart");
+    void runAction("restart", restartProfile.current);
     navigate("/sessions");
     onNavigate();
   };

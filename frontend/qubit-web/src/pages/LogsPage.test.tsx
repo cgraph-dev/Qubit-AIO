@@ -119,6 +119,7 @@ describe("LogsPage pagination", () => {
         lines: ["line-newest"],
         has_more: true,
         next_offset: 1,
+        snapshot: "aa:bb:cc",
       })
       .mockResolvedValueOnce({
         file: "agent",
@@ -142,7 +143,9 @@ describe("LogsPage pagination", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
-    await waitFor(() => requestedUrls().some((u) => u.includes("offset=1")));
+    await waitFor(() => requestedUrls().some(
+      (u) => u.includes("offset=1") && u.includes("snapshot=aa%3Abb%3Acc"),
+    ));
     await waitFor(() => container.textContent?.includes("line-older") ?? false);
     expect(container.textContent).toContain("line-older");
     // The newest page is replaced by the older page (offset is server-driven).
@@ -195,4 +198,26 @@ describe("LogsPage detail view", () => {
     expect(container.textContent).toContain("Line 1");
     expect(container.textContent).toContain("chars");
   });
+});
+
+it("ignores a slow older page after a new filter loads", async () => {
+  let settleOlder: (value: { lines: string[] }) => void = () => {};
+  apiMocks.fetchJSON
+    .mockResolvedValueOnce({ lines: ["newest"], has_more: true, next_offset: 100 })
+    .mockImplementationOnce(() => new Promise((resolve) => { settleOlder = resolve; }))
+    .mockResolvedValueOnce({ lines: ["timeout in active filter"] });
+  await renderLogs();
+  const older = container.querySelector<HTMLButtonElement>('[aria-label="Load older lines"]');
+  await act(async () => { older?.click(); });
+  expect(requestedUrls().at(-1)).toContain("offset=100");
+  const input = container.querySelector<HTMLElement>('sakuga-input[aria-label="Search log lines"]');
+  await act(async () => {
+    typeIntoSakuga(input, "timeout");
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  });
+  expect(requestedUrls().at(-1)).toContain("search=timeout");
+  expect(requestedUrls().at(-1)).not.toContain("offset");
+  await act(async () => { settleOlder({ lines: ["stale older page"] }); });
+  expect(container.textContent).toContain("timeout in active filter");
+  expect(container.textContent).not.toContain("stale older page");
 });

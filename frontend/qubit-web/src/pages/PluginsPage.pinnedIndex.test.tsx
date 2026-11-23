@@ -15,6 +15,7 @@ import { brandText } from "@/lib/catalog-brand";
 import "./sakuga-test-dom";
 import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
+const setAfterTitle = vi.hoisted(() => vi.fn());
 const apiMocks = vi.hoisted(() => ({
   getPluginsHub: vi.fn(),
   getPluginCatalog: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 vi.mock("@/plugins", () => ({ PluginSlot: () => null }));
 vi.mock("@/contexts/usePageHeader", () => ({
-  usePageHeader: () => ({ setAfterTitle: vi.fn(), setEnd: vi.fn() }),
+  usePageHeader: () => ({ setAfterTitle, setEnd: vi.fn() }),
 }));
 
 const PINNED_REF = "e8d59971d2b7901405b39dac7b03bdd616272d0d";
@@ -129,6 +130,7 @@ async function renderPage() {
 }
 
 beforeEach(() => {
+  setAfterTitle.mockClear();
   Object.values(apiMocks).forEach((fn) => fn.mockReset());
   apiMocks.getPluginsHub.mockResolvedValue({
     plugins: [],
@@ -172,6 +174,21 @@ afterEach(async () => {
 });
 
 describe("PluginsPage curated pinned index", () => {
+  it("completes a dashboard rescan while plugin details are pending", async () => {
+    apiMocks.getPluginsHub.mockImplementation(() => new Promise(() => {}));
+    apiMocks.rescanPlugins.mockResolvedValue({ ok: true, count: 4 });
+    await renderPage();
+
+    const rescan = () => setAfterTitle.mock.lastCall?.[0] as {
+      props: { disabled: boolean; onClick: () => void };
+    };
+    expect(rescan().props.disabled).toBe(false);
+    await act(async () => rescan().props.onClick());
+    expect(apiMocks.rescanPlugins).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getPluginsHub).toHaveBeenCalledTimes(2);
+    expect(rescan().props.disabled).toBe(false);
+  });
+
   it("renders curated + pinned entries with their full pinned ref", async () => {
     await renderPage();
     await waitFor(() =>

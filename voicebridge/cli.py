@@ -190,6 +190,8 @@ _OP_LEAF_CLI = (
     ("prompt-budget", "prompt_budget", "context budget report (read-only)"),
 )
 
+_FOREIGN_AGENT_SOURCES = ("hermes", "openclaw", "openjarvis", "picoclaw")
+
 # Whole Qubit CLI families served by the vendored fork (Wave 1). The
 # real dispatch is the pre-parse route in main() (same pattern as `agent` /
 # `qubit`), which preserves upstream argv/help/errors/exit status; these
@@ -505,6 +507,12 @@ def build_parser() -> argparse.ArgumentParser:
                        aliases=["ls", "config", "picker"],
                        help="list configured MCP servers from the canonical "
                             "Qubit registry (read-only)")
+    mcp_inspect = mcp_sub.add_parser(
+        "inspect-source", parents=[common],
+        help="list servers in a foreign configuration without launching them")
+    mcp_inspect.add_argument("source", choices=_FOREIGN_AGENT_SOURCES)
+    mcp_inspect.add_argument("--source-config", type=Path,
+                             help="override the foreign agent's configuration path")
     for verb, aliases in (("remove", ["rm", "delete"]), ("disable", [])):
         mutation = mcp_sub.add_parser(
             verb, aliases=aliases, parents=[common],
@@ -1064,6 +1072,12 @@ def build_parser() -> argparse.ArgumentParser:
     sk = add("skills", help="Packet 7E skill manifests (install staged disabled)")
     sk_sub = sk.add_subparsers(dest="skills_command")
     sk_sub.add_parser("list", parents=[common], help="list installed skills")
+    sk_inspect = sk_sub.add_parser(
+        "inspect-source", parents=[common],
+        help="list skills in a foreign agent's workspace")
+    sk_inspect.add_argument("source", choices=_FOREIGN_AGENT_SOURCES)
+    sk_inspect.add_argument("--source-root", type=Path,
+                            help="override the foreign agent's skill roots")
     sk_show = sk_sub.add_parser("show", parents=[common], help="show one skill manifest")
     sk_show.add_argument("skill_id")
     sk_check = sk_sub.add_parser("check", parents=[common],
@@ -2774,7 +2788,12 @@ def build_parser() -> argparse.ArgumentParser:
                                help=_hk_help + " (dry-run unless --confirm)")
         _p.add_argument("name")
         _p.add_argument("--confirm", action="store_true")
-    ia = add("import-agent", help="Foreign agent setup inventory (never imports)")
+    ia = add(
+        "import-agent", help="Inspect a foreign setup or use the catalog importer",
+        epilog=("With the enabled agent-importers catalog plugin, preview with "
+                "`qubit import-agent openclaw --dry-run`. The source choices are "
+                "openclaw, claude-code, codex and cursor. Applying an import requires --confirm."),
+    )
     ia_sub = ia.add_subparsers(dest="import_agent_command")
     ia_inspect = ia_sub.add_parser("inspect", parents=[common],
                                    help="quarantined structural inventory (read-only)")
@@ -4767,6 +4786,10 @@ def main(argv=None) -> int:
     _install_gettext_find_cache()
     args = build_parser().parse_args(raw)
     command = args.command or "run"
+    if command == "mcp" and args.mcp_command == "inspect-source":
+        return _cmd_mcp_inspect_source(args)
+    if command == "skills" and args.skills_command == "inspect-source":
+        return _cmd_skills_inspect_source(args)
 
     # logging early so every event is captured
     from .config import Config
@@ -5290,6 +5313,48 @@ def _cmd_mcp_status(cfg) -> int:
 
     print(json.dumps(mcp_status(cfg), indent=2))
     return 0
+
+
+def _cmd_mcp_inspect_source(args) -> int:
+    """Preview server names and transports without printing their connection data."""
+    from dataclasses import replace
+    from .agent_compat import McpConfigLoader, registry
+
+    adapter = registry.get(args.source)
+    source = args.source_config
+    if source is None and args.source == "openclaw":
+        source = os.environ.get("OPENCLAW_CONFIG_PATH")
+    if source:
+        adapter = replace(adapter, mcp_config_paths=(str(source),))
+    loader = McpConfigLoader([adapter])
+    entries, errors = loader.read_with_errors()
+    servers = []
+    for entry in entries:
+        spec = entry.spec
+        transport = spec.get("transport")
+        if transport is None:
+            transport = "stdio" if spec.get("command") else "http" if spec.get("url") else None
+        if transport not in ("stdio", "http", "streamable-http", "sse"):
+            transport = "unknown"
+        servers.append({
+            "name": entry.name,
+            "transport": transport,
+            "disabled": spec.get("enabled") is False,
+        })
+    state = "DISCOVERED" if servers else "NO_SERVERS_DISCOVERED"
+    if errors:
+        state = "PARTIALLY_DISCOVERED" if servers else "INVALID_SOURCE_CONFIG"
+    elif source and not loader.paths()[0].is_file():
+        state = "SOURCE_CONFIG_NOT_FOUND"
+    result = {
+        "source": args.source,
+        "state": state,
+        "servers": servers,
+    }
+    if errors:
+        result["unreadable_configs"] = len(errors)
+    print(json.dumps(result, indent=2))
+    return 2 if state in {"INVALID_SOURCE_CONFIG", "SOURCE_CONFIG_NOT_FOUND"} else 0
 
 
 def _cmd_mcp_mutate(cfg, args) -> int:
@@ -6826,6 +6891,27 @@ def _skills_load_manifest(spec, _json, P, _PLUG):
              "rollback": "nothing installed or enabled; nothing to roll back"},
             indent=2))
         return {"rc": 2}
+
+
+def _cmd_skills_inspect_source(args) -> int:
+    """Preview foreign skills without loading their instructions or running steps."""
+    from dataclasses import replace
+    from .agent_compat import SkillLoader, registry
+
+    adapter = registry.get(args.source)
+    if args.source_root is not None:
+        adapter = replace(adapter, skill_roots=(str(args.source_root),))
+    entries = SkillLoader([adapter]).enumerate()
+    print(json.dumps({
+        "source": args.source,
+        "state": "DISCOVERED" if entries else "NO_SKILLS_DISCOVERED",
+        "skills": [
+            {"name": entry.name, "directory": str(entry.directory),
+             **({"pipeline": entry.pipeline, "markdown": entry.markdown} if entry.pipeline else {})}
+            for entry in entries
+        ],
+    }, indent=2))
+    return 0
 
 
 def _cmd_skills(cfg, args) -> int:

@@ -466,18 +466,31 @@ def _bind_session_check(store_obj: Any, check: Callable[[str], Any],
     return store_obj
 
 
-def draft_store(cfg: Any) -> Any:
+def draft_store(cfg: Any, *, runtime_home=None) -> Any:
     """Per-session file-draft store, guarded by the chat session authority."""
     from . import chat_stores as CS
 
-    return _bind_session_check(CS.draft_store(cfg), store(cfg).show, "put")
+    if runtime_home is None:
+        return _bind_session_check(CS.draft_store(cfg), store(cfg).show, "put")
+    from .qubit_session_store import QubitSessionStore
+
+    drafts = CS.FileDraftStore(runtime_home)
+    drafts.reload()
+    return _bind_session_check(drafts, QubitSessionStore(cfg, runtime_home=runtime_home).show, "put")
 
 
-def comment_store(cfg: Any) -> Any:
+def comment_store(cfg: Any, *, runtime_home=None) -> Any:
     """Per-session comment/CI store, guarded by the chat session authority."""
     from . import chat_stores as CS
 
-    return _bind_session_check(CS.comment_store(cfg), store(cfg).show,
+    if runtime_home is None:
+        return _bind_session_check(CS.comment_store(cfg), store(cfg).show,
+                                   "add_comment", "add_ci_detail")
+    from .qubit_session_store import QubitSessionStore
+
+    comments = CS.CommentStore(runtime_home)
+    comments.reload()
+    return _bind_session_check(comments, QubitSessionStore(cfg, runtime_home=runtime_home).show,
                                "add_comment", "add_ci_detail")
 
 

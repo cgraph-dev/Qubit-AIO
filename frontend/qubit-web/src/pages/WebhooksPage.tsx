@@ -232,12 +232,15 @@ export default function WebhooksPage() {
         showToast("Webhooks enabled; gateway restarting…", "success");
         setTimeout(() => void loadWebhooks(), 4000);
         void watchRestartOutcome();
-      } else {
+      } else if (result.needs_restart) {
         const detail = result.restart_error ? `: ${result.restart_error}` : ".";
         setRestartMessage(null);
         setRestartNeeded(true);
         setRestartError(`Gateway restart failed${detail}`);
         showToast(`Webhooks enabled; gateway restart failed${detail}`, "error");
+      } else {
+        setRestartMessage(null);
+        showToast("Webhooks enabled.", "success");
       }
     } catch (e) {
       showToast(`Failed to enable webhooks: ${e}`, "error");

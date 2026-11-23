@@ -583,7 +583,8 @@ export default function PluginsPage() {
         `${t.pluginsPage.refreshDashboard} (${rc.count})`,
         "success",
       );
-      await loadHub();
+      // The rescan is finished. Plugin details can refresh independently.
+      void loadHub();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Rescan failed", "error");
     } finally {
@@ -596,7 +597,7 @@ export default function PluginsPage() {
       <Button
         variant="secondary"
         className="shrink-0 text-muted-foreground hover:text-foreground"
-        disabled={loading || rescanBusy}
+        disabled={rescanBusy}
         onClick={() => void onRescan()}
         aria-label={t.pluginsPage.refreshDashboard}
       >
@@ -604,7 +605,7 @@ export default function PluginsPage() {
       </Button>,
     );
     return () => setAfterTitle(null);
-  }, [loading, onRescan, rescanBusy, setAfterTitle, t.pluginsPage.refreshDashboard]);
+  }, [onRescan, rescanBusy, setAfterTitle, t.pluginsPage.refreshDashboard]);
 
   const onSaveMemoryProvider = async () => {
     const provider = memorySel === MEMORY_PROVIDER_BUILTIN ? "" : memorySel;

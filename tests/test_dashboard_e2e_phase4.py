@@ -19,6 +19,7 @@ it needs a local chromium and a real HTTP server.
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -102,7 +103,8 @@ def _api(base: str, token: str, method: str, path: str, body=None):
             raw = resp.read().decode("utf-8") or "{}"
             return resp.status, json.loads(raw)
     except urllib.error.HTTPError as exc:
-        raw = exc.read().decode("utf-8") or "{}"
+        with exc:
+            raw = exc.read().decode("utf-8") or "{}"
         try:
             return exc.code, json.loads(raw)
         except json.JSONDecodeError:
@@ -113,7 +115,7 @@ def _row_for(page, text: str, aria: str):
     """The innermost row div that contains ``text`` and the ``aria`` button."""
     el = page.get_by_text(text, exact=True).first
     return el.locator(
-        f'xpath=ancestor::div[.//button[@aria-label="{aria}"]][1]')
+        f'xpath=ancestor::div[.//*[self::button or self::sakuga-button][@aria-label="{aria}"]][1]')
 
 
 @pytest.fixture(scope="module")
@@ -172,6 +174,53 @@ def browser():
         pw_.stop()
 
 
+def test_workbench_closed_workspace_panel_stays_within_viewport(browser, ui_server):
+    base, _token = ui_server
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        page.add_init_script("localStorage.setItem('qubit-wb-workspace-panel', 'closed')")
+        page.goto(f"{base}/qubit-workbench", wait_until="domcontentloaded")
+        for reload_page in (False, True):
+            if reload_page:
+                page.reload(wait_until="domcontentloaded")
+            pw.expect(page.locator("html")).to_have_attribute("data-workspace-panel", "closed")
+            pw.expect(page.locator("#btnWorkspacePanelEdgeToggle")).to_be_in_viewport()
+            dimensions = page.evaluate(
+                "({ scroll: document.documentElement.scrollWidth, "
+                "viewport: document.documentElement.clientWidth })"
+            )
+            assert dimensions["scroll"] == dimensions["viewport"], dimensions
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("mount", ["/qubit-workbench", "/wb"])
+def test_workbench_session_deep_link_serves_the_workbench(ui_server, mount):
+    base, token = ui_server
+    code, created = _api(base, token, "POST", f"{mount}/api/session/new",
+                         {"title": "Workbench deep-link regression"})
+    assert code == 200 and created.get("session_id"), created
+    session_id = created["session_id"]
+    with urllib.request.urlopen(f"{base}{mount}/session/{session_id}", timeout=5) as response:
+        assert response.status == 200
+        assert response.headers.get_content_type() == "text/html"
+        assert f'<base href="{mount}/">'.encode() in response.read()
+    code, restored = _api(base, token, "GET", f"{mount}/api/session?session_id={session_id}")
+    assert code == 200 and restored["session"]["session_id"] == session_id
+
+
+@pytest.mark.parametrize("asset", [
+    "Inter-latin.woff2",
+    "Rajdhani-latin.woff2",
+])
+def test_dashboard_fonts_are_served_as_woff2(ui_server, asset):
+    base, _token = ui_server
+    with urllib.request.urlopen(f"{base}/fonts-dashboard/{asset}", timeout=5) as response:
+        assert response.headers.get_content_type() == "font/woff2"
+        assert response.read(4) == b"wOF2"
+
+
 def test_routes_mount_real_pages(browser, ui_server):
     """Every canonical route deep-links to a mounted page with a real heading."""
     base, _token = ui_server
@@ -212,6 +261,33 @@ def test_routes_mount_real_pages(browser, ui_server):
     assert not fatal, fatal[:5]
 
 
+def test_dashboard_control_aliases_open_their_own_page(browser, ui_server):
+    base, _ = ui_server
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    requested_fonts = []
+    page.on("request", lambda request: requested_fonts.append(request.url)
+            if "fonts.googleapis.com" in request.url or "fonts.gstatic.com" in request.url else None)
+    try:
+        for alias, destination, title in (
+            ("/keys", "/env", "Keys"),
+            ("/model", "/models", "Models"),
+            ("/providers", "/models", "Models"),
+            ("/model-providers", "/models", "Models"),
+            ("/models/providers", "/models", "Models"),
+            ("/gateway", "/system", "System"),
+        ):
+            page.goto(base + alias + "?audit=1", wait_until="domcontentloaded")
+            expected = destination + "?audit=1" + ("#gateway" if alias == "/gateway" else "")
+            page.wait_for_url(base + expected)
+            pw.expect(page.get_by_role("heading", name=title, exact=True).first).to_be_visible()
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        pw.expect(page.locator("#gateway")).to_be_in_viewport()
+        assert not requested_fonts, requested_fonts
+    finally:
+        context.close()
+
+
 def test_runtime_alias_is_not_a_page(browser, ui_server):
     """`/runtime` is not a route; the SPA catch-all resolves it to /sessions."""
     base, _token = ui_server
@@ -240,11 +316,17 @@ def test_sessions_rename_persists(browser, ui_server):
         page.goto(base + "/sessions", wait_until="domcontentloaded",
                   timeout=30000)
         page.get_by_role("radio", name="History").click()
-        row = _row_for(page, "phase4-seed", "Rename session")
-        row.get_by_role("button", name="Rename session").click()
-        box = page.get_by_role("textbox", name="Session title")
+        row = page.get_by_test_id(f"session-row-{sid}")
+        row.get_by_text("phase4-seed", exact=True).wait_for()
+        row.get_by_role("button", name="Rename session", exact=True).click()
+        # Fill the native shadow input. The custom element host also advertises a textbox.
+        box = row.locator("input[aria-label='Session title']")
         box.fill("phase4-renamed")
-        box.press("Enter")
+        with page.expect_response(
+                lambda r: r.url.split("?", 1)[0].endswith(f"/api/sessions/{sid}")
+                and r.request.method == "PATCH") as rename:
+            box.press("Enter")
+        assert rename.value.status == 200
 
         deadline = time.time() + 15
         title = None
@@ -271,10 +353,14 @@ def test_cron_pause_persists(browser, ui_server):
 
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
     page = ctx.new_page()
+    _accept_dialogs(page)
     try:
         page.goto(base + "/cron", wait_until="domcontentloaded", timeout=30000)
         row = _row_for(page, "phase4-cron", "Pause")
-        row.get_by_role("button", name="Pause").click()
+        with page.expect_response(
+                lambda r: r.url.split("?", 1)[0].endswith(f"/cron/jobs/{jid}/pause")
+                and r.request.method == "POST" and r.status == 200):
+            row.get_by_role("button", name="Pause", exact=True).click()
 
         deadline = time.time() + 15
         enabled = None
@@ -288,6 +374,57 @@ def test_cron_pause_persists(browser, ui_server):
         assert enabled is False, (jid, enabled)
     finally:
         ctx.close()
+
+
+def test_cron_named_profile_and_blueprint_confirmation(browser, ui_server):
+    from urllib.parse import parse_qs, urlsplit
+
+    from voicebridge import qubit_runtime
+
+    base, token = ui_server
+    qubit_runtime.ensure_path()
+    from qubit_cli import profiles
+
+    home = profiles.get_profile_dir("cron-audit")
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "config.yaml").write_text("{}\n")
+    route = "/agent/api/cron/jobs"
+    for name, profile in (("Default fixture", "default"), ("Scoped fixture", "cron-audit")):
+        status, job = _api(base, token, "POST", f"{route}?profile={profile}",
+                           {"name": name, "prompt": "Summarize notes",
+                            "schedule": "every 1h", "confirm": True})
+        assert status == 200, job
+
+    context = browser.new_context(viewport={"width": 1440, "height": 1000})
+    page = context.new_page()
+    dialogs = []
+    page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.accept()))
+    try:
+        page.goto(base + "/cron", wait_until="domcontentloaded")
+        page.get_by_text("Default fixture", exact=True).wait_for()
+        page.get_by_text("Scoped fixture", exact=True).wait_for()
+        page.locator("#cron-profile-filter").click()
+        page.get_by_role("option", name="cron-audit", exact=True).click()
+        page.get_by_text("Scoped fixture", exact=True).wait_for()
+        assert not page.get_by_text("Default fixture", exact=True).count()
+        page.get_by_text("Blueprints", exact=True).click()
+        card = page.get_by_text("Custom reminder", exact=True).locator(
+            "xpath=ancestor::div[.//button[normalize-space()='Set up']][1]")
+        card.get_by_role("button", name="Set up").click()
+        page.get_by_role("textbox", name="Remind me to…").fill("verify the scheduled fixture")
+        path = "/agent/api/cron/blueprints/instantiate"
+        with page.expect_response(lambda response: urlsplit(response.url).path == path
+                                  and response.request.method == "POST"
+                                  and response.status == 200) as created:
+            page.get_by_role("button", name="Schedule it").click()
+        assert parse_qs(urlsplit(created.value.url).query)["profile"] == ["cron-audit"]
+        assert len(dialogs) == 1
+        row = created.value.json()
+        status, readback = _api(base, token, "GET", f"{route}/{row['id']}?profile=cron-audit")
+        assert status == 200 and "verify the scheduled fixture" in readback["prompt"], readback
+        assert _api(base, token, "GET", f"{route}/{row['id']}?profile=default")[0] == 404
+    finally:
+        context.close()
 
 
 def test_cron_paused_job_exposes_resume(browser, ui_server):
@@ -304,10 +441,13 @@ def test_cron_paused_job_exposes_resume(browser, ui_server):
          "when": "every 1h", "confirm": True})
     assert code == 200 and created.get("id"), created
     jid = str(created["id"])
-    _api(base, token, "POST", f"/agent/api/cron/jobs/{jid}/pause")
+    status, paused = _api(base, token, "POST", f"/agent/api/cron/jobs/{jid}/pause",
+                          {"confirm": True})
+    assert status == 200 and paused.get("enabled") is False, paused
 
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
     page = ctx.new_page()
+    _accept_dialogs(page)
     try:
         page.goto(base + "/cron", wait_until="domcontentloaded", timeout=30000)
         row = _row_for(page, "phase4-cron-resume", "Resume")
@@ -316,7 +456,10 @@ def test_cron_paused_job_exposes_resume(browser, ui_server):
         assert resume.count() >= 1
         # The Resume control fires the real backend resume and the canonical
         # store reflects it.
-        resume.click()
+        with page.expect_response(
+                lambda r: r.url.split("?", 1)[0].endswith(f"/cron/jobs/{jid}/resume")
+                and r.request.method == "POST" and r.status == 200):
+            resume.click()
         deadline = time.time() + 15
         enabled = None
         while time.time() < deadline:
@@ -331,12 +474,18 @@ def test_cron_paused_job_exposes_resume(browser, ui_server):
         ctx.close()
 
 
-def test_skills_list_and_toggle_requires_confirmation(ui_server):
-    """Skills list is real; a toggle stages a typed confirmation on the journal."""
+def test_skills_list_and_toggle_requires_confirmation(browser, ui_server):
+    """Cancel a staged toggle, then confirm the same change through the browser."""
+    from voicebridge.qubit_runtime import runtime_home_for_cfg
+
     base, token = ui_server
+    name = "phase4-audit-skill"
+    folder = runtime_home_for_cfg(_TEST_CTX["cfg"]) / "skills" / name
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Audit fixture\n---\n")
     code, skills = _api(base, token, "GET", "/agent/api/skills")
-    assert code == 200 and isinstance(skills, list) and skills, skills
-    target = skills[0]
+    assert code == 200 and isinstance(skills, list), skills
+    target = next(row for row in skills if row["name"] == name)
     code, staged = _api(base, token, "PUT", "/agent/api/skills/toggle",
                         {"name": target["name"],
                          "enabled": not bool(target.get("enabled"))})
@@ -347,7 +496,32 @@ def test_skills_list_and_toggle_requires_confirmation(ui_server):
     # Leave no pending approval behind: the staged confirm is cancellable.
     code, canceled = _api(base, token, "POST", "/agent/api/ops/cancel",
                           {"confirmation_id": cid})
-    assert canceled.get("state") == "executed", canceled
+    assert code == 200 and canceled.get("state") == "executed", canceled
+    code, skills = _api(base, token, "GET", "/agent/api/skills")
+    assert code == 200
+    current = next(row for row in skills if row["name"] == name)
+    assert current["enabled"] == target["enabled"]
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    _accept_dialogs(page)
+    try:
+        page.goto(base + "/skills", wait_until="domcontentloaded")
+        toggle = page.locator("sakuga-toggle").filter(
+            has=page.get_by_role("switch", name=f"Enable {name}", exact=True))
+        pw.expect(toggle).to_have_attribute("aria-checked", "true")
+        with page.expect_response(
+                lambda r: r.url.split("?")[0].endswith("/api/ops/confirm")
+                and r.request.method == "POST" and r.status == 200):
+            toggle.click()
+        pw.expect(toggle).to_have_attribute("aria-checked", "false")
+        code, skills = _api(base, token, "GET", "/agent/api/skills")
+        assert code == 200
+        assert next(row for row in skills if row["name"] == name)["enabled"] is False
+        page.reload(wait_until="domcontentloaded")
+        pw.expect(toggle).to_have_attribute("aria-checked", "false")
+    finally:
+        context.close()
 
 
 def test_plugins_rescan_returns_manifests(browser, ui_server):
@@ -379,7 +553,7 @@ def test_plugins_rescan_returns_manifests(browser, ui_server):
         ctx.close()
 
 
-def test_config_save_persists_non_secret_edit(browser, ui_server):
+def test_config_save_persists_non_secret_edit(browser, ui_server, monkeypatch):
     """Config Save persists a non-secret edit through the real SPA control.
 
     The SPA PUTs the whole tree it read, including the raw secret-shaped leaves
@@ -389,6 +563,7 @@ def test_config_save_persists_non_secret_edit(browser, ui_server):
     real edit lands in the canonical store. A changed secret leaf is still
     refused.
     """
+    monkeypatch.setenv("QUBIT_GATEWAY_SUPERVISION_DISABLED", "1")
     base, token = ui_server
     code, before = _api(base, token, "GET", "/agent/api/config")
     assert code == 200 and before["browser"]["headed"] is False, \
@@ -413,8 +588,10 @@ def test_config_save_persists_non_secret_edit(browser, ui_server):
         page.goto(base + "/config", wait_until="domcontentloaded",
                   timeout=30000)
         page.get_by_role("heading", name="Config").first.wait_for(timeout=20000)
-        page.get_by_placeholder("Search...").fill("browser.headed")
-        switch = page.get_by_role("switch", name="Headed")
+        page.get_by_role("banner").locator("input[placeholder='Search...']").fill("browser.headed")
+        switch = page.locator("sakuga-toggle").filter(
+            has=page.get_by_role("switch", name="Headed", exact=True)
+        )
         switch.wait_for(timeout=10000)
         assert switch.get_attribute("aria-checked") == "false", "seed not false"
         switch.click()
@@ -423,9 +600,9 @@ def test_config_save_persists_non_secret_edit(browser, ui_server):
                 and r.request.method == "PUT") as info:
             page.get_by_role("button", name="Save").first.click()
         assert info.value.status == 409, info.value.status
-        dialog = page.get_by_role("alertdialog")
+        dialog = page.get_by_role("dialog", name="Apply these settings to Qubit?")
         dialog.wait_for(timeout=10000)
-        dialog.get_by_role("button", name="Save").click()
+        dialog.locator("[data-confirm]").click()
 
         deadline = time.time() + 15
         value = None
@@ -436,6 +613,18 @@ def test_config_save_persists_non_secret_edit(browser, ui_server):
                 break
             time.sleep(0.3)
         assert value is True, value
+
+        def is_restart(response):
+            return (response.url.split("?", 1)[0].endswith("/agent/api/gateway/restart")
+                    and response.request.method == "POST")
+        with page.expect_response(is_restart) as staged:
+            page.locator("main sakuga-button").filter(has_text="Restart gateway").locator("button").click()
+        assert staged.value.status == 409
+        restart = page.get_by_role("dialog", name="Restart the gateway?")
+        with page.expect_response(is_restart) as confirmed:
+            restart.locator("[data-confirm]").click()
+        assert confirmed.value.status == 503
+        assert confirmed.value.json()["code"] == "GATEWAY_SUPERVISION_UNAVAILABLE"
     finally:
         ctx.close()
 
@@ -538,14 +727,13 @@ def test_profiles_set_active_persists(browser, ui_server):
     ``GET /api/profiles/active`` read-back returns the selected name.
     """
     base, token = ui_server
-    code, profs = _api(base, token, "GET", "/agent/api/profiles")
-    assert code == 200 and profs.get("profiles"), profs
-    names = [p["name"] for p in profs["profiles"]]
+    target = "phase4-active-target"
+    code, created = _api(base, token, "POST", "/agent/api/profiles",
+                         {"name": target, "no_skills": True, "confirm": True})
+    assert code == 200 and created["ok"], created
     code, act = _api(base, token, "GET", "/agent/api/profiles/active")
     assert code == 200 and act.get("active"), act
     original = act["active"]
-    target = next((n for n in names if n != original), None)
-    assert target, names
 
     def read_active():
         c, d = _api(base, token, "GET", "/agent/api/profiles/active")
@@ -557,26 +745,14 @@ def test_profiles_set_active_persists(browser, ui_server):
         page.goto(base + "/profiles", wait_until="domcontentloaded",
                   timeout=30000)
         page.get_by_role("heading", name="Profiles").first.wait_for(timeout=20000)
-        # The profile card renders "<name> (<display>)" as one text node, so
-        # an exact-text row lookup does not match. Find the Actions button
-        # whose card text starts with the target name instead.
-        actions = page.get_by_role("button", name="Actions")
-        actions.first.wait_for(timeout=20000)
-        action_index = None
-        for i in range(actions.count()):
-            card_text = actions.nth(i).evaluate(
-                "e => { let n = e; for (let k = 0; k < 6 && n; k++) {"
-                " n = n.parentElement;"
-                " if (n && n.innerText && n.innerText.length > 30) break; }"
-                " return n ? n.innerText : ''; }")
-            if card_text.startswith(f"{target} ("):
-                action_index = i
-                break
-        assert action_index is not None, (target, actions.count())
-        actions.nth(action_index).click()
-        item = page.get_by_role("menuitem", name="Set as active")
-        item.wait_for(timeout=10000)
-        item.click()
+        title = page.get_by_text(re.compile(rf"^(?:.* \()?{re.escape(target)}\)?$"))
+        card = title.locator("xpath=ancestor::*[.//*[@data-profile-actions]][1]")
+        card.locator('sakuga-button[aria-label="Actions"]').locator("button").click()
+        item = page.get_by_role("menuitem", name="Set as active", exact=True)
+        with page.expect_response(
+                lambda r: r.url.endswith("/api/profiles/active")
+                and r.request.method == "POST" and r.status == 200):
+            item.click()
         got = _poll(lambda: read_active() if read_active() == target else None)
         assert got == target, (target, read_active())
     finally:
@@ -593,18 +769,11 @@ def test_profiles_create_requires_confirmation_and_persists(browser, ui_server):
     ``api.createProfile`` now runs the shared staged-confirmation round-trip.
     The first POST stages a typed 409 ``CONFIRM_REQUIRED`` with a REAL
     ``confirmation_id`` on the shared journal (``h_profile_create`` ->
-    ``_compat_confirm``); the human confirms and the re-issued POST registers
-    the Brain principal. Persisted read-back is the canonical
-    ``voicebridge.brain`` registry — the same store the CLI
-    ``qubit brain principal-add`` and voice write.
+    ``_compat_confirm``); the confirmed POST creates the profile home.
+    Read back the canonical profile list used by the CLI and dashboard.
     """
-    from voicebridge import brain as B
-
     base, token = ui_server
-    cfg = _TEST_CTX["cfg"]
     name = "phase4-created"
-    assert name not in {p["id"] for p in B.principal_list(cfg)["principals"]}, \
-        "seed leaked from a prior run"
 
     # The stage is settleable: a direct unconfirmed POST returns a real id.
     code, staged = _api(base, token, "POST", "/agent/api/profiles",
@@ -620,10 +789,11 @@ def test_profiles_create_requires_confirmation_and_persists(browser, ui_server):
     try:
         page.goto(base + "/profiles", wait_until="domcontentloaded",
                   timeout=30000)
-        page.get_by_role("button", name="Create", exact=True).click()
+        page.locator("[data-dashboard-page-header] sakuga-button").filter(
+            has_text="Create").locator("button").click()
         dialog = page.get_by_role("dialog", name="New Profile")
         dialog.wait_for(timeout=10000)
-        dialog.get_by_role("textbox", name="Name").fill(name)
+        dialog.locator("#profile-name").locator("input").fill(name)
         # The staged 409 is followed by the confirmed re-issue; wait for the
         # 200 (the shared round-trip settles on the human's window.confirm).
         # The settle re-issue carries ``?confirmation_id=`` so match the path.
@@ -631,14 +801,12 @@ def test_profiles_create_requires_confirmation_and_persists(browser, ui_server):
                 lambda r: r.url.split("?")[0].endswith("/agent/api/profiles")
                 and r.request.method == "POST"
                 and r.status == 200) as info:
-            dialog.get_by_role("button", name="Create", exact=True).click()
+            dialog.locator("sakuga-button").filter(has_text="Create").locator("button").click()
         assert info.value.status == 200, info.value.status
         assert info.value.json().get("ok") is True, info.value.json()
 
-        def principal_present() -> bool:
-            return name in {p["id"] for p in B.principal_list(cfg)["principals"]}
-
-        assert _poll(principal_present), "principal not registered"
+        code, listed = _api(base, token, "GET", "/agent/api/profiles")
+        assert code == 200 and name in {p["name"] for p in listed["profiles"]}, listed
     finally:
         ctx.close()
 
@@ -703,9 +871,10 @@ def test_channel_test_control_is_real(browser, ui_server):
             page.get_by_role("button", name="Test").first.click()
         assert info.value.status == 200, info.value.status
         payload = info.value.json()
-        assert payload.get("ok") is True, payload
-        assert payload.get("platform"), payload
-        assert payload.get("state"), payload
+        assert payload["platform"] == first, payload
+        assert payload["state"] == "disabled", payload
+        assert payload["ok"] is False and payload["reachable"] is False, payload
+        page.get_by_text(payload["message"], exact=False).first.wait_for()
 
         # Persisted/read-back: the canonical platform listing still carries the
         # platform the probe targeted.
@@ -729,7 +898,9 @@ def test_webhooks_enable_and_list_persist(browser, ui_server):
     """
     base, token = ui_server
     # Normalize through the canonical route so the page renders the control.
-    _api(base, token, "POST", "/agent/api/webhooks/enable", {"enabled": False})
+    code, disabled = _api(base, token, "POST", "/agent/api/webhooks/enable",
+                          {"enabled": False, "confirm": True})
+    assert code == 200 and disabled.get("enabled") is False, disabled
     assert _api(base, token, "GET", "/agent/api/webhooks")[1].get(
         "enabled") is False
 
@@ -740,9 +911,9 @@ def test_webhooks_enable_and_list_persist(browser, ui_server):
                   timeout=30000)
         page.get_by_role("heading", name="Webhooks").first.wait_for(timeout=20000)
         with page.expect_response(
-                lambda r: r.url.endswith("/api/webhooks/enable")
-                and r.request.method == "POST") as info:
-            page.get_by_role("button", name="Enable webhooks").click()
+                lambda r: r.url.split("?")[0].endswith("/api/webhooks/enable")
+                and r.request.method == "POST" and r.status == 200) as info:
+            page.locator("sakuga-button").filter(has_text="Enable webhooks").locator("button").click()
         assert info.value.status == 200, info.value.status
         assert info.value.json().get("enabled") is True, info.value.json()
 
@@ -752,9 +923,11 @@ def test_webhooks_enable_and_list_persist(browser, ui_server):
         )(*_api(base, token, "GET", "/agent/api/webhooks")))
         assert got and got.get("enabled") is True, got
         # The create control is reachable now (was disabled by the split-brain).
-        new_sub = page.get_by_role("button", name="New subscription")
+        new_sub = page.locator("[data-dashboard-page-header] sakuga-button").filter(
+            has_text="New subscription").locator("button")
         new_sub.wait_for(timeout=10000)
         assert new_sub.is_enabled()
+        assert page.get_by_text("Gateway restart failed", exact=False).count() == 0
     finally:
         ctx.close()
 
@@ -771,13 +944,15 @@ def test_webhooks_create_and_delete_via_spa(browser, ui_server):
     """
     base, token = ui_server
     direct = "phase4-hook"
-    _api(base, token, "POST", "/agent/api/webhooks/enable", {"enabled": True})
+    code, enabled = _api(base, token, "POST", "/agent/api/webhooks/enable",
+                         {"enabled": True, "confirm": True})
+    assert code == 200 and enabled.get("enabled") is True, enabled
 
     # Direct canonical request/response + persisted read-back.
     code, created = _api(base, token, "POST", "/agent/api/webhooks",
                          {"id": direct, "url": "http://127.0.0.1:9/hook",
                           "events": ["task.completed"],
-                          "secret_ref": "env:PHASE4_HOOK"})
+                          "secret_ref": "env:PHASE4_HOOK", "confirm": True})
     assert code == 200 and created.get("ok") is True, (code, created)
     assert created.get("name") == direct, created
     assert created.get("url") == "http://127.0.0.1:9/hook", created
@@ -808,24 +983,23 @@ def test_webhooks_create_and_delete_via_spa(browser, ui_server):
     try:
         page.goto(base + "/webhooks", wait_until="domcontentloaded",
                   timeout=30000)
-        page.get_by_role("button", name="New subscription").wait_for(
-            timeout=20000)
-        page.get_by_role("button", name="New subscription").click()
+        page.locator("[data-dashboard-page-header] sakuga-button").filter(
+            has_text="New subscription").locator("button").click(timeout=20000)
         dialog = page.get_by_role("dialog", name="New subscription")
         dialog.wait_for(timeout=10000)
-        dialog.get_by_label("Name").fill(ui_name)
-        dialog.get_by_label("Delivery URL").fill("http://127.0.0.1:9/ui-hook")
-        dialog.get_by_label("Events").fill("task.completed")
-        dialog.get_by_label("Signing secret reference").fill("env:PHASE4_UI")
+        dialog.locator("#webhook-name").locator("input").fill(ui_name)
+        dialog.locator("#webhook-url").locator("input").fill("http://127.0.0.1:9/ui-hook")
+        dialog.locator("#webhook-events").locator("input").fill("task.completed")
+        dialog.locator("#webhook-secret-ref").locator("input").fill("env:PHASE4_UI")
         with page.expect_response(
                 lambda r: r.url.split("?")[0].endswith("/api/webhooks")
                 and r.request.method == "POST" and r.status == 200) as info:
-            dialog.get_by_role("button", name="Create", exact=True).click()
+            dialog.locator("sakuga-button").filter(has_text="Create").locator("button").click()
         assert info.value.status == 200, info.value.status
         payload = info.value.json()
         assert payload.get("name") == ui_name and payload.get("url") == \
             "http://127.0.0.1:9/ui-hook", payload
-        page.get_by_role("button", name="Done").click()
+        dialog.locator("sakuga-button").filter(has_text="Done").locator("button").click()
 
         got = _poll(lambda: (lambda c, d: d if c == 200 and ui_name in {
             s["name"] for s in d.get("subscriptions", [])} else None)(
@@ -836,7 +1010,7 @@ def test_webhooks_create_and_delete_via_spa(browser, ui_server):
         page.reload(wait_until="domcontentloaded")
         row = _row_for(page, ui_name, "Delete")
         row.wait_for(timeout=20000)
-        row.get_by_role("button", name="Delete").click()
+        row.locator('sakuga-button[aria-label="Delete"]').locator("button").click()
         confirm = page.get_by_role("alertdialog")
         confirm.wait_for(timeout=10000)
         with page.expect_response(
@@ -857,10 +1031,8 @@ def test_webhooks_create_and_delete_via_spa(browser, ui_server):
 def test_mcp_add_enable_delete_via_spa(browser, ui_server):
     """MCP add/enable/delete: real SPA controls -> canonical registry.
 
-    A server is seeded through the canonical registry with ``confirm`` +
-    ``transport: http`` (the shape the backend really requires), then the SPA's
-    ``Test connection`` control runs ``POST /api/mcp/servers/{name}/test`` and
-    the canonical ``GET /api/mcp/servers`` read-back shows the server.
+    A disabled HTTP server is seeded through the canonical registry. Test
+    connection must report it as valid and disconnected without probing it.
 
     The SPA's Add Server control now sends ``transport`` (``mcp-server-create``)
     and runs the shared confirm round-trip; Enable and Delete settle their
@@ -870,14 +1042,14 @@ def test_mcp_add_enable_delete_via_spa(browser, ui_server):
     base, token = ui_server
     code, seeded = _api(base, token, "POST", "/agent/api/mcp/servers",
                         {"name": "phase4-mcp", "transport": "http",
-                         "url": "https://example.com/mcp", "confirm": True})
+                         "url": "https://mcp.example.invalid/mcp", "confirm": True})
     assert code == 200, (code, seeded)
 
     # A transport-less create is still honestly refused (typed validation is
     # not weakened): the empty transport defaults to stdio and needs a command.
     code, body = _api(base, token, "POST", "/agent/api/mcp/servers",
                       {"name": "phase4-mcp-bad",
-                       "url": "https://example.com/mcp", "confirm": True})
+                       "url": "https://mcp.example.invalid/mcp", "confirm": True})
     assert code == 400 and body.get("code") == "MCP_BAD_INPUT", (code, body)
 
     ui_name = "phase4-mcp-ui"
@@ -891,22 +1063,24 @@ def test_mcp_add_enable_delete_via_spa(browser, ui_server):
         with page.expect_response(
                 lambda r: r.url.endswith("/api/mcp/servers/phase4-mcp/test")
                 and r.request.method == "POST") as info:
-            row.get_by_role("button", name="Test connection").click()
+            row.locator('sakuga-button[aria-label="Test connection"]').locator("button").click()
         assert info.value.status == 200, info.value.status
         payload = info.value.json()
-        assert payload.get("ok") is True and payload.get("name") == "phase4-mcp", payload
-        assert payload.get("network_probe") is False, payload
+        assert payload["name"] == "phase4-mcp", payload
+        assert payload["valid"] and not payload["connected"] and not payload["ok"], payload
+        assert payload["code"] == "MCP_NOT_CONNECTED" and not payload["network_probe"], payload
 
         # Add Server through the real dialog: stages then settles, persists.
-        page.get_by_role("button", name="Add Server").click()
+        page.locator("[data-dashboard-page-header] sakuga-button").filter(
+            has_text="Add Server").locator("button").click()
         dialog = page.get_by_role("dialog", name="Add MCP server")
         dialog.wait_for(timeout=10000)
-        dialog.get_by_label("Name").fill(ui_name)
-        dialog.get_by_label("URL").fill("https://example.com/mcp")
+        dialog.locator("#mcp-name").locator("input").fill(ui_name)
+        dialog.locator("#mcp-url").locator("input").fill("https://mcp.example.invalid/mcp")
         with page.expect_response(
                 lambda r: r.url.split("?")[0].endswith("/api/mcp/servers")
                 and r.request.method == "POST" and r.status == 200) as info:
-            dialog.get_by_role("button", name="Add", exact=True).click()
+            dialog.locator("sakuga-button").filter(has_text="Add").locator("button").click()
         assert info.value.status == 200, info.value.status
         sent = json.loads(info.value.request.post_data)
         assert sent.get("transport") == "http", sent
@@ -925,7 +1099,7 @@ def test_mcp_add_enable_delete_via_spa(browser, ui_server):
                 lambda r: r.url.split("?")[0].endswith(
                     f"/api/mcp/servers/{ui_name}/enabled")
                 and r.request.method == "PUT" and r.status == 200) as info:
-            row2.get_by_role("button", name="Enable").click()
+            row2.locator('sakuga-button[aria-label="Enable"]').locator("button").click()
         assert info.value.status == 200, info.value.status
         got = _poll(lambda: (lambda c, d: d if c == 200 else None)(
             *_api(base, token, "GET", "/agent/api/mcp/servers")))
@@ -935,7 +1109,7 @@ def test_mcp_add_enable_delete_via_spa(browser, ui_server):
 
         # Delete through the row control (dialog is the human confirmation).
         row3 = _row_for(page, ui_name, "Delete")
-        row3.get_by_role("button", name="Delete").click()
+        row3.locator('sakuga-button[aria-label="Delete"]').locator("button").click()
         confirm = page.get_by_role("alertdialog")
         confirm.wait_for(timeout=10000)
         with page.expect_response(
@@ -1079,7 +1253,8 @@ def test_env_custom_key_set_and_remove(browser, ui_server):
     """Keys: a custom reference is set through the SPA and persisted.
 
     The Custom Keys form opens an edit row; Save PUTs ``/api/env`` with the
-    vault reference and the canonical ``GET /api/env`` read-back shows it set.
+    vault reference and the canonical ``GET /api/env`` read-back distinguishes
+    the saved reference from a resolved credential.
     Clear -> confirm dialog DELETEs it and the read-back drops it.
     """
     base, token = ui_server
@@ -1090,24 +1265,29 @@ def test_env_custom_key_set_and_remove(browser, ui_server):
         page.goto(base + "/env", wait_until="domcontentloaded", timeout=30000)
         card = page.locator("#section-custom")
         card.wait_for(timeout=20000)
-        card.get_by_label("Variable name").fill(key)
-        card.get_by_role("button", name="Add", exact=True).click()
-        value = page.get_by_placeholder("Enter value...")
+        card.locator("input[aria-label='Variable name']").fill(key)
+        card.get_by_role("button", name="Add", exact=True).first.click()
+        value = card.locator("input[placeholder='Enter value...']")
         value.wait_for(timeout=10000)
+        assert value.get_attribute("type") == "password"
         value.fill("vault:phase4-ref")
         with page.expect_response(
                 lambda r: r.url.endswith("/api/env")
                 and r.request.method == "PUT") as info:
-            page.get_by_role("button", name="Save", exact=True).click()
+            card.get_by_role("button", name="Save", exact=True).first.click()
         assert info.value.status == 200, info.value.status
         assert info.value.json().get("ok") is True, info.value.json()
 
         code, env = _api(base, token, "GET", "/agent/api/env")
         assert code == 200, (code, env)
-        assert env.get(key, {}).get("is_set") is True, env.get(key)
+        assert env.get(key, {}).get("category") == "references", env.get(key)
+        assert env[key]["is_set"] is False
+        assert env[key]["redacted_value"] is None
 
-        card.get_by_role("button", name="Clear", exact=True).click()
-        dialog = page.get_by_role("alertdialog")
+        page.reload(wait_until="domcontentloaded")
+
+        card.get_by_role("button", name="Clear", exact=True).first.click()
+        dialog = page.get_by_role("alertdialog", name="Clear this key?")
         dialog.wait_for(timeout=10000)
         with page.expect_response(
                 lambda r: r.url.endswith("/api/env")
@@ -1124,24 +1304,24 @@ def test_env_custom_key_set_and_remove(browser, ui_server):
     _api(base, token, "DELETE", "/agent/api/env", {"key": key, "confirm": True})
 
 
-def test_system_doctor_action_and_gateway_gating(browser, ui_server):
+def test_system_doctor_action_and_gateway_gating(browser, ui_server, monkeypatch):
     """System: a real ops action + the typed supervision gate.
 
     ``Run doctor`` POSTs ``/api/ops/doctor`` and the canonical
     ``GET /api/actions/doctor/status`` read-back records the executed action.
-    The Start/Stop/Restart process controls are disabled and the backend
-    confirms the ``GATEWAY_NO_SUPERVISION`` typed gate.
+    The isolated supervisor refuses to restart the host gateway.
     """
+    monkeypatch.setenv("QUBIT_GATEWAY_SUPERVISION_DISABLED", "1")
     base, token = ui_server
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
     page = ctx.new_page()
     try:
         page.goto(base + "/system", wait_until="domcontentloaded", timeout=30000)
-        page.get_by_role("button", name="Run doctor").wait_for(timeout=20000)
+        doctor = page.locator("sakuga-button").filter(has_text="Run doctor").locator("button")
         with page.expect_response(
                 lambda r: r.url.endswith("/api/ops/doctor")
                 and r.request.method == "POST") as info:
-            page.get_by_role("button", name="Run doctor").click()
+            doctor.click()
         assert info.value.status == 200, info.value.status
         payload = info.value.json()
         assert payload.get("ok") is True and payload.get("name") == "doctor", payload
@@ -1156,53 +1336,79 @@ def test_system_doctor_action_and_gateway_gating(browser, ui_server):
         # test guard refuses to touch the host service, so the call is a typed
         # 503 (never the old unconditional GATEWAY_NO_SUPERVISION refusal and
         # never a real service restart).
-        main_text = page.inner_text("main")
-        assert "GATEWAY_NO_SUPERVISION" not in main_text
-        assert page.get_by_role("button", name="Restart", exact=True).count() == 1
+        gateway = page.locator("main section").filter(
+            has=page.get_by_role("heading", name="Gateway", exact=True))
+        pw.expect(gateway.locator("sakuga-button").filter(has_text="Restart")).to_have_count(1)
         code, body = _api(base, token, "POST", "/agent/api/gateway/restart")
+        assert code == 409 and body["code"] == "GATEWAY_CONFIRM_REQUIRED", (code, body)
+        code, body = _api(base, token, "POST", "/agent/api/gateway/restart",
+                          {"confirm": True})
         assert code == 503 and body.get("code") == \
             "GATEWAY_SUPERVISION_UNAVAILABLE", (code, body)
     finally:
         ctx.close()
 
 
-def test_devices_probe_action_status(browser, ui_server):
-    """Devices: a device Check control runs the shared broker op.
-
-    ``Check acp`` POSTs ``/api/ops/run {id: acp}`` and the canonical
-    ``GET /api/actions/acp/status`` read-back records it. Pinned-runtime
-    inventory is read from ``GET /api/ops/runtime``.
-    """
+def test_devices_mint_enroll_and_remove_in_browser(browser, ui_server):
+    """Use the Devices page with the real pairing store and confirmation journal."""
     base, token = ui_server
-    code, runtime = _api(base, token, "GET", "/agent/api/ops/runtime")
-    assert code == 200 and runtime.get("ok") is True, runtime
+    path = "/agent/api/qubit/devices"
+    status, before = _api(base, token, "GET", path + "/setup-status")
+    assert status == 200 and before["enabled"]
+    label = "Audit companion"
+    scopes = ["operator.read", "status.read"]
 
-    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
-    page = ctx.new_page()
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
     try:
-        page.goto(base + "/devices", wait_until="domcontentloaded",
-                  timeout=30000)
-        page.get_by_label("Check acp", exact=True).wait_for(timeout=20000)
-        with page.expect_response(
-                lambda r: r.url.endswith("/api/ops/run")
-                and r.request.method == "POST") as info:
-            page.get_by_label("Check acp", exact=True).click()
-        assert info.value.status == 200, info.value.status
-        payload = info.value.json()
-        # /api/ops/run returns the raw broker envelope (no "name"); the
-        # action-status read-back below carries the resolved op id.
-        assert payload.get("ok") is True, payload
-        assert payload.get("state") == "executed", payload
-        assert payload.get("result", {}).get("check", {}).get("state"), payload
-        sent = json.loads(info.value.request.post_data)
-        assert sent.get("id") == "acp", sent
+        page.goto(base + "/devices", wait_until="domcontentloaded")
+        mint = page.get_by_role("region", name="Mint setup code form")
+        mint.locator('sakuga-input[aria-label="Setup code label"]').locator("input").fill(label)
+        mint.locator('sakuga-input[aria-label="Setup code scopes"]').locator("input").fill(",".join(scopes))
+        dialog = page.get_by_role("dialog", name="Confirm device action")
+        confirm = dialog.locator('sakuga-button[aria-label="Confirm"]').locator("button")
 
-        status = _poll(lambda: (
-            lambda c, d: d if c == 200 and d.get("state") == "executed" else None
-        )(*_api(base, token, "GET", "/agent/api/actions/acp/status")))
-        assert status and status.get("name") == "acp", status
+        def result(action):
+            return page.expect_response(
+                lambda r: r.url.split("?")[0].endswith(f"{path}/{action}")
+                and r.request.method == "POST" and r.status == 200
+            )
+
+        mint.locator('sakuga-button[aria-label="Mint setup code"]').locator("button").click()
+        with result("setup-code-mint") as created:
+            confirm.click()
+        record = created.value.json()
+        assert record["label"] == label and record["scopes"] == scopes
+        assert record["code_present"] is True and set(record) <= {
+            "ok", "id", "label", "scopes", "expires_at", "code_present"
+        }
+        device_id = record["id"]
+        status, pending = _api(base, token, "GET", path + "/setup-status")
+        assert status == 200 and pending["pending_codes"] == before["pending_codes"] + 1
+        page.get_by_role("list", name="Pending device pairings").get_by_text(label, exact=True).wait_for()
+
+        enroll = page.get_by_role("region", name="Enroll device form")
+        enroll.locator('sakuga-input[aria-label="Enroll setup code id"]').locator("input").fill(device_id)
+        enroll.locator('sakuga-button[aria-label="Enroll device"]').locator("button").click()
+        with result("enroll") as enrolled:
+            confirm.click()
+        assert enrolled.value.json()["approved"] == device_id
+        status, current = _api(base, token, "GET", path + "/setup-status")
+        assert status == 200 and current["paired_devices"] == before["paired_devices"] + 1
+        paired = page.get_by_role("list", name="Paired devices")
+        paired.get_by_text(label, exact=True).wait_for()
+        assert paired.locator(f'sakuga-button[aria-label="Rotate token for {device_id}"]').locator("button").is_disabled()
+        paired.locator(f'sakuga-button[aria-label="Show identity for {device_id}"]').locator("button").click()
+        page.get_by_role("region", name="Device identity").get_by_text(label, exact=True).wait_for()
+
+        paired.locator(f'sakuga-button[aria-label="Remove pairing {device_id}"]').locator("button").click()
+        with result("remove") as removed:
+            confirm.click()
+        assert removed.value.json()["revoked"] == device_id
+        status, after = _api(base, token, "GET", path + "/setup-status")
+        assert status == 200 and after["paired_devices"] == before["paired_devices"]
     finally:
-        ctx.close()
+        context.close()
 
 
 def test_operations_run_op_action_status(browser, ui_server):
@@ -1317,38 +1523,154 @@ def test_achievements_rescan_and_scan_status(browser, ui_server):
         ctx.close()
 
 
-def test_qubit_chat_mobile_composer_not_squeezed(browser, ui_server):
-    """The /qubit-chat composer textarea must not collapse at 390px.
-
-    Before the fix the flex row with Image/Voice/Send buttons squeezed the
-    textarea to ~29px wide at 390px. The composer now wraps the action buttons
-    below the full-width textarea on mobile while the desktop row is unchanged.
-    """
+@pytest.mark.parametrize("width, min_width", [(390, 200), (1440, 400)])
+def test_qubit_chat_composer_respects_viewport(browser, ui_server, width, min_width):
+    """Keep the composer usable at narrow and desktop viewport widths."""
     base, _token = ui_server
-    mob = browser.new_context(viewport={"width": 390, "height": 844})
-    page = mob.new_page()
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    page = context.new_page()
     try:
-        page.goto(base + "/qubit-chat", wait_until="domcontentloaded",
-                  timeout=30000)
-        ta = page.get_by_label("Message Qubit")
-        ta.wait_for(timeout=20000)
-        page.wait_for_timeout(1200)
-        box = ta.bounding_box()
-        assert box, "composer textarea has no box"
-        assert box["width"] >= 200, box   # was ~29px before the fix
-        assert box["height"] >= 36, box
+        page.goto(base + "/qubit-chat", wait_until="domcontentloaded")
+        textarea = page.get_by_label("Message Qubit")
+        pw.expect(textarea).to_be_visible()
+        box = textarea.bounding_box()
+        assert box and box["width"] >= min_width and box["height"] >= 36, box
     finally:
-        mob.close()
+        context.close()
 
-    desk = browser.new_context(viewport={"width": 1440, "height": 900})
-    page = desk.new_page()
+
+@pytest.mark.parametrize("surface", ["/qubit-chat", "/chat"])
+def test_qubit_chat_sidebar_publishes_and_reloads_the_provider(browser, ui_server, monkeypatch, surface):
+    """Switch between two providers that list the same model and reload the picker."""
+    from voicebridge import qubit_compat as compat
+    from urllib.parse import parse_qs, urlsplit
+
+    base, token = ui_server
+    model = "audit-shared-model"
+    catalog = {
+        "ok": True,
+        "provider": "audit-alpha",
+        "model": model,
+        "providers": [
+            {"slug": slug, "name": name, "models": [model], "total_models": 1,
+             "authenticated": True, "is_current": slug == "audit-alpha"}
+            for slug, name in (("audit-alpha", "Audit Alpha"), ("audit-beta", "Audit Beta"))
+        ],
+    }
+
+    validate = compat._chat_session_provider_pair
+    def validate_fixture_pair(cfg, provider, requested_model, **kwargs):
+        return validate(cfg, provider, requested_model, _payload=catalog, **kwargs)
+
+    monkeypatch.setattr(compat, "_chat_session_provider_pair", validate_fixture_pair)
+    monkeypatch.setattr(compat, "_h_model_options_uncached", lambda *_: (200, catalog))
+    status, reply = _api(base, token, "POST", "/agent/api/qubit/chat/sessions", {"name": "Sidebar fixture"})
+    assert status == 200, reply
+    sid = reply["session"]["id"]
+    path = "/agent/api/qubit/chat/sessions/" + sid
+    status, reply = _api(base, token, "PATCH", path, {"provider": "audit-alpha", "model": model})
+    assert status == 200, reply
+
+    if surface == "/chat":
+        monkeypatch.setattr("qubit_cli.model_selection_guards.combined_selection_warning", lambda *a, **k: None)
+        from voicebridge.chat_transport import store
+        from voicebridge.pty_ws import PtyWsServer
+
+        def fixture_guard(self, profile_id="", session_id=""):
+            row = store(self.cfg).show(session_id).get("session", {})
+            return {
+                "ok": True, "profile_id": "audit-fixture",
+                "model": row.get("model", model), "provider": row.get("provider", "audit-alpha"),
+                "context_tokens": 131072, "min_context_tokens": 4096,
+            }
+
+        monkeypatch.setattr(PtyWsServer, "_resolve_guard", fixture_guard)
+
+    context = browser.new_context(viewport={"width": 1440, "height": 950})
+    page = context.new_page()
+    page.set_default_timeout(8000)
     try:
-        page.goto(base + "/qubit-chat", wait_until="domcontentloaded",
-                  timeout=30000)
-        ta = page.get_by_label("Message Qubit")
-        ta.wait_for(timeout=20000)
-        page.wait_for_timeout(1000)
-        box = ta.bounding_box()
-        assert box and box["width"] >= 400, box  # desktop row unchanged
+        scope = "&profile=default" if surface == "/chat" else ""
+        page.goto(base + surface + "?resume=" + sid + scope, wait_until="domcontentloaded")
+        page.locator('[title="audit-alpha/' + model + '"]').click(timeout=20000)
+        dialog = page.get_by_role("dialog").filter(has_text="Switch Model")
+        dialog.locator(".qmodel-picker__current").get_by_text("audit-alpha", exact=True).wait_for()
+        dialog.get_by_text("Applies to this session.", exact=True).wait_for()
+        def refreshed(res):
+            url = urlsplit(res.url)
+            return (url.path.endswith("/api/model/options")
+                    and parse_qs(url.query).get("refresh") == ["1"])
+
+        with page.expect_response(refreshed) as refreshing:
+            dialog.locator(".qmodel-picker__action--refresh").locator("button").click()
+        assert refreshing.value.ok
+        dialog.locator(".qmodel-picker__provider-item").filter(has_text="Audit Beta").click()
+        dialog.locator(".qmodel-picker__model-item").filter(has_text=model).click()
+        with page.expect_response(lambda res: urlsplit(res.url).path == path and res.request.method == "PATCH") as changed:
+            dialog.locator(".qmodel-picker__action--confirm").locator("button").click()
+        assert changed.value.ok
+        if surface == "/chat":
+            assert parse_qs(urlsplit(changed.value.url).query)["profile"] == ["default"]
+            assert changed.value.json()["terminal_model_request"]["provider"] == "audit-beta"
+            page.get_by_text("is queued for the next terminal turn.", exact=False).wait_for()
+            assert page.locator('[title="audit-alpha/' + model + '"]').count() == 1
+            terminal_store = store(_TEST_CTX["cfg"])
+            request = terminal_store._db.read_terminal_model_request(sid)
+            terminal_store.set_model(sid, model, provider="audit-beta")
+            terminal_store._db.finish_terminal_model_request(sid, request, "applied")
+            page.get_by_text("Terminal switched to " + model, exact=False).wait_for()
+        else:
+            assert changed.value.json()["session"]["provider"] == "audit-beta"
+        status, reply = _api(base, token, "GET", path)
+        assert status == 200 and reply["session"]["provider"] == "audit-beta", reply
+        button = page.locator('[title="audit-beta/' + model + '"]')
+        button.wait_for()
+        page.reload(wait_until="domcontentloaded")
+        button.click(timeout=20000)
+        dialog.locator(".qmodel-picker__current").get_by_text("audit-beta", exact=True).wait_for()
     finally:
-        desk.close()
+        context.close()
+
+
+def test_manga_chat_sidebar_labels_and_composer_have_one_visual_owner(browser, ui_server):
+    """Exercise the current sidebar art and painted composer in Chromium."""
+    base, token = ui_server
+    theme_path = "/agent/api/dashboard/theme"
+    status, previous = _api(base, token, "GET", theme_path)
+    assert status == 200 and previous.get("theme"), previous
+    status, selected = _api(base, token, "PUT", theme_path, {"theme": "q6"})
+    assert status == 200 and selected.get("theme") == "q6", selected
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script('localStorage.setItem("qubit-sidebar-collapsed", "false")')
+    page = context.new_page()
+    try:
+        page.goto(base + "/qubit-chat", wait_until="domcontentloaded")
+        page.locator('html[data-qubit-manga="on"]').wait_for()
+        sidebar = page.locator("#app-sidebar")
+        chat = sidebar.get_by_role("group", name="Chat", exact=True)
+        workspace = sidebar.get_by_role("group", name="Workspace", exact=True)
+        for group, label in ((chat, "CHAT"), (workspace, "WORKSPACE")):
+            title = group.locator(".qubit-sidebar-title")
+            title.get_by_text(label, exact=True).wait_for()
+            assert title.locator('svg[aria-hidden="true"]').count() == 1
+        assert sidebar.locator("nav .q5t-gateway__link").count() == 0
+        sidebar.locator(".q5t-system-shell .q5t-gateway__link").wait_for()
+
+        composer = page.locator(".qchat__composer")
+        composer.wait_for()
+        chrome = composer.evaluate("""node => ({
+            frame: getComputedStyle(node, '::before').borderImageSource,
+            overlay: getComputedStyle(node, '::after').content,
+            background: getComputedStyle(node).backgroundImage,
+            field: getComputedStyle(node.querySelector('textarea')).backgroundImage,
+        })""")
+        assert "/manga-ui/qubit-chat/composer.svg" in chrome["frame"], chrome
+        assert (chrome["overlay"], chrome["background"], chrome["field"]) == ("none",) * 3
+
+        sidebar.locator("[data-sidebar-toggle]").locator("button").click()
+        page.wait_for_function("document.querySelector('#app-sidebar')?.dataset.collapsed === 'true'")
+        assert chat.count() == workspace.count() == 1
+        assert chat.locator(".qubit-sidebar-title").count() == 0
+    finally:
+        context.close()
+        _api(base, token, "PUT", theme_path, {"theme": previous["theme"]})

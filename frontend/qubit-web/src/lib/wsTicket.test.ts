@@ -69,8 +69,13 @@ describe("api.wsTicket", () => {
         session_pinned: true,
       });
     }));
-    const grant = await api.wsTicket(undefined, "pty", "dashboard-abc123");
-    expect(sent.resume).toBe("dashboard-abc123");
+    const grant = await api.wsTicket("big-model", "pty", "dashboard-abc123", "work");
+    expect(sent).toEqual({
+      profile: "big-model",
+      management_profile: "work",
+      scope: "pty",
+      resume: "dashboard-abc123",
+    });
     expect(grant.model).toBe("qubit-brain4");
   });
 

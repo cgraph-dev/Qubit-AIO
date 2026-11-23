@@ -9,8 +9,8 @@ const v3 = here("./manga-v3.css");
 const v4 = here("./manga-v4.css");
 const v5 = here("./manga-v5.css");
 const gate = here("./MangaSkin.tsx");
+const picker = here("./PickerPanel.tsx");
 const webSelect = here("../sakuga/MangaAwareSelect.tsx");
-const pickerPanel = here("./PickerPanel.tsx");
 const sharedRoot = fileURLToPath(new URL("../../public/manga-ui/", import.meta.url));
 
 describe("Manga V2/V3 integration contracts", () => {
@@ -25,9 +25,9 @@ describe("Manga V2/V3 integration contracts", () => {
 
   it("uses a web-only portal dropdown rather than editing the shared desktop select", () => {
     expect(webSelect).toContain("<PickerPanel");
-    expect(pickerPanel).toContain("createPortal(");
-    expect(pickerPanel).toContain("document.body");
-    expect(pickerPanel).toContain('position: "fixed"');
+    expect(picker).toContain("createPortal(");
+    expect(picker).toContain('trigger.closest<HTMLElement>(\'[aria-modal="true"]\') ?? document.body');
+    expect(picker).toContain('position: "fixed"');
     expect(webSelect).toContain("useMangaLayerActive(");
     expect(here("./useMangaLayerActive.ts")).toContain('dataset.qubitManga === "on"');
     expect(webSelect).toContain("OriginalSelect");

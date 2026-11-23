@@ -159,9 +159,7 @@ export function ChatSessionList({
   const [nextOffset, setNextOffset] = useState(0);
   const busyRef = useRef(false);
 
-  // `profile` scopes the canonical listing; the empty-string fallback keeps
-  // the dep stable when no profile is selected (default profile). The chat
-  // store is single-principal and ignores it.
+  // Preserve the owning profile on both session listings.
   const scopeKey = profile ?? "";
 
   // Scope changes must not leave another profile's rows visible while loading.
@@ -186,7 +184,9 @@ export function ChatSessionList({
         ? api
             .getSessions(loadedLimitRef.current, 0, scopeKey, "recent")
             .then((res) => ({ sessions: res.sessions, total: res.total }))
-        : api.listChatSessions(SESSION_LIMIT, 0, searchQuery);
+        : scopeKey
+          ? api.listChatSessions(SESSION_LIMIT, 0, searchQuery, scopeKey)
+          : api.listChatSessions(SESSION_LIMIT, 0, searchQuery);
     boundedSessionLoad<{ sessions: ChatStoreSession[]; total?: number }>(request)
       .then((res) => {
         if (reqRef.current !== myReq) return;

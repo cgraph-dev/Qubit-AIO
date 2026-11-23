@@ -91,10 +91,31 @@ def test_options_default_is_configured_subset(cfg):
     """Without ``include_unconfigured`` the payload is the configured subset."""
     from voicebridge import qubit_compat as QC
 
-    _, body = QC.h_model_options(cfg, {}, {}, {})
-    providers = body.get("providers") or []
-    assert providers, "configured subset must not be empty"
+    status, body = QC.h_model_options(cfg, {}, {}, {})
+    assert status == 200, body
+    providers = body["providers"]
+    # A selected model with no credentials need not be selectable. The
+    # default view returns authenticated rows, or an empty configured subset.
+    assert all(row["authenticated"] for row in providers), providers
     assert len(providers) < 20, [p.get("slug") for p in providers]
+
+
+def test_refresh_updates_regular_model_options_cache(cfg, monkeypatch):
+    from voicebridge import qubit_compat as QC
+
+    monkeypatch.setenv("QUBIT_READ_CACHE", "1")
+    calls = []
+
+    def read(_cfg, query, _body, _params):
+        calls.append(query)
+        return 200, {"providers": [{"slug": f"fixture-{len(calls)}"}]}
+
+    monkeypatch.setattr(QC, "_h_model_options_uncached", read)
+    query = {"include_unconfigured": "1"}
+    assert QC.h_model_options(cfg, query, {}, {})[1]["providers"][0]["slug"] == "fixture-1"
+    assert QC.h_model_options(cfg, {**query, "refresh": "1"}, {}, {})[1]["providers"][0]["slug"] == "fixture-2"
+    assert QC.h_model_options(cfg, query, {}, {})[1]["providers"][0]["slug"] == "fixture-2"
+    assert len(calls) == 2
 
 
 def test_options_explicit_only_filters_to_configured(cfg):

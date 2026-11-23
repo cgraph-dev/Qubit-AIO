@@ -731,6 +731,27 @@ class SessionSessionsMixin:
             self._delete_unreferenced_system_prompts(conn)
         self._execute_write(_do)
 
+    def queue_terminal_model_request(self, session_id: str, request: dict[str, Any]) -> bool:
+        """Replace the queued dashboard choice without changing the running route."""
+        payload = json.dumps(request)
+        return bool(self._write_rowcount(
+            "UPDATE sessions SET terminal_model_request = ? WHERE id = ? AND archived = 0",
+            (payload, session_id),
+        ))
+
+    def read_terminal_model_request(self, session_id: str) -> Optional[dict[str, Any]]:
+        row = self._read_one("SELECT terminal_model_request FROM sessions WHERE id = ?", (session_id,))
+        return (_parse_model_config(row[0]) or None) if row else None
+
+    def finish_terminal_model_request(
+        self, session_id: str, request: dict[str, Any], state: str,
+    ) -> None:
+        """Settle this request only. A newer browser pick stays queued."""
+        self._write_sql(
+            "UPDATE sessions SET terminal_model_request = ? WHERE id = ? AND terminal_model_request = ?",
+            (json.dumps({**request, "state": state}), session_id, json.dumps(request)),
+        )
+
     def update_session_model(
         self, session_id: str, model: str, provider: Optional[str] = None, *,
         base_url: Optional[str] = None, api_mode: Optional[str] = None,

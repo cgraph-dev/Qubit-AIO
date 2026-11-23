@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import errno
 import hashlib
+from importlib import import_module
 import json
 import os
 import re
@@ -355,6 +356,36 @@ class ConfigReadError(RuntimeError):
     has no idea what the file holds, so writing a merged result back would
     replace real settings with only the keys it merged.
     """
+
+
+def openclaw_config_reader():
+    """Use the shared reader in the CLI and support standalone copies of this script."""
+    for name in (
+        "qubit_cli.foreign_config",
+        "voicebridge._data.qubit_runtime.qubit_cli.foreign_config",
+        "qubit_runtime.qubit_cli.foreign_config",
+    ):
+        try:
+            return import_module(name).load_openclaw_config
+        except ModuleNotFoundError as exc:
+            if exc.name != name and not name.startswith(f"{exc.name}."):
+                raise
+
+    def standalone(path: Path) -> Dict[str, Any]:
+        text = path.read_text(encoding="utf-8-sig")
+        try:
+            document = json.loads(text)
+        except json.JSONDecodeError:
+            try:
+                from json5 import loads
+            except ImportError:
+                raise ValueError("Run this migration with the Qubit CLI for JSON5 support") from None
+            document = loads(text)
+        if not isinstance(document, dict):
+            raise ValueError("OpenClaw configuration must be an object")
+        return document
+
+    return standalone
 
 
 def load_yaml_file(path: Path) -> Dict[str, Any]:
@@ -874,8 +905,8 @@ class Migrator:
         # default ~/.qubit/workspace/.  Reading agents.defaults.workspace
         # lets source_candidate() find files in the actual workspace.
         self._custom_workspace: Optional[Path] = None
-        oc_config = self.load_openclaw_config()
-        ws = (oc_config.get("agents", {}).get("defaults", {}).get("workspace") or "").strip()
+        self._source_config = self.load_openclaw_config()
+        ws = (self._source_config.get("agents", {}).get("defaults", {}).get("workspace") or "").strip()
         if ws:
             ws_path = Path(ws).expanduser().resolve()
             # Only use it if it exists and is outside the source_root tree
@@ -1018,7 +1049,7 @@ class Migrator:
             self.record("source", self.source_root, None, "error", "Qubit directory does not exist")
             return self.build_report()
 
-        config = self.load_openclaw_config()
+        config = self._source_config
 
         self.run_if_selected("soul", self.migrate_soul)
         self.run_if_selected("workspace-agents", self.migrate_workspace_agents)
@@ -1405,17 +1436,18 @@ class Migrator:
             self.record("command-allowlist", source, destination, "migrated", "Would merge patterns", added_patterns=added)
 
     def load_openclaw_config(self) -> Dict[str, Any]:
-        # Check current name and legacy config filenames
+        # A present primary file is authoritative. Falling through on a parse
+        # error could import obsolete configuration from a retired install.
+        read_config = openclaw_config_reader()
         for name in ("openclaw.json", "clawdbot.json", "moltbot.json"):
-            config_path = self.source_root / name
-            if config_path.exists():
-                try:
-                    # errors="replace" means read_text() cannot raise
-                    # UnicodeDecodeError; OSError covers unreadable/vanished files.
-                    data = json.loads(config_path.read_text(encoding="utf-8", errors="replace"))
-                    return data if isinstance(data, dict) else {}
-                except (json.JSONDecodeError, OSError):
-                    continue
+            try:
+                return read_config(self.source_root / name)
+            except FileNotFoundError:
+                continue
+            except (OSError, ValueError, RecursionError):
+                raise ConfigReadError(
+                    f"Cannot read {name}. Check that it is a valid OpenClaw configuration."
+                ) from None
         return {}
 
     def load_openclaw_env(self) -> Dict[str, str]:
@@ -2259,9 +2291,10 @@ class Migrator:
     # ── MCP servers ─────────────────────────────────────────────
     def migrate_mcp_servers(self, config: Optional[Dict[str, Any]] = None) -> None:
         config = config or self.load_openclaw_config()
-        mcp_raw = (config.get("mcp") or {}).get("servers") or {}
-        if not mcp_raw:
-            self.record("mcp-servers", None, None, "skipped", "No MCP servers found in Qubit config")
+        mcp = config.get("mcp")
+        mcp_raw = mcp.get("servers") if isinstance(mcp, dict) else None
+        if not isinstance(mcp_raw, dict) or not mcp_raw:
+            self.record("mcp-servers", None, None, "skipped", "No MCP servers found in OpenClaw config")
             return
 
         hermes_cfg_path = self.target_root / "config.yaml"
@@ -2277,6 +2310,54 @@ class Migrator:
                             "MCP server already exists in Qubit config")
                 continue
 
+            transport = srv.get("transport")
+            if transport is None and srv.get("type") == "http":
+                transport = "streamable-http"
+            has_command = bool(srv.get("command"))
+            has_url = bool(srv.get("url"))
+            allowed_transports = (None, "stdio") if has_command else (None, "sse", "streamable-http")
+            if has_command == has_url or transport not in allowed_transports:
+                self.record("mcp-servers", f"mcp.servers.{name}", None, "skipped",
+                            "Expected one command or URL with a matching MCP transport")
+                continue
+
+            # Do not turn requester-specific credentials or unsupported
+            # OAuth options into a shared session by discarding their policy.
+            oauth = srv.get("oauth", {})
+            if "oauth" in srv and (not has_url or srv.get("auth") != "oauth"
+                    or not isinstance(oauth, dict)
+                    or oauth.get("identity", "shared") != "shared"
+                    or oauth.keys() - {"identity", "scope"}
+                    or ("scope" in oauth and not isinstance(oauth["scope"], str))):
+                self.record("mcp-servers", f"mcp.servers.{name}", None, "skipped",
+                            "OAuth credential ownership or options require manual review")
+                continue
+
+            tls_fields = {"sslVerify": "ssl_verify", "clientCert": "client_cert",
+                          "clientKey": "client_key"}
+            if tls_fields.keys() & srv.keys() and (
+                    not has_url or not isinstance(srv["url"], str)
+                    or not srv["url"].lower().startswith("https://")
+                    or srv.get("sslVerify", True) is not True
+                    or ("clientKey" in srv and "clientCert" not in srv)
+                    or any(not isinstance(srv[key], str)
+                           or not (srv[key].strip().startswith("~/")
+                                   or Path(srv[key].strip()).is_absolute())
+                           for key in ("clientCert", "clientKey") if key in srv)):
+                self.record("mcp-servers", f"mcp.servers.{name}", None, "skipped",
+                            "TLS settings require verified HTTPS and absolute certificate paths")
+                continue
+
+            modern_filter = srv.get("toolFilter", {})
+            if not isinstance(modern_filter, dict) or any(
+                key not in ("include", "exclude") or not isinstance(patterns, list)
+                or any(not isinstance(pattern, str) or not pattern.strip() for pattern in patterns)
+                for key, patterns in modern_filter.items()
+            ):
+                self.record("mcp-servers", f"mcp.servers.{name}", None, "skipped",
+                            "OpenClaw toolFilter must contain include/exclude arrays of non-empty strings")
+                continue
+
             hermes_srv: Dict[str, Any] = {}
             # STDIO transport
             if srv.get("command"):
@@ -2290,10 +2371,16 @@ class Migrator:
             # HTTP/SSE transport
             if srv.get("url"):
                 hermes_srv["url"] = srv["url"]
+                if transport is not None:
+                    hermes_srv["transport"] = transport
                 if srv.get("headers"):
                     hermes_srv["headers"] = srv["headers"]
                 if srv.get("auth"):
                     hermes_srv["auth"] = srv["auth"]
+                if oauth.get("scope"):
+                    hermes_srv["oauth"] = {"scope": oauth["scope"]}
+                hermes_srv.update({target: srv[source] for source, target in tls_fields.items()
+                                   if source in srv})
             # Common fields
             if srv.get("enabled") is False:
                 hermes_srv["enabled"] = False
@@ -2301,9 +2388,20 @@ class Migrator:
                 hermes_srv["timeout"] = srv["timeout"]
             if srv.get("connectTimeout"):
                 hermes_srv["connect_timeout"] = srv["connectTimeout"]
+            for source_key, target_key in (("requestTimeoutMs", "timeout"),
+                                           ("connectionTimeoutMs", "connect_timeout")):
+                milliseconds = srv.get(source_key)
+                if type(milliseconds) in (int, float) and 0 < milliseconds < float("inf"):
+                    hermes_srv[target_key] = milliseconds / 1000
             # Tool filtering
             tools_cfg = srv.get("tools") or {}
-            if tools_cfg.get("include") or tools_cfg.get("exclude"):
+            if "toolFilter" in srv:
+                if modern_filter:
+                    hermes_srv["tools"] = {
+                        **modern_filter,
+                        "exclude_overrides_include": True,
+                    }
+            elif isinstance(tools_cfg, dict) and (tools_cfg.get("include") or tools_cfg.get("exclude")):
                 hermes_srv["tools"] = {}
                 if tools_cfg.get("include"):
                     hermes_srv["tools"]["include"] = tools_cfg["include"]
@@ -3133,19 +3231,23 @@ def main() -> int:
     except ValueError as exc:
         print(json.dumps({"error": str(exc)}, indent=2, ensure_ascii=False))
         return 2
-    migrator = Migrator(
-        source_root=Path(os.path.expanduser(args.source)).resolve(),
-        target_root=Path(os.path.expanduser(args.target)).resolve(),
-        execute=bool(args.execute),
-        workspace_target=Path(os.path.expanduser(args.workspace_target)).resolve() if args.workspace_target else None,
-        overwrite=bool(args.overwrite),
-        migrate_secrets=bool(args.migrate_secrets),
-        output_dir=Path(os.path.expanduser(args.output_dir)).resolve() if args.output_dir else None,
-        selected_options=selected_options,
-        preset_name=args.preset or "",
-        skill_conflict_mode=args.skill_conflict,
-    )
-    report = migrator.migrate()
+    try:
+        migrator = Migrator(
+            source_root=Path(os.path.expanduser(args.source)).resolve(),
+            target_root=Path(os.path.expanduser(args.target)).resolve(),
+            execute=bool(args.execute),
+            workspace_target=Path(os.path.expanduser(args.workspace_target)).resolve() if args.workspace_target else None,
+            overwrite=bool(args.overwrite),
+            migrate_secrets=bool(args.migrate_secrets),
+            output_dir=Path(os.path.expanduser(args.output_dir)).resolve() if args.output_dir else None,
+            selected_options=selected_options,
+            preset_name=args.preset or "",
+            skill_conflict_mode=args.skill_conflict,
+        )
+        report = migrator.migrate()
+    except ConfigReadError as exc:
+        print(json.dumps({"error": str(exc)}, indent=2, ensure_ascii=False))
+        return 2
 
     # ── Machine-readable JSON mode ────────────────────────────
     # When --json is set, print the redacted report to stdout and skip the

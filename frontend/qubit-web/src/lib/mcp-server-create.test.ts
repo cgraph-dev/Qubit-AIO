@@ -59,7 +59,7 @@ describe("buildMcpServerCreate", () => {
       transport: "stdio",
       command: " uvx ",
       args: "mcp-server, --debug",
-      env: "API_KEY=secret\nURL=https://example.com?a=b\nINVALID",
+      env: "API_KEY=secret\nURL=https://example.com?a=b\nOTHER=env:EXISTING\nINVALID",
     });
 
     expect(server).toEqual({
@@ -67,7 +67,8 @@ describe("buildMcpServerCreate", () => {
       transport: "stdio",
       command: "uvx",
       args: ["mcp-server", "--debug"],
-      env: {
+      env: { OTHER: "env:EXISTING" },
+      env_values: {
         API_KEY: "secret",
         URL: "https://example.com?a=b",
       },

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router";
 import {
   Activity,
   Brain,
@@ -20,6 +20,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { ProfileContext } from "@/contexts/profile-context";
+import type { GatewayStatusResponse } from "@/lib/api";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
@@ -90,10 +92,12 @@ function backupFileName(path: string | null): string {
  */
 function ActionLogViewer({
   action,
+  profile,
   onClose,
   onComplete,
 }: {
   action: string;
+  profile?: string;
   onClose: () => void;
   onComplete?: (action: string, exitCode: number | null) => void;
 }) {
@@ -106,9 +110,11 @@ function ActionLogViewer({
   useEffect(() => {
     let cancelled = false;
     completeRef.current = false;
+    let failures = 0;
     const poll = async () => {
       try {
-        const st = await api.getActionStatus(action, 400);
+        const st = await api.getActionStatus(action, 400, profile);
+        failures = 0;
         if (cancelled) return;
         setLines(st.lines ?? []);
         setRunning(st.running);
@@ -119,7 +125,13 @@ function ActionLogViewer({
         }
         if (st.running) timer.current = setTimeout(poll, 1200);
       } catch {
-        if (!cancelled) setRunning(false);
+        if (cancelled) return;
+        if (++failures <= 6) timer.current = setTimeout(poll, 1200);
+        else {
+          setLines(["The dashboard could not verify the action outcome."]);
+          setRunning(false);
+          setExitCode(null);
+        }
       }
     };
     poll();
@@ -127,7 +139,7 @@ function ActionLogViewer({
       cancelled = true;
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [action, onComplete]);
+  }, [action, onComplete, profile]);
 
   return (
     <Card>
@@ -140,7 +152,7 @@ function ActionLogViewer({
               <Badge tone="warning">running</Badge>
             ) : (
               <Badge tone={exitCode === 0 ? "success" : "destructive"}>
-                {exitCode === 0 ? "done" : `exit ${exitCode}`}
+                {exitCode == null ? "unverified" : exitCode === 0 ? "done" : `exit ${exitCode}`}
               </Badge>
             )}
           </div>
@@ -183,6 +195,11 @@ const MEMORY_STATUS_TONE: Record<
 };
 
 export default function SystemPage() {
+  const { profile } = useContext(ProfileContext);
+  return <ProfileSystemPage key={profile} profile={profile || "current"} />;
+}
+
+function ProfileSystemPage({ profile }: { profile: string }) {
   const showToast = useCallback((message: string, kind?: "success" | "error") => {
     showSakugaToast(message);
     emitFx(kind === "error" ? "error" : "success");
@@ -207,8 +224,14 @@ export default function SystemPage() {
   // (and audit). `enable` is the de-escalation and needs no confirmation.
   const [confirmGlobalDisable, setConfirmGlobalDisable] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { hash } = useLocation();
+  const gatewaySection = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!loading && hash === "#gateway") gatewaySection.current?.scrollIntoView();
+  }, [hash, loading]);
 
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [gatewayActionAttempt, setGatewayActionAttempt] = useState(0);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
   // Add-credential form.
@@ -266,6 +289,8 @@ export default function SystemPage() {
   // is operator-owned, so the Start/Restart/Stop controls render meaningfully
   // disabled instead of failing on click.
   const [gatewayRefusal, setGatewayRefusal] = useState<string | null>(null);
+  const [gatewayProcess, setGatewayProcess] = useState<GatewayStatusResponse["process"]>();
+  const [gatewayBusy, setGatewayBusy] = useState(false);
 
   const loadAll = useCallback(() => {
     Promise.allSettled([
@@ -281,7 +306,7 @@ export default function SystemPage() {
       // load without a separate effect / a forced network round-trip.
       api.checkQubitUpdate(false),
       // Supervision policy: Qubit refuses in-dashboard process control.
-      api.getGatewayStatus(),
+      api.getGatewayStatus(profile),
       // The shared emergency-stop / global-disable latch (one path for
       // CLI/voice/dashboard).
       api.getPowerStatus(),
@@ -304,24 +329,16 @@ export default function SystemPage() {
         if (prt.status === "fulfilled") setPortal(prt.value);
         if (upd.status === "fulfilled") setUpdateInfo(upd.value);
         if (gw.status === "fulfilled") {
-          const supervision = gw.value?.supervision ?? "";
-          setGatewayRefusal(
-            // Any non-empty supervision string means process control is not
-            // available on this host. Keep the legacy GATEWAY_NO_SUPERVISION
-            // token and accept the real supervisor's GATEWAY_SUPERVISION_
-            // UNAVAILABLE so Start/Restart render disabled instead of failing
-            // on click.
-            supervision &&
-              (supervision.includes("GATEWAY_NO_SUPERVISION") ||
-                supervision.includes("GATEWAY_SUPERVISION_UNAVAILABLE"))
-              ? supervision
-              : null,
-          );
+          setGatewayProcess(gw.value?.process);
+          setGatewayRefusal(gw.value?.supervision || null);
+        } else {
+          setGatewayProcess(undefined);
+          setGatewayRefusal("Gateway supervision status could not be loaded.");
         }
         if (pw.status === "fulfilled") setPower(pw.value);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     loadAll();
@@ -339,9 +356,22 @@ export default function SystemPage() {
     detail: string;
   } | null>(null);
 
+  const gatewayMounted = useRef(false);
+  useEffect(() => {
+    gatewayMounted.current = true;
+    return () => {
+      gatewayMounted.current = false;
+      gatewayDecisionRef.current?.(false);
+      gatewayDecisionRef.current = null;
+    };
+  }, []);
   const askGatewayConfirm = useCallback(
     (verb: "start" | "stop" | "restart", detail: string) =>
       new Promise<boolean>((resolve) => {
+        if (!gatewayMounted.current || gatewayDecisionRef.current) {
+          resolve(false);
+          return;
+        }
         gatewayDecisionRef.current = resolve;
         setGatewayConfirm({ verb, detail });
       }),
@@ -355,21 +385,27 @@ export default function SystemPage() {
   };
 
   const runGateway = async (verb: "start" | "stop" | "restart") => {
+    if (gatewayBusy) return;
+    setGatewayBusy(true);
     const confirm = (detail: string) => askGatewayConfirm(verb, detail);
     try {
       if (verb === "start") {
-        await api.startGateway(confirm);
+        await api.startGateway(confirm, profile);
         setActiveAction("gateway-start");
       } else if (verb === "stop") {
-        await api.stopGateway(confirm);
+        await api.stopGateway(confirm, profile);
         setActiveAction("gateway-stop");
       } else {
-        await api.restartGateway(confirm);
+        await api.restartGateway(confirm, profile);
         setActiveAction("gateway-restart");
       }
-      showToast(`Gateway ${verb} started`, "success");
-      setTimeout(loadAll, 3000);
+      if (gatewayMounted.current) {
+        setGatewayActionAttempt((attempt) => attempt + 1);
+        showToast(`Gateway ${verb} requested`, "success");
+        loadAll();
+      }
     } catch (e) {
+      if (!gatewayMounted.current) return;
       // A declined in-app confirmation rethrows the typed ConfirmRequiredError;
       // nothing was executed, so report it as cancelled — never as a failure.
       if (e instanceof ConfirmRequiredError) {
@@ -385,7 +421,10 @@ export default function SystemPage() {
         showToast(`Gateway ${verb} failed: ${e}`, "error");
       }
     } finally {
-      decideGatewayConfirm(false);
+      if (gatewayMounted.current) {
+        decideGatewayConfirm(false);
+        setGatewayBusy(false);
+      }
     }
   };
 
@@ -786,7 +825,7 @@ export default function SystemPage() {
     );
   }
 
-  const gatewayRunning = status?.gateway_running;
+  const gatewayRunning = gatewayProcess?.running ?? status?.gateway_running;
   const canUpdateQubit = status?.can_update_qubit !== false;
   const activeMemoryProvider = memory?.active
     ? memory.providers.find((provider) => provider.name === memory.active)
@@ -990,7 +1029,9 @@ export default function SystemPage() {
       {/* Live action log */}
       {activeAction && (
         <ActionLogViewer
+          key={`${activeAction}:${gatewayActionAttempt}`}
           action={activeAction}
+          profile={activeAction.startsWith("gateway-") ? profile : undefined}
           onComplete={handleActionComplete}
           onClose={() => setActiveAction(null)}
         />
@@ -1209,7 +1250,7 @@ export default function SystemPage() {
       </section>
 
       {/* ── Gateway ───────────────────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
+      <section id="gateway" ref={gatewaySection} className="flex flex-col gap-3">
         <H2 variant="sm" className="flex items-center gap-2 text-muted-foreground">
           <Power className="h-4 w-4" /> Gateway
         </H2>
@@ -1217,18 +1258,18 @@ export default function SystemPage() {
           <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               <Badge tone={gatewayRunning ? "success" : "secondary"}>
-                {gatewayRunning ? "running" : "stopped"}
+                {gatewayProcess?.shared ? "shared gateway" : gatewayRunning ? "running" : "stopped"}
               </Badge>
               <span className="min-w-0 break-words text-sm text-muted-foreground">
-                {status?.gateway_state ?? "—"}
-                {status?.gateway_pid ? ` · pid ${status.gateway_pid}` : ""}
+                {gatewayProcess?.daemon_state ?? gatewayProcess?.state ?? "—"}
+                {gatewayProcess?.pid ? ` · pid ${gatewayProcess.pid}` : ""}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 className="uppercase"
                 onClick={() => runGateway("start")}
-                disabled={gatewayRunning || !!gatewayRefusal}
+                disabled={gatewayBusy || gatewayRunning || !!gatewayRefusal}
                 title={gatewayRefusal ?? undefined}
                 
               >
@@ -1237,7 +1278,7 @@ export default function SystemPage() {
               <Button
                 className="uppercase"
                 onClick={() => runGateway("restart")}
-                disabled={!!gatewayRefusal}
+                disabled={gatewayBusy || !!gatewayRefusal}
                 title={gatewayRefusal ?? undefined}
                 
               >
@@ -1246,7 +1287,7 @@ export default function SystemPage() {
               <Button
                 className="uppercase text-warning"
                 onClick={() => runGateway("stop")}
-                disabled={!gatewayRunning || !!gatewayRefusal}
+                disabled={gatewayBusy || !gatewayRunning || !!gatewayRefusal}
                 title={gatewayRefusal ?? undefined}
                 
               >

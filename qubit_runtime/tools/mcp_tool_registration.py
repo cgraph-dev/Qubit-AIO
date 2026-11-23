@@ -8,6 +8,7 @@ import json
 import logging
 import threading
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional
 from tools.mcp_tool_common import _parse_boolish, _core, _resolve_tool_timeout, mcp_field, mcp_server_enabled
@@ -35,6 +36,28 @@ _UTILITY_HANDLER_FACTORIES = {
     "list_prompts": _make_list_prompts_handler, "get_prompt": _make_get_prompt_handler,
     "list_event_types": _events._make_list_event_types_handler, "subscribe_event": _events._make_subscribe_event_handler,
     "unsubscribe_event": _events._make_unsubscribe_event_handler}
+
+# OpenClaw names for the same MCP resource and prompt operations.
+_OPENCLAW_UTILITY_NAMES = {
+    "list_resources": "resources_list",
+    "read_resource": "resources_read",
+    "list_prompts": "prompts_list",
+    "get_prompt": "prompts_get",
+}
+_OPENCLAW_GLOB_LITERALS = str.maketrans({"?": "[?]", "[": "[[]"})
+
+
+def _filter_imported_utilities(name: str, config: dict, entries: Iterable[dict]) -> list[dict]:
+    if (config.get("tools") or {}).get("exclude_overrides_include") is not True:
+        return list(entries)
+    allows = _make_tool_filter(name, config)
+    selected = []
+    for entry in entries:
+        key = entry.get("handler_key") if isinstance(entry, dict) else None
+        source_name = _OPENCLAW_UTILITY_NAMES.get(key) if isinstance(key, str) else None
+        if source_name and allows(source_name):
+            selected.append(entry)
+    return selected
 
 
 def _normalize_server_trust(value: Any) -> str:
@@ -204,7 +227,7 @@ def _select_utility_schemas(server_name: str, server: "MCPServerTask", config: d
         # Legacy gate (no initialize_result): the ClientSession method shares the handler key.
         return None if hasattr(server.session, handler_key) else f"session lacks {handler_key}"
     selected: list[dict] = []
-    for entry in _build_utility_schemas(server_name):
+    for entry in _filter_imported_utilities(server_name, config, _build_utility_schemas(server_name)):
         reason = _skip_reason(entry["handler_key"])
         if reason:
             logger.debug("MCP server '%s': skipping utility '%s' (%s)", server_name, entry["handler_key"], reason)
@@ -246,7 +269,8 @@ def _existing_tool_names() -> list[str]:
 
 def _make_tool_filter(name: str, config: dict) -> Callable[[str], bool]:
     """Include/exclude predicate for a server's tool names: ``tools.include`` is a whitelist (``[]`` = register
-    nothing), ``tools.exclude`` a blacklist; entries are exact names or fnmatch globs; include wins over exclude."""
+    nothing), ``tools.exclude`` a blacklist; entries are exact names or fnmatch globs.
+    Native entries give inclusion precedence unless the imported policy opts into exclusions."""
     tools_filter = config.get("tools") or {}
     # Selective tool loading: honour include/exclude lists from config. Rules (matching issue #690 spec,
     # extended with glob support): tools.include — whitelist: only matching tool names are registered
@@ -257,6 +281,16 @@ def _make_tool_filter(name: str, config: dict) -> Callable[[str], bool]:
     include_raw = tools_filter.get("include")
     include_set = _normalize_name_filter(include_raw, f"mcp_servers.{name}.tools.include")
     exclude_set = _normalize_name_filter(tools_filter.get("exclude"), f"mcp_servers.{name}.tools.exclude")
+    if tools_filter.get("exclude_overrides_include") is True:
+        # OpenClaw treats only "*" as a wildcard. In particular, "?" and
+        # bracket expressions in a source tool name must stay literal.
+        allowed = [p.translate(_OPENCLAW_GLOB_LITERALS) for p in include_set if "*" in p]
+        denied = [p.translate(_OPENCLAW_GLOB_LITERALS) for p in exclude_set if "*" in p]
+        has_include = isinstance(include_raw, (str, list, tuple, set))
+        return lambda tool: (
+            (not has_include or tool in include_set or any(fnmatchcase(tool, p) for p in allowed))
+            and tool not in exclude_set and not any(fnmatchcase(tool, p) for p in denied)
+        )
     if isinstance(include_raw, (str, list, tuple, set)):
         return lambda tool_name: matches_name_filter(tool_name, include_set)
     return lambda tool_name: not (exclude_set and matches_name_filter(tool_name, exclude_set))
@@ -640,7 +674,8 @@ def _register_from_cache_sync(name: str, config: dict, entry: dict) -> list[str]
     cached_tools = _cached_tools(tools_from_cache_entry(entry))
     _record_tool_trust_metadata(name, config, cached_tools)
     candidates = _tool_candidates(name, cached_tools, _make_tool_filter(name, config), tool_timeout)
-    candidates += _utility_candidates(name, utility_tools_from_cache_entry(entry), tool_timeout)
+    utilities = _filter_imported_utilities(name, config, utility_tools_from_cache_entry(entry))
+    candidates += _utility_candidates(name, utilities, tool_timeout)
     registered = _register_candidates(
         name, candidates, check_fn=_make_check_fn(name), scope=_core._mcp_registry_scope, lazy=True,
         execution_timeout=config.get("timeout"))

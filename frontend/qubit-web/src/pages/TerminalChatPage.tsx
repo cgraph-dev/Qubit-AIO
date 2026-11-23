@@ -163,7 +163,6 @@ function terminalWsUrl(
   cwd?: string,
   attach?: string,
   fresh?: boolean,
-  profile?: string,
 ): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const qs = new URLSearchParams({
@@ -176,12 +175,6 @@ function terminalWsUrl(
   // spawning a fresh one. The server validates/ensures the id against the one
   // canonical store (`terminal_bridge.canonical_terminal_session`).
   if (resume) qs.set("resume", resume);
-  // The server scopes the child's HOME from THIS query param, not from the
-  // ws-ticket (`pty_ws` -> `_resolve_chat_argv(profile=...)`). Without it a
-  // resumed session from a non-default profile runs against the dashboard's
-  // launch home, where the id does not exist: the TUI either errors or forges
-  // a fresh chat. Omitted for the dashboard's own profile ("").
-  if (profile) qs.set("profile", profile);
   // Forced-fresh intent (New chat / "Start new session"): tells the server to
   // ignore any active-session fallback and force an empty resume, so a fresh
   // press can NEVER re-adopt a detached terminal (upstream parity:
@@ -303,6 +296,8 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const [sessionModelPick, setSessionModelPick] = useState<{
     id: string;
     model: string;
+    provider?: string;
+    pending?: boolean;
   } | null>(null);
   // Previous connect's resume target: switching sessions wipes the LOCAL
   // viewport synchronously (in connect), but a plain reconnect to the SAME
@@ -577,7 +572,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // transcript synchronously on switch for the same reason). Same-target
     // reconnects keep the live transcript untouched. Upstream parity for the
     // fresh case: a fresh xterm starts empty (chat_ws.py `fresh` handling).
-    const connectTarget = forceFresh ? "" : resumeRef.current;
+    const connectTarget = JSON.stringify([effectiveProfile, forceFresh ? "" : resumeRef.current]);
     if (
       term &&
       (forceFresh ||
@@ -625,7 +620,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // model (server overlays `sessions.model`); without it the MODEL card
     // showed the config default while the terminal ran the session's own
     // model (2026-10-05).
-    withBackoff(() => api.wsTicket(picked, undefined, resume || undefined), {
+    withBackoff(() => api.wsTicket(
+      picked, undefined, resume || undefined, effectiveProfile || "current",
+    ), {
       shouldStop: () => !current(),
     })
       .then(async (ticket) => {
@@ -671,7 +668,6 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             workspaceRef.current,
             attach,
             forceFresh,
-            effectiveProfile || undefined,
           ),
         );
         ws.binaryType = "arraybuffer";
@@ -1010,12 +1006,13 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Reconnect when the owning profile changes (a `/sessions` row from another
   // profile, a deep link whose `?profile=` arrives after mount, or the sidebar
   // switcher). Keeping the old PTY would leave the terminal in the previous
-  // store: same id, different home. `connect` scopes both the ticket and the
-  // PTY URL to this value.
+  // store: same id, different home. The ticket carries the scope to the socket.
   const effectiveProfileRef = useRef(effectiveProfile);
   useEffect(() => {
     if (effectiveProfileRef.current === effectiveProfile) return;
     effectiveProfileRef.current = effectiveProfile;
+    selectedRef.current = null;
+    setSessionModelPick(null);
     connectRef.current();
   }, [effectiveProfile]);
 
@@ -1434,6 +1431,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           selectedRef.current ?? undefined,
           undefined,
           resumeRef.current || undefined,
+          effectiveProfile || "current",
         )
         .then((next) => {
           if (disposedRef.current || connectionGenerationRef.current !== generation) return;
@@ -1448,7 +1446,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         });
     }, 10000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [effectiveProfile]);
 
   const copyLastResponse = useCallback(async () => {
     const id = (resumeTarget || resumeParam || "").trim();
@@ -1675,14 +1673,15 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                     resolved (the PTY grant), not config.yaml's default role. */}
                 <ChatSidebar
                   channel={channel}
-                  profile={scopedProfile}
+                  profile={effectiveProfile}
+                  terminalSession
                   terminalModel={
                     // A pick made in THIS tab wins immediately. The grant is
                     // only refreshed on reconnect, so waiting for it showed
                     // the old model until a page reload (the reported stale
                     // MODEL card). Cleared when the session target changes.
-                    sessionModelPick
-                      ? { model: sessionModelPick.model }
+                    sessionModelPick && sessionModelPick.id === (resumeTarget ?? "")
+                      ? sessionModelPick
                       : grant?.model
                         ? {
                             provider: grant.provider,
@@ -1698,13 +1697,16 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                   // models. Null on a fresh chat (no session yet): the
                   // global branch applies, as before.
                   sessionId={resumeTarget ?? undefined}
-                  onSessionModelChange={(model) => {
-                    if (resumeTarget) setSessionModelPick({ id: resumeTarget, model });
+                  onSessionModelChange={(selection) => {
+                    if (resumeTarget) setSessionModelPick({ id: resumeTarget, ...selection, pending: true });
+                  }}
+                  onTerminalModelApplied={(selection) => {
+                    if (resumeTarget) setSessionModelPick({ id: resumeTarget, ...selection });
                   }}
                   // The global branch (fresh chat, no session yet) applies
                   // model.default; report it too so the card repaints now.
-                  onAppliedModel={(model) =>
-                    setSessionModelPick({ id: resumeTarget ?? "", model })
+                  onAppliedModel={(selection) =>
+                    setSessionModelPick({ id: "", ...selection, pending: true })
                   }
                 />
               </Suspense>

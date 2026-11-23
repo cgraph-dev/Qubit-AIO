@@ -32,6 +32,7 @@ import select
 import struct
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -100,6 +101,9 @@ class _Ticket:
     target: str
     expires_at: float
     used: bool = False
+    management_profile: str = ""
+    model_profile: str = ""
+    resume: str = ""
 
 
 class TicketStore:
@@ -111,12 +115,15 @@ class TicketStore:
         self._tickets: Dict[str, _Ticket] = {}
 
     def mint(self, *, scope: str, session: str = "", owner: str = "",
-             target: str = "") -> Tuple[str, float]:
+             target: str = "", management_profile: str = "",
+             model_profile: str = "", resume: str = "") -> Tuple[str, float]:
         ticket = secrets.token_urlsafe(32)
         exp = time.monotonic() + self._ttl
         with self._lock:
             self._prune()
-            self._tickets[ticket] = _Ticket(scope, session, owner, target, exp)
+            self._tickets[ticket] = _Ticket(
+                scope, session, owner, target, exp, management_profile=management_profile,
+                model_profile=model_profile, resume=resume)
         return ticket, self._ttl
 
     def consume(self, ticket: str, *, scope: str) -> Optional[_Ticket]:
@@ -176,6 +183,20 @@ def _infer_provider_for_model(model: str, cfg: Any = None) -> str:
     return ""
 
 
+@contextmanager
+def terminal_management_scope(profile: str):
+    """Resolve the management profile with the native home and secret scope."""
+    if not profile:
+        yield None
+        return
+    from . import qubit_runtime
+    qubit_runtime.ensure_path()
+    from qubit_cli.web_server_profiles import _config_profile_scope
+
+    with _config_profile_scope(profile) as home:
+        yield home
+
+
 def _session_stored_model(session_id: str, cfg: Any = None
                         ) -> Tuple[str, str]:
     """Stored (provider, model) for a resumed vendored session, best-effort.
@@ -190,7 +211,9 @@ def _session_stored_model(session_id: str, cfg: Any = None
         return "", ""
     try:
         from . import qubit_runtime as _QR
-        home = _QR.use_qubit_home(cfg)
+        _QR.ensure_path()
+        from qubit_constants import get_qubit_home_override
+        home = get_qubit_home_override() or _QR.use_qubit_home(cfg)
         import sqlite3 as _sql
         db = str(Path(home) / "state.db")
         con = _sql.connect(f"file:{db}?mode=ro", uri=True, timeout=2.0)
@@ -438,16 +461,23 @@ def _default_spawn(cols: int, rows: int, resume: str, profile: str,
     # Without this the vendored TUI resolves ``QUBIT_HOME`` unset -> ``~/.hermes``
     # and reads the operator's external Qubit install: wrong model (e.g. a
     # Qubit/GLM default), zero Qubit skills/tools, and a second session authority.
-    qubit_home = qubit_runtime.use_qubit_home(cfg)
+    from qubit_constants import get_qubit_home_override
+    scoped_home = get_qubit_home_override() if profile else None
+    qubit_home = Path(scoped_home) if scoped_home else qubit_runtime.use_qubit_home(cfg)
     # C7 write-authority invariant: the terminal's state.db MUST be the same
     # canonical store the QubitSessionStore adapter uses. A divergent home is a
     # typed refusal, never a silent second session authority.
-    _assert_terminal_shares_canonical_store(qubit_home, cfg)
-    if home_config:
+    if scoped_home:
+        from .qubit_session_store import STATE_DB_FILENAME, refuse_external_state_db
+        qubit_runtime.assert_safe_test_home(qubit_home)
+        refuse_external_state_db(qubit_home / STATE_DB_FILENAME)
+    else:
+        _assert_terminal_shares_canonical_store(qubit_home, cfg)
+    if home_config and not scoped_home:
         _write_terminal_profile_config(qubit_home, home_config)
     # Terminal bridge (best-effort, never blocks a terminal open):
-    #  (1) merge the ONE Qubit MCP registry into the runtime home config.yaml so
-    #      the TUI sees the same configured servers (additive/atomic/backed up);
+    #  (1) merge the listener's MCP registry into its own home. A named
+    #      terminal reads the MCP servers configured in its home;
     #  (2) ensure an explicit resume target in the canonical store so the TUI
     #      resumes a real transcript; an empty resume means FRESH (reference
     #      parity — no RESUME env, the TUI forges a new session via
@@ -455,13 +485,15 @@ def _default_spawn(cols: int, rows: int, resume: str, profile: str,
     from . import terminal_bridge as TB
 
     meta: Dict[str, Any] = {}
-    try:
-        meta["mcp"] = TB.merge_mcp_servers(qubit_home, cfg)
-    except Exception as exc:  # noqa: BLE001 - inventory merge is non-fatal
-        meta["mcp"] = {"state": "DEGRADED", "detail": _redact(str(exc))[:200]}
+    if not scoped_home:
+        try:
+            meta["mcp"] = TB.merge_mcp_servers(qubit_home, cfg)
+        except Exception as exc:  # noqa: BLE001 - inventory merge is non-fatal
+            meta["mcp"] = {"state": "DEGRADED", "detail": _redact(str(exc))[:200]}
     session_id = str(resume or "").strip()
     try:
-        mapping = TB.canonical_terminal_session(cfg, resume)
+        mapping = (TB.canonical_terminal_session(cfg, resume, runtime_home=qubit_home)
+                   if scoped_home else TB.canonical_terminal_session(cfg, resume))
         session_id = str(mapping.get("session_id") or session_id)
     except Exception as exc:  # noqa: BLE001 - keep the raw requested id
         mapping = {"session_id": session_id, "ensured": False,
@@ -476,6 +508,7 @@ def _default_spawn(cols: int, rows: int, resume: str, profile: str,
     if env is None:
         env = dict(os.environ)
     env["QUBIT_HOME"] = str(qubit_home)
+    env["QUBIT_DASHBOARD_TERMINAL"] = "1"
     if session_id:
         env.update(TB.terminal_resume_env(session_id))
     if env_overrides:
@@ -651,6 +684,8 @@ class _Session:
     # PTY should be kept alive for a re-attach.
     ended: bool = False
     key: str = ""  # stable conversation key used for detach/re-attach
+    profile_home: str = ""
+
     # The canonical session id this terminal resumed/created (``?resume=`` after
     # canonical mapping, or "" for a fresh chat). Used to re-attach a reconnecting
     # client whose attach token changed — a browser CLOSE clears sessionStorage,
@@ -667,6 +702,10 @@ class _Session:
     # key guard so a second connection is refused fast instead of forking a
     # second PTY that the TUI's single-writer lease would refuse.
     sock: Any = None
+
+    @property
+    def detach_key(self) -> str | tuple[str, str]:
+        return (self.profile_home, self.key) if self.profile_home else self.key
 
 
 class PtyWsServer:
@@ -706,7 +745,7 @@ class PtyWsServer:
         # terminal must keep running so an in-flight turn is not killed. We
         # keep the bridge alive under its conversation key and re-attach on the
         # next connect with the same key instead of tearing it down.
-        self._detached: Dict[str, _Session] = {}
+        self._detached: Dict[str | tuple[str, str], _Session] = {}
         # Orphan reaper. `_sweep_idle_detached` used to run ONLY from the
         # connect path, so a listener that stopped accepting connections never
         # reaped its detached terminals: every `qubit --tui` child — and the
@@ -793,7 +832,7 @@ class PtyWsServer:
             via=via, session=session, owner=owner, target=target)
 
     def _production_spawn(self, cols: int, rows: int, resume: str, profile: str,
-                          workspace_cwd: str = ""
+                          workspace_cwd: str = "", management_profile: str = ""
                           ) -> Tuple[Any, Dict[str, Any]]:
         """Guard + spawn the real terminal with the selected Qubit profile.
 
@@ -805,26 +844,33 @@ class PtyWsServer:
         profile directory, so it is NOT forwarded to the vendored ``--profile``
         (which scopes ``QUBIT_HOME`` at a profile dir); the vendored runtime
         resolves the Qubit-seeded model/provider from the child env +
-        ``QUBIT_HOME`` config instead.
+        ``QUBIT_HOME`` config instead. ``management_profile`` selects that home
+        and its credential scope independently.
         """
         guard = self._resolve_guard(profile, session_id=resume)
         if isinstance(guard, dict) and guard.get("ok") is False:
             raise TerminalContextError(guard)
-        overrides = terminal_profile_env(self.cfg, guard) if guard else None
+        # The listener's file references are not part of a named profile's
+        # credentials. The native launcher supplies the profile's secret scope.
+        credential_guard = (
+            {**guard, "key_ref": ""} if guard and management_profile else guard)
+        overrides = terminal_profile_env(self.cfg, credential_guard) if credential_guard else None
         # The QUBIT_HOME config write must track the CURRENT default, never a
         # resumed session's pinned model: a resume must not flip the global
         # default backwards (the TUI reopens the stored session model anyway).
         home_guard = guard
-        if isinstance(guard, dict) and guard.get("session_pinned"):
+        if (not management_profile and isinstance(guard, dict)
+                and guard.get("session_pinned")):
             fresh = self._resolve_guard(profile)
             if isinstance(fresh, dict) and fresh.get("ok") is not False:
                 home_guard = fresh
-        return _default_spawn(cols, rows, resume, "",
+        return _default_spawn(cols, rows, resume, management_profile,
                               env_overrides=overrides, home_config=home_guard,
                               cfg=self.cfg, workspace_cwd=workspace_cwd)
 
     def _request_spawn(self, cols: int, rows: int, resume: str, profile: str,
-                       workspace_cwd: str = "") -> Tuple[Any, Dict[str, Any]]:
+                       workspace_cwd: str = "", management_profile: str = ""
+                       ) -> Tuple[Any, Dict[str, Any]]:
         """Spawn via the production path (which accepts ``workspace_cwd``), or
         an injected/spawn-overridden double (4-arg signature) unchanged.
 
@@ -833,8 +879,10 @@ class PtyWsServer:
         """
         spawn = self._spawn
         if getattr(spawn, "__func__", None) is PtyWsServer._production_spawn:
-            return self._production_spawn(cols, rows, resume, profile,
-                                          workspace_cwd)
+            with terminal_management_scope(management_profile) as scoped_home:
+                return self._production_spawn(
+                    cols, rows, resume, profile, workspace_cwd,
+                    management_profile if scoped_home else "")
         return spawn(cols, rows, resume, profile)
 
     def _estop_engaged(self) -> bool:
@@ -925,6 +973,11 @@ class PtyWsServer:
             _reject(handler, 423, "ESTOP_ENGAGED",
                     "Qubit emergency stop is engaged; terminal refused.")
             return
+        management_profile = ticket.management_profile
+        if management_profile:
+            # Bind model selection and resume to the authenticated grant.
+            # Older clients without a management scope keep their query contract.
+            profile, resume = ticket.model_profile, ticket.resume
         # Forced-fresh intent (New chat): drop any resume target so the vendored
         # TUI forges a NEW session, and suppress step-1b re-adoption below so a
         # fresh press can never inherit a still-live detached terminal
@@ -938,9 +991,16 @@ class PtyWsServer:
         # terminal that would silently truncate, and never fall back to Brain4.
         # The guard applies only to the real vendored spawn; tests replace
         # ``_spawn`` with a double and must not require a 64k+ provider. The
-        # client's Qubit model profile (``?profile=``) is threaded through so an
-        # unknown id is a typed refusal, never a silent substitution.
-        guard = self._resolve_guard(profile, session_id=resume)
+        # chosen model profile is threaded through so an unknown id returns a
+        # typed refusal.
+        from fastapi import HTTPException
+        try:
+            with terminal_management_scope(management_profile) as scoped_home:
+                profile_home = str(scoped_home.resolve()) if scoped_home else ""
+                guard = self._resolve_guard(profile, session_id=resume)
+        except HTTPException as exc:
+            _reject(handler, exc.status_code, "CHAT_PROFILE_INVALID", str(exc.detail))
+            return
         if isinstance(guard, dict) and guard.get("ok") is False:
             status = (503 if guard.get("code") == "TERMINAL_CONTEXT_UNVERIFIED"
                       else 409)
@@ -1000,7 +1060,8 @@ class PtyWsServer:
         #     through to a fresh spawn below (``_reattach`` retires it).
         #     ``key`` was bound above from ``?attach=`` / the ticket session.
         if key and not fresh:
-            prior = self._reattach(key)
+            detach_key = (profile_home, key) if profile_home else key
+            prior = self._reattach(detach_key, resume=resume)
             # A browser CLOSE clears sessionStorage, so the reopened tab presents a
             # NEW attach token that matches no detached key. Fall back to the resume
             # target: the live detached terminal for that session already owns its
@@ -1008,7 +1069,7 @@ class PtyWsServer:
             # window") until the orphan's 30-minute idle timeout. Re-adopt it and
             # keep the new key so future reloads of THIS tab re-attach by key.
             if prior is None and resume:
-                prior = self._reattach_session(resume)
+                prior = self._reattach_session(resume, profile_home=profile_home)
                 if prior is not None:
                     prior.key = key
             if prior is None:
@@ -1021,7 +1082,9 @@ class PtyWsServer:
                 # safety net, not a path the UI takes).
                 with self._lock:
                     live = next((s for s in self._active.values()
-                                 if s.key == key and s.sock is not None), None)
+                                 if s.profile_home == profile_home
+                                 and s.sock is not None
+                                 and (s.key == key or (resume and s.session_id == resume))), None)
                 if live is not None:
                     _fail_chat_start(handler, RuntimeError(
                         "this chat is already open in another connection; "
@@ -1075,7 +1138,8 @@ class PtyWsServer:
                 return
         try:
             bridge, meta = self._request_spawn(cols, rows, resume, profile,
-                                               workspace_cwd)
+                                               workspace_cwd,
+                                               management_profile)
         except (Exception, SystemExit) as exc:  # noqa: BLE001 - typed refusal
             # The vendored TUI launch path calls ``sys.exit`` on an
             # unrecoverable setup failure (e.g. a failed ``npm install`` while
@@ -1089,7 +1153,7 @@ class PtyWsServer:
             _fail_chat_start(handler, exc)
             return
 
-        session = _Session(bridge=bridge, ticket=ticket, key=key,
+        session = _Session(bridge=bridge, ticket=ticket, key=key, profile_home=profile_home,
                            session_id=str(meta.get("session_id") or ""))
         # A terminal with no conversation id and no attach token still needs a
         # re-attachable key: the bridge-derived socket id keeps it reaped and
@@ -1282,8 +1346,8 @@ class PtyWsServer:
     def _teardown(self, session: _Session) -> None:
         with self._lock:
             self._active.pop(id(session), None)
-            if session.key:
-                self._detached.pop(session.key, None)
+            if session.key and self._detached.get(session.detach_key) is session:
+                self._detached.pop(session.detach_key)
             try:
                 self._detached_keyless.remove(session)
             except ValueError:
@@ -1311,7 +1375,7 @@ class PtyWsServer:
         with self._lock:
             self._active.pop(id(session), None)
             if session.key:
-                self._detached[session.key] = session
+                self._detached[session.detach_key] = session
                 # Bound the detached set the same way ``_active`` is bounded.
                 # Collect evictees here but tear them down AFTER releasing the
                 # lock: ``_teardown`` takes ``self._lock`` too, and a plain
@@ -1319,7 +1383,7 @@ class PtyWsServer:
                 # block self-deadlocked the whole listener on the first eviction.
                 while len(self._active) + len(self._detached) > self._max:
                     old_key = next(iter(self._detached))
-                    if old_key == session.key:
+                    if old_key == session.detach_key:
                         break
                     old = self._detached.pop(old_key, None)
                     if old is not None:
@@ -1362,7 +1426,7 @@ class PtyWsServer:
         for old in evicted:
             self._teardown(old)
 
-    def _reattach(self, key: str) -> Optional[_Session]:
+    def _reattach(self, key: str | tuple[str, str], *, resume: str = "") -> Optional[_Session]:
         """Return a still-live detached session for ``key``, if any.
 
         A detached session whose terminal has since exited is retired here (its
@@ -1370,7 +1434,11 @@ class PtyWsServer:
         resurrects a dead terminal.
         """
         with self._lock:
-            session = self._detached.pop(key, None)
+            session = self._detached.get(key)
+            if session is not None and resume and session.session_id not in ("", resume):
+                return None
+            if session is not None:
+                self._detached.pop(key)
         if session is None:
             return None
         if getattr(session.bridge, "isalive", None) is not None:
@@ -1396,7 +1464,7 @@ class PtyWsServer:
         session.ended = False
         return session
 
-    def _reattach_session(self, session_id: str) -> Optional[_Session]:
+    def _reattach_session(self, session_id: str, *, profile_home: str = "") -> Optional[_Session]:
         """Re-attach a reconnecting client to the live detached terminal for
         ``session_id`` when its attach token no longer matches.
 
@@ -1412,10 +1480,10 @@ class PtyWsServer:
             return None
         with self._lock:
             match = next((k for k, s in self._detached.items()
-                          if s.session_id and s.session_id == target), None)
+                          if s.profile_home == profile_home and s.session_id == target), None)
         if match is None:
             return None
-        return self._reattach(match)
+        return self._reattach(match, resume=target)
 
 
 def _safe_pid(bridge: Any) -> int:

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from qubit_cli import claw as claw_mod
+from qubit_cli import openclaw_migration_legacy as claw_mod
 
 
 # ---------------------------------------------------------------------------

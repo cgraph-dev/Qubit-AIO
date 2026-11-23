@@ -2,9 +2,10 @@ import {
   useEffect,
   useLayoutEffect,
   useState,
-  useCallback,
+  useCallback, useContext,
   useRef,
 } from "react";
+import { ProfileContext } from "@/contexts/profile-context";
 import {
   ChevronLeft,
   ChevronRight,
@@ -25,6 +26,7 @@ import { fetchJSON, type LogsResponse } from "@/lib/api";
 // `LogsResponse` in lib/api.ts (owned by another agent) only carries
 // `{file, lines}`; the base shape is unchanged and fully backwards-compatible.
 type LogsPageResponse = LogsResponse & {
+  snapshot?: string | null;
   offset?: number;
   limit?: number;
   returned?: number;
@@ -86,13 +88,18 @@ function isLogFile(value: string | null): value is LogFile {
 }
 
 export default function LogsPage() {
+  const { profile } = useContext(ProfileContext);
   // `?file=gateway` deep link (System page "Open logs" next to a failed
   // gateway). Ported from the reference LogsPage.tsx:9,57-62.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedFile = searchParams.get("file");
-  const [file, setFile] = useState<LogFile>(() =>
-    isLogFile(requestedFile) ? requestedFile : "agent",
-  );
+  const file = isLogFile(requestedFile) ? requestedFile : "agent";
+  const selectFile = (next: LogFile) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "agent") params.delete("file");
+    else params.set("file", next);
+    setSearchParams(params, { replace: true });
+  };
   // Default to ALL (Hermes parity: the reference LogsPage defaults to ALL).
   // A narrower default silently drops a level class AND breaks paging — the
   // backend over-reads only `offset+cap+1` raw lines before filtering, so an
@@ -116,15 +123,33 @@ export default function LogsPage() {
   // (`?search=`). Debounced so typing does not spam the tail reader.
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [lines, setLines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Additive page contract (vendored status router `?offset=`): `offset` counts
-  // matching lines skipped from the newest end; `hasMore`/`nextOffset` come from
-  // the server so "Load older" can never invent a page that does not exist.
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [page, setPage] = useState<{ query: string; data?: LogsPageResponse; error?: string }>();
+  const [pagination, setPagination] = useState<{ filters: string; offset: number; snapshot?: string }>();
+  const requestRef = useRef<AbortController | null>(null);
+  const filters = new URLSearchParams({
+    file,
+    lines: String(lineCount),
+    ...(profile ? { profile } : {}),
+    ...(level !== "ALL" ? { level } : {}),
+    ...(component !== "all" ? { component } : {}),
+    ...(search ? { search } : {}),
+  }).toString();
+  const history = pagination?.filters === filters ? pagination : undefined;
+  const offset = history?.offset ?? 0;
+  const query = offset > 0
+    ? `${filters}&offset=${offset}${history?.snapshot ? `&snapshot=${encodeURIComponent(history.snapshot)}` : ""}`
+    : filters;
+  const activePage = page?.query === query ? page : undefined;
+  const lines = activePage?.data?.lines ?? [];
+  const error = activePage?.error;
+  const nextOffset = activePage?.data?.has_more ? activePage.data.next_offset : null;
+  const setOffset = (next: number) => {
+    if (next === 0) setPagination(undefined);
+    else setPagination({
+      filters, offset: next, snapshot: activePage?.data?.snapshot ?? history?.snapshot,
+    });
+  };
   // Row detail view: the index of the expanded line (null = collapsed).
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -132,69 +157,55 @@ export default function LogsPage() {
   const { setAfterTitle, setEnd } = usePageHeader();
 
   useEffect(() => {
+    setPagination((current) => current?.filters === filters ? current : undefined);
+  }, [filters]);
+
+  useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // A filter/file/page-size change starts a fresh newest-first page.
-  useEffect(() => {
-    setOffset(0);
-  }, [file, lineCount, level, component, search]);
-
   const fetchLogs = useCallback(() => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
-    setError(null);
-    const qs = new URLSearchParams();
-    qs.set("file", file);
-    qs.set("lines", String(lineCount));
-    if (level && level !== "ALL") qs.set("level", level);
-    if (component && component !== "all") qs.set("component", component);
-    if (search.trim()) qs.set("search", search.trim());
-    if (offset > 0) qs.set("offset", String(offset));
-    fetchJSON<LogsPageResponse>(`/api/logs?${qs.toString()}`)
-      .then((resp) => {
-        setLines(resp?.lines ?? []);
-        setHasMore(Boolean(resp?.has_more));
-        setNextOffset(
-          typeof resp.next_offset === "number" ? resp.next_offset : null,
-        );
-        // Only follow the tail on the newest page; an older page must not yank
-        // the viewport to the bottom. With auto-refresh ON this runs every 5s,
-        // so it must NOT fight the operator: we re-pin to the newest line only
-        // when they are already parked at the bottom. Scrolled up = reading,
-        // and the viewport is left exactly where it is.
-        if (offset === 0) {
-          const el = scrollRef.current;
-          const atBottom = el
-            ? el.scrollHeight - el.scrollTop - el.clientHeight < 48
-            : true;
-          if (atBottom) {
-            setTimeout(() => {
-              if (scrollRef.current) {
-                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-              }
-            }, 50);
-          }
+    fetchJSON<LogsPageResponse>(`/api/logs?${query}`, { signal: controller.signal })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setPage({ query, data });
+        const el = scrollRef.current;
+        if (offset === 0 && el && el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+          requestAnimationFrame(() => {
+            if (!controller.signal.aborted) el.scrollTop = el.scrollHeight;
+          });
         }
       })
-      .catch((err) => setError(String(err)))
-      .finally(() => setLoading(false));
-  }, [file, lineCount, level, component, search, offset]);
+      .catch((err) => {
+        if (!controller.signal.aborted) setPage({ query, error: String(err) });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          requestRef.current = null;
+          setLoading(false);
+        }
+      });
+  }, [query, offset]);
 
   // Live tail: while auto-refresh is on, re-fetch every 5s (same cadence as
   // Hermes). Skipped while a line is expanded and while the tab is hidden, so
   // an open detail view is never closed under the operator and a backgrounded
   // tab is not polled.
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || offset !== 0) return;
     const tick = () => {
       if (document.visibilityState === "hidden") return;
-      if (detailIndex !== null) return;
+      if (detailIndex !== null || requestRef.current) return;
       fetchLogs();
     };
     const interval = setInterval(tick, 5000);
     return () => clearInterval(interval);
-  }, [autoRefresh, fetchLogs, detailIndex]);
+  }, [autoRefresh, fetchLogs, detailIndex, offset]);
 
   // Download the exact lines currently shown (the server tail + filters are the
   // source of truth; no second backend fetch is invented).
@@ -258,7 +269,7 @@ export default function LogsPage() {
             onChange={setAutoRefresh}
             id="logs-auto-refresh"
           />
-          {autoRefresh && (
+          {autoRefresh && offset === 0 && (
             <Badge tone="success" className="text-xs">
               <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
               {t.common.live}
@@ -277,6 +288,7 @@ export default function LogsPage() {
     file,
     level,
     loading,
+    offset,
     setAfterTitle,
     setEnd,
     t.common.live,
@@ -288,7 +300,9 @@ export default function LogsPage() {
   ]);
 
   useEffect(() => {
+    setDetailIndex(null);
     fetchLogs();
+    return () => requestRef.current?.abort();
   }, [fetchLogs]);
 
   // NOTE: the live-tail interval lives with `fetchLogs` above (it skips while a
@@ -307,7 +321,7 @@ export default function LogsPage() {
           <SakugaSegmented
             className={segmentedClass}
             value={file}
-            onChange={setFile}
+            onChange={selectFile}
             options={toSegmentOptions(FILES)}
           />
         </FilterGroup>
@@ -394,9 +408,9 @@ export default function LogsPage() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!hasMore || loading}
+                disabled={nextOffset == null || loading}
                 onClick={() => {
-                  if (nextOffset !== null) setOffset(nextOffset);
+                  if (nextOffset != null) setOffset(nextOffset);
                 }}
                 aria-label="Load older lines"
                 title="Older lines"
@@ -410,7 +424,12 @@ export default function LogsPage() {
         <CardContent className="p-0">
           {error && (
             <div className="bg-destructive/10 border-b border-destructive/20 p-3">
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive">
+                {error.includes("LOG_SNAPSHOT_EXPIRED") ? "The log changed while you were paging." : error}
+              </p>
+              {error.includes("LOG_SNAPSHOT_EXPIRED") && (
+                <Button variant="secondary" onClick={() => setOffset(0)}>Load latest logs</Button>
+              )}
             </div>
           )}
 
@@ -418,7 +437,7 @@ export default function LogsPage() {
             ref={scrollRef}
             className="max-w-full min-h-[400px] max-h-[calc(100vh-220px)] overflow-auto p-4 font-mono-ui text-xs leading-5 break-words"
           >
-            {lines.length === 0 && !loading && (
+            {lines.length === 0 && !loading && !error && (
               <p className="text-muted-foreground text-center py-8">
                 {t.logs.noLogLines}
               </p>

@@ -114,6 +114,10 @@ def _cron_profile_home(profile: Optional[str]) -> Tuple[str, Path]:
     """Resolve a profile query value to (profile_name, QUBIT_HOME)."""
     from qubit_cli import profiles as profiles_mod
     raw = (profile or _cron_default_profile()).strip() or "default"
+    if raw.lower() == "current":
+        from qubit_constants import get_qubit_home
+
+        return _cron_default_profile(), get_qubit_home()
     try:
         canon = profiles_mod.normalize_profile_name(raw)
         profiles_mod.validate_profile_name(canon)

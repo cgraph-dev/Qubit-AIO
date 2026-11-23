@@ -70,6 +70,31 @@ def test_first_page_stateful_filter_runs_one_fresh_pass(tmp_path):
 
 
 
+def test_stateful_filter_is_fresh_on_second_pass(tmp_path):
+    path = tmp_path / "agent.log"
+    path.write_text("hit first\nhit second\nhit third\nhit fourth\n")
+    creations = []
+
+    def factory():
+        creations.append(True)
+        count = 0
+
+        def accept(_line):
+            nonlocal count
+            count += 1
+            return count != 2
+
+        return accept
+
+    page, more = search_log_page(
+        path, needle="hit", offset=1, limit=1,
+        accept_line_factory=factory)
+    assert page == ["hit third\n"]
+    assert more is True
+    assert len(creations) == 2
+
+
+
 def test_pagination_is_exhaustive_without_duplicates(tmp_path):
     path = tmp_path / "agent.log"
     path.write_text("".join(f"hit {i}\n" for i in range(7)))

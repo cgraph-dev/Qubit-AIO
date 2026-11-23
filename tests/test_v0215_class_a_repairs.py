@@ -124,7 +124,7 @@ def test_over_rebrand_keeps_openclaw_as_external_source(runtime_on_path, tmp_pat
     ``claw`` migrates FROM OpenClaw and the residue probe detects the legacy
     ``~/.openclaw`` home; renaming those to ``.qubit`` desynced the migration
     from its real source (and would flag Qubit's own home as residue)."""
-    from qubit_cli import claw
+    from qubit_cli import openclaw_migration_legacy as claw
     from agent import onboarding
 
     assert ".openclaw" in claw._OPENCLAW_DIR_NAMES

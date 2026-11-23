@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const read = (name: string) => readFileSync(fileURLToPath(new URL(name, import.meta.url)), "utf8");
 const style = read("./manga-zip-surfaces.css");
+const composer = read("./qubit-chat-manga.css");
+const registry = read("./manga-zip-registry.css");
 const gate = read("./MangaSkin.tsx");
 const installer = read("../../../../scripts/install_manga_zip_assets.py");
 const sidebarFix = read("./manga-zip-sidebar-fix.css");
@@ -32,9 +34,10 @@ describe("full Manga ZIP asset integration safety", () => {
 
   it("carries all key page-family hooks while respecting motion", () => {
     expect(style).toContain("right-model.svg");
-    // The chat composer now has one native skin owner, not an overlapping ZIP sprite.
-    expect(style).not.toContain('background-image:url("/manga-ui/zip/chat-composer.svg")');
-    expect(style).toContain("qubit-chat-manga.css");
+    expect(registry).toContain("chat-composer.svg");
+    expect(style).not.toContain("chat-composer.svg");
+    expect(composer).toContain(".qchat__composer::before");
+    expect(composer).toContain('border-image-source:url("/manga-ui/qubit-chat/composer.svg")');
     expect(style).toContain("prefers-reduced-motion:reduce");
     expect(style).not.toContain("plugin-card.svg");
     expect(style).not.toContain("model-card.svg");

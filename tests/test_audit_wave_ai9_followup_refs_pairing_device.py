@@ -331,3 +331,81 @@ def test_device_token_ops_refuse_without_confirm_and_under_estop(tmp_path,
         power_control_store(cfg).set(emergency_stop=False,
                                      global_disable=False,
                                      issued_by="cli:user")
+
+
+def test_named_keys_keep_secrets_and_references_in_their_home(tmp_path, monkeypatch):
+    import json
+    import os
+    from dotenv import dotenv_values
+
+    from voicebridge import env_store as ES
+    from voicebridge import qubit_compat as HC
+
+    root = tmp_path / "qubit"
+    home = root / "profiles" / "work"
+    home.mkdir(parents=True)
+    (home / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    monkeypatch.setenv("AUDIT_SHARED_KEY", "launch-fixture")
+    monkeypatch.setenv("AUDIT_LAUNCH_ONLY", "launch-only-fixture")
+    cfg = _cfg(tmp_path, monkeypatch)
+    scope = {"profile": "work"}
+    route = "/api/env"
+    value = "work fixture # with quotes 'and spaces'"
+    body = {"key": "AUDIT_SHARED_KEY", "value": value}
+
+    status, staged = HC.dispatch(cfg, "PUT", route, scope, body)
+    assert status == 409 and value not in json.dumps(staged)
+    assert not (home / ".env").exists()
+    status, saved = HC.dispatch(cfg, "PUT", route, scope, {**body, "confirm": True})
+    assert status == 200 and value not in json.dumps(saved), saved
+    assert dotenv_values(home / ".env")["AUDIT_SHARED_KEY"] == value
+    from qubit_cli.web_server_profiles import _qubit_home_scope
+    from voicebridge.providers.credentials import resolve_key
+
+    with _qubit_home_scope(home):
+        assert resolve_key("fixture", "env:AUDIT_SHARED_KEY") == (value, "")
+        assert resolve_key("fixture", "env:AUDIT_LAUNCH_ONLY") == ("", "AUTH_MISSING")
+    assert os.environ["AUDIT_SHARED_KEY"] == "launch-fixture"
+    assert HC.dispatch(cfg, "PUT", route, scope, {
+        "key": "AUDIT_REF", "ref": "env:AUDIT_SHARED_KEY", "confirm": True,
+    })[0] == 200
+    assert HC.dispatch(cfg, "PUT", route, scope, {
+        "key": "AUDIT_MISSING_REF", "ref": "env:AUDIT_LAUNCH_ONLY", "confirm": True,
+    })[0] == 200
+    status, inventory = HC.dispatch(cfg, "GET", route, scope)
+    assert status == 200 and inventory["AUDIT_SHARED_KEY"]["is_set"] is True
+    assert inventory["AUDIT_SHARED_KEY"]["redacted_value"] is None
+    assert inventory["AUDIT_REF"]["is_set"] is True
+    assert inventory["AUDIT_MISSING_REF"]["is_set"] is False
+    public = json.dumps(inventory)
+    assert value not in public and "launch-fixture" not in public
+    assert ES.load(cfg) == {}
+    assert HC.dispatch(cfg, "DELETE", route, scope, {
+        "key": "AUDIT_SHARED_KEY", "confirm": True,
+    })[1]["removed"] is True
+    assert os.environ["AUDIT_SHARED_KEY"] == "launch-fixture"
+    inventory = HC.dispatch(cfg, "GET", route, scope)[1]
+    assert "AUDIT_SHARED_KEY" not in inventory
+    assert inventory["AUDIT_REF"]["is_set"] is False
+
+
+def test_parallel_key_saves_preserve_every_entry(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from voicebridge import env_store as ES
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    home = tmp_path / "work"
+    home.mkdir()
+
+    def write(index):
+        with ES.profile_scope(home):
+            ES.set_ref(cfg, f"REF_{index}", f"env:KEY_{index}")
+            ES.write_secret(cfg, f"KEY_{index}", f"local fixture {index}")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(write, range(12)))
+    with ES.profile_scope(home):
+        assert set(ES.names(cfg)) == {f"REF_{i}" for i in range(12)}
+        assert ES.runtime_env_names(cfg) == {f"KEY_{i}" for i in range(12)}

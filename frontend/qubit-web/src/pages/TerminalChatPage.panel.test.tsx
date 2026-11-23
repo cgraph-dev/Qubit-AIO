@@ -493,18 +493,18 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     await renderTerminal();
     await vi.waitFor(() => expect(sidebarMount).toHaveBeenCalled());
     const first = sidebarMount.mock.calls[0][0] as {
-      onAppliedModel?: (model: string) => void;
+      onAppliedModel?: (selection: { model: string; provider: string }) => void;
     };
     expect(typeof first.onAppliedModel).toBe("function");
     await act(async () => {
-      first.onAppliedModel?.("claude-opus-5-5");
+      first.onAppliedModel?.({ model: "claude-opus-5-5", provider: "anthropic" });
     });
     await vi.waitFor(() => {
       const calls = sidebarMount.mock.calls;
       const latest = calls[calls.length - 1][0] as {
-        terminalModel?: { model?: string } | null;
+        terminalModel?: { model?: string; provider?: string } | null;
       };
-      expect(latest.terminalModel?.model).toBe("claude-opus-5-5");
+      expect(latest.terminalModel).toMatchObject({ model: "claude-opus-5-5", provider: "anthropic" });
     });
   });
 
@@ -1074,7 +1074,7 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
     }
     expect(FakeWebSocket.instances).toHaveLength(2);
     expect(FakeWebSocket.instances[1].url).toContain("resume=resolved-session");
-    expect(apiMocks.wsTicket).toHaveBeenLastCalledWith("qubit-go", undefined, "resolved-session");
+    expect(apiMocks.wsTicket).toHaveBeenLastCalledWith("qubit-go", undefined, "resolved-session", "default");
   });
 
   it("discards a model poll from the connection replaced by New chat", async () => {
@@ -1176,11 +1176,6 @@ describe("Qubit TerminalChatPage copy last response", () => {
 
 describe("Qubit TerminalChatPage /chat?resume=<id>&profile=<p>", () => {
   it("scopes the probe, ticket and PTY to the deep-linked profile", async () => {
-    // Regression: the resume link used to carry only `?resume=`. The PTY's
-    // HOME is resolved from the `/api/pty?profile=` query (not the ws-ticket),
-    // so a row owned by another profile resumed against the launch home, where
-    // the id does not exist — the TUI forged a fresh chat instead of opening
-    // the transcript.
     apiMocks.getSessionDetail.mockClear();
     apiMocks.wsTicket.mockClear();
     apiMocks.wsTicket.mockImplementation(async () => ({
@@ -1216,9 +1211,11 @@ describe("Qubit TerminalChatPage /chat?resume=<id>&profile=<p>", () => {
       undefined,
       undefined,
       "session-1",
+      "other",
     );
     const url = new URL(FakeWebSocket.instances.at(-1)!.url);
     expect(url.searchParams.get("resume")).toBe("session-1");
-    expect(url.searchParams.get("profile")).toBe("other");
+    expect(url.searchParams.get("ticket")).toBe("tkt");
+    expect(url.searchParams.has("profile")).toBe(false);
   });
 });

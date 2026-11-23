@@ -12,6 +12,7 @@ const read = (relative: string) =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
 
 const css = read("./manga-component-contract.css");
+const sectionTitle = read("../components/QubitSidebarTitle.tsx");
 const studio = read("./MangaStudioArt.tsx");
 const studioCss = read("./manga-studio-art.css");
 const app = read("../App.tsx");
@@ -23,8 +24,14 @@ const workspace = read("../pages/AgentWorkspacePage.tsx");
 const kit = read("../../scripts/prepare-manga-zip.mjs");
 
 describe("Qubit Manga sidebar and gateway visual contract", () => {
-  it("mounts a real star in both navigation headings and loads the contract last", () => {
+  it("renders owner-supplied section art and keeps the extension heading ornaments", () => {
+    expect(app).toContain("<QubitSidebarTitle index={section.index}");
     expect((app.match(/<MangaStudioTitleOrnaments \/>/g) ?? []).length).toBe(1);
+    expect(sectionTitle).toContain('className="qubit-sidebar-title__art"');
+    expect(sectionTitle).toContain('className="qubit-sidebar-title__text"');
+    expect(app.slice(app.indexOf("sidebarNav.pluginItems.length > 0"))).toContain(
+      "<MangaStudioTitleOrnaments />",
+    );
     expect(studio).toContain("/manga-ui/studio-star.png");
     expect(studio).toContain("/manga-ui/manga-corner-reflection.svg");
     expect(studioCss).toContain(".qm-studio-title-corner__star");
@@ -65,7 +72,7 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     }
   });
   it("keeps the numbered System menu separate from the fixed gateway instrument", () => {
-    expect(app).toContain('q5t ? "q5t-system-shell" : "qm-manga-gateway-shell"');
+    expect(app).toContain('cn("qagent-sidebar__system", q5t ? "q5t-system-shell" : "qm-manga-gateway-shell")');
     expect(app).toContain('className="qagent-sidebar__telemetry qm-manga-gateway-plate"');
     expect(css).toContain("Fallback before (or without) approved art");
     expect(css).toContain(".qm-manga-gateway-shell .qagent-sidebar__action::part(button)");

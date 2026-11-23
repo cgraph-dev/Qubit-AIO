@@ -1979,8 +1979,8 @@ cmd_prompt_size = _forward_command("cmd_prompt_size", "qubit_cli.prompt_size", "
 cmd_pairing = _forward_command("cmd_pairing", "qubit_cli.pairing", "pairing_command")
 cmd_plugins = _forward_command("cmd_plugins", "qubit_cli.plugins_cmd", "plugins_command")
 cmd_mcp = _forward_command("cmd_mcp", "qubit_cli.mcp_config", "mcp_command", forward_return=True)
-cmd_claw = _forward_command("cmd_claw", "qubit_cli.claw", "claw_command")
-cmd_import_agent = _forward_command("cmd_import_agent", "qubit_cli.agent_import", "import_agent_command")
+cmd_claw = _forward_command("cmd_claw", "qubit_cli.openclaw_migration_legacy", "claw_command")
+cmd_import_agent = _forward_command("cmd_import_agent", "qubit_cli.agent_import_legacy", "import_agent_command")
 
 
 def cmd_model(args):
@@ -3479,6 +3479,24 @@ def _attach_plugin_cli_command(subparsers, cmd_info) -> None:
         plugin_parser.set_defaults(func=cmd_info["handler_fn"])
 
 
+def _agent_importers_v1_handler(command_name, handler):
+    """Use the Qubit migration reader for the pinned importer's OpenClaw commands."""
+    def run(args):
+        claw_migrate = command_name == "claw" and getattr(args, "claw_action", None) == "migrate"
+        explicit_openclaw_import = (
+            command_name == "import-agent"
+            and getattr(args, "agent", None) == "openclaw"
+            and not getattr(args, "sync", False)
+        )
+        if claw_migrate or explicit_openclaw_import:
+            from qubit_cli.openclaw_migration_legacy import _cmd_migrate
+
+            return _cmd_migrate(args)
+        return handler(args)
+
+    return run
+
+
 def _register_plugin_cli_commands(subparsers) -> None:
     """Register plugin-provided top-level commands (each plugin builds its own argparse tree).
 
@@ -3501,9 +3519,17 @@ def _register_plugin_cli_commands(subparsers) -> None:
         # register_cli_command side effect runs before we read _cli_commands.
         # See #54678.
         _resolve_deferred_platform_cli_command(_first_positional_argv())
-        for cmd_info in get_plugin_manager()._cli_commands.values():
-            if cmd_info["name"] not in seen_plugin_commands:
-                _attach_plugin_cli_command(subparsers, cmd_info)
+        manager = get_plugin_manager()
+        for cmd_info in manager._cli_commands.values():
+            name = cmd_info["name"]
+            if name in seen_plugin_commands:
+                continue
+            if name in {"claw", "import-agent"} and cmd_info.get("plugin_key") == "agent-importers":
+                importer = manager._plugins.get("agent-importers")
+                handler = cmd_info.get("handler_fn")
+                if importer and importer.manifest.version == "1.1.0" and handler is not None:
+                    cmd_info = dict(cmd_info, handler_fn=_agent_importers_v1_handler(name, handler))
+            _attach_plugin_cli_command(subparsers, cmd_info)
     except Exception as _exc:
         logging.getLogger(__name__).debug("Plugin CLI discovery failed: %s", _exc)
 
@@ -3848,6 +3874,22 @@ def main():
 
         exec_in_container(container_info, sys.argv[1:])
         sys.exit(1)  # unreachable: execvp replaces the process or raises
+
+    command_name = _first_positional_argv()
+    if command_name in {"claw", "import-agent"} and command_name not in subparsers.choices:
+        import json
+
+        print(json.dumps({
+            "state": "refused",
+            "code": "QUBIT_CLAW_PLUGIN_REQUIRED" if command_name == "claw"
+                    else "QUBIT_IMPORT_AGENT_PLUGIN_REQUIRED",
+            "detail": (
+                "Install the catalog importer with `qubit agent plugins install agent-importers`. "
+                "If installed, enable it with `qubit agent plugins enable agent-importers` "
+                "in this profile and check `qubit agent plugins list` for load errors."
+            ),
+        }))
+        sys.exit(3)
 
     args = _parse_cli_args(parser, subparsers, sys.argv[1:])
 

@@ -88,10 +88,12 @@ function initialValues(blueprint: AutomationBlueprint): Record<string, string> {
 }
 
 function FieldInput({
+  id,
   field,
   value,
   onChange,
 }: {
+  id: string;
   field: AutomationBlueprintField;
   value: string;
   onChange: (v: string) => void;
@@ -99,6 +101,7 @@ function FieldInput({
   if (field.type === "enum" || field.type === "weekdays") {
     return (
       <Select
+        id={id}
         label={field.label}
         value={value}
         onChange={(v) => onChange(v)}
@@ -109,6 +112,7 @@ function FieldInput({
   if (field.type === "time") {
     return (
       <TimeField
+        id={id}
         label={field.label}
         value={value}
         onChange={(next) => onChange(next)}
@@ -118,6 +122,7 @@ function FieldInput({
   // text
   return (
     <Input
+      id={id}
       label={field.label}
       value={value}
       placeholder={field.help || field.label}
@@ -202,6 +207,7 @@ function BlueprintCard({
               <div key={f.name} className="space-y-1">
                 <Label htmlFor={`${blueprint.key}-${f.name}`}>{f.label}</Label>
                 <FieldInput
+                  id={`${blueprint.key}-${f.name}`}
                   field={f}
                   value={values[f.name] ?? ""}
                   onChange={(v) => setValues((prev) => ({ ...prev, [f.name]: v }))}
@@ -249,7 +255,7 @@ export function AutomationBlueprints({ profile, onCreated }: AutomationBlueprint
   useEffect(() => {
     let cancelled = false;
     api
-      .getAutomationBlueprints()
+      .getAutomationBlueprints(profile)
       .then((r) => {
         if (cancelled) return;
         const raw = Array.isArray(r?.blueprints) ? r.blueprints : [];
@@ -265,7 +271,7 @@ export function AutomationBlueprints({ profile, onCreated }: AutomationBlueprint
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profile]);
 
   if (loadError) {
     return <p className="text-sm text-red-500">Couldn't load blueprints: {loadError}</p>;

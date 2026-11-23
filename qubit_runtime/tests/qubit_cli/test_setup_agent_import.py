@@ -9,6 +9,7 @@ and the child `hermes import-agent` process are stand-ins that record what the s
 from __future__ import annotations
 
 import subprocess
+import sys
 
 import pytest
 
@@ -148,3 +149,22 @@ def test_setup_menu_shows_what_was_found_with_the_question(homes, monkeypatch):
     assert ("Found on this computer: OpenClaw (~/.openclaw), Claude Code (~/.claude), Codex CLI (~/.codex)."
             in " ".join(description.split()))
     assert calls == [] and not (qubit_home / "plugins").exists()
+
+
+def test_run_import_uses_the_host_provider_launcher(homes, monkeypatch):
+    _, qubit_home, _, _ = homes
+    source = step.IMPORT_SOURCES[0]
+    calls = []
+    prefix = (sys.executable, "-P", "-m", "fixture_host", "agent")
+    monkeypatch.setattr("qubit_cli.plugins_discovery.foreign_cli_launch_prefix", lambda: prefix)
+
+    def run(argv, env, check=False):
+        calls.append((argv, env["QUBIT_HOME"]))
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(step.subprocess, "run", run)
+    assert step._run_import(source, qubit_home) is False
+    assert calls == [(
+        [*prefix, "--profile", "default", "import-agent", "openclaw", "--migrate-secrets", "--from-setup"],
+        str(qubit_home),
+    )]

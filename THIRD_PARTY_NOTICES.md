@@ -1195,3 +1195,24 @@ The upstream workflow skill (`skills/sakuga-vfx/`: `SKILL.md`, `core.js`,
 (MIT, same pin). It is the authoring guide for new Sakuga controls; the
 runtime copies remain the ones gated by `check_sakuga_vendor.py`.
 
+
+## pyjson5 — OpenClaw configuration reader
+
+Qubit embeds the pure-Python JSON5 reader from
+[Dirk Pranke's pyjson5 v0.14.0](https://github.com/dpranke/pyjson5/tree/66429118dcebb1dda7a2ddb3e87f661b904c7f96)
+at commit `66429118dcebb1dda7a2ddb3e87f661b904c7f96`. The upstream files are
+`json5/__init__.py`, `json5/lib.py`, `json5/parser.py`, and `json5/version.py`.
+Qubit copies those files under `qubit_runtime/qubit_cli/_vendor/json5/` and
+changes the package imports to relative imports. Original notices and the
+Apache License 2.0 are included in that directory. No upstream CLI,
+benchmarks, build dependencies, or tests ship with this reader.
+
+## JetBrains Mono Medium for the dashboard
+
+Qubit includes the unchanged JetBrains Mono Medium WOFF2 from the
+[JetBrains Mono v2.304 tag](https://github.com/JetBrains/JetBrainsMono/tree/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9)
+at commit `cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9`. The upstream binary
+`fonts/webfonts/JetBrainsMono-Medium.woff2` is included under
+`frontend/qubit-web/public/fonts-terminal/` with the upstream SIL Open Font
+License 1.1 and copyright notice in `OFL-JetBrainsMono.txt`. The 500 weight
+lets the default dashboard theme retain its fonts with local assets.

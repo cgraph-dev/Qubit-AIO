@@ -62,6 +62,10 @@ ADAPTER = ForeignAdapter(
     # -- modules the fork renamed, verified present in Qubit's tree
     module_aliases={
         "hermes_cli": "qubit_cli",
+        # Older plugins import these helpers by name. Keep them importable
+        # without files that the catalog importer mistakes for CLI ownership.
+        "hermes_cli.agent_import": "qubit_cli.agent_import_legacy",
+        "hermes_cli.claw": "qubit_cli.openclaw_migration_legacy",
         "hermes_constants": "qubit_constants",
         "hermes_logging": "qubit_logging",
         "hermes_state": "qubit_state",

@@ -374,6 +374,9 @@ def test_capabilities_must_be_valid_tool_names(tmp_path, monkeypatch):
 # HTTP transport
 # ---------------------------------------------------------------------------
 class _FakeMcpHttpHandler(BaseHTTPRequestHandler):
+    session_id = ""
+    mcp_version = "2024-11-05"
+
     def log_message(self, *args):  # silence
         pass
 
@@ -386,10 +389,15 @@ class _FakeMcpHttpHandler(BaseHTTPRequestHandler):
             msg = {}
         mid = msg.get("id")
         method = msg.get("method")
+        if method != "initialize" and self.session_id and not self._session_headers_match():
+            return
         if method == "initialize":
             body = {"jsonrpc": "2.0", "id": mid, "result": {
-                "protocolVersion": "2024-11-05", "capabilities": {},
+                "protocolVersion": self.mcp_version, "capabilities": {},
                 "serverInfo": {"name": "fake-http", "version": "1.0"}}}
+        elif method == "tools/list":
+            body = {"jsonrpc": "2.0", "id": mid, "result": {
+                "tools": [{"name": "echo", "inputSchema": {"type": "object"}}]}}
         elif method == "tools/call":
             params = msg.get("params") or {}
             if params.get("name") == "slow":
@@ -408,15 +416,36 @@ class _FakeMcpHttpHandler(BaseHTTPRequestHandler):
             body = {"jsonrpc": "2.0", "id": mid, "result": {}}
         data = json.dumps(body).encode("utf-8")
         self.send_response(200)
+        if method == "initialize" and self.session_id:
+            self.send_header("Mcp-Session-Id", self.session_id)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
+    def _session_headers_match(self):
+        if (self.headers.get("Mcp-Session-Id") != self.session_id
+                or self.headers.get("MCP-Protocol-Version") != self.mcp_version):
+            self.send_error(400, "Missing or incorrect MCP session headers")
+            return False
+        return True
 
-@pytest.fixture
-def http_mcp():
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _FakeMcpHttpHandler)
+    def do_DELETE(self):
+        if self._session_headers_match():
+            self.server.terminated_sessions += 1
+            self.send_response(204)
+            self.end_headers()
+
+
+@pytest.fixture(params=[False, True], ids=["stateless", "stateful"])
+def http_mcp(request):
+    class Handler(_FakeMcpHttpHandler):
+        if request.param:
+            session_id = "fixture-session-id"
+            mcp_version = "2025-11-25"
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.terminated_sessions = 0
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -430,15 +459,18 @@ def test_http_success_round_trips_a_tool_call(tmp_path, monkeypatch, http_mcp):
     from voicebridge import mcp_servers as MS
 
     cfg = _cfg(tmp_path, monkeypatch)
-    _server, url = http_mcp
+    server, url = http_mcp
     MS.upsert(cfg, "web", {"transport": "http", "url": url,
                            "capabilities": ["echo"]})
     MS.set_enabled(cfg, "web", True)
 
+    discovered = MS.test(cfg, "web")
+    assert discovered["connected"] and discovered["tools"] == ["echo"], discovered
     out = MS.invoke(cfg, "web", tool="echo", args={"a": 1}, confirmed=True)
     assert out["state"] == "OK", out
     assert out["transport"] == "http"
     assert "echo:" in out["text"]
+    assert server.terminated_sessions == (2 if server.RequestHandlerClass.session_id else 0)
 
 
 def test_http_timeout_is_typed(tmp_path, monkeypatch, http_mcp):
@@ -535,3 +567,79 @@ def test_cli_and_voice_entry_points_share_the_canonical_path(
     assert cli["requested_by"] == "cli:user"
     assert voice["requested_by"] == "voice:user"
     assert cli["authority"] == voice["authority"]
+
+
+def test_named_http_invocation_uses_only_selected_profile_key(tmp_path, monkeypatch, http_mcp):
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = tmp_path / "runtime"
+    work = root / "profiles" / "work"
+    work.mkdir(parents=True)
+    (work / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    monkeypatch.setenv("AUDIT_MCP_FIXTURE_KEY", "listener-fixture")
+
+    server, url = http_mcp
+    handler = server.RequestHandlerClass
+    original = handler.do_POST
+    headers = []
+
+    def observe(handler):
+        headers.append(handler.headers.get("Authorization") == "Bearer named-fixture")
+        original(handler)
+
+    monkeypatch.setattr(handler, "do_POST", observe)
+    query = {"profile": "work"}
+    code, out = HC.dispatch(cfg, "POST", "/api/mcp/servers", query, {
+        "name": "fixture", "transport": "http", "url": url, "enabled": True,
+        "auth": "header", "env": {"MCP_AUTH": "env:AUDIT_MCP_FIXTURE_KEY"},
+        "capabilities": ["echo"], "confirm": True,
+    })
+    assert code == 200, out
+    path = "/api/mcp/servers/fixture/invoke"
+    body = {"tool": "echo", "args": {"word": "blue"}, "confirm": True}
+    code, out = HC.dispatch(cfg, "POST", path, query, body)
+    assert code >= 400 and not headers, out
+
+    (work / ".env").write_text("AUDIT_MCP_FIXTURE_KEY=named-fixture\n")
+    code, out = HC.dispatch(cfg, "POST", path, query, body)
+    assert code == 200 and out["ok"] and "blue" in out["text"], out
+    assert headers and all(headers)
+    assert "named-fixture" not in repr(out)
+
+
+def test_named_approval_binds_target_and_is_consumed_once(tmp_path, monkeypatch, http_mcp):
+    from voicebridge import qubit_compat as HC
+    from voicebridge.approvals import ApprovalJournal
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = tmp_path / "runtime"
+    for profile in ("work", "other"):
+        home = root / "profiles" / profile
+        home.mkdir(parents=True)
+        (home / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    _, url = http_mcp
+    for profile in ("work", "other"):
+        status, body = HC.dispatch(cfg, "POST", "/api/mcp/servers", {"profile": profile}, {
+            "name": "fixture", "transport": "http", "url": url, "enabled": True,
+            "capabilities": ["echo"], "confirm": True,
+        })
+        assert status == 200, body
+
+    approvals = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl")
+    legacy = approvals.create("mcp.invoke", "Legacy approval")
+    scoped = approvals.create("mcp.invoke", "Scoped approval", mcp_target={
+        "home": str(root / "profiles" / "work"), "server": "fixture", "tool": "echo",
+    })
+
+    def invoke(profile, approval, tool="echo"):
+        return HC.dispatch(cfg, "POST", "/api/mcp/servers/fixture/invoke",
+                           {"profile": profile}, {"tool": tool, "confirmation_id": approval.id})
+
+    assert invoke("work", legacy)[0] == 409
+    assert invoke("other", scoped)[0] == 409
+    assert invoke("work", scoped, "different")[0] == 409
+    assert invoke("work", scoped)[0] == 200
+    assert invoke("work", scoped)[0] == 409

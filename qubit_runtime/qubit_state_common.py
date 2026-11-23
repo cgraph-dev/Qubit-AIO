@@ -474,6 +474,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     expiry_finalized INTEGER DEFAULT 0,
     model TEXT,
     model_config TEXT,
+    terminal_model_request TEXT,
     system_prompt TEXT,
     system_prompt_hash TEXT,
     parent_session_id TEXT,
