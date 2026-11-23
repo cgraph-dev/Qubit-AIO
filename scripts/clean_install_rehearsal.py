@@ -847,6 +847,16 @@ assert marker.get("prompt") == sys.argv[3], marker
             "restarted dashboard returned wrong interrupted prompt",
             interrupted)
         _chat_transport._clear_turn_marker(cfg, persisted_id)
+        assert _chat_transport._pending_interrupted_turn(cfg, persisted_id) is None, (
+            "clearing recovered marker did not remove it from shared store")
+        cleared_status, _, cleared_body = raw(show_path, session_headers)
+        assert cleared_status == 200, (
+            "session unavailable after clearing interrupted marker",
+            cleared_status, cleared_body[:200])
+        cleared_payload = json.loads(cleared_body)
+        assert cleared_payload.get("interrupted_turn") is None, (
+            "dashboard still offers an already-cleared interrupted turn",
+            cleared_payload)
         assert resumed.get("session", {}).get("id") == persisted_id, resumed
         assert any(m.get("content") == persisted_text
                    for m in resumed.get("messages", [])), (
