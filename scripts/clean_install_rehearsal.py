@@ -546,6 +546,30 @@ try:
         for want in ("qubit-ops", "qubit-devices", "qubit-memory",
                      "qubit-reports", "qubit-approvals"):
             assert want in names, (want, names)
+
+        # A fresh server instance must serve the same installed dashboard
+        # against the same isolated state after a graceful listener restart.
+        # This proves restart liveness, not agent-session persistence.
+        ui.stop()
+        ui = WebUI(_F(), host="127.0.0.1", port=0, state_dir=state,
+                   asr_factory=lambda: None)
+        ui.start()
+        port = ui._server.server_address[1]
+        restarted_status, _, restarted_body = raw("/api/health")
+        restarted_health = json.loads(restarted_body)
+        assert restarted_status == 200 and restarted_health.get("ok") is True, (
+            "installed dashboard failed health after restart",
+            restarted_status, restarted_health)
+        denied_status, _, _ = raw(protected)
+        assert denied_status in (401, 403), (
+            "restarted dashboard lost authentication enforcement",
+            denied_status)
+        accepted_status, _, accepted_body = raw(
+            protected, {"X-Qubit-Session-Token": "rehearsal-token"})
+        assert accepted_status == 200 and isinstance(
+            json.loads(accepted_body), list), (
+            "restarted dashboard lost authenticated plugin catalog",
+            accepted_status, accepted_body[:200])
 finally:
     ui.stop()
 
