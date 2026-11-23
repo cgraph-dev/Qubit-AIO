@@ -137,6 +137,31 @@ def check_secrets(doc: dict, path: Path, errors: list[str]) -> None:
             )
 
 
+def check_secret_workflow_gate(doc: dict, path: Path,
+                               errors: list[str]) -> None:
+    """Allowlisted secrets require manual dispatch and a protected job gate."""
+    allowed = SECRET_WORKFLOWS.get(path.name)
+    if not allowed:
+        return
+    triggers = trigger_names(doc)
+    if triggers != {"workflow_dispatch"}:
+        errors.append(
+            f"{path.name}: secret-capable workflow must be manual-only"
+        )
+    for job_name, job in (doc.get("jobs") or {}).items():
+        if not isinstance(job, dict):
+            continue
+        references = set(SECRET_REF.findall("\\n".join(all_strings(job))))
+        if not any(ref.split(".", 1)[1] in allowed for ref in references):
+            continue
+        environment = job.get("environment")
+        if not (isinstance(environment, str) and environment.strip()):
+            errors.append(
+                f"{path.name}: secret-reading job {job_name!r} "
+                "must declare a protected environment"
+            )
+
+
 def check_pull_request(doc: dict, path: Path, errors: list[str]) -> None:
     triggers = trigger_names(doc)
     if "pull_request_target" in triggers:
@@ -223,6 +248,7 @@ def main() -> int:
         check_concurrency(doc, path, errors)
         check_pins(doc, path, errors)
         check_secrets(doc, path, errors)
+        check_secret_workflow_gate(doc, path, errors)
         check_pull_request(doc, path, errors)
         check_release_shape(doc, path, errors)
         check_promote_shape(doc, path, errors)
