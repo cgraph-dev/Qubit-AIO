@@ -144,9 +144,7 @@ def version_identity(wheel_version: Optional[str],
             f"{health_version!r}")
     if (health or {}).get("ok") is not True:
         problems.append(f"/api/health did not report ok=true: {health}")
-    if not (health or {}).get("state"):
-        problems.append(f"/api/health did not report a state: {health}")
-    return {
+    # /api/health is a liveness endpoint: it reports ok/version/commit, not\n    # a release-verdict state. Do not require a field the live route omits.\n    return {
         "wheel": wheel_version,
         "installed": distribution_version,
         "cli": cli_line,
