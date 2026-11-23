@@ -51,7 +51,7 @@ STORE_FILE = "chat_sessions.json"
 # ``cancel()`` sets; the streaming path checks it (and the caller-supplied
 # ``cancel`` callable) before every emitted delta.
 _cancel_lock = threading.Lock()
-_cancel_events: Dict[str, threading.Event] = {}
+_cancel_events: Dict[str, List[threading.Event]] = {}
 
 # Live PTY-shaped sessions (line buffer + cursor state) keyed by session id.
 # The xterm UI sends keystrokes one at a time, so a frame handler that built a
@@ -1079,30 +1079,38 @@ def _escalation_route(cfg: Any, decision: Any,
 
 
 def _cancel_event(session_id: str) -> threading.Event:
+    """Register a distinct cancellation token for each in-flight turn.
+
+    Multiple turns can share a session. Reusing and clearing one Event would
+    inadvertently uncancel an older worker when a new turn starts.
+    """
+    ev = threading.Event()
     with _cancel_lock:
-        ev = _cancel_events.get(session_id)
-        if ev is None:
-            ev = threading.Event()
-            _cancel_events[session_id] = ev
-        return ev
+        _cancel_events.setdefault(session_id, []).append(ev)
+    return ev
 
 
 def cancel(session_id: str) -> Dict[str, Any]:
-    """Signal cancellation for the in-flight turn on ``session_id``."""
+    """Signal all in-flight turns for ``session_id``."""
     with _cancel_lock:
-        ev = _cancel_events.get(str(session_id or "").strip())
-    if ev is None:
+        events = tuple(_cancel_events.get(str(session_id or "").strip(), ()))
+        for ev in events:
+            ev.set()
+    if not events:
         return {"ok": False, "code": "NO_ACTIVE_TURN",
                 "detail": f"no in-flight chat turn for {session_id!r}"}
-    ev.set()
     _audit("cancel", session=session_id)
     return {"ok": True, "session_id": session_id, "cancelled": True}
 
 
 def _release_cancel(session_id: str, ev: threading.Event) -> None:
     with _cancel_lock:
-        if _cancel_events.get(session_id) is ev:
-            _cancel_events.pop(session_id, None)
+        events = _cancel_events.get(session_id)
+        if events is not None:
+            if ev in events:
+                events.remove(ev)
+            if not events:
+                _cancel_events.pop(session_id, None)
 
 
 # ---------------------------------------------------------------------------
