@@ -657,6 +657,33 @@ try:
         assert released_status == 404, (
             "completed turn retained a cancellable session event",
             released_status, released_body[:200])
+        # Two in-flight turns sharing one session must both receive the
+        # authenticated HTTP cancel, without losing either registration.
+        shared_id = "cancel-shared-" + os.urandom(8).hex()
+        shared_first = _chat_cancel._cancel_event(shared_id)
+        shared_second = _chat_cancel._cancel_event(shared_id)
+        try:
+            shared_body = json.dumps({"session": shared_id}).encode()
+            shared_status, _, shared_response = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=shared_body)
+            assert shared_status == 200, (
+                "HTTP cancellation refused overlapping session turns",
+                shared_status, shared_response[:200])
+            assert shared_first.is_set() and shared_second.is_set(), (
+                "HTTP cancellation did not stop both overlapping turns")
+            _chat_cancel._release_cancel(shared_id, shared_first)
+            still_status, _, still_body = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=shared_body)
+            assert still_status == 200 and shared_second.is_set(), (
+                "one worker exiting unregistered the other active turn",
+                still_status, still_body[:200])
+        finally:
+            _chat_cancel._release_cancel(shared_id, shared_first)
+            _chat_cancel._release_cancel(shared_id, shared_second)
         # Cancellation is session-scoped: cancelling one live turn must not
         # stop another. A bad token must not signal either live event.
         first_id = "cancel-isolation-a-" + os.urandom(8).hex()
