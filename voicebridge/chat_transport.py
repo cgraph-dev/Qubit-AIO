@@ -502,6 +502,13 @@ def _chat_turn_marker_module() -> Any:
     cannot be imported, which degrades to "no marker" (never a broken turn).
     """
     try:
+        # The vendored TUI is shipped inside the installed wheel, not as a
+        # top-level Python dependency. Dashboard chat can start without the
+        # runtime CLI having initialized its import path, so resolve the
+        # packaged runtime before importing the shared marker implementation.
+        from .qubit_runtime import ensure_path
+
+        ensure_path()
         from tui_gateway import turn_marker  # type: ignore[import-not-found]
 
         return turn_marker
