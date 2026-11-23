@@ -547,6 +547,23 @@ try:
                      "qubit-reports", "qubit-approvals"):
             assert want in names, (want, names)
 
+        # The installed session inventory must remain a protected, parseable
+        # HTTP surface on both sides of the restart. This checks read-contract
+        # continuity; it does not create an agent turn or prove persistence.
+        session_path = "/agent/api/sessions"
+        session_headers = {"X-Qubit-Session-Token": "rehearsal-token"}
+        session_denied, _, _ = raw(session_path)
+        assert session_denied in (401, 403), (
+            "session inventory exposed without authentication", session_denied)
+        session_status, _, session_body = raw(session_path, session_headers)
+        assert session_status == 200, (
+            "installed session inventory unavailable", session_status,
+            session_body[:200])
+        session_payload = json.loads(session_body)
+        assert isinstance(session_payload, (dict, list)), (
+            "installed session inventory is not structured JSON",
+            type(session_payload).__name__)
+
         # A fresh server instance must serve the same installed dashboard
         # against the same isolated state after a graceful listener restart.
         # This proves restart liveness, not agent-session persistence.
@@ -570,6 +587,14 @@ try:
             json.loads(accepted_body), list), (
             "restarted dashboard lost authenticated plugin catalog",
             accepted_status, accepted_body[:200])
+        restarted_session_status, _, restarted_session_body = raw(
+            session_path, session_headers)
+        assert restarted_session_status == 200, (
+            "restarted dashboard lost session inventory",
+            restarted_session_status, restarted_session_body[:200])
+        assert isinstance(json.loads(restarted_session_body), (dict, list)), (
+            "restarted session inventory returned malformed data",
+            restarted_session_body[:200])
 finally:
     ui.stop()
 
