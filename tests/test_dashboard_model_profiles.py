@@ -216,6 +216,35 @@ def test_dashboard_dispatch_reads_and_stages_mutations(tmp_path, monkeypatch):
         p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
 
 
+def test_dashboard_secret_ref_confirmation_never_persists_resolved_value(
+        tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    secret = "qubit-confirmation-private-" + "z" * 32
+    monkeypatch.setenv("QUBIT_CONFIRM_SECRET", secret)
+    staged = _dash(cfg, "create_model_profile", {
+        "profile_id": "confirm-private", "kind": "api",
+        "provider": "openai", "model": "example-model",
+        "base_url": "https://api.example/v1",
+        "key_ref": "env:QUBIT_CONFIRM_SECRET"})
+    assert staged["state"] == "needs-confirm", staged
+    confirmed = OPS.confirm_op(
+        cfg, staged["confirmation_id"],
+        sensitive={"key_ref": "env:QUBIT_CONFIRM_SECRET"})
+    assert confirmed["state"] == "executed", confirmed
+    assert confirmed["receipt"]["result"]["state"] == "OK", confirmed
+    for response in (staged, confirmed,
+                     _dash(cfg, "list_model_profiles"),
+                     _dash(cfg, "show_model_profile",
+                           {"profile_id": "confirm-private"})):
+        assert secret not in json.dumps(response), response
+    state_dir = Path(cfg.state_dir())
+    for name in ("approvals.jsonl",):
+        if (state_dir / name).exists():
+            assert secret not in (state_dir / name).read_text(), name
+
+
 def test_dashboard_raw_secret_is_refused_at_confirm(tmp_path, monkeypatch):
     from voicebridge import dashboard_ops as OPS
 
