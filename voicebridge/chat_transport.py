@@ -4279,7 +4279,6 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
 
     st = store(cfg)
     ev = _cancel_event(sid)
-    ev.clear()
     prompt = clean
     if context:
         prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
@@ -4419,7 +4418,6 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
 
     st = store(cfg)
     ev = _cancel_event(sid)
-    ev.clear()
     prompt = clean
     if context:
         prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
@@ -4462,6 +4460,7 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
         except Exception as exc:  # noqa: BLE001 - typed, redacted
             box.put(("error", exc))
         finally:
+            _release_cancel(sid, ev)
             box.put(finished)
 
     thread = threading.Thread(target=_worker,
@@ -4485,7 +4484,9 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
             elif kind == "error":
                 err = value
     finally:
-        _release_cancel(sid, ev)
+        # If the client disconnects, stop the provider; worker owns cleanup.
+        if thread.is_alive():
+            ev.set()
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if err is not None or res is None:
         _audit("turn_remote_error", session=sid,
@@ -4661,7 +4662,6 @@ def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
 
     st = store(cfg)
     ev = _cancel_event(sid)
-    ev.clear()
     prompt = clean
     if context:
         prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
@@ -5394,7 +5394,6 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "detail": appended.get("detail", "")}
         return
     ev = _cancel_event(sid)
-    ev.clear()
     started = time.monotonic()
     yield {"event": "start", "session_id": sid, "session": sid,
            "model": resolved_model, "message": appended.get("message"),
