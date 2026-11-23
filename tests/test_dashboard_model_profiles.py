@@ -116,6 +116,25 @@ def test_profile_reads_never_disclose_environment_credential(tmp_path, monkeypat
         assert secret not in json.dumps(read), read
 
 
+def test_string_false_never_authorizes_profile_mutations(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    created = _ops().create_model_profile(
+        cfg, profile_id="no-consent", kind="local", provider="ollama",
+        model="test", confirm="false")
+    assert created.get("dry_run") is True, created
+    assert "no-consent" not in {
+        p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+    clone = _ops().clone_model_profile(
+        cfg, "qubit-brain", "no-consent-clone", confirm="false")
+    assert clone.get("dry_run") is True, clone
+    assert "no-consent-clone" not in {
+        p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+    clear = _ops().clear_session_model(cfg, "session-a", confirm="false")
+    assert clear.get("dry_run") is True, clear
+
+
 def test_session_select_and_clear_override(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
