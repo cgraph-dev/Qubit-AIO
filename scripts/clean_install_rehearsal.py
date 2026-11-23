@@ -490,11 +490,14 @@ ui.start()
 port = ui._server.server_address[1]
 
 
-def raw(path, headers=None):
+def raw(path, headers=None, method="GET", body=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    c.request("GET", path, headers=headers or {})
-    r = c.getresponse()
-    return r.status, r.getheader("Location"), r.read()
+    try:
+        c.request(method, path, body=body, headers=headers or {})
+        r = c.getresponse()
+        return r.status, r.getheader("Location"), r.read()
+    finally:
+        c.close()
 
 
 try:
@@ -552,6 +555,21 @@ try:
         # continuity; it does not create an agent turn or prove persistence.
         session_path = "/agent/api/sessions"
         session_headers = {"X-Qubit-Session-Token": "rehearsal-token"}
+        # Exercise a real mutating HTTP route without changing any state:
+        # unauthenticated session creation must be refused *before* the
+        # backend can allocate a session or resolve a model.
+        create_path = "/agent/api/qubit/chat/sessions"
+        create_body = json.dumps({"name": "unauthorized-e2e-probe"}).encode()
+        for bad_headers in (
+            {"Content-Type": "application/json"},
+            {"Content-Type": "application/json",
+             "X-Qubit-Session-Token": "incorrect-token"},
+        ):
+            denied_create, _, denied_create_body = raw(
+                create_path, bad_headers, method="POST", body=create_body)
+            assert denied_create in (401, 403), (
+                "installed session create accepted unauthorized mutation",
+                denied_create, denied_create_body[:200])
         session_denied, _, _ = raw(session_path)
         assert session_denied in (401, 403), (
             "session inventory exposed without authentication", session_denied)
