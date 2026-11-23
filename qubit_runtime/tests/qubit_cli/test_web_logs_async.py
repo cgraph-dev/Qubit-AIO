@@ -73,3 +73,28 @@ def test_get_logs_huge_unfiltered_offset_uses_bounded_search(tmp_path,
     assert page["returned"] == 0
     assert page["has_more"] is False
     assert page["next_offset"] is None
+
+
+def test_get_logs_unknown_component_rejected_on_fresh_install(
+        tmp_path, monkeypatch):
+    """An absent log file must not conceal an invalid API filter."""
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(status, "get_qubit_home", lambda: tmp_path)
+    try:
+        asyncio.run(status.get_logs(file="agent", component="not-a-component"))
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "Unknown component" in str(exc.detail)
+    else:
+        raise AssertionError("unknown component should be rejected")
+
+
+def test_get_logs_missing_file_with_valid_filters_returns_empty_page(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(status, "get_qubit_home", lambda: tmp_path)
+    page = asyncio.run(status.get_logs(file="agent", lines=10, level="WARNING",
+                                       search="missing", offset=5))
+    assert page == {"file": "agent", "lines": [], "offset": 5,
+                    "limit": 10, "returned": 0, "has_more": False,
+                    "next_offset": None}
