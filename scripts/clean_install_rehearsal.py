@@ -570,6 +570,29 @@ try:
             assert denied_create in (401, 403), (
                 "installed session create accepted unauthorized mutation",
                 denied_create, denied_create_body[:200])
+        # Real streaming endpoint must fail closed on an empty turn before
+        # opening SSE or contacting any model provider. Verify both auth and
+        # preflight over the installed HTTP server, not a mocked handler.
+        stream_path = "/agent/api/qubit/chat/stream"
+        empty_turn = json.dumps({"text": ""}).encode()
+        denied_stream, _, denied_stream_body = raw(
+            stream_path, {"Content-Type": "application/json"},
+            method="POST", body=empty_turn)
+        assert denied_stream in (401, 403), (
+            "installed streaming route accepted unauthenticated turn",
+            denied_stream, denied_stream_body[:200])
+        rejected_stream, _, rejected_stream_body = raw(
+            stream_path, {**session_headers,
+                          "Content-Type": "application/json"},
+            method="POST", body=empty_turn)
+        assert rejected_stream in (400, 403, 422), (
+            "empty installed streaming turn was not rejected",
+            rejected_stream, rejected_stream_body[:200])
+        rejected_stream_payload = json.loads(rejected_stream_body)
+        assert rejected_stream_payload.get("ok") is False, (
+            "empty streaming turn returned success", rejected_stream_payload)
+        assert rejected_stream_payload.get("code"), (
+            "empty streaming refusal lacks typed code", rejected_stream_payload)
         session_denied, _, _ = raw(session_path)
         assert session_denied in (401, 403), (
             "session inventory exposed without authentication", session_denied)
