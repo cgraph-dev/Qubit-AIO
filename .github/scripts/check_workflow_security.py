@@ -127,13 +127,14 @@ def check_pins(doc: dict, path: Path, errors: list[str]) -> None:
 def check_secrets(doc: dict, path: Path, errors: list[str]) -> None:
     allowed = SECRET_WORKFLOWS.get(path.name, set())
     for text in all_strings(doc):
-        match = SECRET_REF.search(text)
-        if not match:
-            continue
-        name = match.group(0).split(".", 1)[1]
-        if name in allowed:
-            continue
-        errors.append(f"{path.name}: managed workflow references a secret: {text.strip()[:120]}")
+        for match in SECRET_REF.finditer(text):
+            name = match.group(0).split(".", 1)[1]
+            if name in allowed:
+                continue
+            errors.append(
+                f"{path.name}: managed workflow references unauthorized secret "
+                f"{name!r}"
+            )
 
 
 def check_pull_request(doc: dict, path: Path, errors: list[str]) -> None:
