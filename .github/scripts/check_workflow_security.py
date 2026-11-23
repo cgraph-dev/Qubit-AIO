@@ -213,7 +213,7 @@ def check_promote_shape(doc: dict, path: Path, errors: list[str]) -> None:
     if path.name not in PROMOTE_WORKFLOWS:
         return
     triggers = trigger_names(doc)
-    if "workflow_dispatch" not in triggers:
+    if triggers != {"workflow_dispatch"}:
         errors.append(f"{path.name}: promote workflow must be workflow_dispatch only")
     text = "\n".join(all_strings(doc))
     if "gh release create" in text and "--draft" not in text:
