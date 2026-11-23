@@ -131,3 +131,18 @@ def test_first_page_reports_no_older_page_when_exactly_full(tmp_path):
         accept_line_factory=lambda: (lambda _: True))
     assert page == ["hit first\\n", "hit second\\n"]
     assert more is False
+
+
+def test_filtered_history_finds_old_matches_without_search_text(tmp_path):
+    """Level/component filters also require complete-history pagination."""
+    path = tmp_path / "agent.log"
+    path.write_text("allowed old\\n" + "excluded\\n" * 2500 + "allowed new\\n")
+    factory = lambda: (lambda line: line.startswith("allowed"))
+    latest, more = search_log_page(
+        path, needle="", offset=0, limit=1, accept_line_factory=factory)
+    assert latest == ["allowed new\\n"]
+    assert more is True
+    older, more = search_log_page(
+        path, needle="", offset=1, limit=1, accept_line_factory=factory)
+    assert older == ["allowed old\\n"]
+    assert more is False
