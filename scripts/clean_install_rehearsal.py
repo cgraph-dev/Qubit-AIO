@@ -560,9 +560,16 @@ try:
             "installed session inventory unavailable", session_status,
             session_body[:200])
         session_payload = json.loads(session_body)
-        assert isinstance(session_payload, (dict, list)), (
-            "installed session inventory is not structured JSON",
+        assert isinstance(session_payload, dict), (
+            "installed session inventory is not a JSON object",
             type(session_payload).__name__)
+        assert session_payload.get("ok") is True, session_payload
+        assert isinstance(session_payload.get("sessions"), list), (
+            "installed session inventory lacks sessions array", session_payload)
+        assert isinstance(session_payload.get("total"), int), (
+            "installed session inventory lacks total count", session_payload)
+        assert session_payload["total"] >= len(session_payload["sessions"]), (
+            "installed session inventory has inconsistent total", session_payload)
 
         # A fresh server instance must serve the same installed dashboard
         # against the same isolated state after a graceful listener restart.
@@ -592,9 +599,17 @@ try:
         assert restarted_session_status == 200, (
             "restarted dashboard lost session inventory",
             restarted_session_status, restarted_session_body[:200])
-        assert isinstance(json.loads(restarted_session_body), (dict, list)), (
-            "restarted session inventory returned malformed data",
-            restarted_session_body[:200])
+        restarted_sessions = json.loads(restarted_session_body)
+        assert restarted_sessions.get("ok") is True, restarted_sessions
+        assert isinstance(restarted_sessions.get("sessions"), list), (
+            "restarted session inventory lacks sessions array",
+            restarted_sessions)
+        assert isinstance(restarted_sessions.get("total"), int), (
+            "restarted session inventory lacks total count",
+            restarted_sessions)
+        assert restarted_sessions["total"] >= len(restarted_sessions["sessions"]), (
+            "restarted session inventory has inconsistent total",
+            restarted_sessions)
 finally:
     ui.stop()
 
