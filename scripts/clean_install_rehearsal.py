@@ -575,12 +575,21 @@ try:
         # preflight over the installed HTTP server, not a mocked handler.
         stream_path = "/agent/api/qubit/chat/stream"
         empty_turn = json.dumps({"text": ""}).encode()
-        denied_stream, _, denied_stream_body = raw(
-            stream_path, {"Content-Type": "application/json"},
-            method="POST", body=empty_turn)
-        assert denied_stream in (401, 403), (
-            "installed streaming route accepted unauthenticated turn",
-            denied_stream, denied_stream_body[:200])
+        # Invalid credentials must be rejected even for a nonempty turn:
+        # authentication must run before route/model selection or SSE setup.
+        for bad_headers in (
+            {"Content-Type": "application/json"},
+            {"Content-Type": "application/json",
+             "X-Qubit-Session-Token": "incorrect-token"},
+            {"Content-Type": "application/json",
+             "Authorization": "Bearer incorrect-token"},
+        ):
+            denied_stream, _, denied_stream_body = raw(
+                stream_path, bad_headers, method="POST",
+                body=json.dumps({"text": "do not execute this turn"}).encode())
+            assert denied_stream in (401, 403), (
+                "installed streaming route accepted unauthorized turn",
+                bad_headers, denied_stream, denied_stream_body[:200])
         rejected_stream, _, rejected_stream_body = raw(
             stream_path, {**session_headers,
                           "Content-Type": "application/json"},
