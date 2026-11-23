@@ -521,10 +521,23 @@ try:
         # source-level token checks. The plugin catalog is sensitive: neither
         # an absent credential nor an incorrect one may read it.
         protected = "/agent/api/dashboard/plugins"
-        for bad_headers in ({}, {"X-Qubit-Session-Token": "incorrect-token"}):
+        for bad_headers in (
+            {},
+            {"X-Qubit-Session-Token": "incorrect-token"},
+            {"X-Hermes-Session-Token": "incorrect-token"},
+            {"X-Api-Token": "incorrect-token"},
+            {"Authorization": "Bearer incorrect-token"},
+        ):
             denied_status, _, denied_body = raw(protected, bad_headers)
             assert denied_status in (401, 403), (
                 "protected installed dashboard route accepted invalid auth",
+                bad_headers, denied_status, denied_body[:200])
+        # Query-string tokens are not an authentication substitute for this
+        # protected API, even when the query contains the correct secret.
+        for query in ("?token=rehearsal-token", "?token=incorrect-token"):
+            denied_status, _, denied_body = raw(protected + query)
+            assert denied_status in (401, 403), (
+                "protected installed dashboard route accepted query token",
                 denied_status, denied_body[:200])
         st, _, pb = raw(protected,
                         {"X-Qubit-Session-Token": "rehearsal-token"})
