@@ -135,6 +135,27 @@ def test_string_false_never_authorizes_profile_mutations(tmp_path, monkeypatch):
     assert clear.get("dry_run") is True, clear
 
 
+def test_environment_secret_refs_require_valid_variable_names(tmp_path,
+                                                           monkeypatch):
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    assert R.is_secret_ref("env:VALID_KEY_2")
+    assert R.is_secret_ref("file:credentials/provider.key")
+    for invalid in ("env:1INVALID", "env:BAD.NAME", "env:BAD/NAME",
+                    "env:BAD-NAME", "env:", "env:VALID_KEY\\n",
+                    "env:VALID_KEY\\nother"):
+        assert not R.is_secret_ref(invalid), invalid
+        refused = _ops().create_model_profile(
+            cfg, profile_id="invalid-env", kind="api", provider="openai",
+            model="example", base_url="https://api.example/v1",
+            key_ref=invalid, confirm=True)
+        assert refused["state"] == "REFUSED", refused
+        assert refused["code"] == "BAD_SECRET_REF", refused
+    assert "invalid-env" not in {
+        p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+
 def test_session_select_and_clear_override(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
