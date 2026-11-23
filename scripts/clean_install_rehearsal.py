@@ -440,7 +440,7 @@ def _run(cmd: List[str], *, cwd: Optional[Path], env: Dict[str, str],
 
 
 _PROBE = r'''
-import http.client, json, os, pathlib, re, sys, tempfile, time
+import http.client, json, os, pathlib, re, subprocess, sys, tempfile, time
 
 # Isolation guard: the installed artifact must never read or write a live
 # QUBIT_HOME/HERMES_HOME. The engine passes those paths in VB_FORBIDDEN_HOMES.
@@ -673,6 +673,33 @@ try:
         # against the same isolated state after a graceful listener restart.
         # This proves restart liveness, not agent-session persistence.
         ui.stop()
+        # A separate interpreter must recover the same persisted transcript
+        # from the installed wheel, not from an in-memory store retained by
+        # the dashboard process. This is a process-boundary storage check;
+        # the HTTP listener itself is restarted in the current process below.
+        child_code = """
+import json, sys
+from voicebridge.config import Config
+from voicebridge import chat_transport
+cfg = Config.load(sys.argv[1])
+res = chat_transport.store(cfg).show(sys.argv[2])
+assert res.get("state") == "OK", res
+assert res.get("session", {}).get("id") == sys.argv[2], res
+assert any(m.get("content") == sys.argv[3]
+           for m in res.get("messages", [])), res
+print(json.dumps({"ok": True, "session_id": sys.argv[2]}))
+"""
+        child = subprocess.run(
+            [sys.executable, "-c", child_code, str(p),
+             persisted_id, persisted_text],
+            capture_output=True, text=True, timeout=30, check=False)
+        assert child.returncode == 0, (
+            "fresh installed process could not recover persisted transcript",
+            child.returncode, child.stdout[-400:], child.stderr[-400:])
+        child_result = json.loads(child.stdout)
+        assert child_result == {"ok": True, "session_id": persisted_id}, (
+            "fresh process returned unexpected persistence result",
+            child_result)
         ui = WebUI(_F(), host="127.0.0.1", port=0, state_dir=state,
                    asr_factory=lambda: None)
         ui.start()
