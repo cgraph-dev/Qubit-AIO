@@ -4470,9 +4470,22 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
     emitted: List[str] = []
     res: Any = None
     err: Optional[BaseException] = None
+    deadline = (started + float(timeout_s)) if timeout_s else None
     try:
         while True:
-            item = box.get()
+            try:
+                item = box.get(timeout=0.25)
+            except queue.Empty:
+                if deadline is not None and time.monotonic() >= deadline:
+                    ev.set()
+                    _audit("turn_remote_timeout", session=sid,
+                           timeout_s=float(timeout_s))
+                    yield ("outcome", {"ok": False, "state": "FAILED",
+                                      "code": "TURN_TIMEOUT",
+                                      "detail": "remote provider exceeded turn timeout",
+                                      "session_id": sid})
+                    return
+                continue
             if item is finished:
                 break
             kind, value = item
