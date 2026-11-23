@@ -83,7 +83,7 @@ def _roles(value: Any) -> List[str]:
 
 def check_secret_ref(value: Any) -> Dict[str, Any]:
     """Typed guard: raw values refused, only ``env:``/``file:`` refs pass."""
-    text = str(value or "").strip()
+    text = str(value or "")
     if not text:
         return {"state": "OK", "code": "", "detail": "no credential needed"}
     if R.looks_like_raw_secret(text):
