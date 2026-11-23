@@ -28,6 +28,15 @@ def search_log_page(
                 if accept_line(line) and needle in line.lower():
                     yield line
 
+    # The dashboard's initial page is the common case. A single bounded
+    # streaming pass avoids rescanning large logs just to compute an offset
+    # that is already known to be zero. Keep one extra match to report
+    # whether an older page exists without retaining the whole history.
+    if offset == 0:
+        newest = deque(matching_lines(), maxlen=limit + 1)
+        has_older = len(newest) > limit
+        return list(newest)[-limit:], has_older
+
     count = sum(1 for _ in matching_lines())
     end = count - offset
     if end <= 0:
