@@ -649,6 +649,15 @@ try:
         appended = canonical.append(persisted_id, "user", persisted_text)
         assert appended.get("state") == "OK", appended
         show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
+        for unauthorized_headers in (
+            {},
+            {"X-Qubit-Session-Token": "incorrect-token"},
+        ):
+            private_status, _, private_body = raw(
+                show_path, unauthorized_headers)
+            assert private_status in (401, 403), (
+                "installed dashboard leaked a persisted conversation",
+                private_status, private_body[:200])
         show_status, _, show_body = raw(show_path, session_headers)
         assert show_status == 200, ("canonical session HTTP read failed",
                                     show_status, show_body[:200])
@@ -703,6 +712,10 @@ try:
                    for s in restarted_sessions["sessions"]), (
             "canonical session missing from inventory after restart",
             persisted_id, restarted_sessions)
+        private_restart_status, _, private_restart_body = raw(show_path)
+        assert private_restart_status in (401, 403), (
+            "restarted dashboard exposed persisted conversation without auth",
+            private_restart_status, private_restart_body[:200])
         resumed_status, _, resumed_body = raw(show_path, session_headers)
         assert resumed_status == 200, (
             "persisted session unreadable after restart",
