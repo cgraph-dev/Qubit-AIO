@@ -49,7 +49,7 @@ def _probe_payload(**overrides):
             "runtime_root": "/tmp/venv/lib/python3.14/site-packages/voicebridge/_data/qubit_runtime",
             "distribution_version": "1.2.3",
         },
-        "health": {"status": 200, "ok": True, "state": "DEGRADED",
+        "health": {"status": 200, "ok": True,
                    "version": "qubit-1.2.3"},
         "dashboard": {
             "port": 43210, "redirect": "/chat", "chat_status": 200,
@@ -102,18 +102,15 @@ def test_parse_probe_output_uses_last_well_formed_marker():
 def test_version_identity_agrees_and_reports_drift():
     gate = _gate()
     good = gate.version_identity(
-        "1.2.3", "1.2.3", "qubit 1.2.3 (abc)", {"ok": True, "state": "READY",
-                                                "version": "qubit-1.2.3"})
+        "1.2.3", "1.2.3", "qubit 1.2.3 (abc)", {"ok": True, "version": "qubit-1.2.3"})
     assert good["problems"] == []
 
     bad = gate.version_identity(
-        "1.2.3", "1.2.4", "qubit 9.9.9", {"ok": False, "state": "",
-                                          "version": "qubit-9.9.9"})
+        "1.2.3", "1.2.4", "qubit 9.9.9", {"ok": False, "version": "qubit-9.9.9"})
     assert any("wheel filename version" in p for p in bad["problems"])
     assert any("qubit --version" in p for p in bad["problems"])
     assert any("/api/health version" in p for p in bad["problems"])
     assert any("ok=true" in p for p in bad["problems"])
-    assert any("did not report a state" in p for p in bad["problems"])
 
 
 def test_leak_scan_finds_operator_home_and_checkout(tmp_path):
@@ -251,3 +248,13 @@ def test_real_fresh_install_e2e(tmp_path):
     assert out["tui"]["packaged_argv"] is True
     assert "no tty" in out["tui"]["launch_output"].lower()
     assert out["leaks"] == []
+
+
+def test_live_health_shape_without_state_is_accepted():
+    """The actual /api/health route does not return a release state."""
+    gate = _gate()
+    health = {"ok": True, "version": "1.2.3",
+              "displayVersion": "1.2.3", "commit": "abc123",
+              "auth_required": False}
+    result = gate.version_identity("1.2.3", "1.2.3", "qubit 1.2.3", health)
+    assert result["problems"] == []
