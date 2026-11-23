@@ -156,6 +156,36 @@ def test_environment_secret_refs_require_valid_variable_names(tmp_path,
         p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
 
 
+def test_string_false_cannot_remove_or_select_or_rollback_profiles(
+        tmp_path, monkeypatch):
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    created = _ops().clone_model_profile(
+        cfg, "qubit-brain", "retained-profile", confirm=True)
+    assert created["state"] == "OK", created
+    removed = _ops().remove_model_profile(
+        cfg, "retained-profile", confirm="false")
+    assert removed.get("dry_run") is True, removed
+    assert R.get_profile(cfg, "retained-profile") is not None
+
+    selected = _ops().select_session_model(
+        cfg, "consent-session", "retained-profile", confirm="false")
+    assert selected.get("dry_run") is True, selected
+    assert R.resolve(cfg, session="consent-session").profile_id != "retained-profile"
+
+    child = _ops().create_model_profile(
+        cfg, profile_id="rollback-child-false", kind="local",
+        provider="ollama", model="test-model",
+        rollback_to="retained-profile", confirm=True)
+    assert child["state"] == "OK", child
+    rollback = _ops().rollback_model_profile(
+        cfg, "rollback-child-false", session="consent-session",
+        confirm="false")
+    assert rollback.get("dry_run") is True, rollback
+    assert R.resolve(cfg, session="consent-session").profile_id != "retained-profile"
+
+
 def test_session_select_and_clear_override(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
