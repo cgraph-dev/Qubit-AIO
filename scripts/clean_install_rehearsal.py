@@ -657,6 +657,35 @@ try:
         assert released_status == 404, (
             "completed turn retained a cancellable session event",
             released_status, released_body[:200])
+        # Cancellation is session-scoped: cancelling one live turn must not
+        # stop another. A bad token must not signal either live event.
+        first_id = "cancel-isolation-a-" + os.urandom(8).hex()
+        second_id = "cancel-isolation-b-" + os.urandom(8).hex()
+        first_event = _chat_cancel._cancel_event(first_id)
+        second_event = _chat_cancel._cancel_event(second_id)
+        try:
+            first_body = json.dumps({"session": first_id}).encode()
+            bad_status, _, bad_body = raw(
+                cancel_path, {"Content-Type": "application/json",
+                              "X-Qubit-Session-Token": "incorrect-token"},
+                method="POST", body=first_body)
+            assert bad_status in (401, 403), (
+                "unauthorized cancellation accepted for active turn",
+                bad_status, bad_body[:200])
+            assert not first_event.is_set() and not second_event.is_set(), (
+                "unauthorized cancellation signalled a live turn")
+            first_status, _, first_response = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=first_body)
+            assert first_status == 200, (
+                "authorized cancellation refused active turn",
+                first_status, first_response[:200])
+            assert first_event.is_set() and not second_event.is_set(), (
+                "cancelling one session stopped another session")
+        finally:
+            _chat_cancel._release_cancel(first_id, first_event)
+            _chat_cancel._release_cancel(second_id, second_event)
         session_denied, _, _ = raw(session_path)
         assert session_denied in (401, 403), (
             "session inventory exposed without authentication", session_denied)
