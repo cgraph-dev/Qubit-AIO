@@ -5,8 +5,8 @@ repository promises for GitHub-hosted PR CI: least-privilege permissions,
 concurrency, SHA-pinned actions, no ``pull_request_target``, no secrets on
 pull requests, and draft-only releases.
 
-They also pin which workflows are managed versus explicitly legacy, so a new
-workflow cannot be exempted silently.
+Every workflow, including legacy Windows workflows, is managed by the same
+policy. No new workflow can silently bypass security checks.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 POLICY = ROOT / ".github" / "scripts" / "check_workflow_security.py"
 
-EXPECTED_LEGACY = {
+WINDOWS_WORKFLOWS = {
     "windows-ci.yml",
     "windows-install-update-e2e.yml",
 }
@@ -57,8 +57,7 @@ def _workflow_paths() -> list[Path]:
 
 
 def _managed_paths() -> list[Path]:
-    return [path for path in _workflow_paths()
-            if path.name not in POLICY_MODULE.LEGACY_WORKFLOWS]
+    return _workflow_paths()
 
 
 def _jobs(doc: dict):
@@ -77,15 +76,15 @@ def test_every_workflow_parses_and_has_a_name():
         assert isinstance(doc.get("name"), str) and doc["name"], path.name
 
 
-def test_legacy_allowlist_is_exact_and_every_entry_exists():
-    names = {path.name for path in _workflow_paths()}
-    assert POLICY_MODULE.LEGACY_WORKFLOWS == EXPECTED_LEGACY
-    assert EXPECTED_LEGACY <= names
+def test_windows_workflows_are_managed_and_present():
+    names = {path.name for path in _managed_paths()}
+    assert WINDOWS_WORKFLOWS <= names
+    assert not hasattr(POLICY_MODULE, "LEGACY_WORKFLOWS")
 
 
 def test_new_high_value_workflows_are_managed():
     assert NEW_MANAGED <= {path.name for path in _workflow_paths()}
-    assert NEW_MANAGED.isdisjoint(POLICY_MODULE.LEGACY_WORKFLOWS)
+    assert NEW_MANAGED <= {path.name for path in _managed_paths()}
 
 
 def test_no_workflow_uses_pull_request_target():
@@ -112,6 +111,16 @@ def test_managed_workflows_never_reference_repository_secrets():
         assert not errors, errors
 
 
+def test_secret_scan_checks_all_references_even_after_allowlisted_one():
+    doc = {"jobs": {"apply": {"steps": [{
+        "run": "${{ secrets.QUBIT_PUBLIC_PUSH_TOKEN }} "
+               "${{ secrets.UNAUTHORIZED_EXTRA_TOKEN }}",
+    }]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_secrets(doc, Path("promote-public.yml"), errors)
+    assert any("UNAUTHORIZED_EXTRA_TOKEN" in error for error in errors), errors
+
+
 def test_secret_allowlist_is_exact_and_environment_gated():
     assert POLICY_MODULE.SECRET_WORKFLOWS == EXPECTED_SECRET_WORKFLOWS
     for name, secrets in EXPECTED_SECRET_WORKFLOWS.items():
@@ -125,6 +134,26 @@ def test_secret_allowlist_is_exact_and_environment_gated():
             text = "\n".join(POLICY_MODULE.all_strings(job))
             if any("secrets." + secret in text for secret in secrets):
                 assert job.get("environment"), (name, job_name)
+
+
+def test_secret_workflow_policy_rejects_automatic_triggers():
+    doc = {"on": {"pull_request": None}, "jobs": {
+        "publish": {"environment": "public-production", "steps": [
+            {"run": "echo ${{ secrets.QUBIT_PUBLIC_PUSH_TOKEN }}"}]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_secret_workflow_gate(
+        doc, Path("promote-public.yml"), errors)
+    assert any("manual-only" in error for error in errors), errors
+
+
+def test_secret_workflow_policy_rejects_missing_environment():
+    doc = {"on": {"workflow_dispatch": None}, "jobs": {
+        "publish": {"steps": [
+            {"run": "echo ${{ secrets.QUBIT_PUBLIC_PUSH_TOKEN }}"}]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_secret_workflow_gate(
+        doc, Path("promote-public.yml"), errors)
+    assert any("protected environment" in error for error in errors), errors
 
 
 def test_pull_request_workflows_are_hosted_read_only_and_bounded():
@@ -230,6 +259,15 @@ def test_policy_rejects_a_promote_workflow_that_could_create_a_tag():
     errors = []
     POLICY_MODULE.check_promote_shape(unsafe, Path("promote-release.yml"), errors)
     assert any("--verify-tag" in error for error in errors), errors
+
+
+def test_operator_promotion_rejects_automatic_trigger_even_if_manual_present():
+    doc = {"on": {"workflow_dispatch": None, "push": {"branches": ["main"]}},
+           "jobs": {"draft": {"environment": "release", "steps": [{
+               "run": "gh release create v1.0.0 --draft --verify-tag"}]}}}
+    errors: list[str] = []
+    POLICY_MODULE.check_promote_shape(doc, Path("promote-release.yml"), errors)
+    assert any("workflow_dispatch only" in error for error in errors), errors
 
 
 def test_promote_public_is_manual_and_apply_is_environment_gated():

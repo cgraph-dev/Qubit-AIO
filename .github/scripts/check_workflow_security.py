@@ -127,13 +127,39 @@ def check_pins(doc: dict, path: Path, errors: list[str]) -> None:
 def check_secrets(doc: dict, path: Path, errors: list[str]) -> None:
     allowed = SECRET_WORKFLOWS.get(path.name, set())
     for text in all_strings(doc):
-        match = SECRET_REF.search(text)
-        if not match:
+        for match in SECRET_REF.finditer(text):
+            name = match.group(0).split(".", 1)[1]
+            if name in allowed:
+                continue
+            errors.append(
+                f"{path.name}: managed workflow references unauthorized secret "
+                f"{name!r}"
+            )
+
+
+def check_secret_workflow_gate(doc: dict, path: Path,
+                               errors: list[str]) -> None:
+    """Allowlisted secrets require manual dispatch and a protected job gate."""
+    allowed = SECRET_WORKFLOWS.get(path.name)
+    if not allowed:
+        return
+    triggers = trigger_names(doc)
+    if triggers != {"workflow_dispatch"}:
+        errors.append(
+            f"{path.name}: secret-capable workflow must be manual-only"
+        )
+    for job_name, job in (doc.get("jobs") or {}).items():
+        if not isinstance(job, dict):
             continue
-        name = match.group(0).split(".", 1)[1]
-        if name in allowed:
+        references = set(SECRET_REF.findall("\\n".join(all_strings(job))))
+        if not any(ref.split(".", 1)[1] in allowed for ref in references):
             continue
-        errors.append(f"{path.name}: managed workflow references a secret: {text.strip()[:120]}")
+        environment = job.get("environment")
+        if not (isinstance(environment, str) and environment.strip()):
+            errors.append(
+                f"{path.name}: secret-reading job {job_name!r} "
+                "must declare a protected environment"
+            )
 
 
 def check_pull_request(doc: dict, path: Path, errors: list[str]) -> None:
@@ -187,7 +213,7 @@ def check_promote_shape(doc: dict, path: Path, errors: list[str]) -> None:
     if path.name not in PROMOTE_WORKFLOWS:
         return
     triggers = trigger_names(doc)
-    if "workflow_dispatch" not in triggers:
+    if triggers != {"workflow_dispatch"}:
         errors.append(f"{path.name}: promote workflow must be workflow_dispatch only")
     text = "\n".join(all_strings(doc))
     if "gh release create" in text and "--draft" not in text:
@@ -222,6 +248,7 @@ def main() -> int:
         check_concurrency(doc, path, errors)
         check_pins(doc, path, errors)
         check_secrets(doc, path, errors)
+        check_secret_workflow_gate(doc, path, errors)
         check_pull_request(doc, path, errors)
         check_release_shape(doc, path, errors)
         check_promote_shape(doc, path, errors)

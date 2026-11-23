@@ -97,6 +97,95 @@ def test_raw_secret_is_refused_and_never_persisted(tmp_path, monkeypatch):
     assert "raw-key" not in ids and "not-a-ref" not in ids
 
 
+def test_profile_reads_never_disclose_environment_credential(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    secret = "qubit-private-provider-value-" + "x" * 32
+    monkeypatch.setenv("QUBIT_PROFILE_READ_SECRET", secret)
+    created = _ops().create_model_profile(
+        cfg, profile_id="private-read", kind="api", provider="openai",
+        model="example-model", base_url="https://api.example/v1",
+        key_ref="env:QUBIT_PROFILE_READ_SECRET", confirm=True)
+    assert created["state"] == "OK", created
+    for read in (
+        _ops().list_model_profiles(cfg),
+        _ops().show_model_profile(cfg, "private-read"),
+        _ops().test_model_profile(cfg, "private-read", probe=False),
+        _dash(cfg, "list_model_profiles"),
+        _dash(cfg, "show_model_profile", {"profile_id": "private-read"}),
+    ):
+        assert secret not in json.dumps(read), read
+
+
+def test_string_false_never_authorizes_profile_mutations(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    created = _ops().create_model_profile(
+        cfg, profile_id="no-consent", kind="local", provider="ollama",
+        model="test", confirm="false")
+    assert created.get("dry_run") is True, created
+    assert "no-consent" not in {
+        p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+    clone = _ops().clone_model_profile(
+        cfg, "qubit-brain", "no-consent-clone", confirm="false")
+    assert clone.get("dry_run") is True, clone
+    assert "no-consent-clone" not in {
+        p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+    clear = _ops().clear_session_model(cfg, "session-a", confirm="false")
+    assert clear.get("dry_run") is True, clear
+
+
+def test_environment_secret_refs_require_valid_variable_names(tmp_path,
+                                                           monkeypatch):
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    assert R.is_secret_ref("env:VALID_KEY_2")
+    assert R.is_secret_ref("file:credentials/provider.key")
+    for invalid in ("env:1INVALID", "env:BAD.NAME", "env:BAD/NAME",
+                    "env:BAD-NAME", "env:", "env:VALID_KEY\\n",
+                    "env:VALID_KEY\\nother"):
+        assert not R.is_secret_ref(invalid), invalid
+        refused = _ops().create_model_profile(
+            cfg, profile_id="invalid-env", kind="api", provider="openai",
+            model="example", base_url="https://api.example/v1",
+            key_ref=invalid, confirm=True)
+        assert refused["state"] == "REFUSED", refused
+        assert refused["code"] == "BAD_SECRET_REF", refused
+    assert "invalid-env" not in {
+        p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+
+def test_string_false_cannot_remove_or_select_or_rollback_profiles(
+        tmp_path, monkeypatch):
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    created = _ops().clone_model_profile(
+        cfg, "qubit-brain", "retained-profile", confirm=True)
+    assert created["state"] == "OK", created
+    removed = _ops().remove_model_profile(
+        cfg, "retained-profile", confirm="false")
+    assert removed.get("dry_run") is True, removed
+    assert R.get_profile(cfg, "retained-profile") is not None
+
+    selected = _ops().select_session_model(
+        cfg, "consent-session", "retained-profile", confirm="false")
+    assert selected.get("dry_run") is True, selected
+    assert R.resolve(cfg, session="consent-session").profile_id != "retained-profile"
+
+    child = _ops().create_model_profile(
+        cfg, profile_id="rollback-child-false", kind="local",
+        provider="ollama", model="test-model",
+        rollback_to="retained-profile", confirm=True)
+    assert child["state"] == "OK", child
+    rollback = _ops().rollback_model_profile(
+        cfg, "rollback-child-false", session="consent-session",
+        confirm="false")
+    assert rollback.get("dry_run") is True, rollback
+    assert R.resolve(cfg, session="consent-session").profile_id != "retained-profile"
+
+
 def test_session_select_and_clear_override(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
@@ -195,6 +284,35 @@ def test_dashboard_dispatch_reads_and_stages_mutations(tmp_path, monkeypatch):
     assert done["receipt"]["result"]["state"] == "OK", done
     assert "via-dashboard" in {
         p["id"] for p in _ops().list_model_profiles(cfg)["profiles"]}
+
+
+def test_dashboard_secret_ref_confirmation_never_persists_resolved_value(
+        tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    secret = "qubit-confirmation-private-" + "z" * 32
+    monkeypatch.setenv("QUBIT_CONFIRM_SECRET", secret)
+    staged = _dash(cfg, "create_model_profile", {
+        "profile_id": "confirm-private", "kind": "api",
+        "provider": "openai", "model": "example-model",
+        "base_url": "https://api.example/v1",
+        "key_ref": "env:QUBIT_CONFIRM_SECRET"})
+    assert staged["state"] == "needs-confirm", staged
+    confirmed = OPS.confirm_op(
+        cfg, staged["confirmation_id"],
+        sensitive={"key_ref": "env:QUBIT_CONFIRM_SECRET"})
+    assert confirmed["state"] == "executed", confirmed
+    assert confirmed["receipt"]["result"]["state"] == "OK", confirmed
+    for response in (staged, confirmed,
+                     _dash(cfg, "list_model_profiles"),
+                     _dash(cfg, "show_model_profile",
+                           {"profile_id": "confirm-private"})):
+        assert secret not in json.dumps(response), response
+    state_dir = Path(cfg.state_dir())
+    for name in ("approvals.jsonl",):
+        if (state_dir / name).exists():
+            assert secret not in (state_dir / name).read_text(), name
 
 
 def test_dashboard_raw_secret_is_refused_at_confirm(tmp_path, monkeypatch):

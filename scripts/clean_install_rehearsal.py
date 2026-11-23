@@ -440,7 +440,7 @@ def _run(cmd: List[str], *, cwd: Optional[Path], env: Dict[str, str],
 
 
 _PROBE = r'''
-import http.client, json, os, pathlib, re, sys, tempfile, time
+import http.client, json, os, pathlib, re, subprocess, sys, tempfile, time
 
 # Isolation guard: the installed artifact must never read or write a live
 # QUBIT_HOME/HERMES_HOME. The engine passes those paths in VB_FORBIDDEN_HOMES.
@@ -490,11 +490,14 @@ ui.start()
 port = ui._server.server_address[1]
 
 
-def raw(path, headers=None):
+def raw(path, headers=None, method="GET", body=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    c.request("GET", path, headers=headers or {})
-    r = c.getresponse()
-    return r.status, r.getheader("Location"), r.read()
+    try:
+        c.request(method, path, body=body, headers=headers or {})
+        r = c.getresponse()
+        return r.status, r.getheader("Location"), r.read()
+    finally:
+        c.close()
 
 
 try:
@@ -552,6 +555,164 @@ try:
         # continuity; it does not create an agent turn or prove persistence.
         session_path = "/agent/api/sessions"
         session_headers = {"X-Qubit-Session-Token": "rehearsal-token"}
+        # Exercise a real mutating HTTP route without changing any state:
+        # unauthenticated session creation must be refused *before* the
+        # backend can allocate a session or resolve a model.
+        create_path = "/agent/api/qubit/chat/sessions"
+        create_body = json.dumps({"name": "unauthorized-e2e-probe"}).encode()
+        for bad_headers in (
+            {"Content-Type": "application/json"},
+            {"Content-Type": "application/json",
+             "X-Qubit-Session-Token": "incorrect-token"},
+        ):
+            denied_create, _, denied_create_body = raw(
+                create_path, bad_headers, method="POST", body=create_body)
+            assert denied_create in (401, 403), (
+                "installed session create accepted unauthorized mutation",
+                denied_create, denied_create_body[:200])
+        # Real streaming endpoint must fail closed on an empty turn before
+        # opening SSE or contacting any model provider. Verify both auth and
+        # preflight over the installed HTTP server, not a mocked handler.
+        stream_path = "/agent/api/qubit/chat/stream"
+        empty_turn = json.dumps({"text": ""}).encode()
+        # Invalid credentials must be rejected even for a nonempty turn:
+        # authentication must run before route/model selection or SSE setup.
+        for bad_headers in (
+            {"Content-Type": "application/json"},
+            {"Content-Type": "application/json",
+             "X-Qubit-Session-Token": "incorrect-token"},
+            {"Content-Type": "application/json",
+             "Authorization": "Bearer incorrect-token"},
+        ):
+            denied_stream, _, denied_stream_body = raw(
+                stream_path, bad_headers, method="POST",
+                body=json.dumps({"text": "do not execute this turn"}).encode())
+            assert denied_stream in (401, 403), (
+                "installed streaming route accepted unauthorized turn",
+                bad_headers, denied_stream, denied_stream_body[:200])
+        rejected_stream, _, rejected_stream_body = raw(
+            stream_path, {**session_headers,
+                          "Content-Type": "application/json"},
+            method="POST", body=empty_turn)
+        assert rejected_stream in (400, 403, 422), (
+            "empty installed streaming turn was not rejected",
+            rejected_stream, rejected_stream_body[:200])
+        rejected_stream_payload = json.loads(rejected_stream_body)
+        assert rejected_stream_payload.get("ok") is False, (
+            "empty streaming turn returned success", rejected_stream_payload)
+        assert rejected_stream_payload.get("code"), (
+            "empty streaming refusal lacks typed code", rejected_stream_payload)
+        # Cancellation is a protected mutation too. A session with no
+        # in-flight turn must report a typed refusal, never fabricated success.
+        cancel_path = "/agent/api/qubit/chat/cancel"
+        cancel_body = json.dumps(
+            {"session": "nonexistent-release-probe-" + os.urandom(8).hex()}
+        ).encode()
+        denied_cancel, _, denied_cancel_body = raw(
+            cancel_path, {"Content-Type": "application/json"},
+            method="POST", body=cancel_body)
+        assert denied_cancel in (401, 403), (
+            "installed cancel accepted missing credentials",
+            denied_cancel, denied_cancel_body[:200])
+        idle_cancel, _, idle_cancel_body = raw(
+            cancel_path, {**session_headers, "Content-Type": "application/json"},
+            method="POST", body=cancel_body)
+        assert idle_cancel == 404, (
+            "cancel with no active turn returned unexpected status",
+            idle_cancel, idle_cancel_body[:200])
+        idle_cancel_payload = json.loads(idle_cancel_body)
+        assert idle_cancel_payload.get("ok") is False, idle_cancel_payload
+        assert idle_cancel_payload.get("code") == "NO_ACTIVE_TURN", (
+            "idle cancellation must return the real transport refusal",
+            idle_cancel_payload)
+        # Register a live cancellation event through the real transport's
+        # session registry. The HTTP handler must signal that exact event,
+        # and the registry must be released after the simulated turn exits.
+        # This tests cancellation signalling, not provider interruption.
+        from voicebridge import chat_transport as _chat_cancel
+        active_id = "active-cancel-" + os.urandom(8).hex()
+        active_event = _chat_cancel._cancel_event(active_id)
+        assert not active_event.is_set(), "new turn already cancelled"
+        active_body = json.dumps({"session": active_id}).encode()
+        try:
+            active_status, _, active_response = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=active_body)
+            assert active_status == 200, (
+                "authenticated cancellation did not signal active turn",
+                active_status, active_response[:200])
+            active_payload = json.loads(active_response)
+            assert active_payload.get("ok") is True, active_payload
+            assert active_payload.get("session_id") == active_id, active_payload
+            assert active_event.is_set(), (
+                "HTTP cancellation failed to signal transport stop event",
+                active_payload)
+        finally:
+            _chat_cancel._release_cancel(active_id, active_event)
+        released_status, _, released_body = raw(
+            cancel_path, {**session_headers,
+                          "Content-Type": "application/json"},
+            method="POST", body=active_body)
+        assert released_status == 404, (
+            "completed turn retained a cancellable session event",
+            released_status, released_body[:200])
+        # Two in-flight turns sharing one session must both receive the
+        # authenticated HTTP cancel, without losing either registration.
+        shared_id = "cancel-shared-" + os.urandom(8).hex()
+        shared_first = _chat_cancel._cancel_event(shared_id)
+        shared_second = _chat_cancel._cancel_event(shared_id)
+        try:
+            shared_body = json.dumps({"session": shared_id}).encode()
+            shared_status, _, shared_response = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=shared_body)
+            assert shared_status == 200, (
+                "HTTP cancellation refused overlapping session turns",
+                shared_status, shared_response[:200])
+            assert shared_first.is_set() and shared_second.is_set(), (
+                "HTTP cancellation did not stop both overlapping turns")
+            _chat_cancel._release_cancel(shared_id, shared_first)
+            still_status, _, still_body = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=shared_body)
+            assert still_status == 200 and shared_second.is_set(), (
+                "one worker exiting unregistered the other active turn",
+                still_status, still_body[:200])
+        finally:
+            _chat_cancel._release_cancel(shared_id, shared_first)
+            _chat_cancel._release_cancel(shared_id, shared_second)
+        # Cancellation is session-scoped: cancelling one live turn must not
+        # stop another. A bad token must not signal either live event.
+        first_id = "cancel-isolation-a-" + os.urandom(8).hex()
+        second_id = "cancel-isolation-b-" + os.urandom(8).hex()
+        first_event = _chat_cancel._cancel_event(first_id)
+        second_event = _chat_cancel._cancel_event(second_id)
+        try:
+            first_body = json.dumps({"session": first_id}).encode()
+            bad_status, _, bad_body = raw(
+                cancel_path, {"Content-Type": "application/json",
+                              "X-Qubit-Session-Token": "incorrect-token"},
+                method="POST", body=first_body)
+            assert bad_status in (401, 403), (
+                "unauthorized cancellation accepted for active turn",
+                bad_status, bad_body[:200])
+            assert not first_event.is_set() and not second_event.is_set(), (
+                "unauthorized cancellation signalled a live turn")
+            first_status, _, first_response = raw(
+                cancel_path, {**session_headers,
+                              "Content-Type": "application/json"},
+                method="POST", body=first_body)
+            assert first_status == 200, (
+                "authorized cancellation refused active turn",
+                first_status, first_response[:200])
+            assert first_event.is_set() and not second_event.is_set(), (
+                "cancelling one session stopped another session")
+        finally:
+            _chat_cancel._release_cancel(first_id, first_event)
+            _chat_cancel._release_cancel(second_id, second_event)
         session_denied, _, _ = raw(session_path)
         assert session_denied in (401, 403), (
             "session inventory exposed without authentication", session_denied)
@@ -560,14 +721,104 @@ try:
             "installed session inventory unavailable", session_status,
             session_body[:200])
         session_payload = json.loads(session_body)
-        assert isinstance(session_payload, (dict, list)), (
-            "installed session inventory is not structured JSON",
+        assert isinstance(session_payload, dict), (
+            "installed session inventory is not a JSON object",
             type(session_payload).__name__)
+        assert session_payload.get("ok") is True, session_payload
+        assert isinstance(session_payload.get("sessions"), list), (
+            "installed session inventory lacks sessions array", session_payload)
+        assert isinstance(session_payload.get("total"), int), (
+            "installed session inventory lacks total count", session_payload)
+        assert session_payload["total"] >= len(session_payload["sessions"]), (
+            "installed session inventory has inconsistent total", session_payload)
+
+        # Persist an actual canonical chat-store record and message (without
+        # invoking a model provider), then read them through the installed
+        # dashboard HTTP API. This tests shared storage and restart durability,
+        # not agent turn execution.
+        from voicebridge import chat_transport as _chat_transport
+        canonical = _chat_transport.store(cfg)
+        persisted_id = "release-acceptance-" + os.urandom(8).hex()
+        persisted_text = "isolated-restart-proof-" + os.urandom(8).hex()
+        created = canonical.create("release acceptance persistence",
+                                   session_id=persisted_id)
+        assert created.get("state") == "OK", created
+        appended = canonical.append(persisted_id, "user", persisted_text)
+        assert appended.get("state") == "OK", appended
+        show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
+        for unauthorized_headers in (
+            {},
+            {"X-Qubit-Session-Token": "incorrect-token"},
+        ):
+            private_status, _, private_body = raw(
+                show_path, unauthorized_headers)
+            assert private_status in (401, 403), (
+                "installed dashboard leaked a persisted conversation",
+                private_status, private_body[:200])
+        show_status, _, show_body = raw(show_path, session_headers)
+        assert show_status == 200, ("canonical session HTTP read failed",
+                                    show_status, show_body[:200])
+        show_payload = json.loads(show_body)
+        assert show_payload.get("ok") is True, show_payload
+        assert show_payload.get("session", {}).get("id") == persisted_id, (
+            "canonical session ID differs over HTTP", show_payload)
+        assert any(m.get("content") == persisted_text
+                   for m in show_payload.get("messages", [])), (
+            "canonical persisted message missing over HTTP", show_payload)
 
         # A fresh server instance must serve the same installed dashboard
         # against the same isolated state after a graceful listener restart.
         # This proves restart liveness, not agent-session persistence.
         ui.stop()
+        # A separate interpreter must recover the same persisted transcript
+        # from the installed wheel, not from an in-memory store retained by
+        # the dashboard process. This is a process-boundary storage check;
+        # the HTTP listener itself is restarted in the current process below.
+        child_code = """
+import json, sys
+from voicebridge.config import Config
+from voicebridge import chat_transport
+cfg = Config.load(sys.argv[1])
+res = chat_transport.store(cfg).show(sys.argv[2])
+assert res.get("state") == "OK", res
+assert res.get("session", {}).get("id") == sys.argv[2], res
+assert any(m.get("content") == sys.argv[3]
+           for m in res.get("messages", [])), res
+print(json.dumps({"ok": True, "session_id": sys.argv[2]}))
+"""
+        child = subprocess.run(
+            [sys.executable, "-c", child_code, str(p),
+             persisted_id, persisted_text],
+            capture_output=True, text=True, timeout=30, check=False)
+        assert child.returncode == 0, (
+            "fresh installed process could not recover persisted transcript",
+            child.returncode, child.stdout[-400:], child.stderr[-400:])
+        child_result = json.loads(child.stdout)
+        assert child_result == {"ok": True, "session_id": persisted_id}, (
+            "fresh process returned unexpected persistence result",
+            child_result)
+        # Write an interrupted-turn marker from a short-lived installed
+        # interpreter. The dashboard must find the marker after the writer
+        # exits, using the same packaged TUI marker implementation.
+        interrupted_prompt = "resume-only-" + os.urandom(8).hex()
+        marker_writer = """
+import sys
+from voicebridge.config import Config
+from voicebridge import chat_transport
+cfg = Config.load(sys.argv[1])
+chat_transport._write_turn_marker(cfg, sys.argv[2], sys.argv[3])
+marker = chat_transport._pending_interrupted_turn(cfg, sys.argv[2])
+assert marker is not None, "shared turn marker not persisted"
+assert marker.get("prompt") == sys.argv[3], marker
+"""
+        marker_child = subprocess.run(
+            [sys.executable, "-c", marker_writer, str(p),
+             persisted_id, interrupted_prompt],
+            capture_output=True, text=True, timeout=30, check=False)
+        assert marker_child.returncode == 0, (
+            "installed runtime failed to persist shared turn marker",
+            marker_child.returncode, marker_child.stdout[-400:],
+            marker_child.stderr[-400:])
         ui = WebUI(_F(), host="127.0.0.1", port=0, state_dir=state,
                    asr_factory=lambda: None)
         ui.start()
@@ -592,9 +843,51 @@ try:
         assert restarted_session_status == 200, (
             "restarted dashboard lost session inventory",
             restarted_session_status, restarted_session_body[:200])
-        assert isinstance(json.loads(restarted_session_body), (dict, list)), (
-            "restarted session inventory returned malformed data",
-            restarted_session_body[:200])
+        restarted_sessions = json.loads(restarted_session_body)
+        assert restarted_sessions.get("ok") is True, restarted_sessions
+        assert isinstance(restarted_sessions.get("sessions"), list), (
+            "restarted session inventory lacks sessions array",
+            restarted_sessions)
+        assert isinstance(restarted_sessions.get("total"), int), (
+            "restarted session inventory lacks total count",
+            restarted_sessions)
+        assert restarted_sessions["total"] >= len(restarted_sessions["sessions"]), (
+            "restarted session inventory has inconsistent total",
+            restarted_sessions)
+        assert any(s.get("id") == persisted_id
+                   for s in restarted_sessions["sessions"]), (
+            "canonical session missing from inventory after restart",
+            persisted_id, restarted_sessions)
+        private_restart_status, _, private_restart_body = raw(show_path)
+        assert private_restart_status in (401, 403), (
+            "restarted dashboard exposed persisted conversation without auth",
+            private_restart_status, private_restart_body[:200])
+        resumed_status, _, resumed_body = raw(show_path, session_headers)
+        assert resumed_status == 200, (
+            "persisted session unreadable after restart",
+            resumed_status, resumed_body[:200])
+        resumed = json.loads(resumed_body)
+        interrupted = resumed.get("interrupted_turn")
+        assert isinstance(interrupted, dict), (
+            "restarted dashboard lost interrupted-turn marker", resumed)
+        assert interrupted.get("prompt") == interrupted_prompt, (
+            "restarted dashboard returned wrong interrupted prompt",
+            interrupted)
+        _chat_transport._clear_turn_marker(cfg, persisted_id)
+        assert _chat_transport._pending_interrupted_turn(cfg, persisted_id) is None, (
+            "clearing recovered marker did not remove it from shared store")
+        cleared_status, _, cleared_body = raw(show_path, session_headers)
+        assert cleared_status == 200, (
+            "session unavailable after clearing interrupted marker",
+            cleared_status, cleared_body[:200])
+        cleared_payload = json.loads(cleared_body)
+        assert cleared_payload.get("interrupted_turn") is None, (
+            "dashboard still offers an already-cleared interrupted turn",
+            cleared_payload)
+        assert resumed.get("session", {}).get("id") == persisted_id, resumed
+        assert any(m.get("content") == persisted_text
+                   for m in resumed.get("messages", [])), (
+            "persisted message lost across dashboard restart", resumed)
 finally:
     ui.stop()
 

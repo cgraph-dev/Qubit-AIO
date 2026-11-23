@@ -51,7 +51,7 @@ STORE_FILE = "chat_sessions.json"
 # ``cancel()`` sets; the streaming path checks it (and the caller-supplied
 # ``cancel`` callable) before every emitted delta.
 _cancel_lock = threading.Lock()
-_cancel_events: Dict[str, threading.Event] = {}
+_cancel_events: Dict[str, List[threading.Event]] = {}
 
 # Live PTY-shaped sessions (line buffer + cursor state) keyed by session id.
 # The xterm UI sends keystrokes one at a time, so a frame handler that built a
@@ -515,6 +515,13 @@ def _chat_turn_marker_module() -> Any:
     cannot be imported, which degrades to "no marker" (never a broken turn).
     """
     try:
+        # The vendored TUI is shipped inside the installed wheel, not as a
+        # top-level Python dependency. Dashboard chat can start without the
+        # runtime CLI having initialized its import path, so resolve the
+        # packaged runtime before importing the shared marker implementation.
+        from .qubit_runtime import ensure_path
+
+        ensure_path()
         from tui_gateway import turn_marker  # type: ignore[import-not-found]
 
         return turn_marker
@@ -1085,30 +1092,38 @@ def _escalation_route(cfg: Any, decision: Any,
 
 
 def _cancel_event(session_id: str) -> threading.Event:
+    """Register a distinct cancellation token for each in-flight turn.
+
+    Multiple turns can share a session. Reusing and clearing one Event would
+    inadvertently uncancel an older worker when a new turn starts.
+    """
+    ev = threading.Event()
     with _cancel_lock:
-        ev = _cancel_events.get(session_id)
-        if ev is None:
-            ev = threading.Event()
-            _cancel_events[session_id] = ev
-        return ev
+        _cancel_events.setdefault(session_id, []).append(ev)
+    return ev
 
 
 def cancel(session_id: str) -> Dict[str, Any]:
-    """Signal cancellation for the in-flight turn on ``session_id``."""
+    """Signal all in-flight turns for ``session_id``."""
     with _cancel_lock:
-        ev = _cancel_events.get(str(session_id or "").strip())
-    if ev is None:
+        events = tuple(_cancel_events.get(str(session_id or "").strip(), ()))
+        for ev in events:
+            ev.set()
+    if not events:
         return {"ok": False, "code": "NO_ACTIVE_TURN",
                 "detail": f"no in-flight chat turn for {session_id!r}"}
-    ev.set()
     _audit("cancel", session=session_id)
     return {"ok": True, "session_id": session_id, "cancelled": True}
 
 
 def _release_cancel(session_id: str, ev: threading.Event) -> None:
     with _cancel_lock:
-        if _cancel_events.get(session_id) is ev:
-            _cancel_events.pop(session_id, None)
+        events = _cancel_events.get(session_id)
+        if events is not None:
+            if ev in events:
+                events.remove(ev)
+            if not events:
+                _cancel_events.pop(session_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -4277,7 +4292,6 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
 
     st = store(cfg)
     ev = _cancel_event(sid)
-    ev.clear()
     prompt = clean
     if context:
         prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
@@ -4417,7 +4431,6 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
 
     st = store(cfg)
     ev = _cancel_event(sid)
-    ev.clear()
     prompt = clean
     if context:
         prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
@@ -4460,6 +4473,7 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
         except Exception as exc:  # noqa: BLE001 - typed, redacted
             box.put(("error", exc))
         finally:
+            _release_cancel(sid, ev)
             box.put(finished)
 
     thread = threading.Thread(target=_worker,
@@ -4469,9 +4483,24 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
     emitted: List[str] = []
     res: Any = None
     err: Optional[BaseException] = None
+    deadline = (started + float(timeout_s)) if timeout_s else None
     try:
         while True:
-            item = box.get()
+            # A provider may send an endless stream of chunks; enforce the
+            # total deadline even when the queue never becomes empty.
+            if deadline is not None and time.monotonic() >= deadline:
+                ev.set()
+                _audit("turn_remote_timeout", session=sid,
+                       timeout_s=float(timeout_s))
+                yield ("outcome", {"ok": False, "state": "FAILED",
+                                  "code": "TURN_TIMEOUT",
+                                  "detail": "remote provider exceeded turn timeout",
+                                  "session_id": sid})
+                return
+            try:
+                item = box.get(timeout=0.25)
+            except queue.Empty:
+                continue
             if item is finished:
                 break
             kind, value = item
@@ -4483,7 +4512,9 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
             elif kind == "error":
                 err = value
     finally:
-        _release_cancel(sid, ev)
+        # If the client disconnects, stop the provider; worker owns cleanup.
+        if thread.is_alive():
+            ev.set()
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if err is not None or res is None:
         _audit("turn_remote_error", session=sid,
@@ -4659,7 +4690,6 @@ def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
 
     st = store(cfg)
     ev = _cancel_event(sid)
-    ev.clear()
     prompt = clean
     if context:
         prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
@@ -5392,7 +5422,6 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "detail": appended.get("detail", "")}
         return
     ev = _cancel_event(sid)
-    ev.clear()
     started = time.monotonic()
     yield {"event": "start", "session_id": sid, "session": sid,
            "model": resolved_model, "message": appended.get("message"),
@@ -5497,6 +5526,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
             # so the crash marker must not survive: only a process death should
             # leave one behind for auto-continue to act on.
             _clear_turn_marker(cfg, sid)
+            _release_cancel(sid, ev)
             out.put(done)
 
     thread = threading.Thread(target=_worker, name=f"qubit-chat-stream-{sid}",
@@ -5508,6 +5538,14 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     try:
         deadline = (time.monotonic() + float(timeout_s)) if timeout_s else None
         while True:
+            if deadline is not None and time.monotonic() >= deadline:
+                ev.set()
+                _audit("stream_timeout", session=sid,
+                       timeout_s=float(timeout_s))
+                yield {"event": "error", "code": "TURN_TIMEOUT",
+                       "detail": "provider exceeded the turn timeout",
+                       "session_id": sid}
+                return
             try:
                 # A blocking get() is how a stalled provider used to hang the
                 # caller forever: timeout_s was accepted and never applied, so
@@ -5517,6 +5555,9 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 item = out.get(timeout=0.25)
             except queue.Empty:
                 if deadline is not None and time.monotonic() > deadline:
+                    # Signal the still-running provider before returning the
+                    # terminal timeout. The worker owns cancellation cleanup.
+                    ev.set()
                     _audit("stream_timeout", session=sid,
                            timeout_s=float(timeout_s))
                     yield {"event": "error", "code": "TURN_TIMEOUT",
@@ -5552,7 +5593,10 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                        "detail": detail, "session_id": sid}
                 return
     finally:
-        _release_cancel(sid, ev)
+        # A disconnected client must not orphan a still-running provider.
+        # The worker releases the cancellation handle on completion.
+        if thread.is_alive():
+            ev.set()
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if _stopped():
         _audit("stream_cancelled", session=sid, elapsed_ms=elapsed_ms)

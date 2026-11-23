@@ -208,6 +208,40 @@ def test_rollback_restores_pre_apply_revision(isolated):
     assert isolated["sentinel"].read_text() == "user-state-survives\n"
 
 
+def test_update_and_rollback_preserve_user_config_and_private_state(isolated):
+    """Code revision changes must not overwrite operator-owned state."""
+    cfg = isolated["cfg"]
+    private_dir = isolated["qubit_home"] / "profiles"
+    private_dir.mkdir(parents=True)
+    credentials = private_dir / "provider-credentials.json"
+    credentials.write_text('{"provider":"local","secret_ref":"env:USER_KEY"}\\n')
+    sessions = isolated["qubit_home"] / "sessions.jsonl"
+    sessions.write_text('{"id":"session-before-upgrade"}\\n')
+    config_before = cfg.path.read_text()
+    credentials_before = credentials.read_bytes()
+    sessions_before = sessions.read_bytes()
+
+    applied = UM.full_apply(cfg, confirm=True, source="origin", runner=_run,
+                            actor="test:state-preservation")
+    assert applied["state"] == "OK", applied
+    assert _git(isolated["checkout"], "rev-parse", "HEAD") == isolated["v2"]
+    assert credentials.read_bytes() == credentials_before
+    assert sessions.read_bytes() == sessions_before
+    # Migration may add schema metadata but must retain operator settings.
+    import yaml
+    migrated = yaml.safe_load(cfg.path.read_text())
+    original = yaml.safe_load(config_before)
+    assert migrated["update"]["repo_root"] == original["update"]["repo_root"]
+    assert migrated["logging"] == original["logging"]
+
+    rolled_back = UM.rollback(cfg, runner=_run,
+                              actor="test:state-preservation")
+    assert rolled_back["ok"] is True, rolled_back
+    assert _git(isolated["checkout"], "rev-parse", "HEAD") == isolated["v1"]
+    assert credentials.read_bytes() == credentials_before
+    assert sessions.read_bytes() == sessions_before
+
+
 def test_no_real_reference_home_is_required(isolated):
     """Path resolution is confined to the temp HOME; nothing reads ~/.hermes."""
     cfg = isolated["cfg"]
