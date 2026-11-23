@@ -934,12 +934,12 @@ async def get_logs(
                                 f"Available: {', '.join(sorted(COMPONENT_PREFIXES))}")
     # Free-text search must inspect the entire log; a fixed tail of 2000
     # lines silently hides older matches and breaks pagination.
-    if search and cap > 0:
+    if (search or min_level or comp_prefixes is not None) and cap > 0:
         from qubit_cli.log_search import search_log_page
         from qubit_cli.logs import _LineFilter
         def _search():
             return search_log_page(
-                log_path, needle=search, offset=offset, limit=cap,
+                log_path, needle=search or "", offset=offset, limit=cap,
                 accept_line_factory=lambda: _LineFilter(
                     min_level=min_level, component_prefixes=comp_prefixes))
         page, has_more = await asyncio.to_thread(_search)
@@ -947,7 +947,7 @@ async def get_logs(
                 "returned": len(page), "has_more": has_more,
                 "next_offset": (offset + len(page)) if has_more else None}
 
-    # Non-search requests retain the existing tail-based pagination contract.
+    # Unfiltered requests retain the existing tail-based pagination contract.
     read_n = max(1, offset + cap + 1)
 
     def _load_logs():
