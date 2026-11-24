@@ -763,6 +763,46 @@ def test_approvals_cancel_settles_staged_config_write(ui_server):
     assert not any(a["id"] == cid for a in after.get("approvals", [])), after
 
 
+def test_named_config_approval_reads_back_from_the_owning_profile(ui_server):
+    from voicebridge import qubit_runtime
+
+    qubit_runtime.ensure_path()
+    from qubit_cli import profiles
+
+    profile = "config-audit"
+    home = profiles.get_profile_dir(profile)
+    home.mkdir(parents=True)
+    (home / "config.yaml").write_text("{}\n")
+    base, token = ui_server
+
+    settings = "/agent/api/config"
+    named = f"{settings}?profile={profile}"
+    default = f"{settings}?profile=default"
+    before_named = _api(base, token, "GET", named)[1]["voice"]["input_engine"]
+    before_default = _api(base, token, "GET", default)[1]["voice"]["input_engine"]
+    assert before_named != "local" and before_default != "local"
+
+    edit = {"config": {"voice": {"input_engine": "local"}}}
+    status, stage = _api(base, token, "PUT", named, edit)
+    assert status == 409 and stage["code"] == "CONFIRM_REQUIRED", stage
+    receipt = {"confirmation_id": stage["confirmation_id"]}
+    confirm = "/agent/api/ops/confirm"
+    cancel = "/agent/api/ops/cancel"
+
+    for target, attempted in ((default, edit), (named, {"config": {"browser": {"headed": True}}})):
+        status, rejected = _api(base, token, "PUT", target, {**attempted, **receipt})
+        assert status == 409 and rejected["code"] == "CONFIRM_REQUIRED", rejected
+        assert rejected["confirmation_id"] != receipt["confirmation_id"]
+        _api(base, token, "POST", cancel, {"confirmation_id": rejected["confirmation_id"]})
+
+    status, accepted = _api(base, token, "POST", confirm, receipt)
+    assert status == 200 and accepted["state"] == "executed", accepted
+    assert _api(base, token, "GET", named)[1]["voice"]["input_engine"] == "local"
+    assert _api(base, token, "GET", default)[1]["voice"]["input_engine"] == before_default
+    status, duplicate = _api(base, token, "POST", confirm, receipt)
+    assert status == 400 and duplicate["code"] == "NO_CONFIRMATION", duplicate
+
+
 def test_approvals_confirm_settles_staged_config_write(ui_server):
     """The approvals Confirm path executes a staged ``qubit.config.write``.
 

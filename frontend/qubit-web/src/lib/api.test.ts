@@ -634,6 +634,25 @@ describe("api.saveConfig / api.powerAction / api.getPowerStatus", () => {
     expect(body.config).toEqual({ ui: { theme: "dark" } });
   });
 
+  it("cancels the staged approval when a Config save is declined", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(confirmEnvelope("settings-stage"), 409))
+      .mockResolvedValueOnce(jsonResponse({ state: "executed", receipt: { cancelled: 1 } }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.saveConfig({ browser: { headed: true } }, "work", false, () => false))
+      .rejects.toBeInstanceOf(ConfirmRequiredError);
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/agent/api/config?profile=work",
+      "/agent/api/ops/cancel",
+    ]);
+    const [, request] = fetchMock.mock.calls[1];
+    expect(request?.method).toBe("POST");
+    expect(JSON.parse(String(request?.body))).toEqual({ confirmation_id: "settings-stage" });
+  });
+
   it("posts an explicitly confirmed power action", async () => {
     const fetchMock = jsonFetchMock({ state: "OK", health: "degraded" });
     vi.stubGlobal("fetch", fetchMock);
