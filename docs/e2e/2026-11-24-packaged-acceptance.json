@@ -406,6 +406,14 @@
       "command": "POST /agent/api/qubit/chat/sessions/{id}/continue?profile=work with a stable request_id; verify fresh and repeated requests, new session messages, next provider turn, and gateway restart",
       "observed": "The selected gateway copied the original user and assistant rows into a separate active chat. The next turn sent those rows in their original roles to the provider, and SQLite read-back matched the copied transcript and saved reply. The source stayed intact, conflicting profile selectors were refused, and the default profile could not see the copy. Exact retry returned the same ID before and after restart. Chromium opened the legacy chat and activated Continue in new chat with the keyboard at 390px and 1440px, then reloaded the same copied transcript.",
       "scope": "The source gateway and built dashboard used disposable state. Deployed and rebuilt-wheel verification are open."
+    },
+    {
+      "check": "Named-profile recovery and cancellation after a lost dashboard stream",
+      "status": "PASS",
+      "environment": "Source dashboard and gateway, disposable named profile and gated loopback SSE provider",
+      "command": "POST the named stream with a submission_id, reset the HTTP connection after the start event, wait for relay cleanup, then POST /agent/api/qubit/chat/recover with the same profile, session and submission ID",
+      "observed": "One detached turn completed and the correct provider reply appeared in the transcript. An exact retry returned the terminal result with one provider invocation and one SQLite admission. A separate detached turn stopped through the recovery endpoint and did not persist the late provider reply. A different ID did not match either receipt. Native tests resolved an identical submission ID independently for two authenticated principals. Chromium at 390px and 1440px restored the pending turn after reload, blocked Send, and fetched the canonical transcript when Check turn settled. The dashboard and API selection passed 97 tests, the Python route selection passed 21, and the native receipt selection passed four.",
+      "scope": "The deployed build, image inputs, turn-scoped overrides and recovery under load remain open."
     }
   ],
   "cancellation_fix_artifact": {

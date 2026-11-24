@@ -59,6 +59,7 @@ const apiMocks = vi.hoisted(() => ({
     meta: {},
   })),
   continueChatHistory: vi.fn(async () => ({ session: { id: "active-copy" } })),
+  recoverProfileChatTurn: vi.fn(),
   patchChatSession: vi.fn(async () => ({ ok: true })),
   createChatSession: vi.fn(async () => ({
     session: { id: "fresh-after-switch" },
@@ -111,6 +112,7 @@ vi.mock("@/lib/api", () => ({
     describeChatImage: vi.fn(async () => ({ description: "described" })),
     getChatSession: apiMocks.getChatSession,
     continueChatHistory: apiMocks.continueChatHistory,
+    recoverProfileChatTurn: apiMocks.recoverProfileChatTurn,
     getProfileChatApproval: vi.fn(async () => ({ approval: null })),
     patchChatSession: apiMocks.patchChatSession,
     createChatSession: apiMocks.createChatSession,
@@ -313,6 +315,8 @@ async function typeAndSend(value: string) {
 
 beforeEach(() => {
   profileScope.profile = "";
+  window.sessionStorage.clear();
+  apiMocks.recoverProfileChatTurn.mockReset();
   capturedSessionListProps.length = 0;
   capturedSidebarProps.length = 0;
   apiMocks.getModelInfo.mockClear();
@@ -390,7 +394,7 @@ describe("Qubit ChatPage", () => {
     ));
     await typeAndSend("keep my draft");
     expect(streamChatTurn).toHaveBeenCalledWith(
-      { text: "keep my draft", session: "dashboard-chat", profile: "work" },
+      expect.objectContaining({ text: "keep my draft", session: "dashboard-chat", profile: "work", submission_id: expect.any(String) }),
       expect.any(Object),
       expect.anything(),
     );
@@ -1154,6 +1158,56 @@ describe("Qubit ChatPage", () => {
     });
     expect(container.textContent).toContain("Start a new run.");
   });
+});
+
+it("blocks a second named turn and reconciles the transcript after reload", async () => {
+  profileScope.profile = "work";
+  window.sessionStorage.setItem("qubit.chat.pending.work/dashboard-chat",
+    JSON.stringify({ id: "lost-response", text: "original prompt" }));
+  apiMocks.recoverProfileChatTurn.mockResolvedValue({ status: "terminal", outcome: "completed" });
+  await renderChatAt("/qubit-chat?profile=work&resume=dashboard-chat");
+
+  const check = () => [...container.querySelectorAll("button")].find((button) => button.textContent === "Check turn");
+  await vi.waitFor(() => expect(check()).toBeDefined());
+  await typeAndSend("duplicate prompt");
+  expect(streamChatTurn).not.toHaveBeenCalled();
+
+  apiMocks.getChatSessionMessages.mockResolvedValueOnce({
+    session_id: "dashboard-chat",
+    messages: [{ role: "assistant", content: "recovered reply" }],
+    total: 1,
+  });
+  await act(async () => check()?.click());
+  expect(apiMocks.recoverProfileChatTurn).toHaveBeenCalledWith("dashboard-chat", "work", "lost-response", false);
+  expect(container.textContent).toContain("recovered reply");
+  expect(window.sessionStorage.getItem("qubit.chat.pending.work/dashboard-chat")).toBeNull();
+});
+
+it("retries a missing named submission with the original text and ID", async () => {
+  streamChatTurn.mockResolvedValueOnce(undefined);
+  profileScope.profile = "work";
+  window.sessionStorage.setItem("qubit.chat.pending.work/dashboard-chat",
+    JSON.stringify({ id: "lost-response", text: "original prompt" }));
+  apiMocks.recoverProfileChatTurn.mockResolvedValue({ status: "missing" });
+  await renderChatAt("/qubit-chat?profile=work&resume=dashboard-chat");
+  const button = (label: string) => [...container.querySelectorAll("button")].find(
+    (node) => node.textContent === label,
+  );
+  await vi.waitFor(() => expect(button("Check turn")).toBeDefined());
+  expect(button("Retry same message")).toBeUndefined();
+  await act(async () => button("Check turn")?.click());
+  await act(async () => {
+    const retry = button("Retry same message");
+    expect(retry).toBeDefined();
+    retry?.click();
+    retry?.click();
+  });
+  expect(streamChatTurn).toHaveBeenCalledTimes(1);
+  expect(streamChatTurn).toHaveBeenCalledWith(
+    { text: "original prompt", session: "dashboard-chat", profile: "work", submission_id: "lost-response" },
+    expect.any(Object),
+    expect.anything(),
+  );
 });
 
 it("continues a named legacy history and reuses the request after a lost response", async () => {

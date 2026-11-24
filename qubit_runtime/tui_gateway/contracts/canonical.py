@@ -40,7 +40,9 @@ class AdmissionStatus(Result):
 
 class PromptReceiptParams(Params):
     session_id: str
-    admission_id: str
+    admission_id: str | None = None
+    # The original caller's exact submission when its admission ACK was lost.
+    submission_id: str | None = None
     include_result: bool | None = None
 
 

@@ -216,3 +216,9 @@ or deny over authenticated HTTP. Chromium exercised Continue in new chat and
 reloaded the same copied session. A separate provider turn consumed the copied
 messages in their original roles. An exact retry after gateway restart resolved
 to the same copy. The row still requires deployed verification.
+
+The recovery row has disposable evidence for a dropped HTTP connection during
+an admitted turn. The dashboard can inspect the exact receipt, refresh the
+transcript after settlement, and stop a turn after the relay detaches. A retry
+uses the same submission ID, and the gateway kept one admission and one provider
+request. Image turns, turn-scoped overrides, and recovery under load remain open.

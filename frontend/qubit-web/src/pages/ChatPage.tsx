@@ -341,6 +341,17 @@ function storageSet(key: string, value: string): void {
   }
 }
 
+type PendingProfileTurn = { id: string; text: string };
+
+function savedProfileTurn(key: string): PendingProfileTurn | null {
+  try {
+    const turn = JSON.parse(window.sessionStorage.getItem(key) || "null");
+    return turn && typeof turn.id === "string" && typeof turn.text === "string" ? turn : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Read-through transcript cache. The server chat store
  * (`/api/qubit/chat/sessions/<id>/messages`) is authoritative and always
@@ -506,6 +517,32 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
     [pointerKey, resumeParam],
   );
   const transcriptKey = scopePrefix + session;
+  const recoveryKey = `qubit.chat.pending.${transcriptKey}`;
+  const pendingTurnRef = useRef<{ key: string; turn: PendingProfileTurn } | null>(null);
+  const [pendingProfileTurn, setPendingProfileTurn] = useState(pendingTurnRef.current);
+  const currentRecovery = pendingProfileTurn?.key === recoveryKey ? pendingProfileTurn.turn : null;
+  const [recoveryNotice, setRecoveryNotice] = useState("");
+  const [retrySubmission, setRetrySubmission] = useState("");
+  const retryPermission = useRef("");
+  const [recovering, setRecovering] = useState(false);
+  const recoveryLock = useRef(false);
+  const rememberTurn = useCallback((turn: PendingProfileTurn | null) => {
+    const entry = turn ? { key: recoveryKey, turn } : null;
+    pendingTurnRef.current = entry;
+    setPendingProfileTurn(entry);
+    try {
+      if (turn) window.sessionStorage.setItem(recoveryKey, JSON.stringify(turn));
+      else window.sessionStorage.removeItem(recoveryKey);
+    } catch {
+      // The pending ID remains in memory if storage is unavailable.
+    }
+  }, [recoveryKey]);
+  useEffect(() => {
+    if (routed) rememberTurn(savedProfileTurn(recoveryKey));
+    setRecoveryNotice("");
+    retryPermission.current = "";
+    setRetrySubmission("");
+  }, [recoveryKey, rememberTurn, routed]);
   const readMessages = useCallback((id: string, limit?: number) => {
     if (scopedProfile) return api.getChatSessionMessages(id, limit ?? 500, scopedProfile);
     return limit === undefined ? api.getChatSessionMessages(id) : api.getChatSessionMessages(id, limit);
@@ -1122,9 +1159,18 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   }, []);
 
   const send = useCallback(
-    (raw: string, activity: "thinking" | "summarizing" = "thinking") => {
+    (raw: string, activity: "thinking" | "summarizing" = "thinking", retryId?: string) => {
       const text = (raw || "").trim();
-      if (!text || busy) return;
+      const previous = pendingTurnRef.current;
+      if (!text || busy || (routed && previous?.key === recoveryKey && previous.turn.id !== retryId)) return;
+      if (retryId && retryPermission.current !== retryId) return;
+      retryPermission.current = "";
+      const submissionId = routed ? (retryId ?? generateChatChannel()) : undefined;
+      if (submissionId) {
+        rememberTurn({ id: submissionId, text });
+        setRetrySubmission("");
+        setRecoveryNotice("");
+      }
       void emitFxAt("impact", composerRef.current, { scale: 0.7 });
       setInput("");
       setError(null);
@@ -1155,7 +1201,8 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       // The reasoning selector rides along (null = session preference, which
       // the server resolves from the persisted session metadata).
       streamChatTurn(
-        { text, session, ...(reasoning ? { reasoning } : {}), ...(scopedProfile ? { profile: scopedProfile } : {}) },
+        { text, session, ...(reasoning ? { reasoning } : {}), ...(scopedProfile ? { profile: scopedProfile } : {}),
+          ...(submissionId ? { submission_id: submissionId } : {}) },
         {
           onDelta: (delta, event) => {
             if (controller.signal.aborted) return;
@@ -1202,6 +1249,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           },
           onDone: (event) => {
             if (controller.signal.aborted) return;
+            if (submissionId) rememberTurn(null);
             // Authoritative settle: a done frame that no longer carries the
             // signal clears the banner; one that still carries it keeps it.
             setPendingConfirm(extractPendingConfirm(event));
@@ -1269,6 +1317,12 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           },
           onError: (event) => {
             if (controller.signal.aborted) return;
+            const refusedBeforeSubmit = event.code === "CHAT_GATEWAY_REFUSED"
+              || event.code === "CHAT_SESSION_MOVED" || event.code === "CHAT_SESSION_BUSY"
+              || event.code === "CHAT_PROFILE_WORKER_UNAVAILABLE";
+            if (submissionId && (event.code === "CHAT_GATEWAY_TURN_FAILED" || (!retryId && refusedBeforeSubmit))) {
+              rememberTurn(null);
+            }
             setPendingConfirm(extractPendingConfirm(event));
             setTaskProgress((prev) =>
               prev && prev.status === "working"
@@ -1282,8 +1336,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             setError(
               `[${event.code ?? "TURN_FAILED"}] ${event.detail ?? "turn failed"}`,
             );
-            if (routed && (event.code === "CHAT_GATEWAY_REFUSED"
-                || event.code === "CHAT_SESSION_MOVED" || event.code === "CHAT_SESSION_BUSY")) {
+            if (routed && refusedBeforeSubmit) {
               setInput(text);
               setMessages((rows) => rows.slice(0, -1));
             } else if (!routed) {
@@ -1297,6 +1350,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           },
           onCancelled: (event) => {
             if (controller.signal.aborted) return;
+            if (submissionId) rememberTurn(null);
             setPendingConfirm(extractPendingConfirm(event));
             setTaskProgress((prev) =>
               prev && prev.status === "working"
@@ -1315,14 +1369,15 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           if (controller.signal.aborted) return;
           const failure = parseTurnError(err);
           if (failure.startsWith("[CHAT_ADMISSION_UNCONFIRMED]")) {
-            setError(failure);
+            setError(routed ? "The connection dropped before the turn settled." : failure);
           } else if (routed) {
             if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OVERRIDE_UNSUPPORTED|MALFORMED|EMERGENCY_STOP)\]/.test(failure)) {
+              if (submissionId && !retryId) rememberTurn(null);
               setInput(text);
               setMessages((rows) => rows.slice(0, -1));
               setError(failure);
             } else {
-              setError(`${failure} Reload the chat before sending again.`);
+              setError(failure);
             }
           } else {
             setError(failure);
@@ -1334,8 +1389,51 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           if (!controller.signal.aborted) setBusy(false);
         });
     },
-    [busy, session, reasoning, followLiveVoice, routed, scopedProfile],
+    [busy, session, reasoning, followLiveVoice, routed, scopedProfile, recoveryKey, rememberTurn],
   );
+
+  async function checkProfileTurn(cancel: boolean) {
+    if (!currentRecovery || recoveryLock.current) return;
+    const stamp = loadReqRef.current;
+    recoveryLock.current = true;
+    setRecovering(true);
+    setError(null);
+    setRecoveryNotice("");
+    retryPermission.current = "";
+    setRetrySubmission("");
+    try {
+      const receipt = await api.recoverProfileChatTurn(session, scopedProfile, currentRecovery.id, cancel);
+      if (loadReqRef.current !== stamp) return;
+      if (receipt.status === "missing" || receipt.status === "terminal") {
+        const transcript = await readMessages(session);
+        if (loadReqRef.current !== stamp) return;
+        const rows = (transcript.messages ?? []).map(toChatMessage);
+        setMessages(rows);
+        saveTranscript(transcriptKey, rows);
+        if (receipt.status === "missing") {
+          retryPermission.current = currentRecovery.id;
+          setRetrySubmission(currentRecovery.id);
+          setRecoveryNotice("The gateway has no receipt for this turn. You can retry the same message.");
+        } else {
+          rememberTurn(null);
+          setSessionListNonce((nonce) => nonce + 1);
+          setVoiceNotice(receipt.outcome === "cancelled" || receipt.outcome === "interrupted"
+            ? "The gateway stopped the turn."
+            : "The turn has settled. The transcript is up to date.");
+        }
+      } else {
+        setRecoveryNotice(receipt.status === "unknown"
+          ? "The gateway could not establish the outcome. Check again before resending."
+          : cancel ? "The stop request was sent. Check the turn again for its final status."
+            : "The gateway still has this turn queued or running.");
+      }
+    } catch {
+      if (loadReqRef.current === stamp) setRecoveryNotice("The gateway is unavailable. Check again to recover this turn.");
+    } finally {
+      recoveryLock.current = false;
+      setRecovering(false);
+    }
+  }
 
   const stopProfileTurn = useCallback(() => {
     void api.cancelProfileChatTurn(session, scopedProfile).catch((failure: unknown) => {
@@ -2974,6 +3072,31 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             </div>
           ) : null}
 
+          {routed && currentRecovery && !busy ? (
+            <div className="mt-2 flex flex-col items-start gap-2 rounded-md border border-border px-3 py-2">
+              <p role="status" className="text-sm text-text-secondary">
+                {recoveryNotice || "Check your last turn before sending another message."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <NativeButton type="button" className="min-h-[44px]" disabled={recovering}
+                  onClick={() => void checkProfileTurn(false)}>
+                  Check turn
+                </NativeButton>
+                {retrySubmission === currentRecovery.id ? (
+                  <NativeButton type="button" className="min-h-[44px]" disabled={recovering}
+                    onClick={() => send(currentRecovery.text, "thinking", currentRecovery.id)}>
+                    Retry same message
+                  </NativeButton>
+                ) : (
+                  <NativeButton type="button" outlined className="min-h-[44px]" disabled={recovering}
+                    onClick={() => void checkProfileTurn(true)}>
+                    Stop turn
+                  </NativeButton>
+                )}
+              </div>
+            </div>
+          ) : null}
+
           {routed && legacySession === session && transcriptState === "ready" ? (
             <div className="mt-2 flex flex-col items-start gap-2 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center">
               <p className="min-w-0 flex-1 text-sm text-text-secondary">
@@ -3217,7 +3340,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             ) : (
             <Button
               type="button"
-              disabled={busy || !input.trim()}
+              disabled={busy || Boolean(currentRecovery) || !input.trim()}
               aria-label="Send"
               onClick={() => send(input)}
             >

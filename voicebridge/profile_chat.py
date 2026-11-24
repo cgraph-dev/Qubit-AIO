@@ -41,7 +41,7 @@ def _result(outcome: str | None, reply: Any, session: str) -> dict:
     return _error("CHAT_GATEWAY_TURN_FAILED", "The profile gateway did not complete the turn.", session)
 
 
-async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped):
+async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id):
     from qubit_cli.gateway_client import GatewayRPCError
     from tui_gateway.owner_forward import _REFUSED_BEFORE_COMMIT, connect_owner
 
@@ -58,13 +58,13 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                 return
             submitted = True
             admitted = await client.rpc("prompt.submit", session_id=target, text=text,
-                                        submission_id=uuid.uuid4().hex)
+                                        submission_id=submission_id)
             admission = admitted.get("admission_id")
             if not isinstance(admission, str) or not admission:
                 if admitted.get("voice_stopped") is True:
                     yield _result("cancelled", None, session)
                 else:
-                    yield _error("CHAT_ADMISSION_UNCONFIRMED", "Reload the chat before sending again.", session)
+                    yield _error("CHAT_ADMISSION_UNCONFIRMED", "Check the last turn before sending again.", session)
                 return
             with _lock:
                 turn.target, turn.admission = target, admission
@@ -108,7 +108,7 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                     yield {"event": "delta", "text": payload["text"], "session_id": session}
                 elif params.get("type") == "message.complete":
                     status = "terminal"
-        yield _error("CHAT_ADMISSION_UNCONFIRMED", "Reload the chat before sending again.", session)
+        yield _error("CHAT_ADMISSION_UNCONFIRMED", "Check the last turn before sending again.", session)
     except GatewayRPCError as exc:
         reason = str(exc.data.get("reason") or exc)
         if reason == "session_read_only" and not turn.admission:
@@ -117,14 +117,14 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
         elif not submitted or (not turn.admission and reason in _REFUSED_BEFORE_COMMIT):
             yield _error("CHAT_GATEWAY_REFUSED", f"The profile gateway refused the turn ({reason}).", session)
         else:
-            yield _error("CHAT_ADMISSION_UNCONFIRMED", "Reload the chat before sending again.", session)
+            yield _error("CHAT_ADMISSION_UNCONFIRMED", "Check the last turn before sending again.", session)
     except Exception:  # Owner connection and protocol failures cannot safely be retried after submission.
         code = "CHAT_ADMISSION_UNCONFIRMED" if submitted else "CHAT_PROFILE_WORKER_UNAVAILABLE"
-        detail = "Reload the chat before sending again." if submitted else "The selected profile gateway is unavailable."
+        detail = "Check the last turn before sending again." if submitted else "The selected profile gateway is unavailable."
         yield _error(code, detail, session)
 
 
-def events(home: Path, endpoint, session: str, text: str, *, cfg=None):
+def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None):
     """Run the gateway relay on the calling HTTP thread and close its socket on exit."""
     from .plugins import estop_engaged
     from .power import power_control
@@ -155,7 +155,7 @@ def events(home: Path, endpoint, session: str, text: str, *, cfg=None):
         if control is not None:
             control.track(correlation, stop_turn)
         with asyncio.Runner() as runner:
-            stream = _events(home, endpoint, session, text, turn, stopped)
+            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex)
             try:
                 while True:
                     yield runner.run(anext(stream))
@@ -184,6 +184,30 @@ def cancel(home: Path, session: str) -> tuple[int, dict]:
     except Exception:
         return 409, {"ok": False, "code": "CHAT_CANCELLATION_UNCONFIRMED"}
     return 200, {"ok": True, "session_id": session}
+
+
+def recover(home: Path, session: str, submission: str, *, cancel_turn=False) -> dict:
+    """Look up a turn on the owning gateway without submitting any input."""
+    from qubit_cli.gateway_client import GatewayRPCError
+    from tui_gateway.owner_forward import connect_owner, discover_owner
+
+    async def recover_owner(endpoint):
+        async with connect_owner(home, endpoint) as client:
+            if cancel_turn:
+                snapshot = await client.rpc("session.resume", session_id=session, omit_messages=True)
+                if snapshot.get("stored_session_id") != session or snapshot.get("session_id") != session:
+                    raise ValueError("The chat moved to another session.")
+            try:
+                receipt = await client.rpc("prompt.receipt", session_id=session, submission_id=submission)
+            except GatewayRPCError as exc:
+                if exc.data.get("reason") == "not_found" and exc.data.get("field") == "submission_id":
+                    return {"status": "missing"}
+                raise
+            if cancel_turn and receipt["status"] in ("queued", "started"):
+                receipt = await client.rpc("prompt.cancel", session_id=session, admission_id=receipt["admission_id"])
+            return {"status": receipt["status"], "outcome": receipt.get("outcome")}
+
+    return asyncio.run(recover_owner(discover_owner(home)))
 
 
 def _cancel_admission(home: Path, target: str, admission: str) -> None:
