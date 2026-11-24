@@ -638,7 +638,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         ...availableThemes.map((t) => t.name),
         ...Object.keys(userThemeDefs),
       ]);
-      const next = knownNames.has(name) ? name : "q4";
+      const next = knownNames.has(name) ? name : "g3";
       themeChanged.current = true;
       setThemeName(next);
       writePreference(STORAGE_KEY, next);

@@ -10,34 +10,40 @@
  * in the node environment. Keep in sync with `_THEME_NAME_ALIASES` in
  * `qubit_cli/web_server_dashboard.py`.
  */
-/** The theme a fresh install starts on: Lofi SciFi (q6-l, large manga). */
-export const DEFAULT_THEME_NAME = "q6-l";
+/** The theme a fresh install starts on: Lofi SciFi (g4-l, large manga). */
+export const DEFAULT_THEME_NAME = "g4-l";
 
 export const THEME_NAME_ALIASES: Record<string, string> = {
-  // `default` is the owner's chosen default theme: Lofi SciFi (q6-l, the large
+  // `default` is the owner's chosen default theme: Lofi SciFi (g4-l, the large
   // manga variant). It is an explicit default, not a migration fallback — the
-  // stale ids below still resolve to Cyber Ghost (q4), which is the safe
+  // stale ids below still resolve to Cyber Ghost (g3), which is the safe
   // landing spot for a theme this install no longer ships.
-  default: "q6-l",
-  "default-large": "q6-l",
+  default: "g4-l",
+  "default-large": "g4-l",
   // Q1 (navy) and Q2 (grayscale) were removed at owner request; stored ids
-  // from either family resolve to Cyber Ghost (q4).
-  "nous-blue": "q4",
-  "lens-5i": "q4",
-  "qubit-blue": "q4",
-  q1: "q4",
-  "q1-l": "q4-l",
-  q2: "q4",
-  "q2-l": "q4-l",
-  q3: "q4",
-  "q3-l": "q4-l",
-  q5: "q4",
-  "q5-l": "q4-l",
-  qubit: "q4",
-  "qubit-contrast": "q4",
-  midnight: "q4",
-  mono: "q4",
-  cyberpunk: "q4",
+  // from either family resolve to Cyber Ghost (g3).
+  "nous-blue": "g3",
+  "lens-5i": "g3",
+  "qubit-blue": "g3",
+  q1: "g3",
+  "q1-l": "g3-l",
+  q2: "g3",
+  "q2-l": "g3-l",
+  q3: "g3",
+  "q3-l": "g3-l",
+  q5: "g3",
+  "q5-l": "g3-l",
+  qubit: "g3",
+  "qubit-contrast": "g3",
+  midnight: "g3",
+  mono: "g3",
+  cyberpunk: "g3",
+  // The pre-rename ids of the two SURVIVING themes. These were live until the
+  // id/label offset was removed, so a stored preference can still carry them.
+  q4: "g3",
+  "q4-l": "g3-l",
+  q6: "g4",
+  "q6-l": "g4-l",
 };
 
 export function migrateThemeName(name: string): string {

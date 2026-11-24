@@ -416,7 +416,7 @@ SAFE_MUTATION_MATRIX = [
      ["platform", "reachable", "state", "ok"]),
     ("memory", "PUT", "/api/memory/provider", {},
      ["active", "config", "qubit_counterpart", "ok"]),
-    ("system", "PUT", "/api/dashboard/theme", {"theme": "q4"},
+    ("system", "PUT", "/api/dashboard/theme", {"theme": "g3"},
      ["persisted", "theme", "ok"]),
     ("system", "PUT", "/api/dashboard/font", {"font": "Inter"},
      ["font", "persisted", "ok"]),

@@ -63,7 +63,7 @@ def test_themes_serve_vendored_builtins_plus_overlay(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     out = HC.themes_response(cfg)
     names = [t["name"] for t in out["themes"]]
-    for expected in ("q4", "q4-l", "q6", "q6-l"):
+    for expected in ("g3", "g3-l", "g4", "g4-l"):
         assert expected in names, names
     # The retired themes are gone from the served list, and the legacy ids are
     # only ever read-old.
@@ -72,10 +72,10 @@ def test_themes_serve_vendored_builtins_plus_overlay(tmp_path, monkeypatch):
                     "q5", "q5-l", "qubit", "q2", "q2-l", "q3", "q3-l"):
         assert retired not in names, names
     code, res = HC.dispatch(cfg, "PUT", "/api/dashboard/theme",
-                            {}, {"theme": "q4"})
+                            {}, {"theme": "g3"})
     assert code == 200 and res.get("persisted") is True, res
     code, res = HC.dispatch(cfg, "GET", "/api/dashboard/theme", {}, {})
-    assert res.get("theme") == "q4", res
+    assert res.get("theme") == "g3", res
     code, res = HC.dispatch(cfg, "PUT", "/api/dashboard/theme",
                             {}, {"theme": "nope"})
     assert code == 400 and res.get("code") == "NOT_FOUND", res
@@ -90,28 +90,34 @@ def test_legacy_theme_id_read_old_alias():
         _BUILTIN_DASHBOARD_THEMES, normalize_theme_name,
     )
 
-    assert normalize_theme_name("nous-blue") == "q4"
-    assert normalize_theme_name("qubit-blue") == "q4"
-    assert normalize_theme_name("midnight") == "q4"
-    assert normalize_theme_name("default-large") == "q6-l"
-    assert normalize_theme_name("default") == "q6-l"
-    assert normalize_theme_name("q1") == "q4"
-    assert normalize_theme_name("q1-l") == "q4-l"
-    assert normalize_theme_name("q5") == "q4"
-    assert normalize_theme_name("q5-l") == "q4-l"
-    assert normalize_theme_name("qubit") == "q4"
-    assert normalize_theme_name("qubit-contrast") == "q4"
+    assert normalize_theme_name("nous-blue") == "g3"
+    assert normalize_theme_name("qubit-blue") == "g3"
+    assert normalize_theme_name("midnight") == "g3"
+    assert normalize_theme_name("default-large") == "g4-l"
+    assert normalize_theme_name("default") == "g4-l"
+    assert normalize_theme_name("q1") == "g3"
+    assert normalize_theme_name("q1-l") == "g3-l"
+    assert normalize_theme_name("q5") == "g3"
+    assert normalize_theme_name("q5-l") == "g3-l"
+    assert normalize_theme_name("qubit") == "g3"
+    assert normalize_theme_name("qubit-contrast") == "g3"
+    # The PRE-RENAME ids of the surviving themes must still land: these were
+    # live until the id/label offset was removed, so stored prefs carry them.
+    assert normalize_theme_name("q4") == "g3"
+    assert normalize_theme_name("q4-l") == "g3-l"
+    assert normalize_theme_name("q6") == "g4"
+    assert normalize_theme_name("q6-l") == "g4-l"
     # The removed Q1/Q2 ids migrate too.
-    assert normalize_theme_name("q2") == "q4"
-    assert normalize_theme_name("q3") == "q4"
+    assert normalize_theme_name("q2") == "g3"
+    assert normalize_theme_name("q3") == "g3"
     # Canonical and unknown ids are untouched.
-    assert normalize_theme_name("q4") == "q4"
+    assert normalize_theme_name("g3") == "g3"
     assert normalize_theme_name("nope") == "nope"
     # The served built-in list carries only the canonical Q2..Q6 ids, and every
     # legacy id maps onto one of them.
     served = {t["name"] for t in _BUILTIN_DASHBOARD_THEMES}
-    assert "q4" in served and "q4-l" in served
-    assert "q6" in served and "q6-l" in served
+    assert "g3" in served and "g3-l" in served
+    assert "g4" in served and "g4-l" in served
     assert "q2" not in served and "q3" not in served
     for legacy in ("nous-blue", "qubit-blue", "midnight", "mono",
                    "cyberpunk", "default-large"):
@@ -158,20 +164,20 @@ def test_served_theme_list_matches_the_frontend_mirror(tmp_path, monkeypatch):
     served = [(t["name"], t["label"]) for t in out["themes"]]
 
     assert served == [
-        ("q4", "Cyber Ghost"),
-        ("q4-l", "Cyber Ghost-L"),
-        ("q6", "Lofi SciFi"),
-        ("q6-l", "Lofi SciFi-L"),
+        ("g3", "Cyber Ghost"),
+        ("g3-l", "Cyber Ghost-L"),
+        ("g4", "Lofi SciFi"),
+        ("g4-l", "Lofi SciFi-L"),
     ], served
 
     # An id that is not in the served list must never reach the picker.
     names = {name for name, _ in served}
-    assert names == {"q4", "q4-l", "q6", "q6-l"}
+    assert names == {"g3", "g3-l", "g4", "g4-l"}
 
     # `default` is the owner's chosen theme; a removed id lands on Cyber Ghost.
     # These are different questions and must not collapse into each other.
-    for stored, expected in (("default", "q6-l"), ("q2", "q4"),
-                             ("midnight", "q4"), ("q4", "q4")):
+    for stored, expected in (("default", "g4-l"), ("q2", "g3"),
+                             ("midnight", "g3"), ("g3", "g3")):
         cfg = _cfg(tmp_path, monkeypatch)
         prefs = HC._prefs_path(cfg)
         prefs.parent.mkdir(parents=True, exist_ok=True)

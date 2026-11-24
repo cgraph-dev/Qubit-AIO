@@ -7,7 +7,7 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme ids are Qubit-owned (`q4`, `q6`); the picker presents them in display
+ * Theme ids are Qubit-owned (`g3`, `g4`); the picker presents them in display
  * order as Q3/Q3-L and Q4/Q4-L. Q1/Q1-L (navy, internal `q2`) and Q2/Q2-L
  * (grayscale, internal `q3`) were removed at owner request; those ids still
  * migrate on read. Q5/Q5-L were removed the same way earlier. Every surviving
@@ -15,7 +15,7 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * size and roomier spacing. Theme names must stay in sync with the backend's
  * `_BUILTIN_DASHBOARD_THEMES` list in `qubit_cli/web_server_dashboard.py`.
  *
- * The fallback is `cyberpunkTheme` (internal q4, shown as Q3).
+ * The fallback is `cyberpunkTheme` (internal g3, shown as Q3).
  */
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ const LARGE_LAYOUT: Partial<ThemeLayout> = {
 
 /** Q3 "Cyber Ghost" — black canvas, monospace throughout, bright mint signal. */
 export const cyberpunkTheme: DashboardTheme = {
-  name: "q4",
+  name: "g3",
   label: "Cyber Ghost",
   description: "Black with monospace text and bright mint accents",
   palette: {
@@ -89,7 +89,7 @@ export const cyberpunkTheme: DashboardTheme = {
  *  any other theme turns it back off. The palette below is the fallback for
  *  the brief frame before the layer applies and for the theme-picker swatch. */
 export const mangaTheme: DashboardTheme = {
-  name: "q6",
+  name: "g4",
   label: "Lofi SciFi",
   description:
     "Manga — magenta frames, deep navy surfaces, and yellow accents",
@@ -123,8 +123,8 @@ export const mangaTheme: DashboardTheme = {
   terminalForeground: "#f7e9ff",
 };
 
-export const MANGA_THEME_NAME = "q6";
-export const MANGA_THEME_LARGE_NAME = "q6-l";
+export const MANGA_THEME_NAME = "g4";
+export const MANGA_THEME_LARGE_NAME = "g4-l";
 
 /** Theme ids retired at owner request. They are filtered out of a served
  *  list even if an older/rolling backend still returns them. */
@@ -169,12 +169,12 @@ function largeVariant(base: DashboardTheme, name: string): DashboardTheme {
 }
 
 // Display labels come from the base theme's own label, so these need no numbers.
-export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l");
-export const bigMangaTheme = largeVariant(mangaTheme, "q6-l");
+export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "g3-l");
+export const bigMangaTheme = largeVariant(mangaTheme, "g4-l");
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
-  q4: cyberpunkTheme,
-  "q4-l": bigCyberpunkTheme,
-  q6: mangaTheme,
-  "q6-l": bigMangaTheme,
+  g3: cyberpunkTheme,
+  "g3-l": bigCyberpunkTheme,
+  g4: mangaTheme,
+  "g4-l": bigMangaTheme,
 };

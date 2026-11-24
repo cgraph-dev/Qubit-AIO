@@ -324,15 +324,15 @@ def mount_spa(application: FastAPI):
 # ---------------------------------------------------------------------------
 
 # Built-in themes — label + description only; colors live in web/src/themes/presets.ts.
-# Qubit-owned ids q4 (shown as Q3) and q6 (shown as Q4), each with a `-L` large
+# Qubit-owned ids g3 (shown as Q3) and g4 (shown as Q4), each with a `-L` large
 # variant. Q1/Q1-L (q2), Q2/Q2-L (q3) and Q5/Q5-L were removed at owner request;
 # `default` and those ids are read-old aliases only.
 # Keep in sync with BUILTIN_THEMES in presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "q4",      "label": "Cyber Ghost", "description": "Cyber Ghost — black canvas, monospace throughout, bright mint signal colour"},
-    {"name": "q4-l",    "label": "Cyber Ghost-L", "description": "Cyber Ghost-L — the Cyber Ghost look with larger type and roomier spacing"},
-    {"name": "q6",      "label": "Lofi SciFi", "description": "Lofi SciFi — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
-    {"name": "q6-l",    "label": "Lofi SciFi-L", "description": "Lofi SciFi-L — the Lofi SciFi look with larger type and roomier spacing"},
+    {"name": "g3",      "label": "Cyber Ghost", "description": "Cyber Ghost — black canvas, monospace throughout, bright mint signal colour"},
+    {"name": "g3-l",    "label": "Cyber Ghost-L", "description": "Cyber Ghost-L — the Cyber Ghost look with larger type and roomier spacing"},
+    {"name": "g4",      "label": "Lofi SciFi", "description": "Lofi SciFi — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
+    {"name": "g4-l",    "label": "Lofi SciFi-L", "description": "Lofi SciFi-L — the Lofi SciFi look with larger type and roomier spacing"},
 ]
 
 # Theme ids a preference may still carry from before the normal-order set.
@@ -340,24 +340,29 @@ _BUILTIN_DASHBOARD_THEMES = [
 # resolves to a surviving theme instead of silently falling back to Q1/Q5 or
 # the retired Qubit Command overlay. Retired ids with no successor map to Q2.
 _THEME_NAME_ALIASES: Dict[str, str] = {
-    "nous-blue": "q4",
-    "lens-5i": "q4",
-    "qubit-blue": "q4",
-    "default": "q6-l",
-    "q1": "q4",
-    "q1-l": "q4-l",
-    "q2": "q4",
-    "q2-l": "q4-l",
-    "q3": "q4",
-    "q3-l": "q4-l",
-    "q5": "q4",
-    "q5-l": "q4-l",
-    "qubit": "q4",
-    "default-large": "q6-l",
-    "midnight": "q4",
-    "mono": "q4",
-    "cyberpunk": "q4",
-    "qubit-contrast": "q4",
+    "nous-blue": "g3",
+    "lens-5i": "g3",
+    "qubit-blue": "g3",
+    "default": "g4-l",
+    "q1": "g3",
+    "q1-l": "g3-l",
+    "q2": "g3",
+    "q2-l": "g3-l",
+    "q3": "g3",
+    "q3-l": "g3-l",
+    "q5": "g3",
+    "q5-l": "g3-l",
+    "qubit": "g3",
+    "default-large": "g4-l",
+    "midnight": "g3",
+    "mono": "g3",
+    "cyberpunk": "g3",
+    "qubit-contrast": "g3",
+    # Pre-rename ids of the surviving themes; a stored pref can still carry them.
+    "q4": "g3",
+    "q4-l": "g3-l",
+    "q6": "g4",
+    "q6-l": "g4-l",
 }
 
 

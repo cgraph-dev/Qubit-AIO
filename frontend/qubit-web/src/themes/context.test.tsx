@@ -45,17 +45,17 @@ describe("appearance preferences", () => {
     try {
       await act(async () => root.render(<ThemeProvider><ReadPreferences /></ThemeProvider>));
       await act(async () => {
-        preferences.setTheme("q6");
+        preferences.setTheme("g4");
         preferences.setFont("system-serif");
       });
       await act(async () => {
         themes.resolve({
-          themes: [{ name: "q4", label: "Cyber Ghost", description: "" }],
-          active: "q4",
+          themes: [{ name: "g3", label: "Cyber Ghost", description: "" }],
+          active: "g3",
         });
         font.resolve({ font: "inter" });
       });
-      expect(preferences.themeName).toBe("q6");
+      expect(preferences.themeName).toBe("g4");
       expect(preferences.fontId).toBe("system-serif");
       expect(preferences.availableThemes[0].label).toBe("Cyber Ghost");
       expect(document.documentElement.style.getPropertyValue("--theme-font-display")).toContain("Georgia");

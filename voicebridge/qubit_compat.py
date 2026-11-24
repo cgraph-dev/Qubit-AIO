@@ -21608,7 +21608,7 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
     if stored in names:
         active = stored
     else:
-        active = themes[0]["name"] if themes else "q4"
+        active = themes[0]["name"] if themes else "g3"
     return {"active": active, "themes": themes}
 
 
