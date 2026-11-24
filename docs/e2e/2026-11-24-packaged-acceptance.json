@@ -457,6 +457,17 @@
       "command": "pytest tests/test_chat_projections8u.py tests/test_sessions_mutations_wave18.py tests/test_route_wiring_fixes8u.py; vitest run src/pages/SessionsPage.test.tsx src/pages/SessionsPage.resume.test.tsx",
       "observed": "List, content search, counts, messages, activity, drafts, comments, CI details, export/import, lineage, rename, archive/restore, prune, empty cleanup and bulk deletion stayed on the selected profile. Archive recovery passed before prune. Preview and prune agreed that the compression ancestor was protected. The same approval ID with a changed profile or retention window could not prune. SQLite read-back preserved the sibling, archived, pinned, open and lineage records. Additive replay skipped an existing import. The focused suites passed 53 Python and 15 frontend tests.",
       "scope": "Named activity covers the transcript summary and recorded events. Listener Git and media readiness are outside that profile projection. Disposable session-history verification passed. Deployed testing is pending a build newer than 3d6595549328b150b9dcfc432adcc7119aae40f5."
+    },
+    {
+      "check": "QAI-007 model pickers preserve provider identity and profile",
+      "date": "2026-11-25",
+      "status": "PASS",
+      "environment": "Chromium against a production Vite bundle and authenticated disposable loopback dashboard with two custom provider fixtures and duplicated session IDs",
+      "revision": "6c15a8cb2e117bbae819e854a7dbe3e276e8bc27",
+      "bundle_index_sha256": "e1eb626cbfbe8abea73011be18881f8b3ff7931ecf5889c62acf36dbc086a343",
+      "command": "Open both chat hosts and the Models aliases, refresh the catalog, select the second provider for o3-mini, inspect save and queue responses and compare independent GET, reload, YAML and SQLite.",
+      "observed": "Six Models entry paths preserved the profile and fit the tested viewports. An injected 400 left the picker actionable and the stored pair intact. A subsequent save changed the named main model to custom:beta/o3-mini. Named reasoning read-back was true for beta and false for alpha. Qubit Chat persisted beta and its endpoint on the named conversation while the duplicate in the listener stayed on alpha. The terminal persisted beta as queued and retained alpha as active across reload. The build, 37 Python tests and 63 frontend tests passed.",
+      "scope": "Catalog and provider endpoints were fixtures. Deployed source revision 3d6595549328b150b9dcfc432adcc7119aae40f5 predates the repair. Live provider authentication and application of the queued selection on the next PTY prompt remain open."
     }
   ],
   "cancellation_fix_artifact": {
