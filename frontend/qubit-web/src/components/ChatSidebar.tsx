@@ -737,7 +737,7 @@ export function ChatSidebar({
                 setTerminalWatchVersion((version) => version + 1);
                 return response;
               }
-              const res = await api.patchChatSession(sessionId, { model, provider });
+              const res = await api.patchChatSession(sessionId, { model, provider }, profile);
               const applied = chatModelSelection(res.session) ?? { model, provider };
               onSessionModelChange?.(applied);
               setModelNotice(`Model set to ${applied.model.split("/").slice(-1)[0]} for this session.`);

@@ -341,6 +341,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/files": FilesPage,
   "/analytics": AnalyticsPage,
   "/models": ModelsPage,
+  "/qubit-models": () => <DashboardRouteAlias pathname="/models" />,
   "/model": () => <DashboardRouteAlias pathname="/models" />,
   "/providers": () => <DashboardRouteAlias pathname="/models" />,
   "/model-providers": () => <DashboardRouteAlias pathname="/models" />,

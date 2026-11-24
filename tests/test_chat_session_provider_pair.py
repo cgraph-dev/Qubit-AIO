@@ -272,3 +272,61 @@ def test_terminal_picker_queues_provider_without_relabeling_the_running_model(tm
     assert check["terminal_model_request"] == request
     assert "confirmed" not in request
     assert "min_context_tokens" not in request
+
+
+def test_named_main_model_save_and_reasoning_lookup_are_profile_owned(tmp_path, monkeypatch):
+    import yaml
+    from voicebridge import qubit_runtime
+
+    home = tmp_path / "runtime"
+    profile = home / "profiles" / "secondary"
+    profile.mkdir(parents=True)
+    (home / "config.yaml").write_text("model: listener-model\n")
+    (profile / "config.yaml").write_text(yaml.safe_dump({
+        "model": {"provider": "opencode-go", "default": "grok-4.7"},
+        "model_overrides": {
+            "opencode-go": {"grok-4.7": {"supports_reasoning": False}},
+            "cheapvibecode": {"grok-4.7": {"supports_reasoning": True}},
+        },
+    }))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    qubit_runtime.ensure_path()
+    _isolate_profile_host_state(monkeypatch)
+    cfg = _cfg(tmp_path, monkeypatch)
+    from fastapi import HTTPException
+    from qubit_cli import web_server_config
+    from qubit_cli.model_switch import ModelSwitchResult
+    from qubit_constants import get_qubit_home
+
+    def prepare(config, provider, model, base_url, api_key):
+        assert get_qubit_home() == profile
+        assert config["model"]["default"] == "grok-4.7"
+        if provider == "unavailable":
+            raise HTTPException(400, "Provider is unavailable")
+        return "", ModelSwitchResult(success=True, target_provider=provider,
+                                     new_model=model, provider_changed=True)
+
+    monkeypatch.setattr(web_server_config, "_prepare_main_assignment", prepare)
+    monkeypatch.setattr("qubit_cli.free_tier_bootstrap.reconcile_record", lambda: None)
+    main = "/api/model/set"
+    selected = {"profile": "secondary"}
+    pair = {"provider": "cheapvibecode", "model": "grok-4.7"}
+    assert HC.dispatch(cfg, "POST", main, selected, pair)[1]["confirm_required"]
+    assert yaml.safe_load((profile / "config.yaml").read_text())["model"]["provider"] == "opencode-go"
+    status, failure = HC.dispatch(cfg, "POST", main, selected,
+                                  {**pair, "provider": "unavailable", "confirm": True})
+    assert status == 400 and failure["code"] == "MODEL_SET_FAILED", failure
+    assert HC.dispatch(cfg, "POST", main, selected, {**pair, "profile": "default", "confirm": True})[0] == 400
+    status, saved = HC.dispatch(cfg, "POST", main, selected, {**pair, "confirm": True})
+    assert status == 200 and saved["provider"] == "cheapvibecode", saved
+
+    status, auxiliary = HC.dispatch(cfg, "GET", "/api/model/auxiliary", selected, {})
+    assert status == 200 and auxiliary["main"] == pair, auxiliary
+    status, capabilities = HC.dispatch(cfg, "GET", "/api/model/info", selected, {})
+    assert status == 200 and capabilities["capabilities"]["supports_reasoning"] is True, capabilities
+    status, prior = HC.dispatch(cfg, "GET", "/api/model/info",
+                                {**selected, "provider": "opencode-go", "model": "grok-4.7"}, {})
+    assert status == 200 and prior["capabilities"]["supports_reasoning"] is False, prior
+    assert yaml.safe_load((home / "config.yaml").read_text()) == {"model": "listener-model"}
+    persisted = yaml.safe_load((profile / "config.yaml").read_text())["model"]
+    assert (persisted["provider"], persisted["default"]) == ("cheapvibecode", "grok-4.7")

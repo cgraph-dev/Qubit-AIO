@@ -500,6 +500,7 @@ describe("ChatSidebar SSE event feed", () => {
       <ChatSidebar
         channel="chat-1"
         sessionId="dashboard-bound"
+        profile="work"
         onSessionModelChange={onSessionModelChange}
       />,
     );
@@ -521,7 +522,7 @@ describe("ChatSidebar SSE event feed", () => {
     expect(apiMocks.patchChatSession).toHaveBeenCalledWith("dashboard-bound", {
       model: "deepseek-v4.1-flash",
       provider: "opencode-go",
-    });
+    }, "work");
     expect(apiMocks.setModelAssignment).not.toHaveBeenCalled();
     expect(onSessionModelChange).toHaveBeenCalledWith({ model: "deepseek-v4.1-flash", provider: "opencode-go" });
   });

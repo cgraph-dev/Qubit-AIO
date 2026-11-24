@@ -1485,7 +1485,8 @@ export const api = {
     fetchJSON<AuxiliaryModelsResponse>(
       appendProfileParam("/api/model/auxiliary", profile),
     ),
-  getMoaModels: () => fetchJSON<MoaConfigResponse>("/api/model/moa"),
+  getMoaModels: (profile = getManagementProfile()) =>
+    fetchJSON<MoaConfigResponse>(appendProfileParam("/api/model/moa", profile)),
   saveMoaModels: (body: MoaConfigResponse) =>
     fetchJSON<MoaConfigResponse & { ok: boolean }>("/api/model/moa", {
       method: "PUT",

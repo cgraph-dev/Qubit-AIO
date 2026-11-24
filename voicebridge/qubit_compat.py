@@ -2111,8 +2111,54 @@ def _model_info_cache_key(cfg: Any, q: Dict[str, str]) -> Any:
                        _rc.stamp_of(*extra))
 
 
+def _model_management_profiled(handler):
+    @wraps(handler)
+    def scoped(cfg, q, b, p):
+        profile = str(q.get("profile") or "").strip()
+        body_profile = str(b.get("profile") or "").strip()
+        if profile and body_profile and profile != body_profile:
+            return 400, {"ok": False, "code": "MODEL_PROFILE_CONFLICT",
+                         "detail": "The query and body specify different model profiles."}
+        profile = profile or body_profile
+        try:
+            if settings_profile_home(cfg, {"profile": profile}) is not None:
+                from qubit_cli.web_server_profiles import _config_profile_scope
+
+                with _config_profile_scope(profile):
+                    return handler(cfg, q, b, p)
+            return handler(cfg, q, b, p)
+        except Exception as exc:
+            return _settings_profile_error(exc)
+    return scoped
+
+
+def _named_model_info(q):
+    from agent.models_dev import get_model_capabilities
+    from qubit_cli.config import load_config
+
+    config = load_config()
+    model_config = config.get("model") or {}
+    if not isinstance(model_config, dict):
+        model_config = {"default": model_config}
+    configured_model = str(model_config.get("default") or model_config.get("name") or "")
+    configured_provider = str(model_config.get("provider") or "")
+    model = str(q.get("model") or configured_model).strip()
+    provider = str(q.get("provider") or configured_provider).strip()
+    metadata = get_model_capabilities(provider, model, config=config) if model and provider else None
+    caps = {name: getattr(metadata, name, None) for name in _CAPABILITY_FIELDS} if metadata else {}
+    configured_context = model_config.get("context_length") if (
+        provider, model) == (configured_provider, configured_model) else None
+    context = int(caps.get("context_window") or 0)
+    return _ok(model=model, provider=provider, capabilities=caps, auto_context_length=context,
+               config_context_length=configured_context or 0,
+               effective_context_length=configured_context or context)
+
+
+@_model_management_profiled
 def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    if _chat_lifecycle_routed():
+        return _named_model_info(q)
     cache_key = _model_info_cache_key(cfg, q)
     cached = _rc.get(cache_key)
     if cached is not None:
@@ -2602,6 +2648,7 @@ def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _fail(exc)
 
 
+@_model_management_profiled
 def h_model_auxiliary(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/model/auxiliary -> real auxiliary-task assignments.
@@ -2707,6 +2754,7 @@ def _model_set_auxiliary(cfg: Any, b: Dict[str, Any]) -> Tuple[int, Dict[str, An
     return 200, out
 
 
+@_model_management_profiled
 def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/model/moa — the REAL, read-only MoA state for this profile.
@@ -2783,10 +2831,44 @@ def _publish_model_changed(cfg: Any, provider: str, model: str,
         pass
 
 
+def _named_model_assignment(cfg, b, scope):
+    from fastapi import HTTPException
+    from qubit_cli.config import load_config
+    from qubit_cli.web_routers._common import _CONFIG_MUTATION_LOCK
+    from qubit_cli.web_server_config import _apply_model_assignment_sync, _prepare_main_assignment
+
+    if _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP", "detail": "Emergency stop is latched."}
+    provider = str(b.get("provider") or "").strip()
+    model = str(b.get("model") or "").strip()
+    if scope == "main":
+        if not provider or not model:
+            return 400, {"ok": False, "code": "MALFORMED", "detail": "Choose a provider and model."}
+        if not any(_truthy(b.get(key)) for key in ("confirm", "confirmed", "confirm_expensive_model")):
+            return 200, {"ok": False, "scope": scope, "provider": provider, "model": model,
+                         "confirm_required": True, "confirm_message": f"Set the main model to {provider}/{model}?"}
+    task = str(b.get("task") or "").strip()
+    base_url = str(b.get("base_url") or "").strip()
+    options = {"reasoning_effort": b["reasoning_effort"]} if "reasoning_effort" in b else {}
+    try:
+        prepared = _prepare_main_assignment(load_config(), provider, model, base_url, "") if scope == "main" else None
+        with _CONFIG_MUTATION_LOCK:
+            result = _apply_model_assignment_sync(scope, provider, model, task, base_url, prepared=prepared, **options)
+    except HTTPException as exc:
+        return exc.status_code, {"ok": False, "code": "MODEL_SET_FAILED", "detail": _redact(str(exc.detail))[:300]}
+    if scope == "main" and result.get("ok"):
+        result.update(terminal_follows=False,
+                      terminal_detail="New chats in this profile will use the saved model.")
+    return 200, _strip_provider_secret_fields(result)
+
+
+@_model_management_profiled
 def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
     scope = str(b.get("scope", "main") or "main").lower()
+    if _chat_lifecycle_routed() and scope in {"main", "auxiliary"}:
+        return _named_model_assignment(cfg, b, scope)
     if scope == "auxiliary":
         return _model_set_auxiliary(cfg, b)
     if scope != "main":
@@ -8952,10 +9034,16 @@ def _chat_session_provider_pair(cfg: Any, provider: str, model: str,
     canon = str(row.get("slug") or slug)
     ep: Any = {}
     try:
-        if scoped:
+        if scoped or canon.startswith("custom:"):
             from qubit_cli.config import load_config
+            from qubit_cli.providers import resolve_custom_provider
 
-            ep = (load_config().get("providers") or {}).get(canon) or {}
+            config = load_config()
+            ep = (config.get("providers") or {}).get(canon) or {}
+            if not ep and canon.startswith("custom:"):
+                custom = resolve_custom_provider(canon, config.get("custom_providers"))
+                if custom is not None:
+                    ep = {"base_url": custom.base_url}
         else:
             ep = cfg.get("providers", canon, default={}) or {}
     except Exception:  # noqa: BLE001 - odd cfg objects degrade to registry read

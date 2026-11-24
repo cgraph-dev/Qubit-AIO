@@ -40,6 +40,7 @@ import {
   shouldCloseOuterModalOnEscape,
 } from "@/lib/dashboard-modal-shell";
 import { usePageHeader } from "@/contexts/usePageHeader";
+import { useProfileScope } from "@/contexts/useProfileScope";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
@@ -223,6 +224,7 @@ function UseAsMenu({
   onAssigned(): void;
 }) {
   const [open, setOpen] = useState(false);
+  const { profile } = useProfileScope();
   const menuAnchorRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -250,7 +252,7 @@ function UseAsMenu({
         provider,
         model,
         task,
-      });
+      }, profile || undefined);
       if (result.confirm_required) {
         setPendingConfirm({
           scope,
@@ -574,6 +576,7 @@ function AuxiliaryTasksModal({
   onClose(): void;
 }) {
   const [picker, setPicker] = useState<PickerTarget | null>(null);
+  const { profile } = useProfileScope();
   const [resetBusy, setResetBusy] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const modalRef = useModalBehavior({ open: true, onClose });
@@ -587,7 +590,7 @@ function AuxiliaryTasksModal({
         task: "__reset__",
         provider: "",
         model: "",
-      });
+      }, profile || undefined);
       onSaved();
     } finally {
       setResetBusy(false);
@@ -676,7 +679,7 @@ function AuxiliaryTasksModal({
         {picker && picker.kind === "aux" && (
           <ModelPickerDialog
             key={`picker-${refreshKey}`}
-            loader={api.getModelOptions}
+            loader={(options) => api.getModelOptions({ ...options, profile })}
             alwaysGlobal
             title={`Set Auxiliary: ${
               AUX_TASKS.find((t) => t.key === picker.task)?.label ??
@@ -689,7 +692,7 @@ function AuxiliaryTasksModal({
                 task: picker.task,
                 provider,
                 model,
-              });
+              }, profile || undefined);
               if (!result.confirm_required) onSaved();
               return result;
             }}
@@ -736,6 +739,7 @@ function MoaModelsModal({
   onClose(): void;
   onSaved(next: MoaConfigResponse): void;
 }) {
+  const { profile } = useProfileScope();
   const [draft, setDraft] = useState<MoaConfigResponse>(config);
   const ro = readOnly;
   const presetNames = Object.keys(draft.presets || {});
@@ -1036,7 +1040,7 @@ function MoaModelsModal({
           key={`moa-picker-${refreshKey}-${selected}-${picker.kind}-${
             picker.kind === "reference" ? picker.index : "agg"
           }`}
-          loader={api.getModelOptions}
+          loader={(options) => api.getModelOptions({ ...options, profile })}
           alwaysGlobal
           title="Select MoA Model"
           onApply={async ({ provider, model }) => {
@@ -1082,6 +1086,7 @@ function ModelSettingsPanel({
   refreshKey: number;
   onSaved(): void;
 }) {
+  const { profile } = useProfileScope();
   const [auxModalOpen, setAuxModalOpen] = useState(false);
   const [moaModalOpen, setMoaModalOpen] = useState(false);
   const [moa, setMoa] = useState<MoaConfigResponse | null>(null);
@@ -1097,7 +1102,7 @@ function ModelSettingsPanel({
   useEffect(() => {
     let live = true;
     api
-      .getMoaModels()
+      .getMoaModels(profile || undefined)
       .then((next) => {
         if (live) setMoa(next);
       })
@@ -1107,7 +1112,7 @@ function ModelSettingsPanel({
     return () => {
       live = false;
     };
-  }, [refreshKey]);
+  }, [profile, refreshKey]);
 
   const mainProv = activeProfile?.provider ?? aux?.main?.provider ?? "";
   const mainModel = activeProfile?.model ?? aux?.main?.model ?? "";
@@ -1135,7 +1140,7 @@ function ModelSettingsPanel({
       task,
       provider,
       model,
-    });
+    }, profile || undefined);
     if (!result.confirm_required) onSaved();
     void emitFx(result.confirm_required ? "approval" : "success");
     return result;
@@ -1273,7 +1278,7 @@ function ModelSettingsPanel({
         {picker && (
           <ModelPickerDialog
             key={`picker-${refreshKey}`}
-            loader={api.getModelOptions}
+            loader={(options) => api.getModelOptions({ ...options, profile })}
             alwaysGlobal
             title="Set Main Model"
             currentOverride={
@@ -1528,6 +1533,12 @@ const EMPTY_MODEL_TOTALS: ModelsAnalyticsResponse["totals"] = {
 };
 
 export default function ModelsPage() {
+  const { profile, currentProfile } = useProfileScope();
+  const named = !!profile && profile !== "current" && profile !== currentProfile;
+  return <ProfileModelsPage key={profile} profile={profile} named={named} />;
+}
+
+function ProfileModelsPage({ profile, named }: { profile: string; named: boolean }) {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<ModelsAnalyticsResponse | null>(null);
   const [aux, setAux] = useState<AuxiliaryModelsResponse | null>(null);
@@ -1563,9 +1574,9 @@ export default function ModelsPage() {
     setLoading(true);
     setError(null);
     Promise.all([
-      api.getModelsAnalytics(days),
-      api.getAuxiliaryModels().catch(() => null),
-      api.getActiveTerminalProfile().catch(() => null),
+      api.getModelsAnalytics(days, profile || undefined),
+      api.getAuxiliaryModels(profile || undefined).catch(() => null),
+      named ? Promise.resolve(null) : api.getActiveTerminalProfile().catch(() => null),
     ])
       .then(([models, auxData, active]) => {
         // A backend response missing `totals`/`models` must not blank the
@@ -1581,21 +1592,22 @@ export default function ModelsPage() {
       })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, named, profile]);
 
   const refreshAux = useCallback(() => {
     api
-      .getAuxiliaryModels()
+      .getAuxiliaryModels(profile || undefined)
       .then(setAux)
       .catch(() => {});
-  }, []);
+  }, [profile]);
 
   const refreshActiveProfile = useCallback(() => {
+    if (named) return;
     api
       .getActiveTerminalProfile()
       .then(setActiveProfile)
       .catch(() => {});
-  }, []);
+  }, [named]);
 
   const onAssigned = useCallback(() => {
     // Reload aux + the real active model profile after any assignment change.
@@ -1678,7 +1690,7 @@ export default function ModelsPage() {
           onSaved={onAssigned}
         />
 
-        <ProfileUseAsPanel onAssigned={onAssigned} />
+        {!named && <ProfileUseAsPanel onAssigned={onAssigned} />}
 
         {data && (
           <Card data-qm-zip-asset="model-card" className="min-w-0 max-w-full overflow-hidden">
