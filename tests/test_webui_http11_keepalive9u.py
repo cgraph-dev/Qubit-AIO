@@ -17,9 +17,11 @@ A throwaway ``WebUI`` on an ephemeral loopback port is driven with
 from __future__ import annotations
 
 import http.client
+import json
 import sys
 import threading
 import time
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -92,6 +94,21 @@ def _request(conn, method, path, headers=None):
     resp = conn.getresponse()
     body = resp.read()
     return resp, body, local_port
+
+
+def test_workbench_mounts_expose_the_public_health_probe(dashboard):
+    _, port = _base(dashboard)
+    with closing(http.client.HTTPConnection("127.0.0.1", port, timeout=10)) as conn:
+        resp, body, _ = _request(conn, "GET", "/api/health")
+        assert resp.status == 200
+        canonical = json.loads(body)
+        assert canonical["ok"] is True
+
+        for mount in ("/qubit-workbench", "/wb"):
+            resp, body, _ = _request(conn, "GET", mount + "/health?offline_probe=1")
+            assert resp.status == 200
+            assert resp.getheader("Content-Type").startswith("application/json")
+            assert json.loads(body) == canonical
 
 
 def test_json_and_static_requests_reuse_one_connection(dashboard):

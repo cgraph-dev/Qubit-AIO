@@ -4305,7 +4305,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # /qubit-workbench now serves, and /wb stays as its short alias. The
         # static tree wins over the React page it replaced: the React route and
         # its sidebar entry point here, so there is ONE workbench and this is it.
-        if self._serve_workbench_ui("GET"):
+        if path in (f"{WORKBENCH_MOUNT}/health", "/wb/health"):
+            # Workbench probes health relative to its mount.
+            path = "/api/health"
+        elif self._serve_workbench_ui("GET"):
             return
         if path in ("/", "/index.html"):
             # Ruling 3 → Option A: the root lands on the Qubit chat workspace.
