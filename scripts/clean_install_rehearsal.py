@@ -505,11 +505,14 @@ def raw(path, headers=None, method="GET", body=None):
         c.close()
 
 
-def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt, *, cancel_path=None):
+def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt, *, cancel_path=None, disconnect=False):
     """Run the installed dashboard and provider client against a loopback SSE peer."""
+    import socket
+
     from voicebridge.providers import resolver
 
     release_second_delta = threading.Event()
+    provider_disconnected = threading.Event()
     requests_seen = []
     chunks = ("fixture ", "response")
     credential = "rehearsal-provider-value"
@@ -532,6 +535,16 @@ def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt, *, cancel
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
             for index, chunk in enumerate(chunks):
+                if index and disconnect:
+                    self.connection.settimeout(5)
+                    try:
+                        if not self.connection.recv(1):
+                            provider_disconnected.set()
+                    except ConnectionResetError:
+                        provider_disconnected.set()
+                    except TimeoutError:
+                        pass
+                    return
                 if index:
                     released = release_second_delta.wait(10)
                     if cancel_path or not released:
@@ -554,42 +567,56 @@ def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt, *, cancel
 
         worker = threading.Thread(target=provider.serve_forever, daemon=True)
         worker.start()
-        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5 if cancel_path else 15)
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5 if cancel_path or disconnect else 15)
         events = []
+        saw_keep_alive = False
+        response = None
         try:
             connection.request("POST", stream_path, json.dumps({
                 "session": session_id, "text": prompt, "model": profile.id,
             }), {**headers, "Content-Type": "application/json"})
+            dashboard_socket = connection.sock
             response = connection.getresponse()
             content_type = response.getheader("Content-Type") or ""
             assert response.status == 200 and content_type.startswith("text/event-stream"), (
                 response.status, content_type)
             for line in iter(response.readline, b""):
+                if line == b": keep-alive\n":
+                    if len(events) == 2 and events[-1]["event"] == "delta":
+                        saw_keep_alive = True
+                        if disconnect:
+                            dashboard_socket.shutdown(socket.SHUT_RDWR)
+                            assert provider_disconnected.wait(5), "quiet provider remained connected"
+                            break
+                        release_second_delta.set()
+                    continue
                 if not line.startswith(b"data: "):
                     continue
                 event = json.loads(line[6:])
                 events.append(event)
-                if event.get("event") == "delta" and len(events) == 2:
-                    # The provider stays quiet until the dashboard delivers its first chunk.
-                    if cancel_path:
-                        status, _, body = raw(
-                            cancel_path, {**headers, "Content-Type": "application/json"},
-                            method="POST", body=json.dumps({"session": session_id}).encode())
-                        assert status == 200 and json.loads(body).get("ok") is True, (status, body)
-                    else:
-                        release_second_delta.set()
+                if cancel_path and event.get("event") == "delta" and len(events) == 2:
+                    status, _, body = raw(
+                        cancel_path, {**headers, "Content-Type": "application/json"},
+                        method="POST", body=json.dumps({"session": session_id}).encode())
+                    assert status == 200 and json.loads(body).get("ok") is True, (status, body)
         finally:
             release_second_delta.set()
+            if response is not None:
+                response.close()
             connection.close()
             provider.shutdown()
             worker.join(2)
 
     assert requests_seen == [prompt], requests_seen
     assert all(event["session_id"] == session_id for event in events), events
-    sequence = ["start", "delta", "cancelled"] if cancel_path else ["start", "delta", "delta", "done"]
+    sequence = ["start", "delta"]
+    if not disconnect:
+        sequence += ["cancelled"] if cancel_path else ["delta", "done"]
     assert [event["event"] for event in events] == sequence, events
     assert events[1]["text"] == chunks[0], events
-    if cancel_path:
+    if not cancel_path:
+        assert saw_keep_alive, "no keep-alive while provider was quiet"
+    if cancel_path or disconnect:
         return
     assert events[2]["text"] == chunks[1], events
     reply = "".join(chunks)
@@ -855,6 +882,8 @@ try:
         stored = canonical.show(persisted_id)
         assert stored.get("state") == "OK", stored
         assert stored.get("session", {}).get("id") == persisted_id, stored
+        # Use the real poll loop with a short interval for this disposable probe.
+        _chat_transport._STREAM_HEARTBEAT_INTERVAL = 0.25
         persisted_reply = stream_fixture_turn(
             cfg, stream_path, session_headers, persisted_id, persisted_text)
         settled = canonical.show(persisted_id)
@@ -878,6 +907,28 @@ try:
         status, _, body = raw(
             cancel_path, {**session_headers, "Content-Type": "application/json"},
             method="POST", body=json.dumps({"session": cancelled_id}).encode())
+        assert status == 404 and json.loads(body).get("code") == "NO_ACTIVE_TURN", (status, body)
+        disconnected_id = persisted_id + "-disconnected"
+        disconnected_prompt = "Please say hello. Disconnect fixture."
+        stream_fixture_turn(cfg, stream_path, session_headers, disconnected_id,
+                            disconnected_prompt, disconnect=True)
+        disconnected = canonical.show(disconnected_id)
+        assert disconnected.get("state") == "OK", disconnected
+        assert [(msg["role"], msg["content"]) for msg in disconnected["messages"]] == [
+            ("user", disconnected_prompt),
+        ], disconnected
+        # Provider connection closure can precede the worker releasing its registration.
+        deadline = time.monotonic() + 5
+        while True:
+            with _chat_transport._cancel_lock:
+                pending = disconnected_id in _chat_transport._cancel_events
+            if not pending:
+                break
+            assert time.monotonic() < deadline, "disconnected turn registration remained"
+            time.sleep(0.05)
+        status, _, body = raw(
+            cancel_path, {**session_headers, "Content-Type": "application/json"},
+            method="POST", body=json.dumps({"session": disconnected_id}).encode())
         assert status == 404 and json.loads(body).get("code") == "NO_ACTIVE_TURN", (status, body)
         show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
         for unauthorized_headers in (
