@@ -8360,7 +8360,10 @@ def _named_chat_events(cfg, home, body):
     except (OwnerUnavailable, OSError, TimeoutError):
         return 409, {"ok": False, "code": "CHAT_PROFILE_WORKER_UNAVAILABLE",
                      "detail": "Start the gateway serving this profile or open it in /chat."}
-    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg)
+    submission = body.get("submission_id")
+    if submission is not None and not _valid_chat_submission(submission):
+        return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat submission ID."}
+    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg, submission_id=submission)
 
 
 def _chat_execution_local(handler):
@@ -9138,6 +9141,32 @@ def h_chat_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return profile_chat.cancel(home, session)
     res = CT.cancel(session)
     return (200 if res.get("ok") else 404), res
+
+
+def _valid_chat_submission(value):
+    return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9-]{1,100}", value)
+
+
+def h_chat_recover(cfg, q, b, p):
+    from . import profile_chat
+    from .qubit_session_store import QubitSessionStore
+
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    session = b.get("session")
+    submission = b.get("submission_id")
+    cancel_turn = b.get("cancel", False)
+    if (not isinstance(session, str) or not 0 < len(session) <= 80
+            or not _valid_chat_submission(submission) or type(cancel_turn) is not bool):
+        return 400, {"ok": False, "code": "MALFORMED"}
+    if home is None or not QubitSessionStore(cfg, runtime_home=home)._session(session):
+        return 404, {"ok": False, "code": "CHAT_SESSION_NOT_FOUND"}
+    try:
+        return _ok(**profile_chat.recover(home, session, submission, cancel_turn=cancel_turn))
+    except Exception:
+        return 409, {"ok": False, "code": "CHAT_RECOVERY_UNAVAILABLE",
+                     "detail": "The profile gateway could not confirm this turn."}
 
 
 def _chat_approval(cfg, q, b, p, *, settle=False):
@@ -13007,6 +13036,7 @@ _r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/terminal-model", "h_chat_term
 _r("DELETE", r"/api/qubit/chat/sessions/(?P<id>[^/]+)",
    "h_chat_session_delete")
 _r("POST", r"/api/qubit/chat/cancel", "h_chat_cancel")
+_r("POST", r"/api/qubit/chat/recover", "h_chat_recover")
 _r("POST", r"/api/qubit/chat/retry", "h_chat_retry")
 _r("POST", r"/api/qubit/chat/vision", "h_chat_vision")
 _r("POST", r"/api/qubit/chat/image", "h_chat_image")
@@ -21462,6 +21492,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_chat_session_export": h_chat_session_export,
     "h_chat_session_import": h_chat_session_import,
     "h_chat_cancel": h_chat_cancel, "h_chat_pty": h_chat_pty,
+    "h_chat_recover": h_chat_recover,
     "h_chat_approval": h_chat_approval, "h_chat_approval_respond": h_chat_approval_respond,
     "h_chat_continue_history": h_chat_continue_history,
     "h_chat_retry": h_chat_retry, "h_chat_stream": h_chat_stream,

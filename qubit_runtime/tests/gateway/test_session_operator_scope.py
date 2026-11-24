@@ -56,6 +56,13 @@ async def test_operators_share_local_sessions_without_reassigning_receipts(tmp_p
         rows = list_session_admissions(authority.db, session_id=ref.session_id, pending_only=False)
         assert [row['principal_id'] for row in rows] == [owner.subject, peer.subject]
         assert all(row['status'] == 'terminal' for row in rows)
+        for actor, row in zip((owner, peer), rows, strict=True):
+            connection = SimpleNamespace(authority=authority, actor=actor)
+            recovered = await AuthorityConnection.receipt(connection, ref, {'submission_id': 'same-input'})
+            assert recovered['admission_id'] == row['admission_id']
+            with pytest.raises(RuntimeStoreError, match='invalid_params'):
+                await AuthorityConnection.receipt(connection, ref, {
+                    'submission_id': 'same-input', 'admission_id': row['admission_id']})
         assert executed[-2:] == [(owner.subject, owner.subject), (peer.subject, peer.subject)]
         for denied in (replace(peer, profile_id='foreign'), replace(peer, capabilities=caps - {'session:read'}),
                        replace(peer, capabilities=caps - {'session:operator'})):

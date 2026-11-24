@@ -1234,6 +1234,15 @@ export const api = {
       }),
     },
   ),
+  recoverProfileChatTurn: (session: string, profile: string, submissionId: string, cancel: boolean) =>
+    fetchJSON<{ status: "queued" | "started" | "missing" | "unknown" | "terminal"; outcome?: string }>(
+      appendProfileParam("/api/qubit/chat/recover", profile),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, submission_id: submissionId, cancel }),
+      },
+    ),
   cancelProfileChatTurn: (session: string, profile: string) =>
     fetchJSON<{ ok: boolean }>(appendProfileParam("/api/qubit/chat/cancel", profile), {
       method: "POST",
@@ -4100,7 +4109,7 @@ export const CHAT_REASONING_LEVELS = [
 ] as const;
 
 export async function streamChatTurn(
-  body: { text: string; session?: string; model?: string; reasoning?: string; profile?: string },
+  body: { text: string; session?: string; model?: string; reasoning?: string; profile?: string; submission_id?: string },
   handlers: ChatStreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {

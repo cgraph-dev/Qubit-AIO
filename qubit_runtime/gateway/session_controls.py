@@ -898,7 +898,21 @@ class AuthorityConnection:
         return result
 
     async def receipt(self, ref, params):
-        receipt = await self.authority.receipt(self.actor, ref, params.get('admission_id'))
+        admission = params.get('admission_id')
+        submission = params.get('submission_id')
+        if (admission is None) == (submission is None):
+            raise RuntimeStoreError('invalid_params')
+        if submission is not None:
+            from qubit_state_runtime import find_session_admission
+            self.authority.authorize(self.actor, ref, 'session:submit')
+            if not isinstance(submission, str) or not 0 < len(submission) <= 256:
+                raise RuntimeStoreError('invalid_params', field='submission_id')
+            row = find_session_admission(self.authority.db, principal_id=self.actor.subject,
+                                         session_id=ref.session_id, request_id=submission)
+            if row is None:
+                raise RuntimeStoreError('not_found', field='submission_id')
+            admission = row['admission_id']
+        receipt = await self.authority.receipt(self.actor, ref, admission)
         out = asdict(receipt)
         if params.get('include_result') is True and receipt.status == 'terminal':
             # The exact structured result the turn committed with settlement (`finish_result`):
