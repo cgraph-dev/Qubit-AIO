@@ -357,9 +357,19 @@ function ProfileSettings({ profile }: { profile: string }) {
     });
 
   const commitConfig = async (next: Record<string, unknown>) => {
-    const result = await api.saveConfig(next, profile, false, (detail) => confirmAction("save", detail));
-    if (result?.applied_to_home === false) {
-      throw new Error("Settings were saved for this dashboard. The runtime configuration write failed.");
+    let declined = false;
+    try {
+      const result = await api.saveConfig(next, profile, false, async (detail) => {
+        declined = !(await confirmAction("save", detail));
+        return !declined;
+      });
+      if (result?.applied_to_home === false) {
+        throw new Error("Settings were saved for this dashboard. The runtime configuration write failed.");
+      }
+      return true;
+    } catch (error) {
+      if (declined && error instanceof ConfirmRequiredError) return false;
+      throw error;
     }
   };
 
@@ -393,7 +403,7 @@ function ProfileSettings({ profile }: { profile: string }) {
     }
     setSaving(true);
     try {
-      await commitConfig(changes);
+      if (!(await commitConfig(changes))) return;
       setRestartNeeded(true);
       try {
         const persisted = await api.getConfig(profile);
@@ -492,7 +502,7 @@ function ProfileSettings({ profile }: { profile: string }) {
       }
       setSaving(true);
       try {
-        await commitConfig(imported);
+        if (!(await commitConfig(imported))) return;
         setRestartNeeded(true);
         // Converge on the server record, not the file bytes: the backend
         // drops unchanged leaves, refuses secret-shaped values, and rejects

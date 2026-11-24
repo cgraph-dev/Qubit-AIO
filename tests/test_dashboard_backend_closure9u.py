@@ -301,6 +301,51 @@ def test_config_write_persists_and_refuses_secret_values(cfg):
     assert "brand-new-secret" not in json.dumps(out), out
 
 
+def test_concurrent_listener_config_saves_preserve_disjoint_edits(cfg, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    import yaml
+
+    from voicebridge import qubit_compat as compat, qubit_runtime
+
+    first_staging = Event()
+    second_finished = Event()
+    runtime_home = qubit_runtime.runtime_home_for_cfg(cfg)
+    save_store = compat._save_json_store
+
+    def delay_first_publish(path, data):
+        if "voice.input_engine" in data and "browser.headed" not in data:
+            first_staging.set()
+            second_finished.wait(timeout=3)
+        save_store(path, data)
+
+    def write(config):
+        return _dispatch(cfg, "PUT", "/api/config", {"config": config, "confirm": True})
+
+    def write_second():
+        try:
+            return write({"browser": {"headed": True}})
+        finally:
+            second_finished.set()
+
+    monkeypatch.setattr(compat, "_save_json_store", delay_first_publish)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(write, {"voice": {"input_engine": "local"}})
+        assert first_staging.wait(timeout=30)
+        second = pool.submit(write_second)
+        for response in (first.result(timeout=10), second.result(timeout=10)):
+            status, saved = response
+            assert status == 200 and saved["applied_to_home"], saved
+
+    overrides = json.loads(compat._config_overrides_path(cfg).read_text())
+    assert overrides["voice.input_engine"] == "local"
+    assert overrides["browser.headed"] is True
+    persisted = yaml.safe_load((runtime_home / "config.yaml").read_text())
+    assert persisted["voice"]["input_engine"] == "local"
+    assert persisted["browser"]["headed"] is True
+
+
 def test_config_write_stages_and_refuses_on_estop(cfg):
     code, out = _dispatch(cfg, "PUT", "/api/config",
                           {"config": {"voice": {"input_engine": "local"}}})

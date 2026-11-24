@@ -2051,5 +2051,29 @@
       "source_dirty": true,
       "disposition": "Older dashboard build, recheck pending on deployment"
     }
+  },
+  "current_settings_and_approvals": {
+    "date": "2026-11-25",
+    "base_revision": "ad144fc47",
+    "environment": "Disposable authenticated loopback dashboard with a production frontend build",
+    "checks": {
+      "listener_concurrent_edits": "Before the fix both requests returned 200 and one key disappeared from the overrides record. After the fix both distinct edits were present in the merged overrides and runtime YAML.",
+      "config_approval": "The original named approval refused a replay with changed fields or a different profile. Confirming the original through the journal applied it once, and the named GET returned the Qubit-specific input engine while the default GET retained its original value.",
+      "inline_decline": "The Config dialog's Cancel requested settlement of its exact approval ID. The entry was removed and the named value stayed at its original value.",
+      "profile_switch_during_save": "Chromium held the real staged response while client-side navigation changed from work to default. Releasing the response canceled the abandoned approval and neither profile changed.",
+      "inline_confirm_and_cli": "Chromium confirmed the original work request with the same profile, fields and approval ID. Independent HTTP and fresh qubit agent config get browser.headed --json processes returned true for work and false for default.",
+      "keys": "The disposable default profile passed unresolved-reference masking, reload and confirmed removal."
+    },
+    "focused_checks": {
+      "backend": 6,
+      "http_and_chromium": 4,
+      "frontend_api": 4
+    },
+    "remaining": [
+      "Field-by-field settings sweep",
+      "Real external vault resolution and provider rotation",
+      "Application by the running gateway after restart",
+      "Deployed and cross-process concurrency checks"
+    ]
   }
 }

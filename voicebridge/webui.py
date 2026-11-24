@@ -3711,8 +3711,21 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # "all implemented handlers are no-proxy" rule is retired; ``gated_path``
         # is still checked explicitly so a Qubit-gated path can never reach the
         # fork proxy even if the allow/route tables change underneath it.
-        if method in ("GET", "HEAD") and self._qubit_backend_enabled() \
-                and not qubit_read_authority(api_path):
+        is_read = method in ("GET", "HEAD")
+        if is_read and api_path.rstrip("/") == "/api/config":
+            try:
+                settings_home = HC.settings_profile_home(self.app.orch.cfg, query)
+            except Exception as exc:
+                code, payload = HC._settings_profile_error(exc)
+                self._json(payload, code)
+                return
+            if settings_home is not None:
+                # Named writes go to this profile's native config. Read it
+                # here too, including Qubit settings omitted by the proxy.
+                code, payload = HC.h_config(self.app.orch.cfg, query, {}, {})
+                self._json(payload, code)
+                return
+        if is_read and self._qubit_backend_enabled() and not qubit_read_authority(api_path):
             try:
                 from . import qubit_asgi as HA
                 if not HA.gated_path(api_path) and \
@@ -3755,8 +3768,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                     # the Settings save round-trips.
                                     try:
                                         from . import qubit_compat as _HC
-                                        if _HC.settings_profile_home(self.app.orch.cfg, query) is None:
-                                            parsed = _HC._merge_config_overrides(self.app.orch.cfg, parsed)
+                                        parsed = _HC._merge_config_overrides(self.app.orch.cfg, parsed)
                                     except Exception:
                                         pass
                                     # Serve Qubit-owned keys the fork payload

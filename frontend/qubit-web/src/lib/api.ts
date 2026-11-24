@@ -438,13 +438,24 @@ async function buildLocalSkillManifest(skill: {
 export async function runMutationWithConfirm<T>(
   call: () => Promise<T>,
   confirmPrompt?: (detail: string) => boolean | Promise<boolean>,
+  cancelOnDecline = false,
 ): Promise<T> {
   try {
     return await call();
   } catch (e) {
     if (!(e instanceof ConfirmRequiredError)) throw e;
     const ask = confirmPrompt ?? defaultConfirmPrompt;
-    if (!(await ask(e.detail))) throw e;
+    if (!(await ask(e.detail))) {
+      if (cancelOnDecline && e.hasConfirmationId) {
+        const response = await fetchJSON("/api/ops/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmation_id: e.confirmationId }),
+        });
+        rejectFabricatedSuccess(response);
+      }
+      throw e;
+    }
     return e.settle<T>();
   }
 }
@@ -1597,6 +1608,7 @@ export const api = {
           body: JSON.stringify(confirm ? { config: writable, confirm: true } : { config: writable }),
         }),
       onConfirm,
+      true,
     )
     );
   },

@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Config, Keys, and Approvals (2026-11-25).** Continue field-by-field coverage, Keys vault and rotation with an approved fixture provider, and gateway reload of restart-dependent settings. Config read-back, approval scope and cancellation, concurrent listener saves, and reference clearing passed in the [disposable rehearsal](e2e/2026-11-22-dashboard-cli-audit-results.json).
+
 **Dashboard defect recheck (2026-11-25).** The seven repaired defects passed in the current source build using disposable loopback state. Re-run the deployed cases when port 8890 serves the new revision. The broader dashboard action audit still needs to capture the 404 on a fresh chat's default session and test the optional artwork pack with that pack installed. See the [recheck results](e2e/2026-11-22-dashboard-cli-audit-results.json).
 
 **Dashboard route and control audit (2026-11-25).** The current built-in and checked-in overlay routes and sidebar destinations were reconciled with the historical inventory. Chromium verified Workbench handoffs, session reload, Back and alias query preservation in a disposable build. Remaining scope includes per-control write and read-back verification, error/retry and accessibility coverage, installed overlay behavior, and the deployed dashboard. See the [current route reconciliation](e2e/2026-11-22-dashboard-cli-audit-results.json).

@@ -17951,42 +17951,45 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return _save_scoped_config(home, values)
         except Exception as exc:
             return _settings_profile_error(exc)
+    from qubit_cli.web_server import _CONFIG_MUTATION_LOCK
+
     path = _config_overrides_path(cfg)
-    try:
-        previous = _load_json_store(_config_overrides_read_path(cfg))
-        merged = dict(previous)
-        merged.update(values)
-        _save_json_store(path, merged)
-    except Exception as exc:
-        return _fail(exc)
-    # The store changed: drop every config/model/toolset snapshot before any
-    # later best-effort step can fail, so the next read cannot serve the old
-    # tree.
-    _rc.invalidate("config")
-    _rc.invalidate("model_info")
-    _rc.invalidate("toolsets")
-    # B-03 runtime consumer: also merge into the Qubit runtime home config so
-    # the vendored runtime / CLI / voice actually read the applied settings.
-    applied_to_home = _persist_overrides_to_home(values, cfg)
-    _audit("config_apply", "dashboard:user",
-           {"keys": sorted(values)[:20], "count": len(values),
-            "home_applied": applied_to_home})
-    # The dashboard serves its boot-loaded record merged with overrides, so a
-    # PUT would otherwise be invisible to running code until restart. Refresh
-    # the in-process record in place (the same object every holder reads) so
-    # per-request readers converge immediately. Separate OS processes (the
-    # gateway, helper services) and boot-built singletons still read config
-    # at boot — reported honestly below instead of implied.
-    try:
-        live_data = getattr(cfg, "data", None)
-        if isinstance(live_data, dict):
-            for dotted, value in values.items():
-                try:
-                    _set_dotted(live_data, dotted, value)
-                except Exception:
-                    continue
-    except Exception:
-        pass
+    with _CONFIG_MUTATION_LOCK:
+        try:
+            previous = _load_json_store(_config_overrides_read_path(cfg))
+            merged = dict(previous)
+            merged.update(values)
+            _save_json_store(path, merged)
+        except Exception as exc:
+            return _fail(exc)
+        # The store changed: drop every config/model/toolset snapshot before any
+        # later best-effort step can fail, so the next read cannot serve the old
+        # tree.
+        _rc.invalidate("config")
+        _rc.invalidate("model_info")
+        _rc.invalidate("toolsets")
+        # B-03 runtime consumer: also merge into the Qubit runtime home config so
+        # the vendored runtime / CLI / voice actually read the applied settings.
+        applied_to_home = _persist_overrides_to_home(values, cfg)
+        _audit("config_apply", "dashboard:user",
+               {"keys": sorted(values)[:20], "count": len(values),
+                "home_applied": applied_to_home})
+        # The dashboard serves its boot-loaded record merged with overrides, so a
+        # PUT would otherwise be invisible to running code until restart. Refresh
+        # the in-process record in place (the same object every holder reads) so
+        # per-request readers converge immediately. Separate OS processes (the
+        # gateway, helper services) and boot-built singletons still read config
+        # at boot — reported honestly below instead of implied.
+        try:
+            live_data = getattr(cfg, "data", None)
+            if isinstance(live_data, dict):
+                for dotted, value in values.items():
+                    try:
+                        _set_dotted(live_data, dotted, value)
+                    except Exception:
+                        continue
+        except Exception:
+            pass
     return _ok(ok=True, config=values, count=len(values),
                applied_to_home=applied_to_home,
                path=str(path),
@@ -18230,7 +18233,10 @@ def plugin_providers_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         values["context.engine"] = str(context_engine).strip()
     if memory_provider is not None:
         values["memory.provider"] = str(memory_provider).strip()
-    applied = _persist_overrides_to_home(values, cfg)
+    from qubit_cli.web_server import _CONFIG_MUTATION_LOCK
+
+    with _CONFIG_MUTATION_LOCK:
+        applied = _persist_overrides_to_home(values, cfg)
     if not applied:
         return _gate("CONFIG_WRITE_FAILED",
                      "could not persist the plugin provider selection to the "
