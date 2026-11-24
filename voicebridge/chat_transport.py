@@ -471,7 +471,9 @@ def _bind_session_check(store_obj: Any, check: Callable[[str], Any],
 def draft_store(cfg: Any, *, runtime_home=None) -> Any:
     """Per-session file-draft store, guarded by the chat session authority."""
     from . import chat_stores as CS
+    from .qubit_runtime import artifact_profile_home
 
+    runtime_home = runtime_home or artifact_profile_home()
     if runtime_home is None:
         return _bind_session_check(CS.draft_store(cfg), store(cfg).show, "put")
     from .qubit_session_store import QubitSessionStore
@@ -484,7 +486,9 @@ def draft_store(cfg: Any, *, runtime_home=None) -> Any:
 def comment_store(cfg: Any, *, runtime_home=None) -> Any:
     """Per-session comment/CI store, guarded by the chat session authority."""
     from . import chat_stores as CS
+    from .qubit_runtime import artifact_profile_home
 
+    runtime_home = runtime_home or artifact_profile_home()
     if runtime_home is None:
         return _bind_session_check(CS.comment_store(cfg), store(cfg).show,
                                    "add_comment", "add_ci_detail")
@@ -496,16 +500,24 @@ def comment_store(cfg: Any, *, runtime_home=None) -> Any:
                                "add_comment", "add_ci_detail")
 
 
-def build_projection(cfg: Any, session_id: str, **kwargs: Any) -> Dict[str, Any]:
+def build_projection(cfg: Any, session_id: str, *, runtime_home=None, **kwargs: Any) -> Dict[str, Any]:
     """Session activity projection for one session.
 
     The canonical chat store is injected as ``session_store`` so the summary
     section reads the same single transcript authority as the chat surface.
     """
     from . import session_activity as SA
+    from .qubit_runtime import artifact_profile_home
 
-    kwargs.setdefault("session_store", store(cfg))
-    return SA.build_projection(cfg, session_id, **kwargs)
+    runtime_home = runtime_home or artifact_profile_home()
+    if runtime_home is None:
+        kwargs.setdefault("session_store", store(cfg))
+    else:
+        from .qubit_session_store import QubitSessionStore
+
+        kwargs.setdefault("session_store", QubitSessionStore(cfg, runtime_home=runtime_home))
+        kwargs.setdefault("activity_store", SA.store(cfg, runtime_home=runtime_home))
+    return SA.build_projection(cfg, session_id, include_listener_status=runtime_home is None, **kwargs)
 
 
 def _chat_turn_marker_module() -> Any:
@@ -590,9 +602,10 @@ def record_activity(cfg: Any, session_id: str, assistant_text: str, *,
     """
     try:
         from . import session_activity as SA
+        from .qubit_runtime import artifact_profile_home
 
-        return SA.store(cfg).record(session_id, "summary",
-                                    detail=assistant_text, actor=actor)
+        return SA.store(cfg, runtime_home=artifact_profile_home()).record(
+            session_id, "summary", detail=assistant_text, actor=actor)
     except Exception as exc:  # noqa: BLE001 - typed, audited, non-fatal
         _audit("activity_error", session=session_id, error=str(exc))
         return {"state": "FAILED", "code": "SESSION_ACTIVITY_ERROR",

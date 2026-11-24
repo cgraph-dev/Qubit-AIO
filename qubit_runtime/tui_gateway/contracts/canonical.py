@@ -58,6 +58,16 @@ canonical_method("prompt.receipt", params=PromptReceiptParams, result=PromptRece
                  doc="Current receipt of one admission the caller submitted (or controls).")
 
 
+class PromptRetryParams(Params):
+    session_id: str
+    submission_id: str
+    retry_of: str
+
+
+canonical_method("prompt.retry", params=PromptRetryParams, result=AdmissionStatus,
+                 doc="Readmit the last failed turn of this submitter using its saved input.")
+
+
 class PromptCancelParams(Params):
     session_id: str
     admission_id: str

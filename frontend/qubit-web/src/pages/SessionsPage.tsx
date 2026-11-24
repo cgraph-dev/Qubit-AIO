@@ -1767,9 +1767,9 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
   );
 
   const handlePrune = useCallback(async () => {
-    const days = parseInt(pruneDays, 10);
-    if (!Number.isFinite(days) || days < 0) {
-      showToast("Enter a valid number of days", "error");
+    const days = Number(pruneDays);
+    if (!Number.isSafeInteger(days) || days < 1) {
+      showToast("Enter a whole number of days, at least 1", "error");
       return;
     }
     setPruning(true);
@@ -1920,13 +1920,13 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
           <DialogHeader>
             <DialogTitle>Prune old sessions</DialogTitle>
             <DialogDescription>
-              Permanently remove archived sessions whose last activity is older
-              than the given number of days. Active sessions are never pruned.
+              Permanently delete ended, unpinned sessions in this profile after the chosen
+              period of inactivity. Archived sessions stay available to restore.
             </DialogDescription>
           </DialogHeader>
           <NumberField
-            label="Older than (days)"
-            min={0}
+            label="Days since last activity"
+            min={1}
             step={1}
             value={pruneDays}
             onChange={(value) => setPruneDays(String(value))}
@@ -1938,7 +1938,6 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
             }}
             disabled={pruning}
             className="qsk-field"
-            description="Only archived sessions older than this are removed."
           />
           <DialogFooter>
             <Button

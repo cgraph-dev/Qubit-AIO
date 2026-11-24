@@ -1212,6 +1212,40 @@ it("retries a missing named submission with the original text and ID", async () 
   );
 });
 
+it("retries a failed named turn with a new ID and keeps one user message", async () => {
+  profileScope.profile = "work";
+  const pendingKey = "qubit.chat.pending.work/dashboard-chat";
+  window.sessionStorage.setItem(pendingKey, JSON.stringify({ id: "failed-id", text: "original prompt" }));
+  apiMocks.recoverProfileChatTurn.mockResolvedValue({ status: "terminal", outcome: "failed" });
+  await renderChatAt("/qubit-chat?profile=work&resume=dashboard-chat");
+  const retry = () => [...container.querySelectorAll<HTMLElement>('[aria-label]')].find(
+    (node) => node.getAttribute("aria-label") === "Retry the last failed turn",
+  );
+  const check = () => [...container.querySelectorAll("button")].find((button) => button.textContent === "Check turn");
+  await vi.waitFor(() => expect(check()).toBeDefined());
+  expect(retry()).toBeUndefined();
+  apiMocks.getChatSessionMessages.mockResolvedValueOnce({
+    session_id: "dashboard-chat", messages: [{ role: "user", content: "original prompt" }], total: 1,
+  });
+  await act(async () => check()?.click());
+  streamChatTurn.mockImplementationOnce(async (_body, handlers) => {
+    handlers.onDone?.({ event: "done", reply: "retried answer" });
+  });
+  apiMocks.getChatSessionMessages.mockResolvedValueOnce({
+    session_id: "dashboard-chat", total: 2,
+    messages: [{ role: "user", content: "original prompt" }, { role: "assistant", content: "retried answer" }],
+  });
+  await vi.waitFor(() => expect(retry()).toBeDefined());
+  await act(async () => retry()?.click());
+  expect(streamChatTurn).toHaveBeenCalledWith(expect.objectContaining({
+    session: "dashboard-chat", profile: "work", retry_of: "failed-id",
+    submission_id: expect.not.stringMatching(/^failed-id$/),
+  }), expect.any(Object), expect.anything());
+  expect(container.textContent?.match(/original prompt/g)).toHaveLength(1);
+  expect(container.textContent).toContain("retried answer");
+  expect(window.sessionStorage.getItem(pendingKey)).toBeNull();
+});
+
 it("continues a named legacy history and reuses the request after a lost response", async () => {
   profileScope.profile = "work";
   apiMocks.continueChatHistory.mockClear();

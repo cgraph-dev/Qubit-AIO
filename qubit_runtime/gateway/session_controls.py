@@ -251,7 +251,7 @@ class AuthorityConnection:
                     'worker.persist': self.worker_persist,
                     'setup.status': self.setup_status, 'setup.runtime_check': self.setup_runtime_check,
                     'session.resume': self.resume, 'session.detach': self.detach,
-                    'prompt.submit': self.submit,
+                    'prompt.submit': self.submit, 'prompt.retry': self.retry,
                     'prompt.receipt': self.receipt, 'prompt.cancel': self.cancel,
                     'prompt.resolve_unknown': self.resolve_unknown,
                     'session.interrupt': self.interrupt, 'session.events.since': self.events_since,
@@ -800,6 +800,14 @@ class AuthorityConnection:
         receipt = await self.authority.submit(self.actor, self.submission(ref, params),
                                               queue_while_restarting=self._operator is True)
         return asdict(receipt)
+
+    async def retry(self, ref, params):
+        if ref.session_id not in self.subscriptions:
+            raise RuntimeStoreError('permission_denied')
+        from gateway.session_retry_admission import retry_failed_turn
+
+        return asdict(await retry_failed_turn(
+            self.authority, self.actor, ref, params['submission_id'], params['retry_of']))
 
     def _voice_stop_key(self, ref, params):
         request_id = params.get('submission_id') or params.get('input_id')

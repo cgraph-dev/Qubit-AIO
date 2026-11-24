@@ -439,6 +439,24 @@
       "command": "Open simultaneous named chat streams, close two HTTP connections after start, check and cancel by submission ID, then compare SSE frames, transcript, SQLite admissions and provider request counts",
       "observed": "One stream sent a keep-alive comment during a quiet turn and then emitted a delta and completion. Another chat completed while a fixture HTTP 400 produced a typed error and terminal failed receipt in a third. A fresh turn in the failed chat completed. A competing send in the quiet chat was refused. The first detached turn settled completed, its expected reply appeared in the transcript, and exact replay returned that reply with no second model request. The second detached turn settled interrupted after cancellation through the recovery endpoint. The six terminal admission rows matched the six provider requests.",
       "scope": "This was a source rehearsal using deterministic providers and five chats. General retry of a failed turn, higher concurrency and the deployed build are open."
+    },
+    {
+      "check": "Retry the latest settled failed named-profile turn",
+      "status": "PASS",
+      "environment": "Source dashboard and native gateway, disposable named profile, loopback text and native-vision providers",
+      "revision": "098e8a2eb3437800c62f2f3c94d43544768cded3",
+      "command": "Fail a named chat stream once. Stream a retry with a new submission_id and the original retry_of. Replay the new ID, compare provider requests and read back active and archived transcript rows.",
+      "observed": "The text retry kept the original provider and high reasoning effort. The PNG retry delivered the same bytes as the first request. Each retained one active user row. A repeated retry ID returned its saved reply with no additional provider calls. Pending, stale and cross-chat retries were refused. Four native retry tests, nine named HTTP route tests and 39 frontend chat tests passed.",
+      "scope": "Retry requires a settled failed admission, its unchanged transcript suffix and any retained media. Turns that recorded tool activity are ineligible. The deployed dashboard reports source revision 3d6595549328b150b9dcfc432adcc7119aae40f5 and has no retry evidence for this change."
+    },
+    {
+      "check": "Profile-scoped session history, archive recovery and maintenance",
+      "status": "PASS",
+      "environment": "Authenticated source dashboard on loopback with two disposable sibling profiles and duplicate session IDs",
+      "revision": "fc8f341119a1d4a99bb19f0f21e0967c600c5041",
+      "command": "pytest tests/test_chat_projections8u.py tests/test_sessions_mutations_wave18.py tests/test_route_wiring_fixes8u.py; vitest run src/pages/SessionsPage.test.tsx src/pages/SessionsPage.resume.test.tsx",
+      "observed": "List, content search, counts, messages, activity, drafts, comments, CI details, export/import, lineage, rename, archive/restore, prune, empty cleanup and bulk deletion stayed on the selected profile. Archive recovery passed before prune. Preview and prune agreed that the compression ancestor was protected. The same approval ID with a changed profile or retention window could not prune. SQLite read-back preserved the sibling, archived, pinned, open and lineage records. Additive replay skipped an existing import. The focused suites passed 53 Python and 15 frontend tests.",
+      "scope": "Named activity covers the transcript summary and recorded events. Listener Git and media readiness are outside that profile projection. Disposable session-history verification passed. Deployed testing is pending a build newer than 3d6595549328b150b9dcfc432adcc7119aae40f5."
     }
   ],
   "cancellation_fix_artifact": {

@@ -22,6 +22,7 @@ import base64
 import copy
 import hashlib
 import json
+import math
 from contextlib import closing, contextmanager
 from functools import wraps
 import os
@@ -1072,7 +1073,7 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 @_session_history_profiled
 def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    chat_items = _chat_session_rows(cfg).get("sessions", [])
+    chat_items = _chat_session_rows(cfg, include_archived=True).get("sessions", [])
     res = _receipt_session_store(cfg).list(100)
     items = res.get("sessions", [])
     by_state: Dict[str, int] = {}
@@ -8344,7 +8345,8 @@ def _named_chat_events(cfg, home, body):
         return 403, {"ok": False, "code": "EMERGENCY_STOP", "detail": "Emergency stop is latched."}
     session = str(body.get("session") or CT.DEFAULT_SESSION).strip()
     text = str(body.get("text") or "").strip()
-    if not session or len(session) > 80 or not text or len(text) > CT.MAX_TEXT_CHARS:
+    retry_of = body.get("retry_of")
+    if not session or len(session) > 80 or (retry_of is None and not text) or len(text) > CT.MAX_TEXT_CHARS:
         return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat session or message."}
     from qubit_constants import parse_reasoning_effort
 
@@ -8376,11 +8378,14 @@ def _named_chat_events(cfg, home, body):
     if submission is not None and not _valid_chat_submission(submission):
         return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat submission ID."}
     image = body.get("image_data_url")
+    if retry_of is not None and (not _valid_chat_submission(retry_of) or submission is None
+                                 or retry_of == submission or options or image is not None):
+        return 400, {"ok": False, "code": "MALFORMED", "detail": "Retry requires the original and new submission IDs."}
     if image is not None and not _valid_named_chat_image(image):
         return 400, {"ok": False, "code": "BAD_IMAGE",
                      "detail": "Attach a PNG, JPEG, GIF, or WebP image of up to 10 MiB."}
     return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg,
-                                    submission_id=submission, image=image, options=options)
+                                    submission_id=submission, image=image, options=options, retry_of=retry_of)
 
 
 def _chat_execution_local(handler):
@@ -8644,10 +8649,8 @@ def h_chat_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 # ---------------------------------------------------------------------------
 # S5 — chat projection reads (session activity / file drafts / comments + CI).
 #
-# Every handler delegates to the ``chat_transport`` adapters, which inject the
-# single chat-session authority (:class:`ChatSessionStore`) as the writer guard,
-# so a projection row can only reference a session the authority knows. Reads
-# are side-effect free; typed ``ChatStoreError`` codes map to HTTP 400.
+# Named-profile reads share the transcript's ownership and archive boundary.
+# The chat_transport adapters also preserve the listener's legacy sidecars.
 # ---------------------------------------------------------------------------
 def _chat_store_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
     code = getattr(exc, "code", None) or type(exc).__name__
@@ -8657,7 +8660,20 @@ def _chat_store_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
                                       "(same store as chat)"}
 
 
-@_chat_execution_local
+def _session_artifacts_profiled(handler):
+    """A scoped sidecar is visible only while its owning conversation is visible."""
+    @_session_history_profiled
+    @wraps(handler)
+    def scoped(cfg, q, b, p):
+        if _session_history_home() is not None:
+            record = _chat_session_store(cfg)._session(p["id"])
+            if record is None or record.get("archived"):
+                return 404, {"ok": False, "code": "SESSION_NOT_FOUND"}
+        return handler(cfg, q, b, p)
+    return scoped
+
+
+@_session_artifacts_profiled
 def h_chat_session_activity(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/activity -> read-only projection."""
@@ -8669,20 +8685,20 @@ def h_chat_session_activity(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     git_root = str(q.get("git_root", "") or "")
     try:
         out = CT.build_projection(cfg, p.get("id", ""), git_root=git_root,
-                                  limit=limit)
+                                  limit=limit, runtime_home=_session_history_home())
     except Exception as exc:
         return _chat_store_error(exc)
     ok = str(out.get("state")) == "OK"
     return (200 if ok else 400), {"ok": ok, **out}
 
 
-@_session_history_profiled
+@_session_artifacts_profiled
 def h_chat_session_drafts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/drafts -> per-session file drafts."""
     from . import chat_transport as CT
 
-    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
+    scope = {"runtime_home": _session_history_home()}
     try:
         limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
     except (TypeError, ValueError):
@@ -8703,14 +8719,14 @@ def h_chat_session_drafts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(**out)
 
 
-@_session_history_profiled
+@_session_artifacts_profiled
 def h_chat_session_draft_content(cfg: Any, q: Dict[str, str],
                                  b: Dict[str, Any],
                                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/draft?path=... -> one draft body."""
     from . import chat_transport as CT
 
-    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
+    scope = {"runtime_home": _session_history_home()}
     path = str(q.get("path", b.get("path", "")) or "")
     if not path:
         return 400, {"ok": False, "code": "MALFORMED",
@@ -8726,13 +8742,13 @@ def h_chat_session_draft_content(cfg: Any, q: Dict[str, str],
     return _ok(**out)
 
 
-@_session_history_profiled
+@_session_artifacts_profiled
 def h_chat_session_comments(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/comments -> operator comments."""
     from . import chat_transport as CT
 
-    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
+    scope = {"runtime_home": _session_history_home()}
     try:
         limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
     except (TypeError, ValueError):
@@ -8750,13 +8766,13 @@ def h_chat_session_comments(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(**out)
 
 
-@_session_history_profiled
+@_session_artifacts_profiled
 def h_chat_session_ci(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/chat/sessions/{id}/ci -> structured CI-detail rows."""
     from . import chat_transport as CT
 
-    scope = {"runtime_home": _session_history_home()} if _chat_lifecycle_routed() else {}
+    scope = {"runtime_home": _session_history_home()}
     try:
         limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
     except (TypeError, ValueError):
@@ -9302,7 +9318,6 @@ def h_chat_approval_respond(cfg, q, b, p):
     return _chat_approval(cfg, q, b, p, settle=True)
 
 
-@_chat_execution_local
 def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/qubit/chat/retry -> re-run the last unanswered user message.
@@ -9311,6 +9326,13 @@ def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     re-invokes the model without duplicating the transcript. Nothing is
     fabricated when the model is still unavailable.
     """
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is not None:
+        if b.get("retry_of") is None:
+            return 400, {"ok": False, "code": "MALFORMED", "detail": "Provide the failed submission ID."}
+        return h_chat_turn(cfg, q, b, p)
     from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
@@ -13700,19 +13722,19 @@ def h_sessions_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     (``hermes_cli/web_routers/sessions.py:71``) onto the vendored
     ``qubit_state`` maintainer (``qubit_runtime/qubit_state_maintenance.py:272``:
     ``prune_sessions`` / ``count_open_prune_matches`` / ``list_prune_candidates``).
-    Only ended, non-archived sessions outside the window are removed; a live
+    Only ended, unpinned, non-archived sessions outside the window are removed; a live
     (un-ended) session is always skipped and reported. Confirmation, e-stop and
     audit all run before any row is touched. ``dry_run`` reports the real match
     set without deleting.
     """
+    raw_days = b.get("older_than_days")
     try:
-        days = float(b.get("older_than_days", 90) or 90)
-    except (TypeError, ValueError):
+        days = float(90 if raw_days in (None, "") else raw_days)
+    except (TypeError, ValueError, OverflowError):
+        days = 0
+    if isinstance(raw_days, bool) or not math.isfinite(days) or days < 1:
         return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "older_than_days must be numeric"}
-    if days < 1:
-        return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "older_than_days must be >= 1"}
+                     "detail": "older_than_days must be a finite number of at least 1"}
     source = str(b.get("source") or q.get("source") or "").strip() or None
     _cs, db, sessions_dir = _chat_session_db(cfg)
     if db is None:
@@ -13720,7 +13742,7 @@ def h_sessions_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     filters = {"older_than_days": days, "source": source, "archived": False}
     if _truthy(b.get("dry_run")):
         try:
-            rows = db.list_prune_candidates(**filters)
+            rows = db.list_prune_candidates(whole_lineages=True, **filters)
             skipped_open = int(db.count_open_prune_matches(**filters))
         except Exception as exc:
             return _fail(exc)

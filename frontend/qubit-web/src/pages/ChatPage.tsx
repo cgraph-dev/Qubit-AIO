@@ -342,7 +342,7 @@ function storageSet(key: string, value: string): void {
 }
 
 type NextTurnOptions = { model?: string; provider?: string; reasoning?: string };
-type PendingProfileTurn = { id: string; text: string; image?: true; options?: NextTurnOptions };
+type PendingProfileTurn = { id: string; text: string; image?: true; options?: NextTurnOptions; retryOf?: string };
 
 const NextTurnModelPicker = lazy(() => import("@/components/ModelPickerDialog")
   .then(({ ModelPickerDialog }) => ({ default: ModelPickerDialog })));
@@ -644,6 +644,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   );
   const [error, setError] = useState<string | null>(null);
   const [retryText, setRetryText] = useState<string | null>(null);
+  const [failedProfileTurn, setFailedProfileTurn] = useState<{ key: string; turn: PendingProfileTurn } | null>(null);
   // Live transcription (one controller for browser/local/terminal). The
   // snapshot drives the composer, status strip and Right-Ctrl/push-to-talk.
   const { controller, snapshot: voice } = useTranscriptionController({
@@ -1176,14 +1177,16 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   }, []);
 
   const send = useCallback(
-    (raw: string, activity: "thinking" | "summarizing" = "thinking", retryId?: string, imageDataUrl?: string) => {
+    (raw: string, activity: "thinking" | "summarizing" = "thinking", retryId?: string,
+      imageDataUrl?: string, failedId?: string) => {
       const text = (raw || "").trim();
       const previous = pendingTurnRef.current;
       if (!text || busy || (routed && previous?.key === recoveryKey && previous.turn.id !== retryId)) return;
       if (retryId && retryPermission.current !== retryId) return;
       retryPermission.current = "";
       const submissionId = routed ? (retryId ?? generateChatChannel()) : undefined;
-      const options = routed
+      const retryOf = failedId ?? (retryId ? previous?.turn.retryOf : undefined);
+      const options = retryOf ? undefined : routed
         ? retryId ? previous?.turn.options : {
           ...(nextModel ?? {}),
           ...(nextReasoning ? { reasoning: nextReasoning } : {}),
@@ -1194,15 +1197,19 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           id: submissionId,
           text,
           ...(imageDataUrl ? { image: true } : {}),
+          ...(retryOf ? { retryOf } : {}),
           ...(options && Object.keys(options).length ? { options } : {}),
         });
-        setNextModel(null);
-        setNextReasoning("");
+        if (!retryOf) {
+          setNextModel(null);
+          setNextReasoning("");
+        }
+        setFailedProfileTurn(null);
         setRetrySubmission("");
         setRecoveryNotice("");
       }
       void emitFxAt("impact", composerRef.current, { scale: 0.7 });
-      setInput("");
+      if (!retryOf) setInput("");
       setError(null);
       setRetryText(null);
       setVoiceNotice(null);
@@ -1213,8 +1220,10 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       taskTurnRef.current = false;
       // This row is the operator's own message and outranks any transcript read
       // issued before it (see `localAppendRef` / the load effect's 404 branch).
-      localAppendRef.current += 1;
-      setMessages((prev) => prev.concat([{ role: "user", text }]));
+      if (!retryOf) {
+        localAppendRef.current += 1;
+        setMessages((prev) => prev.concat([{ role: "user", text }]));
+      }
       // A locally-driven turn in a followed voice session appends rows the
       // server will persist too; advance the merge counter so the next poll
       // does not re-append them as "new".
@@ -1223,6 +1232,16 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      const stamp = loadReqRef.current;
+      const refreshRetryTranscript = () => {
+        const appended = localAppendRef.current;
+        void readMessages(session).then((transcript) => {
+          if (controller.signal.aborted || stamp !== loadReqRef.current || appended !== localAppendRef.current) return;
+          const rows = (transcript.messages ?? []).map(toChatMessage);
+          setMessages(rows);
+          saveTranscript(transcriptKey, rows);
+        }).catch(() => { /* Keep the rendered reply if the read is unavailable. */ });
+      };
 
       // SSE turn on the shared chat transport: deltas render live, the final
       // reply is persisted server-side, and a typed error is surfaced as-is.
@@ -1233,6 +1252,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       streamChatTurn(
         { text, session, ...options, ...(scopedProfile ? { profile: scopedProfile } : {}),
           ...(submissionId ? { submission_id: submissionId } : {}),
+          ...(retryOf ? { retry_of: retryOf } : {}),
           ...(imageDataUrl ? { image_data_url: imageDataUrl } : {}) },
         {
           onDelta: (delta, event) => {
@@ -1345,13 +1365,18 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             // refresh.
             if (followLiveVoice) voiceSyncedRef.current += 1;
             setSessionListNonce((n) => n + 1);
+            if (retryOf) refreshRetryTranscript();
           },
           onError: (event) => {
             if (controller.signal.aborted) return;
             const refusedBeforeSubmit = event.code === "CHAT_GATEWAY_REFUSED"
               || event.code === "CHAT_SESSION_MOVED" || event.code === "CHAT_SESSION_BUSY"
               || event.code === "CHAT_PROFILE_WORKER_UNAVAILABLE";
-            if (submissionId && (event.code === "CHAT_GATEWAY_TURN_FAILED" || (!retryId && refusedBeforeSubmit))) {
+            if (submissionId && event.code === "CHAT_GATEWAY_TURN_FAILED") {
+              setFailedProfileTurn({ key: recoveryKey, turn: { id: submissionId, text } });
+              rememberTurn(null);
+              if (retryOf) refreshRetryTranscript();
+            } else if (event.code === "CHAT_RETRY_UNAVAILABLE" || (submissionId && !retryId && refusedBeforeSubmit)) {
               rememberTurn(null);
             }
             setPendingConfirm(extractPendingConfirm(event));
@@ -1367,7 +1392,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             setError(
               `[${event.code ?? "TURN_FAILED"}] ${event.detail ?? "turn failed"}`,
             );
-            if (routed && refusedBeforeSubmit) {
+            if (routed && refusedBeforeSubmit && !retryOf) {
               setInput(text);
               setMessages((rows) => rows.slice(0, -1));
             } else if (!routed) {
@@ -1392,6 +1417,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             setVoiceNotice("turn cancelled — the shared backend aborted it");
             void emitFx("warning", { target: composerRef.current });
             setSessionListNonce((n) => n + 1);
+            if (retryOf) refreshRetryTranscript();
           },
         },
         controller.signal,
@@ -1404,8 +1430,10 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           } else if (routed) {
             if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OPTIONS_INVALID|MALFORMED|EMERGENCY_STOP|BAD_IMAGE)\]/.test(failure)) {
               if (submissionId && !retryId) rememberTurn(null);
-              setInput(text);
-              setMessages((rows) => rows.slice(0, -1));
+              if (!retryOf) {
+                setInput(text);
+                setMessages((rows) => rows.slice(0, -1));
+              }
               setError(failure);
             } else {
               setError(failure);
@@ -1420,7 +1448,8 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           if (!controller.signal.aborted) setBusy(false);
         });
     },
-    [busy, session, reasoning, nextModel, nextReasoning, followLiveVoice, routed, scopedProfile, recoveryKey, rememberTurn],
+    [busy, session, reasoning, nextModel, nextReasoning, followLiveVoice, routed, scopedProfile, recoveryKey,
+      rememberTurn, readMessages, transcriptKey],
   );
 
   async function checkProfileTurn(cancel: boolean) {
@@ -1450,6 +1479,10 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         } else {
           rememberTurn(null);
           setSessionListNonce((nonce) => nonce + 1);
+          if (receipt.outcome === "failed") {
+            setFailedProfileTurn({ key: recoveryKey, turn: currentRecovery });
+            setError("The gateway could not complete this turn.");
+          }
           setVoiceNotice(receipt.outcome === "cancelled" || receipt.outcome === "interrupted"
             ? "The gateway stopped the turn."
             : "The turn has settled. The transcript is up to date.");
@@ -3086,7 +3119,14 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
               className="mt-2 flex flex-wrap items-center gap-2 border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive"
             >
               <span className="min-w-0 flex-1 break-words">{error}</span>
-              {retryText ? (
+              {routed && failedProfileTurn?.key === recoveryKey && !currentRecovery ? (
+                <NativeButton type="button" outlined disabled={busy}
+                  onClick={() => send(failedProfileTurn.turn.text, "thinking", undefined, undefined, failedProfileTurn.turn.id)}
+                  aria-label="Retry the last failed turn">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Retry
+                </NativeButton>
+              ) : retryText ? (
                 <Button
                   variant="secondary"
                   onClick={() => send(retryText)}

@@ -42,7 +42,7 @@ def _result(outcome: str | None, reply: Any, session: str) -> dict:
     return _error("CHAT_GATEWAY_TURN_FAILED", "The profile gateway did not complete the turn.", session)
 
 
-async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id, image, options):
+async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id, image, options, retry_of):
     from qubit_cli.gateway_client import GatewayRPCError
     from tui_gateway.owner_forward import _REFUSED_BEFORE_COMMIT, connect_owner
 
@@ -73,7 +73,11 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                     yield _result("cancelled", None, session)
                     return
             submitted = True
-            admitted = await client.rpc("prompt.submit", **params)
+            if retry_of is not None:
+                admitted = await client.rpc("prompt.retry", session_id=target, submission_id=submission_id,
+                                            retry_of=retry_of)
+            else:
+                admitted = await client.rpc("prompt.submit", **params)
             # The owner captures immutable bytes before acknowledging admission.
             if staged is not None:
                 with suppress(OSError):
@@ -131,6 +135,12 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
         yield _error("CHAT_ADMISSION_UNCONFIRMED", "Check the last turn before sending again.", session)
     except GatewayRPCError as exc:
         reason = str(exc.data.get("reason") or exc)
+        if retry_of is not None and not turn.admission and reason in ("retry_unavailable", "retry_attachment_missing"):
+            detail = ("The original attachment is no longer available. Attach it to a new message."
+                      if reason == "retry_attachment_missing" else
+                      "Only the latest failed turn with an unchanged transcript can be retried.")
+            yield _error("CHAT_RETRY_UNAVAILABLE", detail, session)
+            return
         if reason in _REFUSED_BEFORE_COMMIT and not turn.admission:
             submitted = False
         if reason == "session_read_only" and not turn.admission:
@@ -153,7 +163,7 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                 staged.unlink(missing_ok=True)
 
 
-def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None, image=None, options=None):
+def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None, image=None, options=None, retry_of=None):
     """Run the gateway relay on the calling HTTP thread and close its socket on exit."""
     from .plugins import estop_engaged
     from .power import power_control
@@ -184,7 +194,7 @@ def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submissio
         if control is not None:
             control.track(correlation, stop_turn)
         with asyncio.Runner() as runner:
-            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex, image, options)
+            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex, image, options, retry_of)
             try:
                 while True:
                     yield runner.run(anext(stream))

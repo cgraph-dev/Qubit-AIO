@@ -76,3 +76,107 @@ def compose(rewrite: Optional[RetryRewrite], authorize):
         authorize(conn)
         rewrite.guard(conn)
     return guard
+
+
+async def retry_failed_turn(authority, actor, ref, request_id, retry_of):
+    """Use the original accepted input; archive only the exact failed transcript suffix."""
+    from gateway.session_ingress_media import capture_lease, hold_retained_media
+    from gateway.session_results import admission_result
+    from gateway.session_runtime_workers import tracked_write
+    from qubit_state_runtime import admission_fingerprint, admit_session_input, find_session_admission
+
+    if (any(not isinstance(value, str) or not 0 < len(value) <= 256 for value in (request_id, retry_of))
+            or request_id == retry_of):
+        raise RuntimeStoreError('invalid_params')
+    authority.authorize(actor, ref, 'session:submit')
+    db, session_id = authority.db, ref.session_id
+    lookup = dict(principal_id=actor.subject, session_id=session_id)
+    binding = 'gateway.failed_retry.v1.' + admission_fingerprint(
+        canonical_target=session_id, payload={'principal': actor.subject, 'request': request_id})
+    applied = None
+
+    def admit():
+        original = find_session_admission(db, **lookup, request_id=retry_of)
+        if original is None or (original['status'], original['outcome']) != ('terminal', 'failed'):
+            raise RuntimeStoreError('retry_unavailable')
+        payload = original['payload']
+        if not {'text'} <= payload.keys() <= {'text', 'attachments_v1', 'cli_turn_v1',
+                                             'local_operator_v1'}:
+            raise RuntimeStoreError('retry_unavailable')
+        saved = admission_result(db, original['admission_id'])
+        persisted = ((saved or {}).get('result') or {}).get('persisted_turn') or {}
+
+        def rewind(conn):
+            nonlocal applied
+            applied = None
+            applied = _rewind_failed_turn(db, conn, session_id, original, persisted)
+            conn.execute('INSERT INTO state_meta(key,value) VALUES(?,?)', (binding, original['admission_id']))
+
+        def reconcile(conn):
+            saved = conn.execute('SELECT value FROM state_meta WHERE key=?', (binding,)).fetchone()
+            if saved is None or saved[0] != original['admission_id']:
+                raise RuntimeStoreError('admission_conflict')
+
+        with capture_lease():
+            # An exact replay needs only the digest and can still answer after media retention.
+            if find_session_admission(db, **lookup, request_id=request_id) is None:
+                try:
+                    hold_retained_media(payload.get('attachments_v1', {}).get('media', []))
+                except RuntimeStoreError as exc:
+                    raise RuntimeStoreError('retry_attachment_missing') from exc
+            return admit_session_input(db, **lookup, epoch=authority.epoch, request_id=request_id,
+                                       payload=payload, _authorize_write=authority._admission_gate(rewind), _replay_guard=reconcile)
+
+    def committed(row):
+        if applied is not None:
+            authority.runner.session_store._clear_dirty_transcript(applied)
+        return authority._admitted(ref, None, row)
+
+    async with authority.sessions[session_id].mutation_lock:
+        authority.authorize(actor, ref, 'session:submit')
+        return await tracked_write(authority, admit, then=committed, ordered=True,
+                                   after=lambda _receipt: authority._schedule_admitted(ref))
+
+
+def _rewind_failed_turn(db, conn, session_id, original, persisted):
+    from agent.context_compressor import split_user_originated_turn
+    from qubit_state_local_lineage import local_physical_target
+    from qubit_state_mutation_guards import MUTATION_GUARD_REFUSALS, busy_refusal, require_not_executing
+    from qubit_state_mutation_transcript import rewind_in_transaction
+    from qubit_state_runtime import _canonical_chain
+
+    current = conn.execute(
+        "SELECT status,outcome FROM session_admissions WHERE target_session_id=? AND admission_id=?",
+        (session_id, original['admission_id'])).fetchone()
+    if current is None or tuple(current) != ('terminal', 'failed'):
+        raise RuntimeStoreError('retry_unavailable')
+    if conn.execute(
+        "SELECT 1 FROM session_admissions WHERE target_session_id=? "
+        "AND (seq>? OR status!='terminal') LIMIT 1", (session_id, original['seq'])
+    ).fetchone():
+        raise RuntimeStoreError('retry_unavailable')
+    target = _canonical_chain(conn, local_physical_target(conn, session_id))[-1]
+    anchor = persisted.get('user_row_id')
+    if (type(anchor) is not int or persisted.get('complete') is not False
+            or persisted.get('user_row_ids', [anchor]) != [anchor]):
+        raise RuntimeStoreError('retry_unavailable')
+    suffix = conn.execute(
+        "SELECT id,role,tool_calls,content,display_kind,display_metadata,_compressed_summary "
+        "FROM messages WHERE session_id=? AND active=1 AND id>=? ORDER BY id", (target, anchor)
+    ).fetchall()
+    if (not suffix or suffix[0]['id'] != anchor or suffix[0]['role'] != 'user'
+            or [row['id'] for row in suffix] != sorted(persisted.get('row_ids', ()))
+            or any(row['role'] == 'tool' or row['tool_calls'] for row in suffix)):
+        raise RuntimeStoreError('retry_unavailable')
+    first = dict(suffix[0])
+    first['content'] = db._decode_content(first['content'])
+    first['display_metadata'] = db._decode_display_metadata(first['display_metadata'])
+    scaffold, message = split_user_originated_turn(first)
+    if message is None:
+        raise RuntimeStoreError('retry_unavailable')
+    require_not_executing(conn, {session_id, target})
+    try:
+        rewind_in_transaction(db, conn, target, anchor, preserve_compaction_handoff=scaffold is not None)
+    except MUTATION_GUARD_REFUSALS as exc:
+        raise busy_refusal(exc) from exc
+    return target

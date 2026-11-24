@@ -536,6 +536,162 @@ def test_sessions_history_and_confirmations_follow_the_owning_profile(tmp_path, 
         ui.stop()
 
 
+def test_named_session_activity_and_artifacts_follow_the_exact_profile(tmp_path, monkeypatch):
+    from voicebridge import chat_stores, chat_transport, qubit_runtime, session_activity
+
+    root = tmp_path / "runtime"
+    root.mkdir()
+    (root / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    qubit_runtime.ensure_path()
+    from qubit_state import SessionDB
+    from qubit_cli.web_server_profiles import _qubit_home_scope
+
+    cfg, _state = _cfg(tmp_path, monkeypatch)
+    for profile in ("work", "sibling"):
+        home = root / "profiles" / profile
+        home.mkdir(parents=True)
+        (home / "config.yaml").write_text("{}\n")
+        db = SessionDB(home / "state.db")
+        try:
+            db.create_session("same-id", "cli")
+            db.append_message("same-id", "assistant", f"Transcript belongs to {profile}.")
+        finally:
+            db.close()
+        with _qubit_home_scope(home):
+            assert chat_transport.record_activity(cfg, "same-id", f"activity for {profile}")["state"] == "OK"
+            chat_transport.draft_store(cfg).put("same-id", "notes.txt", f"draft for {profile}")
+            comments = chat_transport.comment_store(cfg)
+            comments.add_comment("same-id", f"comment for {profile}")
+            comments.add_ci_detail("same-id", check="fixture", status="success", detail=f"CI for {profile}")
+        session_activity.store(cfg, runtime_home=home).record("orphan-id", "note", detail="orphan activity")
+        chat_stores.FileDraftStore(home).put("orphan-id", "notes.txt", "orphan draft")
+        chat_stores.CommentStore(home).add_comment("orphan-id", "orphan comment")
+
+    listener_reads = []
+    monkeypatch.setattr("voicebridge.git_scope.status", lambda *_a, **_k: listener_reads.append("git"))
+    monkeypatch.setattr("voicebridge.media_gen.status", lambda *_a, **_k: listener_reads.append("media"))
+    ui, port = _live(tmp_path, monkeypatch)
+
+    def request(profile, surface, *, sid="same-id", method="GET", body=None):
+        route = f"/agent/api/qubit/chat/sessions/{sid}{surface}"
+        separator = "&" if "?" in route else "?"
+        code, raw = _req(port, method, f"{route}{separator}profile={profile}", body)
+        return code, _json_body(raw)
+
+    try:
+        for profile in ("work", "sibling"):
+            code, activity = request(profile, "/activity")
+            assert code == 200, activity
+            assert profile in activity["summary"]["text"]
+            assert activity["counts"]["summary"] == 1
+            assert [row["detail"] for row in activity["events"]] == [f"activity for {profile}"]
+            assert activity["git_scope"]["state"] == activity["media"]["state"] == "UNAVAILABLE"
+            code, drafts = request(profile, "/drafts?include_content=false")
+            assert code == 200 and drafts["total"] == 1 and "content" not in drafts["drafts"][0]
+            code, draft = request(profile, "/draft?path=notes.txt")
+            assert code == 200 and draft["draft"]["content"] == f"draft for {profile}", draft
+            assert request(profile, "/comments")[1]["comments"][0]["body"] == f"comment for {profile}"
+            assert request(profile, "/ci")[1]["ci"][0]["detail"] == f"CI for {profile}"
+        for surface in ("/activity", "/drafts", "/draft?path=notes.txt", "/comments", "/ci"):
+            assert request("work", surface, sid="orphan-id")[0] == 404
+        assert request("work", "", method="PATCH", body={"archived": True})[0] == 200
+        assert request("work", "/activity")[0] == 404
+        assert request("work", "/comments")[0] == 404
+        assert request("sibling", "/activity")[0] == 200
+        assert request("work", "", method="PATCH", body={"archived": False})[0] == 200
+        assert request("work", "/activity")[1]["events"][0]["detail"] == "activity for work"
+        assert request("work", "/comments")[1]["comments"][0]["body"] == "comment for work"
+        assert listener_reads == []
+    finally:
+        ui.stop()
+
+
+def test_named_session_search_import_and_prune_preserve_sibling_and_archive(tmp_path, monkeypatch):
+    from voicebridge import qubit_runtime
+
+    root = tmp_path / "runtime"
+    root.mkdir()
+    (root / "config.yaml").write_text("{}\n")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    qubit_runtime.ensure_path()
+    from qubit_state import SessionDB
+
+    homes = {profile: root / "profiles" / profile for profile in ("work", "sibling")}
+    old = time.time() - 10 * 86400
+    for profile, home in homes.items():
+        home.mkdir(parents=True)
+        (home / "config.yaml").write_text("{}\n")
+        with SessionDB(home / "state.db") as db:
+            for sid in ("prune-id", "archive-id", "pinned-id", "older-root", "open-id"):
+                db.create_session(sid, "cli")
+                db.append_message(sid, "user", f"lookup{profile} history for {sid}", timestamp=old)
+                if sid != "open-id":
+                    db.end_session(sid, "compression" if sid == "older-root" else "done")
+            db.create_session("recent-child", "cli", parent_session_id="older-root")
+            db.append_message("recent-child", "assistant", "Recent reply")
+            db.set_session_archived("archive-id", True)
+            db.set_session_pinned("pinned-id", True)
+            db._execute_write(lambda conn: conn.execute(
+                "UPDATE sessions SET started_at=?, last_activity_at=? WHERE id<>'recent-child'", (old, old)))
+
+    ui, port = _live(tmp_path, monkeypatch)
+
+    def request(method, endpoint, profile="work", body=None):
+        separator = "&" if "?" in endpoint else "?"
+        code, raw = _req(port, method, f"/agent/api/{endpoint}{separator}profile={profile}", body)
+        return code, _json_body(raw)
+
+    try:
+        stats = request("GET", "sessions/stats")[1]
+        assert (stats["total"], stats["active_store"], stats["archived"]) == (5, 4, 1), stats
+        assert request("GET", "sessions/search?q=lookupwork")[1]["sessions"]
+        assert not request("GET", "sessions/search?q=lookupwork", "sibling")[1]["sessions"]
+        assert request("GET", "sessions/archive-id")[0] == 404
+        assert request("PATCH", "qubit/chat/sessions/archive-id", body={"archived": False})[0] == 200
+        assert request("GET", "sessions/archive-id/messages")[1]["messages"][0]["content"].startswith("lookupwork")
+        assert request("PATCH", "qubit/chat/sessions/archive-id", body={"archived": True})[0] == 200
+
+        code, exported = request("GET", "sessions/prune-id/export")
+        assert code == 200 and exported["messages"][0]["content"].startswith("lookupwork")
+        code, imported = request("POST", "sessions/import", "sibling", {"sessions": [exported]})
+        assert code == 200 and imported["imported"] == 0 and imported["skipped"] == 1
+        assert request("GET", "sessions/prune-id/messages", "sibling")[1]["messages"][0]["content"].startswith("lookupsibling")
+
+        criteria = {"older_than_days": 5, "source": "cli"}
+        code, preview = request("POST", "sessions/prune", body={**criteria, "dry_run": True})
+        assert code == 200 and preview["removed"] == 0 and preview["skipped_open"] == 1, preview
+        assert [row["id"] for row in preview["sessions"]] == ["prune-id"], preview
+        for invalid in (0, False, True, "nan", "inf"):
+            assert request("POST", "sessions/prune", body={"older_than_days": invalid, "dry_run": True})[0] == 400
+        code, staged = request("POST", "sessions/prune", body=criteria)
+        assert code == 409 and staged["confirmation_id"], staged
+        confirm = {**criteria, "confirmation_id": staged["confirmation_id"]}
+        assert request("POST", "sessions/prune", "sibling", confirm)[0] == 409
+        assert request("POST", "sessions/prune", body={**confirm, "older_than_days": 2})[0] == 409
+        assert request("GET", "sessions/prune-id")[0] == 200
+        code, applied = request("POST", "sessions/prune", body=confirm)
+        assert code == 200 and applied["removed"] == 1, applied
+        assert request("POST", "sessions/prune", body=confirm)[0] == 409
+        with SessionDB(homes["work"] / "state.db") as named_db, SessionDB(homes["sibling"] / "state.db") as sibling_db:
+            assert named_db.get_session("prune-id") is None
+            assert sibling_db.get_session("prune-id") is not None
+            assert named_db.get_session("archive-id")["archived"]
+            assert named_db.get_session("pinned-id")["pinned"]
+            assert named_db.get_session("open-id")["ended_at"] is None
+            assert named_db.get_session("recent-child")["parent_session_id"] == "older-root"
+
+        # Restore a portable transcript into a fresh ID, then check exact replay is additive.
+        restored = {**exported, "id": "imported-id"}
+        code, imported = request("POST", "sessions/import", body={"sessions": [restored]})
+        assert code == 200 and imported["imported_ids"] == ["imported-id"], imported
+        assert request("GET", "sessions/imported-id/messages")[1]["messages"][0]["content"].startswith("lookupwork")
+        assert request("GET", "sessions/imported-id", "sibling")[0] == 404
+        assert request("POST", "sessions/import", body={"sessions": [restored]})[1]["skipped"] == 1
+    finally:
+        ui.stop()
+
+
 def test_qubit_chat_lifecycle_and_worker_boundary_use_the_selected_profile(tmp_path, monkeypatch):
     import asyncio
     from types import SimpleNamespace
@@ -615,9 +771,14 @@ def test_qubit_chat_lifecycle_and_worker_boundary_use_the_selected_profile(tmp_p
         assert request("GET", f"{base}/{sid}{named}")[0] == 404
         assert not events
 
-        for endpoint in ("", "/stream", "/retry", "/image"):
-            status, out = request("POST", endpoint + named, {"text": "fixture", "session": "same-chat"})
+        turn = {"text": "fixture", "session": "same-chat"}
+        for endpoint in ("", "/stream", "/image"):
+            status, out = request("POST", endpoint + named, turn)
             assert status == 409 and out["code"] == "CHAT_PROFILE_WORKER_UNAVAILABLE", out
+        status, out = request("POST", "/retry" + named, turn)
+        assert status == 400 and out["code"] == "MALFORMED", out
+        status, out = request("POST", "/retry" + named, {**turn, "retry_of": "failed", "submission_id": "new"})
+        assert status == 409 and out["code"] == "CHAT_PROFILE_WORKER_UNAVAILABLE", out
         assert request("POST", "/cancel" + named, {"session": "same-chat"})[1]["code"] == "CHAT_NO_ACTIVE_TURN"
         assert request("GET", base + "/same-chat/messages")[1]["total"] == 1
         assert request("GET", base + "/same-chat/messages" + named)[1]["total"] == 1
