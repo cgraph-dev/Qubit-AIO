@@ -10,15 +10,21 @@
  * in the node environment. Keep in sync with `_THEME_NAME_ALIASES` in
  * `qubit_cli/web_server_dashboard.py`.
  */
+/** The theme a fresh install starts on: Lofi SciFi (q6-l, large manga). */
+export const DEFAULT_THEME_NAME = "q6-l";
+
 export const THEME_NAME_ALIASES: Record<string, string> = {
+  // `default` is the owner's chosen default theme: Lofi SciFi (q6-l, the large
+  // manga variant). It is an explicit default, not a migration fallback — the
+  // stale ids below still resolve to Cyber Ghost (q4), which is the safe
+  // landing spot for a theme this install no longer ships.
+  default: "q6-l",
+  "default-large": "q6-l",
   // Q1 (navy) and Q2 (grayscale) were removed at owner request; stored ids
-  // from either family resolve to Q3 (q4) — the closest surviving dark look.
-  // Q4 (manga) is never used as a migration target: it is a deliberate choice,
-  // not a safe default for a stale id.
+  // from either family resolve to Cyber Ghost (q4).
   "nous-blue": "q4",
   "lens-5i": "q4",
   "qubit-blue": "q4",
-  default: "q4",
   q1: "q4",
   "q1-l": "q4-l",
   q2: "q4",
@@ -29,7 +35,6 @@ export const THEME_NAME_ALIASES: Record<string, string> = {
   "q5-l": "q4-l",
   qubit: "q4",
   "qubit-contrast": "q4",
-  "default-large": "q4-l",
   midnight: "q4",
   mono: "q4",
   cyberpunk: "q4",

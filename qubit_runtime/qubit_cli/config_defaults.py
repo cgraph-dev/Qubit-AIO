@@ -1040,7 +1040,8 @@ DEFAULT_CONFIG = {
     "webapp": {"enabled": False, "host": "127.0.0.1", "port": 9120, "public_url": ""},  # gateway/webapp_listener.py
 
     "dashboard": {
-        # Visual theme: "default" (alias) | "q4" | "q4-l" (Q3) | "q6" | "q6-l" (Q4, manga).
+        # Visual theme: "default" (-> Lofi SciFi, q6-l) | "q4" | "q4-l" (Cyber Ghost)
+        #              | "q6" | "q6-l" (Lofi SciFi, manga).
         # Q1/Q2 (q2/q3) were removed at owner request; those ids migrate to q4 on read.
         "theme": "default",
         # Process-isolation rollout controls. Read via the raw config loader, so tui_gateway.server

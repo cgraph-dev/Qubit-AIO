@@ -81,7 +81,7 @@ describe("large variants", () => {
 
 describe("read-old theme name migration", () => {
   it("maps every retired built-in id onto a surviving theme", () => {
-    expect(migrateThemeName("default")).toBe("q4");
+    expect(migrateThemeName("default")).toBe("q6-l");
     expect(migrateThemeName("q1")).toBe("q4");
     expect(migrateThemeName("q1-l")).toBe("q4-l");
     expect(migrateThemeName("q2")).toBe("q4");
@@ -92,7 +92,7 @@ describe("read-old theme name migration", () => {
     expect(migrateThemeName("q5-l")).toBe("q4-l");
     expect(migrateThemeName("qubit")).toBe("q4");
     expect(migrateThemeName("qubit-contrast")).toBe("q4");
-    expect(migrateThemeName("default-large")).toBe("q4-l");
+    expect(migrateThemeName("default-large")).toBe("q6-l");
     expect(migrateThemeName("midnight")).toBe("q4");
     expect(migrateThemeName("mono")).toBe("q4");
     expect(migrateThemeName("cyberpunk")).toBe("q4");

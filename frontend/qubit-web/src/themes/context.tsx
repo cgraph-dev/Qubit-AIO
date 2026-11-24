@@ -18,7 +18,7 @@ import {
   mangaRouteEligible,
   setMangaEnabled,
 } from "@/manga-skin/manga-store";
-import { migrateThemeName } from "./themeAliases";
+import { DEFAULT_THEME_NAME, migrateThemeName } from "./themeAliases";
 import { mergeThemeChoices } from "./themeChoices";
 import {
   FONT_CHOICES,
@@ -459,7 +459,7 @@ function applyTheme(theme: DashboardTheme) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Name of the currently active theme (built-in id or user YAML name). */
   const [themeName, setThemeName] = useState<string>(() => {
-    if (typeof window === "undefined") return "q4";
+    if (typeof window === "undefined") return DEFAULT_THEME_NAME;
     // The server injects the persisted active theme into the HTML; trust it
     // first so the initial render (and first paint) is already correct and
     // there is no flash while the async theme list loads.
@@ -470,7 +470,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored =
       injected ||
       readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ||
-      "q4";
+      DEFAULT_THEME_NAME;
     const migrated = migrateThemeName(stored);
     // Write the migrated name back so future reads converge on the new
     // key and we eventually retire the alias entry.
