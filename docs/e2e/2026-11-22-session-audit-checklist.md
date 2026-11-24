@@ -223,6 +223,7 @@ transcript after settlement, and stop a turn after the relay detaches. A retry
 uses the same submission ID, and the gateway kept one admission and one provider
 request. The same path now carries image bytes through the owning gateway.
 A native-vision fixture independently received and compared the PNG, and
-replaying the same submission produced no second model request. Turn-scoped
-model and reasoning overrides, recovery under load, and deployed checks remain
-open.
+replaying the same submission produced no second model request. The one-turn
+picker routed an identical model ID to a second provider. Effort alone kept the
+current route, and the following turn used its defaults. General retry, recovery
+under load, and deployed checks remain open.

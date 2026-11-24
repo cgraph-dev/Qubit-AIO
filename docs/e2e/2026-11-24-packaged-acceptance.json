@@ -422,6 +422,14 @@
       "command": "POST the named chat stream with image_data_url and submission_id; verify the provider image_url bytes, admission digest, staging cleanup and saved transcript",
       "observed": "The PNG reached the selected profile’s provider as an image part with matching bytes. The admission contained the exact digest and retained media path under the named profile. The finished reply matched the transcript. The same submission ID returned the saved result with one provider request and one admission. Bad PNG and MIME mismatch were refused in route tests. Chromium uploaded the PNG from the named chat and reloaded its reply at 390px and 1440px. The route selection passed 22 tests, the gateway image selection passed three, and the dashboard selection passed 38.",
       "scope": "The real provider probe used a deterministic native-vision fixture and PNG input. The deployed build and external providers remain unverified."
+    },
+    {
+      "check": "Named-profile per-turn model provider and reasoning",
+      "status": "PASS",
+      "environment": "Source dashboard and gateway, disposable named profile and two loopback providers advertising the same model ID",
+      "command": "Submit the named chat stream with model, provider and reasoning; replay the same submission ID; inspect provider wire requests, stored admissions, subsequent defaults and profile config bytes",
+      "observed": "The one-turn selection went to the second provider at high effort. A reasoning-only turn used medium on the first provider. The following turn used the first provider and its low default. Repeating either override produced no extra provider request, the saved admissions retained their distinct choices, and the profile config stayed byte-identical. The untitled New chat path created a session against the authenticated named owner. Chromium selected a model and reasoning effort at 390px and 1440px, then sent the intended provider and effort and cleared the one-turn selection. Focused verification passed 22 dashboard route tests, 25 native route and reasoning tests, and 38 frontend tests.",
+      "scope": "The provider changes were verified with disposable endpoints. The deployed build and external providers remain open."
     }
   ],
   "cancellation_fix_artifact": {
