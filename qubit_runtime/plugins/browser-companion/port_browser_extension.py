@@ -9,21 +9,18 @@ written separately and are NOT produced here.
 
 Run from the repository root:
 
-    .venv/bin/python qubit_runtime/plugins/browser-companion/port_browser_extension.py
+    .venv/bin/python qubit_runtime/plugins/browser-companion/port_browser_extension.py /path/to/upstream
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
 import sys
 from pathlib import Path
 
-UPSTREAM = Path(
-    "/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch/repo-survey/"
-    "hermes-browser-extension"
-)
 REPO = Path(__file__).resolve().parents[3]
 EXT_DEST = REPO / "frontend" / "qubit-app" / "plugins" / "qubit-browser-ext" / "extension"
 PLUGIN_DEST = REPO / "qubit_runtime" / "plugins" / "browser-companion"
@@ -297,16 +294,23 @@ def copy_plugin(src: Path, dest: Path) -> int:
 
 
 def main() -> int:
-    if not UPSTREAM.is_dir():
-        print(f"upstream tree missing: {UPSTREAM}", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("upstream", type=Path, help="path to the pinned upstream checkout")
+    upstream = parser.parse_args().upstream.expanduser().resolve()
+    extension = upstream / "extension"
+    companion = upstream / "companion-plugin"
+    for source in (extension, companion):
+        if not source.is_dir():
+            parser.error(f"upstream source directory missing: {source}")
+        if source == EXT_DEST or EXT_DEST in source.parents:
+            parser.error(f"upstream source is inside the extension destination: {source}")
     if EXT_DEST.exists():
         shutil.rmtree(EXT_DEST)
     EXT_DEST.mkdir(parents=True, exist_ok=True)
-    count = copy_tree(UPSTREAM / "extension", EXT_DEST)
+    count = copy_tree(extension, EXT_DEST)
     print(f"extension: {count} files -> {EXT_DEST}")
 
-    plugin_count = copy_plugin(UPSTREAM / "companion-plugin", PLUGIN_DEST)
+    plugin_count = copy_plugin(companion, PLUGIN_DEST)
     print(f"companion-plugin: {plugin_count} files -> {PLUGIN_DEST}")
     return 0
 
