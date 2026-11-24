@@ -159,6 +159,40 @@ def test_reattach_session_matches_by_resume_target():
     assert back.bridge is bridge
 
 
+def test_resume_without_attach_token_reuses_named_profiles_detached_pty(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    srv = _srv()
+    profile_home = str(tmp_path)
+    bridge = _Bridge()
+    ticket, _ttl = srv.tickets.mint(scope="pty", management_profile="work", resume="S-100")
+    existing = pty_ws._Session(bridge=bridge, ticket=_ticket(""), key="S-100",
+                                session_id="S-100", profile_home=profile_home)
+    sibling = pty_ws._Session(bridge=_Bridge(), ticket=_ticket(""), key="S-100",
+                               session_id="S-100", profile_home=str(tmp_path / "sibling"))
+    srv._detached[existing.detach_key] = existing
+    srv._detached[sibling.detach_key] = sibling
+    monkeypatch.setattr(srv, "_estop_engaged", lambda: False)
+    monkeypatch.setattr(pty_ws, "terminal_management_scope", lambda _profile: nullcontext(tmp_path))
+    monkeypatch.setattr(pty_ws, "handshake", lambda _handler: None)
+    monkeypatch.setattr(pty_ws, "_replay_buffer", lambda _session, _socket: True)
+
+    def unexpected_spawn(*_args):
+        raise AssertionError("A resume must reuse the terminal that owns this conversation")
+
+    monkeypatch.setattr(srv, "_request_spawn", unexpected_spawn)
+    attached = []
+    monkeypatch.setattr(srv, "_pump", lambda _handler, session: attached.append(session))
+
+    srv.serve(SimpleNamespace(connection=object()), ticket_value=ticket, cols=80, rows=24,
+              resume="untrusted-query-override", profile="", origin_ok=True, peer_ok=True)
+
+    assert attached == [existing]
+    assert not bridge.closed
+    assert srv._detached[sibling.detach_key] is sibling
+
+
 def test_reattach_session_unknown_target_returns_none():
     srv = _srv()
     assert srv._reattach_session("never-seen") is None

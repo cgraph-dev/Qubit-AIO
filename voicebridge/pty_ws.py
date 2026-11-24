@@ -1014,12 +1014,10 @@ class PtyWsServer:
                     _redact(str(guard.get("detail") or ""))[:220])
             return
         # Bind a conversation key up front. ``?attach=`` is the browser's own
-        # token; a caller that sends none (a script, a regression probe) would
-        # otherwise detach KEY-LESS and never be reaped. The ticket's session,
-        # then the terminal's conversation id, give a stable key. Computed
-        # before the reattach below because that path may rewrite
-        # ``session_id`` to the value this key was derived from.
-        key = str(attach or ticket.session or "").strip()
+        # token. A resumed caller without that token or a ticket session still
+        # needs a key before the reattach lookup. Use the resolved resume ID
+        # so the detached PTY keeps ownership of that conversation.
+        key = str(attach or ticket.session or resume or "").strip()
         # Retire detached terminals whose browser is long gone. The in-pump idle
         # check cannot see them (no client), so without this sweep an orphan
         # keeps its vendored session lease until the process exits — the cause
