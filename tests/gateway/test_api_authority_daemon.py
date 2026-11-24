@@ -1,6 +1,7 @@
 import pytest
 """Ordinary daemon/API listener and private authenticated WS share execution."""
 import asyncio
+from contextlib import closing
 from http.server import ThreadingHTTPServer
 import json
 import os
@@ -39,7 +40,7 @@ def test_ordinary_daemon_api_ws_fifo_retry(tmp_path):
                API_SERVER_ENABLED='true', API_SERVER_PORT=str(api_port), PYTHONUNBUFFERED='1')
 
     def rows():
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
             return [dict(zip(('request_id', 'status', 'payload'), row)) for row in db.execute(
                 'SELECT request_id,status,payload_json FROM session_admissions WHERE target_session_id=? ORDER BY seq', ('api-daemon',))]
 

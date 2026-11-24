@@ -226,6 +226,63 @@
       "revision": "a61a2f5150e3edbafc7e0fc8dece9ca7be9d4d9c",
       "command": "gh run list --commit a61a2f5150e3edbafc7e0fc8dece9ca7be9d4d9c",
       "observed": "All nine workflows reported success, including Linux artifact install, release qualification, E2E and Windows."
+    },
+    {
+      "check": "Authorization and data-handling regressions",
+      "status": "PASS",
+      "environment": "Python 3.14 checkout, disposable homes and non-production fixtures",
+      "revision": "aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
+      "tests_passed": 150,
+      "command": "python -m pytest --import-mode=importlib -o 'pythonpath=qubit_runtime tests tests/phase8_security' -q TEST_FILES",
+      "test_files": [
+        "tests/test_dashboard_auth_contract.py",
+        "tests/test_dashboard_auth_nous_binding9u.py",
+        "tests/test_webui_security_hardening9u.py",
+        "tests/test_sessions_filter_estop9u.py",
+        "tests/test_chat_session_authority8u.py",
+        "tests/test_route_wiring_fixes8u.py",
+        "tests/test_toolset_authority_and_cancel9u.py",
+        "tests/test_single_confirmation_authority8u.py",
+        "tests/test_transport_redaction_wave5.py",
+        "tests/test_config_secret_skip.py",
+        "tests/test_ingress_confinement8u.py",
+        "tests/test_webui_static_confinement9u.py",
+        "tests/test_file_delete_confinement_edges.py",
+        "tests/test_qubit_d5_backup_portable.py",
+        "tests/phase8_security/test_asi_denials.py",
+        "tests/phase8_security/test_mcp_security.py",
+        "tests/test_credential_refs9u.py",
+        "tests/test_qubitchat_safety_gates9u.py",
+        "tests/test_openclaw_family_security9u.py"
+      ],
+      "observed": "Passed session and tool authorization, named-home isolation, redacted credentials and errors, emergency stop, filesystem and ingress confinement, typed refusal and unchanged state, and policy isolation fixtures. The artifact-install workflow separately passed its authenticated wheel probes."
+    },
+    {
+      "check": "Gateway boot, scope, reconnect and cleanup fixtures",
+      "status": "PASS",
+      "environment": "Isolated root and native runtime test runners, loopback provider and daemon fixtures",
+      "revision": "301451b4b75b4d901a4e3956015e6905345d0e45",
+      "tests_passed": 67,
+      "command": "python -m pytest -q TEST_FILES (run root and native runtime groups separately)",
+      "test_files": [
+        "tests/gateway/test_api_authority_daemon.py",
+        "tests/gateway/test_session_authorities_multiplex.py",
+        "tests/test_gateway_control_authority9u.py",
+        "qubit_runtime/tests/gateway/test_control_listener_fatal.py",
+        "qubit_runtime/tests/gateway/test_host_gateway_profile_env.py",
+        "qubit_runtime/tests/gateway/test_abandoned_turn_process_cleanup.py",
+        "qubit_runtime/tests/qubit_cli/test_gateway_connection_reconnect.py"
+      ],
+      "observed": "The ordinary daemon fixture used an authenticated HTTP listener and WebSocket for the same session. The queue and retry receipts matched independent SQLite reads. Closing read-back connections removed the SQLite warnings. A combined root run still emitted an event-loop teardown warning. Installed gateway readiness and provider-unavailable recovery remain open."
+    },
+    {
+      "check": "Release archive verification and failure boundaries",
+      "status": "PASS",
+      "environment": "Python 3.14 checkout and disposable archive fixtures",
+      "revision": "aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
+      "tests_passed": 46,
+      "command": "python -m pytest -q tests/test_verify_public_release.py tests/test_release_scan_version_contract.py",
+      "observed": "Archive verification passed, including the scan-budget refusal and oversized member checks."
     }
   ],
   "cancellation_fix_artifact": {
