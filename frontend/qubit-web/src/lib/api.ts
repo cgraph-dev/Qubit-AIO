@@ -1203,6 +1203,28 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     }),
+  getProfileChatApproval: (session: string, profile: string, signal?: AbortSignal) =>
+    fetchJSON<{ approval: ProfileChatApproval | null }>(
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(session)}/approval`, profile),
+      { signal },
+    ),
+  respondToProfileChatApproval: (
+    session: string,
+    profile: string,
+    approval: ProfileChatApproval,
+    choice: ProfileChatApprovalChoice,
+  ) => fetchJSON<{ status: "resolved" }>(
+    appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(session)}/approval`, profile),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_id: approval.prompt_id,
+        execution_generation: approval.execution_generation,
+        choice,
+      }),
+    },
+  ),
   cancelProfileChatTurn: (session: string, profile: string) =>
     fetchJSON<{ ok: boolean }>(appendProfileParam("/api/qubit/chat/cancel", profile), {
       method: "POST",
@@ -3865,6 +3887,16 @@ export interface InterruptedTurn {
 export interface PendingConfirmation {
   action_summary?: string;
   staged_ms?: number;
+}
+
+export type ProfileChatApprovalChoice = "once" | "deny";
+
+export interface ProfileChatApproval {
+  prompt_id: string;
+  execution_generation: number;
+  command: string;
+  description: string;
+  choices: ProfileChatApprovalChoice[];
 }
 
 export interface ChatStoreSessionResponse {

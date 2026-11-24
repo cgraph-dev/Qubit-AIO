@@ -196,6 +196,52 @@ def _cancel_admission(home: Path, target: str, admission: str) -> None:
     asyncio.run(stop(discover_owner(home)))
 
 
+def approval(home: Path, session: str, response: dict | None) -> dict:
+    """Read or settle the exact pending command using a profile-scoped owner ticket."""
+    from qubit_cli.gateway_client import GatewayRPCError
+    from tui_gateway.owner_forward import connect_owner, discover_owner
+
+    async def use_owner(endpoint):
+        async with connect_owner(home, endpoint) as client:
+            if response is None:
+                # An idle poll needs no subscription or transcript read.
+                try:
+                    pending = await client.rpc("approval.pending", session_id=session)
+                except GatewayRPCError as exc:
+                    if exc.data.get("reason") == "not_found":
+                        return {"approval": None}
+                    raise
+                if not pending.get("approvals"):
+                    return {"approval": None}
+
+            snapshot = await client.rpc("session.resume", session_id=session, omit_messages=True)
+            if snapshot.get("stored_session_id") != session or not snapshot.get("session_id"):
+                return {"approval": None}
+
+            for prompt in snapshot.get("prompts") or ():
+                if prompt.get("kind") != "approval" or "edit" in prompt:
+                    continue
+                choices = [choice for choice in ("once", "deny") if choice in prompt.get("choices", ())]
+                if not choices or not prompt.get("command"):
+                    continue
+                pending = {
+                    "prompt_id": prompt["prompt_id"],
+                    "execution_generation": prompt["execution_generation"],
+                    "command": prompt["command"],
+                    "description": prompt.get("description") or "",
+                    "choices": choices,
+                }
+                if response is None:
+                    return {"approval": pending}
+                if (response["prompt_id"] == pending["prompt_id"]
+                        and response["execution_generation"] == pending["execution_generation"]
+                        and response["choice"] in choices):
+                    return await client.rpc("approval.respond", session_id=snapshot["session_id"], **response)
+            return {"approval": None}
+
+    return asyncio.run(use_owner(discover_owner(home)))
+
+
 def create(home: Path, name: str) -> str | None:
     """Mint a native session when the owner is ready, otherwise allow offline drafts."""
     from tui_gateway.owner_forward import OwnerNotRunning, connect_owner, discover_owner

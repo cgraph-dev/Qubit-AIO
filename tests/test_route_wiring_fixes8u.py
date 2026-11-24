@@ -856,3 +856,69 @@ def test_profile_chat_disconnect_does_not_resubmit(tmp_path, monkeypatch):
     assert len(submits) == 1 and submits[0]["submission_id"]
     assert events[0]["code"] == "CHAT_ADMISSION_UNCONFIRMED"
     assert profile_chat.cancel(tmp_path, "chat")[0] == 404
+
+
+def test_named_dashboard_approval_is_scoped_and_generation_bound(tmp_path, monkeypatch):
+    from contextlib import asynccontextmanager, closing
+
+    from voicebridge import qubit_runtime
+
+    root = tmp_path / "runtime"
+    work = root / "profiles" / "work"
+    work.mkdir(parents=True)
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    qubit_runtime.ensure_path()
+    from qubit_state import SessionDB
+    from tui_gateway import owner_forward
+
+    for home in (root, work):
+        (home / "config.yaml").write_text("{}\n")
+        with closing(SessionDB(home / "state.db")) as db:
+            db.create_session("same-chat", "gui")
+
+    prompt = {"kind": "approval", "prompt_id": "request-1", "execution_generation": 4,
+              "command": "fixture action", "description": "fixture reason",
+              "choices": ["once", "deny", "always"]}
+    settled = []
+
+    class Client:
+        async def rpc(self, method, **params):
+            assert params["session_id"] == "same-chat"
+            if method == "approval.pending":
+                return {"approvals": [] if settled else [{"request_id": "request-1"}]}
+            if method == "session.resume":
+                assert params["omit_messages"]
+                return {"session_id": "same-chat", "stored_session_id": "same-chat",
+                        "prompts": [] if settled else [prompt]}
+            assert method == "approval.respond"
+            settled.append(params)
+            return {"status": "resolved"}
+
+    @asynccontextmanager
+    async def connect(home, endpoint):
+        assert home == work and endpoint == "fixture-owner"
+        yield Client()
+
+    monkeypatch.setattr(owner_forward, "discover_owner", lambda _home: "fixture-owner")
+    monkeypatch.setattr(owner_forward, "connect_owner", connect)
+    ui, port = _live(tmp_path, monkeypatch)
+    try:
+        endpoint = "/agent/api/qubit/chat/sessions/same-chat/approval"
+        assert _req(port, "GET", endpoint)[0] == 404
+        scoped = endpoint + "?profile=work"
+        status, raw = _req(port, "GET", scoped)
+        assert status == 200 and _json_body(raw)["approval"] == {
+            "prompt_id": "request-1", "execution_generation": 4, "command": "fixture action",
+            "description": "fixture reason", "choices": ["once", "deny"],
+        }
+        response = {"prompt_id": "request-1", "execution_generation": 4, "choice": "once"}
+        assert _req(port, "POST", scoped, {**response, "profile": "default"})[0] == 400
+        assert _req(port, "POST", scoped, {**response, "choice": "always"})[0] == 400
+        assert _req(port, "POST", scoped, {**response, "execution_generation": 3})[0] == 409
+        assert settled == []
+        assert _req(port, "POST", scoped, response)[0] == 200
+        assert settled == [{"session_id": "same-chat", **response}]
+        assert _req(port, "POST", scoped, response)[0] == 409
+        assert _json_body(_req(port, "GET", scoped)[1])["approval"] is None
+    finally:
+        ui.stop()
