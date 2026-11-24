@@ -261,3 +261,18 @@ def create(home: Path, name: str) -> str | None:
             return sid
 
     return asyncio.run(mint())
+
+
+def continue_history(home: Path, session: str, request_id: str) -> str:
+    from tui_gateway.owner_forward import connect_owner, discover_owner
+
+    async def copy(endpoint):
+        async with connect_owner(home, endpoint) as client:
+            snapshot = await client.rpc("session.create", source="gui", request_id=request_id,
+                                        dashboard_history_id=session)
+            sid = snapshot.get("stored_session_id")
+            if not isinstance(sid, str) or not sid or sid == session:
+                raise ValueError("The owning gateway did not return a new session ID.")
+            return sid
+
+    return asyncio.run(copy(discover_owner(home)))

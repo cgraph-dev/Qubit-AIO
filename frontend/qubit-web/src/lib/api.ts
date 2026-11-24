@@ -1203,6 +1203,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     }),
+  continueChatHistory: (session: string, profile: string, requestId: string) =>
+    fetchJSON<{ session: ChatStoreSession }>(
+      appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(session)}/continue`, profile),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: requestId }),
+      },
+    ),
   getProfileChatApproval: (session: string, profile: string, signal?: AbortSignal) =>
     fetchJSON<{ approval: ProfileChatApproval | null }>(
       appendProfileParam(`/api/qubit/chat/sessions/${encodeURIComponent(session)}/approval`, profile),

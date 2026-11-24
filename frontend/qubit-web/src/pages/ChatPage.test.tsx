@@ -58,6 +58,7 @@ const apiMocks = vi.hoisted(() => ({
     message_count: 0,
     meta: {},
   })),
+  continueChatHistory: vi.fn(async () => ({ session: { id: "active-copy" } })),
   patchChatSession: vi.fn(async () => ({ ok: true })),
   createChatSession: vi.fn(async () => ({
     session: { id: "fresh-after-switch" },
@@ -109,6 +110,8 @@ vi.mock("@/lib/api", () => ({
     getChatSessionCi: apiMocks.getChatSessionCi,
     describeChatImage: vi.fn(async () => ({ description: "described" })),
     getChatSession: apiMocks.getChatSession,
+    continueChatHistory: apiMocks.continueChatHistory,
+    getProfileChatApproval: vi.fn(async () => ({ approval: null })),
     patchChatSession: apiMocks.patchChatSession,
     createChatSession: apiMocks.createChatSession,
     deleteChatSession: apiMocks.deleteChatSession,
@@ -1151,6 +1154,31 @@ describe("Qubit ChatPage", () => {
     });
     expect(container.textContent).toContain("Start a new run.");
   });
+});
+
+it("continues a named legacy history and reuses the request after a lost response", async () => {
+  profileScope.profile = "work";
+  apiMocks.continueChatHistory.mockClear();
+  apiMocks.continueChatHistory.mockRejectedValueOnce(new Error("Response lost"));
+  const legacy = { id: "dashboard-legacy", source: "dashboard" };
+  apiMocks.getChatSession.mockResolvedValueOnce({
+    session: legacy,
+    messages: [],
+    message_count: 0,
+    meta: {},
+  });
+  await renderChatWithProbe("/qubit-chat?profile=work&resume=dashboard-legacy");
+  const copy = () => [...container.querySelectorAll("button")].find(
+    (button) => button.textContent === "Continue in new chat",
+  );
+  await vi.waitFor(() => expect(copy()).toBeDefined());
+  await act(async () => copy()?.click());
+  expect(container.textContent).toContain("Response lost");
+  await act(async () => copy()?.click());
+  expect(apiMocks.continueChatHistory).toHaveBeenCalledTimes(2);
+  expect(apiMocks.continueChatHistory).toHaveBeenCalledWith("dashboard-legacy", "work", expect.any(String));
+  expect(apiMocks.continueChatHistory.mock.calls[0]).toEqual(apiMocks.continueChatHistory.mock.calls[1]);
+  expect(container.querySelector('[data-testid="location"]')?.textContent).toContain("resume=active-copy");
 });
 
 describe("ChatPage New chat mint reliability", () => {

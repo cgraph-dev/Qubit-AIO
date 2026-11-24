@@ -246,7 +246,7 @@ def staged_creation_follows(authority, actor, request_id):
 
 
 def stage_local_session(authority, actor, params, *, trusted_policy=None, trusted_secrets=None, skills_prompt=None,
-                        client_local=False, desktop_local=False):
+                        client_local=False, desktop_local=False, dashboard_history_id=None):
     """Everything before the creation commit: the existing session's ref on an exact retry, else the
     receipt ``commit_local_session`` writes (the async RPC commits it off the owner loop).
     ``client_local``: the gateway's own proof that the client is on this host (its connection redeemed a
@@ -310,7 +310,8 @@ def stage_local_session(authority, actor, params, *, trusted_policy=None, truste
         saved = local_receipt(authority.db, sid)
         original = restore_policy(saved['policy'])
         from qubit_state_local import same_create_retry
-        if not same_create_retry(saved['policy'], policy.request_json, params):
+        if (saved.get('dashboard_history_id') != dashboard_history_id
+                or not same_create_retry(saved['policy'], policy.request_json, params)):
             raise RuntimeStoreError('invalid_params', field='request_id',
                                     detail='a resumed request_id must carry the same frozen request')
         import hmac
@@ -353,6 +354,8 @@ def stage_local_session(authority, actor, params, *, trusted_policy=None, truste
     # Owner memory, never stored: an overlapping create's commit judges this request's own map by the
     # winner's committed rules, as a sequential retry is.
     staged.client_request = client_request
+    if dashboard_history_id is not None:
+        staged['dashboard_history_id'] = dashboard_history_id
     return staged
 
 

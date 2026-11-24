@@ -36,6 +36,7 @@ def commit_local_session(db, *, epoch, receipt):
                 saved = json.loads(old[0])
                 same = all(saved[k] == receipt[k] for k in (
                     'profile_id', 'principal_id', 'request_id', 'session_id', 'route'))
+                same = same and saved.get('dashboard_history_id') == receipt.get('dashboard_history_id')
                 same = same and same_create_retry(saved['policy'], receipt['policy']['request_json'], request)
             except (ValueError, TypeError, KeyError) as exc:
                 raise RuntimeStoreError('storage_unavailable') from exc
@@ -72,6 +73,8 @@ def commit_local_session(db, *, epoch, receipt):
             (sid, policy['source'], created, receipt['principal_id'], route,
              entry['origin']['chat_id'], policy['model'], _row_cwd(policy), db._own_profile_name(),
              _json(entry['origin']), started))
+        if 'dashboard_history_id' in receipt:
+            copy_dashboard_history(db, conn, receipt)
         conn.execute("INSERT INTO gateway_routing(scope,session_key,entry_json,updated_at) VALUES('',?,?,?)",
                      (route, _json(entry), started))
         conn.execute('INSERT INTO state_meta(key,value) VALUES(?,?)', (key, encoded))
@@ -84,6 +87,40 @@ def commit_local_session(db, *, epoch, receipt):
         if on_create is not None:
             on_create.withdraw()  # only this attempt's own snapshot, never another winner's
         raise
+
+
+def copy_dashboard_history(db, conn, receipt):
+    """Copy the owner's legacy dashboard rows within the local session creation transaction."""
+    from qubit_state_mutation_binding import binding_names, history_binding
+    from qubit_state_mutation_guards import require_idle
+    from qubit_state_titles import lineage_title_on_conn
+
+    source = receipt['dashboard_history_id']
+    row = conn.execute("""SELECT source, user_id, profile_name, session_key, chat_id, origin_json,
+                                 title, display_name, archived FROM sessions WHERE id=?""", (source,)).fetchone()
+    if (row is None or row['source'] != 'dashboard' or row['archived']
+            or row['profile_name'] not in (None, '', db._own_profile_name() or 'default')
+            or any(row[field] for field in ('session_key', 'chat_id', 'origin_json'))):
+        raise RuntimeStoreError('not_found', field='dashboard_history_id')
+    binding = history_binding(conn, source)
+    if binding is not None:
+        if not binding_names(binding, receipt['profile_id'], receipt['principal_id']):
+            raise RuntimeStoreError('not_found', field='dashboard_history_id')
+    elif row['user_id'] not in (None, '', receipt['principal_id']):
+        raise RuntimeStoreError('not_found', field='dashboard_history_id')
+
+    require_idle(db, conn, [source])
+    ids, count = db._tail_rows_after_watermark(conn, """SELECT id, tool_calls FROM messages
+        WHERE session_id=? AND active=1 ORDER BY id""", [source])
+    child = receipt['session_id']
+    if ids:
+        db._clone_message_rows(conn, ids, session_id=child)
+    conn.execute("""UPDATE sessions SET parent_session_id=?, model_config=?, message_count=?,
+                    tool_call_count=? WHERE id=?""",
+                 (source, _json({'_branched_from': source}), len(ids), count, child))
+    title = row['title'] or row['display_name'] or 'Continued chat'
+    db._set_session_title_in_transaction(conn, child, lineage_title_on_conn(conn, title),
+                                         source=db.TITLE_SOURCE_DERIVED)
 
 
 def client_request(request_json, derived=None):
