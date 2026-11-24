@@ -21579,10 +21579,11 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
     removed at owner request; stored ids are read-old to a surviving theme (Q3).
     """
     themes: List[Dict[str, Any]] = []
+    normalize_theme_name = None  # type: ignore[assignment]
     try:
         _vendored_runtime(cfg)
         from qubit_cli.web_server_dashboard import (  # type: ignore
-            _BUILTIN_DASHBOARD_THEMES)
+            _BUILTIN_DASHBOARD_THEMES, normalize_theme_name)
         for t in _BUILTIN_DASHBOARD_THEMES or []:
             if isinstance(t, dict) and t.get("name"):
                 themes.append({"name": str(t["name"]),
@@ -21595,14 +21596,15 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
         stored = str(_prefs(cfg).get("theme", "") or "").strip()
     except Exception:  # noqa: BLE001 - prefs miss falls back to Q2
         stored = ""
-    # Read-old: a preference persisted under a retired id resolves to a
-    # surviving theme. Must mirror `web_server_dashboard._THEME_NAME_ALIASES`.
-    stored = {"nous-blue": "q4", "lens-5i": "q4", "qubit-blue": "q4",
-              "default": "q6-l", "q1": "q4", "q1-l": "q4-l", "q2": "q4", "q2-l": "q4-l",
-              "q3": "q4", "q3-l": "q4-l", "q5": "q4", "q5-l": "q4-l",
-              "qubit": "q4", "default-large": "q6-l", "midnight": "q4",
-              "mono": "q4", "cyberpunk": "q4",
-              "qubit-contrast": "q4"}.get(stored, stored)
+    # Read-old: a preference persisted under a removed id resolves to a theme
+    # that still ships. The CANONICAL map lives in web_server_dashboard and is
+    # imported, never copied — a duplicate here is what let the picker keep
+    # serving themes the catalogue had already dropped.
+    if normalize_theme_name is not None:
+        try:
+            stored = normalize_theme_name(stored)
+        except Exception:  # noqa: BLE001 - a bad value must not crash the request
+            pass
     if stored in names:
         active = stored
     else:

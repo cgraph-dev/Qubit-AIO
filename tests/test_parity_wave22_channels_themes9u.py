@@ -10,6 +10,7 @@ Behavioral invariants (no source-text reads) for the 1:1 repairs:
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -140,3 +141,40 @@ def test_normalize_scope_contract():
 
     assert normalize_scope(None) is None
     assert normalize_scope("/tmp") == qubit_home_key("/tmp")
+
+
+def test_served_theme_list_matches_the_frontend_mirror(tmp_path, monkeypatch):
+    """The bytes the dashboard actually receives, not a module's private list.
+
+    Regression: the theme catalogue lived in three places — the frontend
+    presets, `web_server_dashboard._BUILTIN_DASHBOARD_THEMES`, and a duplicate
+    alias map inside `qubit_compat.themes_response`. Removing a theme from the
+    first two left the third serving it, so the picker still showed dead rows
+    while every unit test passed. This asserts the SERVED shape.
+    """
+    from voicebridge import qubit_compat as HC
+
+    out = HC.themes_response(_cfg(tmp_path, monkeypatch))
+    served = [(t["name"], t["label"]) for t in out["themes"]]
+
+    assert served == [
+        ("q4", "Cyber Ghost"),
+        ("q4-l", "Cyber Ghost-L"),
+        ("q6", "Lofi SciFi"),
+        ("q6-l", "Lofi SciFi-L"),
+    ], served
+
+    # An id that is not in the served list must never reach the picker.
+    names = {name for name, _ in served}
+    assert names == {"q4", "q4-l", "q6", "q6-l"}
+
+    # `default` is the owner's chosen theme; a removed id lands on Cyber Ghost.
+    # These are different questions and must not collapse into each other.
+    for stored, expected in (("default", "q6-l"), ("q2", "q4"),
+                             ("midnight", "q4"), ("q4", "q4")):
+        cfg = _cfg(tmp_path, monkeypatch)
+        prefs = HC._prefs_path(cfg)
+        prefs.parent.mkdir(parents=True, exist_ok=True)
+        prefs.write_text(json.dumps({"theme": stored}))
+        active = HC.themes_response(cfg)["active"]
+        assert active == expected, (stored, active, expected)
