@@ -33,6 +33,7 @@ import tempfile
 import threading
 import time
 import uuid
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
@@ -40,6 +41,7 @@ SCHEMA = "qubit-chat/1"
 SESSION_SCHEMA = "qubit-chat-session/1"
 DEFAULT_SESSION = "dashboard-chat"
 DEFAULT_MODEL = "qubit-brain"
+_STREAM_HEARTBEAT_INTERVAL = 10.0
 MAX_TEXT_CHARS = 8000
 MAX_NAME_CHARS = 120
 MAX_MESSAGES = 5000
@@ -4409,8 +4411,9 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
                         cancel: Optional[Callable[[], bool]],
                         context_meta: Optional[Dict[str, Any]] = None,
                         decision: Any = None,
-                        reasoning: Optional[str] = None
-                        ) -> Iterator[Dict[str, Any]]:
+                        reasoning: Optional[str] = None,
+                        heartbeat_interval: Optional[float] = None
+                        ) -> Iterator[tuple[str, Any]]:
     """Run one remote turn and yield REAL per-chunk deltas as they arrive.
 
     Yields ``("delta", text)`` once per SSE chunk the provider actually sent,
@@ -4484,6 +4487,7 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
     res: Any = None
     err: Optional[BaseException] = None
     deadline = (started + float(timeout_s)) if timeout_s else None
+    last_frame_at = started
     try:
         while True:
             # A provider may send an endless stream of chunks; enforce the
@@ -4500,11 +4504,17 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
             try:
                 item = box.get(timeout=0.25)
             except queue.Empty:
+                now = time.monotonic()
+                if (heartbeat_interval is not None
+                        and now - last_frame_at >= heartbeat_interval):
+                    last_frame_at = now
+                    yield ("heartbeat", None)
                 continue
             if item is finished:
                 break
             kind, value = item
             if kind == "delta":
+                last_frame_at = time.monotonic()
                 emitted.append(value)
                 yield ("delta", value)
             elif kind == "result":
@@ -4844,7 +4854,8 @@ def stream_preflight(cfg: Any, text: str, model: Optional[str] = None, *,
 def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
                    routed: Dict[str, Any], timeout_s: Optional[float],
                    cancel: Optional[Callable[[], bool]],
-                   reasoning: Optional[str] = None
+                   reasoning: Optional[str] = None,
+                   heartbeat_interval: Optional[float] = None
                    ) -> Iterator[Dict[str, Any]]:
     """Streaming envelope for a registered non-local profile.
 
@@ -4890,14 +4901,17 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
            "streaming": False, "message": appended.get("message"),
            "context": decision.public(), **_pending_event_field(cfg, sid)}
     outcome: Optional[Dict[str, Any]] = None
-    for kind, value in _stream_remote_turn(
+    with closing(_stream_remote_turn(
             cfg, sid, clean, context, routed, timeout_s=timeout_s,
             cancel=cancel, context_meta=ctx_meta, decision=decision,
-            reasoning=reasoning):
-        if kind == "delta":
-            yield {"event": "delta", "text": value, "session_id": sid}
-        else:
-            outcome = value
+            reasoning=reasoning, heartbeat_interval=heartbeat_interval)) as turn:
+        for kind, value in turn:
+            if kind == "delta":
+                yield {"event": "delta", "text": value, "session_id": sid}
+            elif kind == "heartbeat":
+                yield {"event": "heartbeat"}
+            else:
+                outcome = value
     if outcome is None:
         yield {"event": "error", "code": "MODEL_ERROR",
                "detail": "remote stream produced no result",
@@ -5078,7 +5092,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
          cancel: Optional[Callable[[], bool]] = None,
          role: str = "chat",
          actor: str = "dashboard:user",
-         reasoning: Optional[str] = None) -> Iterator[Dict[str, Any]]:
+         reasoning: Optional[str] = None,
+         heartbeat_interval: Optional[float] = None) -> Iterator[Dict[str, Any]]:
     """Yield typed streaming events for one persisted agent turn.
 
     Event shapes: ``{"event": "start"}``, ``{"event": "delta", "text": ...}``,
@@ -5387,7 +5402,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     if routed_probe.get("kind") in ("api", "realtime", "plugin"):
         yield from _stream_remote(cfg, text, session=session,
                                   routed=routed_probe, timeout_s=timeout_s,
-                                  cancel=cancel, reasoning=reasoning_level)
+                                  cancel=cancel, reasoning=reasoning_level,
+                                  heartbeat_interval=heartbeat_interval)
         return
 
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
@@ -5413,7 +5429,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
             return
         yield from _stream_remote(cfg, text, session=session,
                                   routed=escalated, timeout_s=timeout_s,
-                                  cancel=cancel)
+                                  cancel=cancel, heartbeat_interval=heartbeat_interval)
         return
     context, ctx_meta = CTX.build_context_prompt(msgs, decision)
     appended = st.append(sid, "user", clean)
@@ -5670,8 +5686,10 @@ def sse_encode(event: Dict[str, Any]) -> str:
 
 def stream_sse(cfg: Any, text: str, **kwargs: Any) -> Iterator[str]:
     """SSE-encoded streaming turn for a threaded HTTP handler."""
-    for event in stream_turn(cfg, text, **kwargs):
-        yield sse_encode(event)
+    with closing(stream_turn(cfg, text, heartbeat_interval=_STREAM_HEARTBEAT_INTERVAL,
+                             **kwargs)) as turn:
+        for event in turn:
+            yield ": keep-alive\n\n" if event["event"] == "heartbeat" else sse_encode(event)
 
 
 # ---------------------------------------------------------------------------
