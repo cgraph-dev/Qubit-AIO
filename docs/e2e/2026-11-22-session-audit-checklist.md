@@ -210,5 +210,9 @@ profile isolation, exact offline draft adoption, saved-result correlation, and
 readable legacy dashboard history. An active named turn survived the original
 dashboard emergency stop. The patched dashboard cancelled the admitted turn
 through the installed owner and checked the terminal admission and transcript.
-The row still requires approval continuation, a supported transfer of legacy
-history to an active conversation, and verification on the deployed build.
+A real approval-blocked turn continued after an authenticated native viewer
+reconnected and approved the exact request. The dashboard stream did not surface
+the approval. Exporting legacy messages and sending them as quoted context in a
+new named chat worked. The manual handoff preserves the source transcript and
+does not recreate its rows in the new chat. The row still requires dashboard
+approval settlement, transcript-preserving transfer, and deployed verification.

@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Named-profile dashboard approval and history transfer (2026-11-24).** The installed owner resumes an approval-blocked dashboard turn when an authenticated native viewer settles the matching prompt ID and execution generation. Add the dashboard's approval presentation and settlement path using that owner protocol. Legacy rows are readable. A user can export the history and quote it in a new chat today. A transcript-preserving transfer needs a deliberate owner-backed operation that creates a new active session from the authorized source. The deployed build still needs an approved disposable profile and provider for the requested checks. Evidence is in the [installed acceptance results](e2e/2026-11-24-packaged-acceptance.json).
+
 **Packaged acceptance and Workbench follow-up (2026-11-24):** The [acceptance results](e2e/2026-11-24-packaged-acceptance.json) capture the Linux release and installed HTTP evidence. Track GitHub checks and deployment of the Workbench health fix. The installed cancellation fix passed against a quiet loopback provider. Continue the installed timeout, disconnect, keep-alive and concurrency cases and the populated-state upgrade and rollback. Live inference and PTY checks require an approved disposable profile and provider endpoint. The frozen-target inventory refresh stopped because the configured upstream clone was absent.
 
 **Qubit Office live deploy — 2026-11-14 (`main` `d72d3c611`, owner-approved):** The feature branch

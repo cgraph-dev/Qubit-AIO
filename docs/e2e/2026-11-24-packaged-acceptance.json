@@ -365,6 +365,31 @@
       "environment": "Patched dashboard relay from source and installed Linux 0.0.15 gateway, disposable profile and gated loopback provider",
       "observed": "On the installed baseline, dashboard emergency stop returned OK and blocked new submissions, while an already admitted named turn completed and persisted its reply. The patched relay used the same gateway to cancel that exact admission. The stream reported cancellation, the admission became terminal, and the fixture provider reply did not appear in the transcript. Both probes checked graceful gateway cleanup.",
       "scope": "The patched dashboard ran from source. A rebuilt wheel, the deployed dashboard, cross-process stop, and approval continuations were outside this check."
+    },
+    {
+      "check": "Named-profile approval after native viewer reconnect",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 wheel, disposable named profile, loopback dashboard and SSE fixture provider",
+      "revision": "202d7751e1046da98b997eff916a0a491084db73",
+      "wheel_sha256": "b2ea7a9f3aa642b69a3ba5da75ee1bbf27b43dfbc9ce3f1f02d1c8a39d0b1882",
+      "command": "Submit over the dashboard stream; recover the pending prompt over a fresh ticketed session.resume; send stale, exact and duplicate approval.respond requests",
+      "observed": "The prompt ID survived the native viewer reconnect. A stale execution generation was refused and the scratch marker file stayed present. The exact approval settled once, removed the scratch marker, and let the dashboard stream finish with the expected provider reply. A duplicate response could not apply the effect again."
+    },
+    {
+      "check": "Named-profile dashboard approval presentation and legacy transcript transfer",
+      "status": "FAIL",
+      "environment": "Same installed wheel and disposable dashboard",
+      "revision": "202d7751e1046da98b997eff916a0a491084db73",
+      "observed": "The dashboard response contained start, delta and done frames and did not carry a pending native approval. The named legacy transcript read and export passed. The owner returned unknown_method for session.branch_stored and session_read_only for session.mutate branch. Creating a fresh named chat and deliberately submitting quoted export content reached the fixture provider and saved the turn under the new session ID. The source messages were unchanged and the default profile could not access the new chat."
+    },
+    {
+      "check": "Focused approval and stored-history regressions",
+      "status": "PASS",
+      "environment": "Python 3.14 source checkout and disposable fixtures",
+      "revision": "35e2dc32b6389a6af789bb89f30890f892c2381a",
+      "tests_passed": 26,
+      "command": "From qubit_runtime: python -m pytest -q tests/gateway/test_shared_session_controls.py tests/gateway/test_stored_history_mount.py. From the root: python -m pytest --import-mode=importlib -o 'pythonpath=qubit_runtime tests' -q tests/gateway/test_authority_approval_projection.py tests/gateway/test_session_approval_commands.py",
+      "observed": "The native selection passed 24 tests and emitted dependency deprecation warnings. The root selection passed two tests and emitted event-loop and socket teardown warnings."
     }
   ],
   "cancellation_fix_artifact": {
