@@ -1,5 +1,7 @@
 # Qubit Office — session status (2026-10-24)
 
+**Linux packaged acceptance and Workbench recovery (2026-11-24):** On `92ef8fd71`, local unsigned release qualification, the isolated artifact-install probe, and the fresh-install verifier passed. A real installed HTTP listener streamed two ordered deltas from an explicitly configured loopback provider. The canonical store and a fresh installed interpreter recovered the same transcript. Workbench health on live `:8890` returned 404 on both aliases at `912268aff`. The route fix passed isolated loopback tests. The deployed build still reports `912268aff`. See the [packaged acceptance results](e2e/2026-11-24-packaged-acceptance.json) for commands, artifact identity, and open cases.
+
 **Qubit Chat profile ownership (2026-11-23):** Named chat history, session lifecycle and artifact reads follow the selected profile. A ready profile gateway can create a session, adopt a newly created offline draft, handle text turns, stream replies and cancel the exact turn. The browser reports an unconfirmed outcome when the stream closes before settlement. The [audit checklist](e2e/2026-11-22-session-audit-checklist.md) records the deployed and feature checks still open.
 
 **Named Sessions ownership (2026-11-23):** History and maintenance now follow the selected profile. Duplicate IDs remained isolated over authenticated loopback HTTP, including banner confirmations, and exported sessions contained their transcripts. The [audit checklist](e2e/2026-11-22-session-audit-checklist.md) records the remaining deployed coverage.

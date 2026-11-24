@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Packaged acceptance and Workbench follow-up (2026-11-24):** The [acceptance results](e2e/2026-11-24-packaged-acceptance.json) capture the Linux release and installed HTTP evidence. Track GitHub checks and deployment of the Workbench health fix. Continue the installed provider interruption cases and the populated-state upgrade and rollback. Live inference and PTY checks require an approved disposable profile and provider endpoint. The frozen-target inventory refresh stopped because the configured upstream clone was absent.
+
 **Qubit Office live deploy — 2026-11-14 (`main` `d72d3c611`, owner-approved):** The feature branch
 `feat/qoffice-next` was merged into `main` (`55c512261`), the Office bundle and dashboard were
 rebuilt, the package was reinstalled into `/home/trick/venvs/qubit-0.0.13` as `0.0.15` (code-only),
