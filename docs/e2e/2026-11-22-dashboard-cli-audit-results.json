@@ -1793,5 +1793,237 @@
     {"case": "test_achievements_rescan_and_scan_status", "exit": 0, "seconds": 6.04, "summary": "1 passed in 4.88s", "status": "PASS"},
     {"case": "test_qubit_chat_mobile_composer_not_squeezed", "exit": 1, "seconds": 7.01, "summary": "1 failed in 5.91s", "status": "FAIL"}
   ],
-  "isolated_followups": {"sessions_rename": "UI PATCH 200 and GET read-back showed the renamed title", "cron_pause_resume": "UI staged confirmation, approved mutation returned 200 and canonical list reflected disabled/enabled", "config_save": "UI staged confirmation and persisted edited non-secret setting; secret-shaped change retained its 403 refusal", "keys_unresolved_reference": "PUT 200, reference persisted and unresolved after reload, DELETE 200 and canonical list no longer contained it", "logs_and_chat_store": "8 checks passed; includes log pagination and chat session creation, persistence and export/import", "embedded_terminal_ws": "Browser ticket/authenticated WebSocket round trip passed with synthetic PTY output", "plugins_rescan": "Real rescan handler returned HTTP 200 and overlay manifest set with plugin-details request deliberately pending", "dashboard_fonts": "Inter and Rajdhani returned font/woff2 with valid WOFF2 magic bytes", "backend_contracts": "78 checks passed for sampled configuration, profile, MCP, webhook and static asset contracts", "provider_contracts": "113 isolated model selection, inventory and persistence tests passed", "native_chat_contracts": "Nine route, provider-pair and reasoning tests passed. HTTP turn and SSE returned synthetic replies and persisted the transcript. Real Ollama connection failed in the audit environment."}
+  "isolated_followups": {"sessions_rename": "UI PATCH 200 and GET read-back showed the renamed title", "cron_pause_resume": "UI staged confirmation, approved mutation returned 200 and canonical list reflected disabled/enabled", "config_save": "UI staged confirmation and persisted edited non-secret setting; secret-shaped change retained its 403 refusal", "keys_unresolved_reference": "PUT 200, reference persisted and unresolved after reload, DELETE 200 and canonical list no longer contained it", "logs_and_chat_store": "8 checks passed; includes log pagination and chat session creation, persistence and export/import", "embedded_terminal_ws": "Browser ticket/authenticated WebSocket round trip passed with synthetic PTY output", "plugins_rescan": "Real rescan handler returned HTTP 200 and overlay manifest set with plugin-details request deliberately pending", "dashboard_fonts": "Inter and Rajdhani returned font/woff2 with valid WOFF2 magic bytes", "backend_contracts": "78 checks passed for sampled configuration, profile, MCP, webhook and static asset contracts", "provider_contracts": "113 isolated model selection, inventory and persistence tests passed", "native_chat_contracts": "Nine route, provider-pair and reasoning tests passed. HTTP turn and SSE returned synthetic replies and persisted the transcript. Real Ollama connection failed in the audit environment."},
+  "current_navigation_reconciliation": {
+    "date": "2026-11-25",
+    "revision": "38b90720df44e52475f22ee3250d71e7259a16f7",
+    "bundle_index_sha256": "751efa4031402a4e43e58b83cf9f0a80457ebcb01dd8b8878defb3d70cc20b48",
+    "environment": "Source dashboard and production Vite bundle in a disposable authenticated loopback home",
+    "registry": {
+      "built_in_route_patterns": [
+        "/",
+        "/admin/mcp-calls",
+        "/admin/skills-review",
+        "/admin/users",
+        "/agent-cards",
+        "/agent-workspace",
+        "/agents",
+        "/analytics",
+        "/canvas",
+        "/channels",
+        "/chat",
+        "/checkpoints",
+        "/computer",
+        "/config",
+        "/cron",
+        "/devices",
+        "/docs",
+        "/env",
+        "/files",
+        "/gateway",
+        "/guide",
+        "/keys",
+        "/kitchen",
+        "/logs",
+        "/mcp",
+        "/model",
+        "/model-providers",
+        "/models",
+        "/models/providers",
+        "/nodes",
+        "/omniroute",
+        "/open-viking",
+        "/open-viking/agent-hub",
+        "/open-viking/context-store",
+        "/open-viking/resources",
+        "/open-viking/retrieval",
+        "/open-viking/uploads",
+        "/pairing",
+        "/plugins",
+        "/profiles",
+        "/profiles/new",
+        "/providers",
+        "/qubit-board-admin",
+        "/qubit-bot",
+        "/qubit-chat",
+        "/qubit-harness-router",
+        "/qubit-memory",
+        "/qubit-models",
+        "/qubit-office",
+        "/qubit-office2",
+        "/qubit-office3",
+        "/qubit-scheduler",
+        "/qubit-talk",
+        "/qubit-task-inbox",
+        "/qubit-taskflows",
+        "/qubit-tasks",
+        "/qubit-tv",
+        "/qubit-workbench",
+        "/qubit-workbench/session/:sessionId",
+        "/sakuga-gallery",
+        "/session-ops",
+        "/sessions",
+        "/skills",
+        "/system",
+        "/voice-edit",
+        "/wb",
+        "/wb/session/:sessionId",
+        "/webchat",
+        "/webhooks",
+        "/worktrees"
+      ],
+      "overlay_manifest_routes": {
+        "/devices": {
+          "plugin": "qubit-devices",
+          "hidden": false,
+          "override": null
+        },
+        "/memory": {
+          "plugin": "qubit-memory",
+          "hidden": false,
+          "override": null
+        },
+        "/operations": {
+          "plugin": "qubit-ops",
+          "hidden": false,
+          "override": null
+        },
+        "/qubit-approvals": {
+          "plugin": "qubit-approvals",
+          "hidden": true,
+          "override": null
+        },
+        "/qubit-boards": {
+          "plugin": "qubit-boards",
+          "hidden": false,
+          "override": null
+        },
+        "/qubit-brand": {
+          "plugin": "qubit-brand",
+          "hidden": true,
+          "override": null
+        },
+        "/qubit-gateway": {
+          "plugin": "qubit-gateway",
+          "hidden": false,
+          "override": null
+        },
+        "/qubit-hud": {
+          "plugin": "qubit-hud",
+          "hidden": true,
+          "override": null
+        },
+        "/qubit-models": {
+          "plugin": "qubit-models",
+          "hidden": false,
+          "override": null
+        },
+        "/qubit-office": {
+          "plugin": "qubit-office",
+          "hidden": true,
+          "override": null
+        },
+        "/qubit-office2": {
+          "plugin": "qubit-office2",
+          "hidden": true,
+          "override": null
+        },
+        "/qubit-office3": {
+          "plugin": "qubit-office3",
+          "hidden": true,
+          "override": null
+        },
+        "/qubit-runtime": {
+          "plugin": "qubit-runtime",
+          "hidden": false,
+          "override": null
+        },
+        "/reports": {
+          "plugin": "qubit-reports",
+          "hidden": false,
+          "override": null
+        }
+      },
+      "built_in_sidebar_paths": [
+        "/admin/mcp-calls",
+        "/admin/skills-review",
+        "/admin/users",
+        "/agent-cards",
+        "/agent-workspace",
+        "/agents",
+        "/analytics",
+        "/canvas",
+        "/channels",
+        "/chat",
+        "/checkpoints",
+        "/computer",
+        "/config",
+        "/cron",
+        "/devices",
+        "/env",
+        "/files",
+        "/guide",
+        "/kitchen",
+        "/logs",
+        "/mcp",
+        "/models",
+        "/nodes",
+        "/omniroute",
+        "/open-viking",
+        "/open-viking/context-store",
+        "/pairing",
+        "/plugins",
+        "/profiles",
+        "/qubit-board-admin",
+        "/qubit-bot",
+        "/qubit-chat",
+        "/qubit-harness-router",
+        "/qubit-hud",
+        "/qubit-memory",
+        "/qubit-office",
+        "/qubit-scheduler",
+        "/qubit-talk",
+        "/qubit-task-inbox",
+        "/qubit-taskflows",
+        "/qubit-tasks",
+        "/qubit-tv",
+        "/qubit-workbench",
+        "/session-ops",
+        "/sessions",
+        "/skills",
+        "/system",
+        "/voice-edit",
+        "/webchat",
+        "/webhooks",
+        "/worktrees"
+      ],
+      "added_since_historical_inventory": [
+        "/gateway",
+        "/keys",
+        "/model",
+        "/model-providers",
+        "/models/providers",
+        "/providers",
+        "/qubit-models",
+        "/qubit-workbench/session/:sessionId",
+        "/wb",
+        "/wb/session/:sessionId"
+      ],
+      "removed_since_historical_inventory": [],
+      "route_pattern_overlaps": [
+        "/devices",
+        "/qubit-models",
+        "/qubit-office",
+        "/qubit-office2",
+        "/qubit-office3"
+      ],
+      "unmapped_built_in_sidebar_paths": []
+    },
+    "browser_evidence": {
+      "baseline": "SPA Workbench navigation dropped the full query, the /wb session route fell through to Sessions, and root HTTP redirect discarded profile and resume.",
+      "observed": "Chromium followed eight Workbench handoffs and four session deep-link reloads at 390px and 1440px. Query parameters, repeated values and fragments survived. Back restored the Sessions document and its prior profile. The unknown-route fallback preserved the explicit profile and fragment. A keyboard activation of the normal Workbench link did not send a profile-switch request. The seven Models, Keys and Gateway aliases preserved their query strings.",
+      "tests": "Five HTTP route tests, eight frontend tests and five focused Chromium regressions passed."
+    },
+    "scope": "Static registry reconciliation and focused browser navigation. Full route action read-back, focus and accessibility, error states and deployed checks are open. The deployed dashboard reported source revision 3d6595549328b150b9dcfc432adcc7119aae40f5."
+  }
 }
