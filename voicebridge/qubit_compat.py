@@ -21411,13 +21411,13 @@ def plugins_response() -> Dict[str, Any]:
 
 
 def themes_response(cfg: Any) -> Dict[str, Any]:
-    """GET /api/dashboard/themes -> the served Q2..Q6 theme list.
+    """GET /api/dashboard/themes -> the served theme list.
 
     The vendored ``_BUILTIN_DASHBOARD_THEMES`` is the source of names; the
     frontend owns every definition (``frontend/qubit-web/src/themes/
     presets.ts``) and the backend only lists names and persists the choice.
-    Q1/Q1-L/Q5/Q5-L and the old Qubit Command overlay were retired at owner
-    request; stored ids are read-old to a surviving theme (Q2/Q2-L).
+    Q1/Q1-L (q2), Q2/Q2-L (q3), Q5/Q5-L and the old Qubit Command overlay were
+    removed at owner request; stored ids are read-old to a surviving theme (Q3).
     """
     themes: List[Dict[str, Any]] = []
     try:
@@ -21438,15 +21438,16 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
         stored = ""
     # Read-old: a preference persisted under a retired id resolves to a
     # surviving theme. Must mirror `web_server_dashboard._THEME_NAME_ALIASES`.
-    stored = {"nous-blue": "q3", "lens-5i": "q3", "qubit-blue": "q3",
-              "default": "q2", "q1": "q2", "q1-l": "q2-l", "q5": "q2", "q5-l": "q2-l",
-              "qubit": "q2", "default-large": "q2-l", "midnight": "q2",
-              "mono": "q3", "cyberpunk": "q4",
-              "qubit-contrast": "q2"}.get(stored, stored)
+    stored = {"nous-blue": "q4", "lens-5i": "q4", "qubit-blue": "q4",
+              "default": "q4", "q1": "q4", "q1-l": "q4-l", "q2": "q4", "q2-l": "q4-l",
+              "q3": "q4", "q3-l": "q4-l", "q5": "q4", "q5-l": "q4-l",
+              "qubit": "q4", "default-large": "q4-l", "midnight": "q4",
+              "mono": "q4", "cyberpunk": "q4",
+              "qubit-contrast": "q4"}.get(stored, stored)
     if stored in names:
         active = stored
     else:
-        active = themes[0]["name"] if themes else "q2"
+        active = themes[0]["name"] if themes else "q4"
     return {"active": active, "themes": themes}
 
 

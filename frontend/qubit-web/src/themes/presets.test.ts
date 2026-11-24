@@ -16,12 +16,12 @@ describe("built-in theme ids", () => {
     }
   });
 
-  it("labels every theme with its Q-number", () => {
+  it("labels every theme with its display name", () => {
     for (const [id, label] of [
-      ["q4", "Q3"],
-      ["q6", "Q4"],
-      ["q4-l", "Q3-L"],
-      ["q6-l", "Q4-L"],
+      ["q4", "Cyber Ghost"],
+      ["q6", "Lofi SciFi"],
+      ["q4-l", "Cyber Ghost-L"],
+      ["q6-l", "Lofi SciFi-L"],
     ]) {
       expect(BUILTIN_THEMES[id].label).toBe(label);
     }

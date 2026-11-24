@@ -54,10 +54,10 @@ const LARGE_LAYOUT: Partial<ThemeLayout> = {
 // Themes
 // ---------------------------------------------------------------------------
 
-/** Q3 — black canvas, monospace throughout, bright mint signal colour. */
+/** Q3 "Cyber Ghost" — black canvas, monospace throughout, bright mint signal. */
 export const cyberpunkTheme: DashboardTheme = {
   name: "q4",
-  label: "Q3",
+  label: "Cyber Ghost",
   description: "Black with monospace text and bright mint accents",
   palette: {
     background: { hex: "#040608", alpha: 1 },
@@ -90,7 +90,7 @@ export const cyberpunkTheme: DashboardTheme = {
  *  the brief frame before the layer applies and for the theme-picker swatch. */
 export const mangaTheme: DashboardTheme = {
   name: "q6",
-  label: "Q4",
+  label: "Lofi SciFi",
   description:
     "Manga — magenta frames, deep navy surfaces, and yellow accents",
   palette: {
@@ -155,22 +155,22 @@ export function isMangaThemeName(name: string | null | undefined): boolean {
  * field are inherited by reference so a base-theme edit flows into its large
  * sibling; only typography, layout, and the Q-number label change.
  */
-function largeVariant(base: DashboardTheme, name: string, num: number): DashboardTheme {
+function largeVariant(base: DashboardTheme, name: string): DashboardTheme {
   return {
     ...base,
     name,
-    label: `Q${num}-L`,
+    // The display name IS the label now (owner-named themes), so the large
+    // variant suffixes "-L" instead of deriving a Q-number.
+    label: `${base.label}-L`,
     description: "Larger text and roomier spacing",
     typography: { ...base.typography, ...LARGE_TYPOGRAPHY },
     layout: { ...base.layout, ...LARGE_LAYOUT },
   };
 }
 
-// The third argument is the DISPLAY number, not a list index: the picker still
-// presents these as Q3/Q3-L and Q4/Q4-L even though the two lower themes were
-// removed, so the surviving pair keeps its labels.
-export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 3);
-export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 4);
+// Display labels come from the base theme's own label, so these need no numbers.
+export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l");
+export const bigMangaTheme = largeVariant(mangaTheme, "q6-l");
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   q4: cyberpunkTheme,

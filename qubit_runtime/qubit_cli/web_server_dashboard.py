@@ -329,10 +329,10 @@ def mount_spa(application: FastAPI):
 # `default` and those ids are read-old aliases only.
 # Keep in sync with BUILTIN_THEMES in presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "q4",      "label": "Q3",   "description": "Q3 — black canvas, monospace throughout, bright mint signal colour"},
-    {"name": "q4-l",    "label": "Q3-L", "description": "Q3-L — the Q3 look with larger type and roomier spacing"},
-    {"name": "q6",      "label": "Q4",   "description": "Q4 — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
-    {"name": "q6-l",    "label": "Q4-L", "description": "Q4-L — the Q4 look with larger type and roomier spacing"},
+    {"name": "q4",      "label": "Cyber Ghost", "description": "Cyber Ghost — black canvas, monospace throughout, bright mint signal colour"},
+    {"name": "q4-l",    "label": "Cyber Ghost-L", "description": "Cyber Ghost-L — the Cyber Ghost look with larger type and roomier spacing"},
+    {"name": "q6",      "label": "Lofi SciFi", "description": "Lofi SciFi — manga ink: hot magenta frames, deep navy plate and yellow impact accents"},
+    {"name": "q6-l",    "label": "Lofi SciFi-L", "description": "Lofi SciFi-L — the Lofi SciFi look with larger type and roomier spacing"},
 ]
 
 # Theme ids a preference may still carry from before the normal-order set.
