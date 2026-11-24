@@ -341,7 +341,7 @@ function storageSet(key: string, value: string): void {
   }
 }
 
-type PendingProfileTurn = { id: string; text: string };
+type PendingProfileTurn = { id: string; text: string; image?: true };
 
 function savedProfileTurn(key: string): PendingProfileTurn | null {
   try {
@@ -1159,7 +1159,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   }, []);
 
   const send = useCallback(
-    (raw: string, activity: "thinking" | "summarizing" = "thinking", retryId?: string) => {
+    (raw: string, activity: "thinking" | "summarizing" = "thinking", retryId?: string, imageDataUrl?: string) => {
       const text = (raw || "").trim();
       const previous = pendingTurnRef.current;
       if (!text || busy || (routed && previous?.key === recoveryKey && previous.turn.id !== retryId)) return;
@@ -1167,7 +1167,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       retryPermission.current = "";
       const submissionId = routed ? (retryId ?? generateChatChannel()) : undefined;
       if (submissionId) {
-        rememberTurn({ id: submissionId, text });
+        rememberTurn({ id: submissionId, text, ...(imageDataUrl ? { image: true } : {}) });
         setRetrySubmission("");
         setRecoveryNotice("");
       }
@@ -1202,7 +1202,8 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       // the server resolves from the persisted session metadata).
       streamChatTurn(
         { text, session, ...(reasoning ? { reasoning } : {}), ...(scopedProfile ? { profile: scopedProfile } : {}),
-          ...(submissionId ? { submission_id: submissionId } : {}) },
+          ...(submissionId ? { submission_id: submissionId } : {}),
+          ...(imageDataUrl ? { image_data_url: imageDataUrl } : {}) },
         {
           onDelta: (delta, event) => {
             if (controller.signal.aborted) return;
@@ -1371,7 +1372,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           if (failure.startsWith("[CHAT_ADMISSION_UNCONFIRMED]")) {
             setError(routed ? "The connection dropped before the turn settled." : failure);
           } else if (routed) {
-            if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OVERRIDE_UNSUPPORTED|MALFORMED|EMERGENCY_STOP)\]/.test(failure)) {
+            if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OVERRIDE_UNSUPPORTED|MALFORMED|EMERGENCY_STOP|BAD_IMAGE)\]/.test(failure)) {
               if (submissionId && !retryId) rememberTurn(null);
               setInput(text);
               setMessages((rows) => rows.slice(0, -1));
@@ -1413,7 +1414,9 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         if (receipt.status === "missing") {
           retryPermission.current = currentRecovery.id;
           setRetrySubmission(currentRecovery.id);
-          setRecoveryNotice("The gateway has no receipt for this turn. You can retry the same message.");
+          setRecoveryNotice(currentRecovery.image
+            ? "The gateway has no receipt for this turn. Attach the original image to retry."
+            : "The gateway has no receipt for this turn. You can retry the same message.");
         } else {
           rememberTurn(null);
           setSessionListNonce((nonce) => nonce + 1);
@@ -1841,20 +1844,30 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   const submitImageToAgent = useCallback(
     (file: File) => {
       // A turn is already in flight: never start a concurrent image turn.
-      if (busy) return;
-      if (routed) {
-        setAttachError("Open this profile in /chat to submit an image to its own worker.");
+      if (busy || attachState === "describing") return;
+      const retry = routed && currentRecovery?.image && retryPermission.current === currentRecovery.id
+        ? currentRecovery : null;
+      if (routed && currentRecovery && !retry) return;
+      if (routed && (file.size > 10 * 1024 * 1024
+          || !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type))) {
+        setAttachError("Choose a PNG, JPEG, GIF, or WebP image of up to 10 MiB.");
         setAttachState("error");
         return;
       }
+      const request = loadReqRef.current;
       setAttachState("describing");
       setAttachError(null);
       const reader = new FileReader();
       reader.onerror = () => {
+        if (loadReqRef.current !== request) return;
         setAttachError("file read failed");
         setAttachState("error");
       };
       reader.onload = () => {
+        if (loadReqRef.current !== request) {
+          setAttachState("idle");
+          return;
+        }
         const dataUrl = typeof reader.result === "string" ? reader.result : "";
         if (!dataUrl) {
           setAttachError("file read failed");
@@ -1866,6 +1879,11 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         // is routed to the agent, never described into the text-only brain.
         const prompt = input.trim();
         const userText = prompt || DEFAULT_IMAGE_ASK;
+        if (routed) {
+          setAttachState("idle");
+          send(retry?.text ?? userText, "thinking", retry?.id, dataUrl);
+          return;
+        }
         setInput("");
         setError(null);
         setRetryText(null);
@@ -1915,7 +1933,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       };
       reader.readAsDataURL(file);
     },
-    [busy, input, session, followLiveVoice, routed, scopedProfile],
+    [attachState, busy, currentRecovery, input, session, followLiveVoice, routed, scopedProfile, send],
   );
 
   // A36: documents keep the review-before-send contract — extract and hand the
@@ -3082,17 +3100,18 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
                   onClick={() => void checkProfileTurn(false)}>
                   Check turn
                 </NativeButton>
-                {retrySubmission === currentRecovery.id ? (
+                {retrySubmission === currentRecovery.id && !currentRecovery.image ? (
                   <NativeButton type="button" className="min-h-[44px]" disabled={recovering}
                     onClick={() => send(currentRecovery.text, "thinking", currentRecovery.id)}>
                     Retry same message
                   </NativeButton>
-                ) : (
+                ) : null}
+                {retrySubmission !== currentRecovery.id ? (
                   <NativeButton type="button" outlined className="min-h-[44px]" disabled={recovering}
                     onClick={() => void checkProfileTurn(true)}>
                     Stop turn
                   </NativeButton>
-                )}
+                ) : null}
               </div>
             </div>
           ) : null}

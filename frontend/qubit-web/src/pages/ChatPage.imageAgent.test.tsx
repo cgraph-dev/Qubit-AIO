@@ -83,6 +83,7 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 const streamChatTurn = vi.hoisted(() => vi.fn());
+const profileScope = vi.hoisted(() => ({ profile: "", currentProfile: "default" }));
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -126,7 +127,7 @@ vi.mock("@/contexts/usePageHeader", () => ({
   usePageHeader: () => ({ setEnd: vi.fn(), setTitle: vi.fn() }),
 }));
 vi.mock("@/contexts/useProfileScope", () => ({
-  useProfileScope: () => ({ profile: "" }),
+  useProfileScope: () => profileScope,
 }));
 vi.mock("@/i18n", () => ({
   useI18n: () => ({
@@ -226,6 +227,8 @@ class FakeFileReader {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  profileScope.profile = "";
+  window.sessionStorage.clear();
   vi.stubGlobal("FileReader", FakeFileReader);
   vi.stubGlobal("WebSocket", vi.fn());
   vi.stubGlobal("localStorage", {
@@ -247,6 +250,27 @@ afterEach(async () => {
 });
 
 describe("Qubit ChatPage image routing", () => {
+  it("submits a named-profile image as one recoverable gateway turn", async () => {
+    profileScope.profile = "work";
+    streamChatTurn.mockRejectedValueOnce(new Error("[CHAT_ADMISSION_UNCONFIRMED] lost reply"));
+    await renderChat();
+    await pasteImage(imageFile());
+
+    expect(streamChatTurn).toHaveBeenCalledWith({
+      profile: "work",
+      session: "dashboard-chat",
+      text: "What is in this image, and what should I know about it?",
+      submission_id: expect.any(String),
+      image_data_url: "data:image/png;base64,AAAA",
+    }, expect.any(Object), expect.any(AbortSignal));
+    expect(apiMocks.submitChatImage).not.toHaveBeenCalled();
+    const pending = window.sessionStorage.getItem("qubit.chat.pending.work/dashboard-chat");
+    expect(JSON.parse(pending!)).toEqual({
+      id: expect.any(String), text: expect.any(String), image: true,
+    });
+    expect(pending).not.toContain("base64");
+  });
+
   it("routes a pasted image to the agent and renders its reply", async () => {
     await renderChat();
     await pasteImage(imageFile());

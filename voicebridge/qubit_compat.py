@@ -8363,7 +8363,11 @@ def _named_chat_events(cfg, home, body):
     submission = body.get("submission_id")
     if submission is not None and not _valid_chat_submission(submission):
         return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat submission ID."}
-    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg, submission_id=submission)
+    image = body.get("image_data_url")
+    if image is not None and not _valid_named_chat_image(image):
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "Attach a PNG, JPEG, GIF, or WebP image of up to 10 MiB."}
+    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg, submission_id=submission, image=image)
 
 
 def _chat_execution_local(handler):
@@ -8398,6 +8402,9 @@ def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 if event["event"] in ("error", "cancelled"):
                     return 409, event
         return _fail(RuntimeError("The profile gateway closed without a result."))
+    if b.get("image_data_url") is not None:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "Use the image attachment action for the current profile."}
     from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
@@ -8761,6 +8768,24 @@ _CHAT_IMAGE_MIME_EXT = {
 _CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 _CHAT_DATA_URL_RE = re.compile(
     r"^data:(image/(?:png|jpeg|gif|webp|bmp));base64,([A-Za-z0-9+/=\s]+)$")
+
+
+def _valid_named_chat_image(value):
+    import base64
+
+    from tools.vision_tools_image_prep import _detect_image_mime_type_from_bytes
+
+    if not isinstance(value, str) or len(value) > ((_CHAT_IMAGE_MAX_BYTES + 2) // 3) * 4 + 32:
+        return False
+    match = _CHAT_DATA_URL_RE.fullmatch(value)
+    if not match or match[1] == "image/bmp":
+        return False
+    try:
+        raw = base64.b64decode(match[2], validate=True)
+    except ValueError:
+        return False
+    return 0 < len(raw) <= _CHAT_IMAGE_MAX_BYTES and _detect_image_mime_type_from_bytes(raw) == match[1]
+
 
 #: Cap on the pasted description carried into a turn. The vision prompt is
 #: already bounded to 2000 chars and the reply is redacted; this keeps a
@@ -9534,6 +9559,9 @@ def prepare_chat_stream(cfg, q, b):
     if home is not None:
         status, result = _named_chat_events(cfg, home, b)
         return (200, _profile_chat_sse(result)) if status == 200 else (status, result)
+    if b.get("image_data_url") is not None:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "Use the image attachment action for the current profile."}
     status, error, _ = CT.stream_preflight(cfg, str(b.get("text") or ""), b.get("model"),
                                            session=b.get("session"))
     if error is not None:

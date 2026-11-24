@@ -221,4 +221,8 @@ The recovery row has disposable evidence for a dropped HTTP connection during
 an admitted turn. The dashboard can inspect the exact receipt, refresh the
 transcript after settlement, and stop a turn after the relay detaches. A retry
 uses the same submission ID, and the gateway kept one admission and one provider
-request. Image turns, turn-scoped overrides, and recovery under load remain open.
+request. The same path now carries image bytes through the owning gateway.
+A native-vision fixture independently received and compared the PNG, and
+replaying the same submission produced no second model request. Turn-scoped
+model and reasoning overrides, recovery under load, and deployed checks remain
+open.
