@@ -342,6 +342,14 @@
       "revision": "53f00be2b6586d72e39f9dc89a8883b22805c35d",
       "command": "macOS manual CI dispatch and separately scoped live provider, PTY and voice rehearsals",
       "observed": "macOS install and launchd, external inference and integrations, deployed named-profile PTY and microphone, speaker and physical device checks remain outside the installed loopback result."
+    },
+    {
+      "check": "Workbench reload and PTY lifecycle in disposable state",
+      "status": "PASS",
+      "environment": "Chromium, isolated loopback dashboard and PTY fixtures",
+      "revision": "a0774f332ebb2589bc4490533e3682a86286c692",
+      "command": "pytest -m ui -q tests/test_dashboard_e2e_phase4.py -k workbench; focused PTY, Workbench stream and HTTP transport tests",
+      "observed": "Both aliases loaded and reloaded the same session at 390px and 1440px, fetched its session API successfully and fit the viewport. Independent API read-back matched the ID. The focused 56-test selection passed, including resize, named-profile ownership, reconnect, detach, reattach and orphan cleanup. The deployed dashboard's two health aliases still returned 404. Live inference and deployed PTY remain open."
     }
   ],
   "cancellation_fix_artifact": {
