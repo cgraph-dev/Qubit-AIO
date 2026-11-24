@@ -81,12 +81,12 @@
       "observed": "11 tests passed. The corrected regression supplies the passphrase through the actual confirmation flow and verifies a wrong passphrase leaves the newer version of a report in place and creates no restore snapshot."
     },
     {
-      "check": "Additional installed streaming cases and packaged upgrade",
+      "check": "Packaged upgrade and rollback",
       "status": "NOT RUN",
       "environment": "Disposable Linux install",
       "revision": null,
       "command": null,
-      "observed": "Remaining installed cases include quiet-turn keep-alives, transport disconnect, and a populated-state package upgrade and rollback."
+      "observed": "A populated-state packaged upgrade and rollback still need installed coverage."
     },
     {
       "check": "Deployed named-profile inference and PTY",
@@ -162,6 +162,33 @@
       "observed": "The provider sent one delta and stayed quiet beyond the configured 0.8-second read timeout. The dashboard sent start, delta and error TIMEOUT. The canonical transcript contained only the user message, the cancel endpoint returned NO_ACTIVE_TURN after settlement, and the provider saw one request.",
       "wheel_sha256": "df7590609749c1646397171699863157717acebdd4232747792f2b33be746205",
       "cleanup": "The standalone fixture process still needed termination after the timeout, transcript and cancellation assertions passed."
+    },
+    {
+      "check": "Quiet remote stream on the previous installed wheel",
+      "status": "FAIL",
+      "environment": "Disposable Linux installation with an authenticated HTTP dashboard and a loopback provider",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "wheel_sha256": "df7590609749c1646397171699863157717acebdd4232747792f2b33be746205",
+      "command": "python scripts/artifact_install_e2e.py --wheel BASELINE_WHEEL --require-clean --require-network",
+      "observed": "The new fixture withheld its second delta until the dashboard emitted an SSE comment. The previous wheel did not emit one, so the provider's guard closed the stream and the expected two-delta sequence failed."
+    },
+    {
+      "check": "Installed quiet remote stream, disconnect, and cleanup",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 installed wheel, disposable home and loopback provider",
+      "revision": "a953ae1755a17dc3e69afa7de3b8d022741c6c22",
+      "wheel_sha256": "d530e3e93219567b0169c86876b368ac1da1d6151668e7c9267549a1aab1b696",
+      "command": "python scripts/artifact_install_e2e.py --build --require-clean --require-network",
+      "observed": "Authenticated create, keep-alive after the first delta, second delta, final reply and transcript recovery passed. Explicit cancel still passed. In a separate turn the dashboard client disconnected on the keep-alive. While the provider was still quiet, its socket closed, the worker registration cleared, and the stored transcript retained only the user message. The fixture shortened the heartbeat interval. The production interval is 10 seconds."
+    },
+    {
+      "check": "Fresh install, provider errors, concurrency, and timeout on the same wheel",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 installed wheel, disposable home and loopback provider",
+      "revision": "a953ae1755a17dc3e69afa7de3b8d022741c6c22",
+      "wheel_sha256": "d530e3e93219567b0169c86876b368ac1da1d6151668e7c9267549a1aab1b696",
+      "command": "python scripts/verify_fresh_install.py --wheel WHEEL --require-clean --require-network plus authenticated loopback chat fixture probes",
+      "observed": "Fresh-install verification passed. Provider 401 mapped to AUTH_INVALID. Two overlapping streams produced separate exact transcripts. A quiet provider after one delta produced TIMEOUT with one provider request and no assistant row or active registration. Each fixture process exited normally. The unchanged dashboard assets were reused from the verified baseline."
     }
   ],
   "cancellation_fix_artifact": {

@@ -1,5 +1,7 @@
 # Qubit Office — session status (2026-10-24)
 
+**Installed remote chat keep-alives and disconnect (2026-11-24):** The previous wheel failed the quiet-stream probe. On `a953ae175`, the Linux artifact-install and fresh-install gates passed. A quiet remote stream delivered an SSE comment, and a separate HTTP client disconnect closed the provider socket and released the active turn. Provider 401, overlapping turns, and timeout passed against the same wheel. The continuation checklist now has two fully evidenced items out of 30. See the [packaged acceptance results](e2e/2026-11-24-packaged-acceptance.json).
+
 **Local Graft repair (2026-11-24):** Upgraded the VS Code checkout's Graft CLI to 0.30.1 and rebuilt its local source graph from scratch. The default `graft grep` and `graft ask --source` commands, and a fresh MCP `graft_find_all` call, returned the current source spans for `AbortableChatStream`. The previous graph remains in the local cache. Existing MCP processes need a restart to load the upgraded executable.
 
 **Direct main and installed timeout follow-up (2026-11-24):** PR #48 was already merged at `3c05ac4aa`. Qubit-AIO now uses the local checkout and direct pushes to `main` for validated changes. The installed Linux wheel reported `TIMEOUT` after one provider delta and settled with one request, no assistant message, and no active turn to cancel. See the [packaged acceptance results](e2e/2026-11-24-packaged-acceptance.json).
