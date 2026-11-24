@@ -82,11 +82,23 @@
     },
     {
       "check": "Packaged upgrade and rollback",
-      "status": "NOT RUN",
-      "environment": "Disposable Linux install",
-      "revision": null,
-      "command": null,
-      "observed": "A populated-state packaged upgrade and rollback still need installed coverage."
+      "status": "PASS",
+      "environment": "Linux Python 3.12 wheel installation with a disposable home, state database, and venv",
+      "revision": "202d7751e1046da98b997eff916a0a491084db73",
+      "command": "uv pip install --python VENV/bin/python WHEEL; qubit --version; fresh isolated Python process reads voicebridge.chat_transport.store",
+      "observed": "Built 0.0.14 from historical source and installed it with its declared dependencies. A malformed 0.0.15 wheel failed before replacement. Upgrade to 0.0.15, rollback to 0.0.14 and repeat upgrade all preserved metadata, the interrupted-turn prompt and exact transcript. The old wheel also read the message appended on the new wheel. Each phase checked CLI and distribution versions and verified the installed chat module against the selected wheel bytes. The installed qubit update --check identifies package mode and points to scripts/install.sh. The rehearsal used wheel installation with uv.",
+      "artifacts": [
+        {
+          "version": "0.0.14",
+          "source_commit": "79470a4e310e8aef77675e7df8cdd7da51011b76",
+          "sha256": "673261095adbf0699faf6ccbe77dba4613680ccd1b44c935b62b0adaaac110a0"
+        },
+        {
+          "version": "0.0.15",
+          "source_commit": "202d7751e1046da98b997eff916a0a491084db73",
+          "sha256": "b2ea7a9f3aa642b69a3ba5da75ee1bbf27b43dfbc9ce3f1f02d1c8a39d0b1882"
+        }
+      ]
     },
     {
       "check": "Deployed named-profile inference and PTY",
@@ -189,6 +201,31 @@
       "wheel_sha256": "d530e3e93219567b0169c86876b368ac1da1d6151668e7c9267549a1aab1b696",
       "command": "python scripts/verify_fresh_install.py --wheel WHEEL --require-clean --require-network plus authenticated loopback chat fixture probes",
       "observed": "Fresh-install verification passed. Provider 401 mapped to AUTH_INVALID. Two overlapping streams produced separate exact transcripts. A quiet provider after one delta produced TIMEOUT with one provider request and no assistant row or active registration. Each fixture process exited normally. The unchanged dashboard assets were reused from the verified baseline."
+    },
+    {
+      "check": "Unenrolled portable restore on the previous wheel",
+      "status": "FAIL",
+      "environment": "Disposable installed Linux 0.0.15 wheel",
+      "revision": "a953ae1755a17dc3e69afa7de3b8d022741c6c22",
+      "command": "CLI import-state apply handler against an encrypted report bundle",
+      "observed": "The restore refused because the device was not enrolled, but created a pre-restore snapshot. The report remained unchanged."
+    },
+    {
+      "check": "Installed CLI portable backup and restore",
+      "status": "PASS",
+      "environment": "Disposable installed Linux 0.0.15 wheel and system OpenSSL",
+      "revision": "202d7751e1046da98b997eff916a0a491084db73",
+      "wheel_sha256": "b2ea7a9f3aa642b69a3ba5da75ee1bbf27b43dfbc9ce3f1f02d1c8a39d0b1882",
+      "command": "qubit export-state, qubit import-state, qubit import-state --apply, qubit device enroll, qubit import-state --apply",
+      "observed": "Encrypted private-mode export, write-free preview and write-free unenrolled refusal passed. After enrollment, apply restored the archived report and wrote exactly one snapshot containing the previous report. Focused tests also passed for separate snapshots in one second and refusal before any writes when the snapshot copy fails. The artifact-install gate passed on this wheel."
+    },
+    {
+      "check": "GitHub checks for the quiet-stream fix",
+      "status": "PASS",
+      "environment": "GitHub Actions",
+      "revision": "a61a2f5150e3edbafc7e0fc8dece9ca7be9d4d9c",
+      "command": "gh run list --commit a61a2f5150e3edbafc7e0fc8dece9ca7be9d4d9c",
+      "observed": "All nine workflows reported success, including Linux artifact install, release qualification, E2E and Windows."
     }
   ],
   "cancellation_fix_artifact": {

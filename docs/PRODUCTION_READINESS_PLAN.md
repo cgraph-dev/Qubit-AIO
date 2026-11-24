@@ -20,7 +20,7 @@ A merged change is not equivalent to a verified deployment. Code changes must be
 - [x] P1: Make release archive secret scanning fail closed when content cannot be fully inspected; add large-file and scan-budget tests (merged PR #36; dedicated archive security, CI and E2E passed 2026-11-23).
 - [ ] P1: Verify dashboard behavior at port 8890: /chat, /sessions, /logs, /env, keys, and model-provider views. Enumerate actual routes and test every supported action against real backend APIs; no hardcoded success fixtures as release proof.
 - [ ] P1: Add full dashboard-enabled clean install and model provisioning tests in addition to the existing minimal install gate.
-- [ ] P1: Exercise upgrade and rollback with real persisted user state.
+- [x] P1: Exercise Linux wheel upgrade and rollback with persisted state (0.0.14 and 0.0.15, disposable installation).
 - [ ] P1: Verify gateway authentication, streaming reconnect, concurrent sessions, and errors from unavailable model providers.
 - [ ] P2: Pin reproducible shared frontend dependencies in CI; validate macOS and Windows separately.
 - [ ] P2: Replace operator-specific release path checks with portable detection and regression tests.
