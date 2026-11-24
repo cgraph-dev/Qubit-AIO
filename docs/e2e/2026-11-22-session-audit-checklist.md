@@ -225,5 +225,8 @@ request. The same path now carries image bytes through the owning gateway.
 A native-vision fixture independently received and compared the PNG, and
 replaying the same submission produced no second model request. The one-turn
 picker routed an identical model ID to a second provider. Effort alone kept the
-current route, and the following turn used its defaults. General retry, recovery
-under load, and deployed checks remain open.
+current route, and the following turn used its defaults. Five disposable chats
+sharing a gateway verified a quiet SSE keep-alive, provider error recovery,
+and completion and cancellation of two detached turns. Saved admission rows
+and provider request counts agreed. General retry of a failed turn and deployed
+checks remain open.

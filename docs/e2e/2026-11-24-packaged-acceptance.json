@@ -430,6 +430,15 @@
       "command": "Submit the named chat stream with model, provider and reasoning; replay the same submission ID; inspect provider wire requests, stored admissions, subsequent defaults and profile config bytes",
       "observed": "The one-turn selection went to the second provider at high effort. A reasoning-only turn used medium on the first provider. The following turn used the first provider and its low default. Repeating either override produced no extra provider request, the saved admissions retained their distinct choices, and the profile config stayed byte-identical. The untitled New chat path created a session against the authenticated named owner. Chromium selected a model and reasoning effort at 390px and 1440px, then sent the intended provider and effort and cleared the one-turn selection. Focused verification passed 22 dashboard route tests, 25 native route and reasoning tests, and 38 frontend tests.",
       "scope": "The provider changes were verified with disposable endpoints. The deployed build and external providers remain open."
+    },
+    {
+      "check": "Named-profile keep-alives and detached recovery during concurrent turns",
+      "status": "PASS",
+      "environment": "Source Linux dashboard and gateway, authenticated loopback HTTP, one disposable named profile and a gated SSE fixture provider",
+      "revision": "3af48d93a2d629a5883f392030f661e3f16fede2",
+      "command": "Open simultaneous named chat streams, close two HTTP connections after start, check and cancel by submission ID, then compare SSE frames, transcript, SQLite admissions and provider request counts",
+      "observed": "One stream sent a keep-alive comment during a quiet turn and then emitted a delta and completion. Another chat completed while a fixture HTTP 400 produced a typed error and terminal failed receipt in a third. A fresh turn in the failed chat completed. A competing send in the quiet chat was refused. The first detached turn settled completed, its expected reply appeared in the transcript, and exact replay returned that reply with no second model request. The second detached turn settled interrupted after cancellation through the recovery endpoint. The six terminal admission rows matched the six provider requests.",
+      "scope": "This was a source rehearsal using deterministic providers and five chats. General retry of a failed turn, higher concurrency and the deployed build are open."
     }
   ],
   "cancellation_fix_artifact": {
