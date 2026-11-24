@@ -439,6 +439,15 @@
       "command": "Open simultaneous named chat streams, close two HTTP connections after start, check and cancel by submission ID, then compare SSE frames, transcript, SQLite admissions and provider request counts",
       "observed": "One stream sent a keep-alive comment during a quiet turn and then emitted a delta and completion. Another chat completed while a fixture HTTP 400 produced a typed error and terminal failed receipt in a third. A fresh turn in the failed chat completed. A competing send in the quiet chat was refused. The first detached turn settled completed, its expected reply appeared in the transcript, and exact replay returned that reply with no second model request. The second detached turn settled interrupted after cancellation through the recovery endpoint. The six terminal admission rows matched the six provider requests.",
       "scope": "This was a source rehearsal using deterministic providers and five chats. General retry of a failed turn, higher concurrency and the deployed build are open."
+    },
+    {
+      "check": "Retry the latest settled failed named-profile turn",
+      "status": "PASS",
+      "environment": "Source dashboard and native gateway, disposable named profile, loopback text and native-vision providers",
+      "revision": "098e8a2eb3437800c62f2f3c94d43544768cded3",
+      "command": "Fail a named chat stream once. Stream a retry with a new submission_id and the original retry_of. Replay the new ID, compare provider requests and read back active and archived transcript rows.",
+      "observed": "The text retry kept the original provider and high reasoning effort. The PNG retry delivered the same bytes as the first request. Each retained one active user row. A repeated retry ID returned its saved reply with no additional provider calls. Pending, stale and cross-chat retries were refused. Four native retry tests, nine named HTTP route tests and 39 frontend chat tests passed.",
+      "scope": "Retry requires a settled failed admission, its unchanged transcript suffix and any retained media. Turns that recorded tool activity are ineligible. The deployed dashboard reports source revision 3d6595549328b150b9dcfc432adcc7119aae40f5 and has no retry evidence for this change."
     }
   ],
   "cancellation_fix_artifact": {

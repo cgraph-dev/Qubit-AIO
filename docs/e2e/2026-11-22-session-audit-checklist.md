@@ -228,5 +228,7 @@ picker routed an identical model ID to a second provider. Effort alone kept the
 current route, and the following turn used its defaults. Five disposable chats
 sharing a gateway verified a quiet SSE keep-alive, provider error recovery,
 and completion and cancellation of two detached turns. Saved admission rows
-and provider request counts agreed. General retry of a failed turn and deployed
-checks remain open.
+and provider request counts agreed. The same environment verified retry of the
+latest settled failed text and PNG turns, preserving the original provider,
+reasoning and image bytes and leaving one active user message. Deployed
+verification remains open.
