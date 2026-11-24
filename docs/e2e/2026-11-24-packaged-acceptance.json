@@ -301,6 +301,47 @@
       "revision": "aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
       "command": "gh run list --commit aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
       "observed": "All nine workflows passed, including release qualification, artifact install, Windows and E2E."
+    },
+    {
+      "check": "Linux CI installed dashboard artifact",
+      "status": "PASS",
+      "environment": "GitHub Actions Linux, clean wheel install",
+      "revision": "aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
+      "wheel_sha256": "b1fcaa09b5b99aed612ac37f5946bfa527a7444d1383b475a9e21f268dd7d324",
+      "command": "gh run download 45312072339 -n artifact-install-e2e",
+      "observed": "The CI report records PASS and a dashboard-enabled qubit 0.0.15 wheel. The later main commit changes only evidence documents from its parent."
+    },
+    {
+      "check": "Dashboard build, native E2E and release CI on main",
+      "status": "PASS",
+      "environment": "GitHub Actions Linux and Windows",
+      "revision": "53f00be2b6586d72e39f9dc89a8883b22805c35d",
+      "command": "gh run view 45315800920; gh run view 45315801046; gh run view 45315800996",
+      "observed": "All eight triggered workflows passed. Dashboard typecheck, 1530 tests in 208 files, production build, runtime smoke, release qualification, eight native E2E shards and the Windows workflow passed. macOS is manual-dispatch only. GitHub reports main as unprotected, so these are audit checks rather than branch-protection requirements."
+    },
+    {
+      "check": "Dashboard and native gateway smoke on main",
+      "status": "PASS",
+      "environment": "Python 3.14 and disposable localhost fixtures",
+      "revision": "53f00be2b6586d72e39f9dc89a8883b22805c35d",
+      "command": "python -m pytest --import-mode=importlib -o 'pythonpath=qubit_runtime tests' -q tests/test_webui_http11_keepalive9u.py tests/test_route_wiring_fixes8u.py tests/gateway/test_normal_runtime_boot.py tests/gateway/test_api_authority_daemon.py",
+      "observed": "28 tests passed. Teardown emitted resource warnings for a temporary gateway lock, event loop and sockets."
+    },
+    {
+      "check": "Live route shell and Workbench health",
+      "status": "FAIL",
+      "environment": "Read-only HTTP on the running local dashboard at port 8890",
+      "revision": "049e4794c2868f292be40dd1041c83618c663b74",
+      "command": "GET /build-info.json, /api/health, /chat, /qubit-chat, /webchat, /qubit-workbench, /wb and both Workbench health aliases",
+      "observed": "The running dashboard reports a dirty bundle at the listed SHA and health ok=true in state DEGRADED. All five route shells returned 200. Both Workbench health aliases returned 404. The fix passes on main in disposable loopback tests."
+    },
+    {
+      "check": "Opt-in platforms, external providers, and physical hardware",
+      "status": "NOT RUN",
+      "environment": "MacOS runner, approved external provider or integration, and physical peripherals",
+      "revision": "53f00be2b6586d72e39f9dc89a8883b22805c35d",
+      "command": "macOS manual CI dispatch and separately scoped live provider, PTY and voice rehearsals",
+      "observed": "macOS install and launchd, external inference and integrations, deployed named-profile PTY and microphone, speaker and physical device checks remain outside the installed loopback result."
     }
   ],
   "cancellation_fix_artifact": {
