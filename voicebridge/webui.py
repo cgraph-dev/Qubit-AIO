@@ -4312,7 +4312,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         if path in ("/", "/index.html"):
             # Ruling 3 → Option A: the root lands on the Qubit chat workspace.
-            self._redirect("/chat")
+            _path, separator, query = self.path.partition("?")
+            self._redirect("/chat" + separator + query)
             return
         if path == "/hermes" or path.startswith("/hermes/"):
             # The upstream mount is gone: no route at all, no redirect. A

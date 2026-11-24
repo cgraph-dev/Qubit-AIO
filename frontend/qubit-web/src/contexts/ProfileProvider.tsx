@@ -72,6 +72,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // dashboard's own home, where the session does not exist). Only re-map when
   // the URL has no profile at all (a bare nav link).
   useEffect(() => {
+    // Workbench uses an explicit profile query to switch its active profile.
+    // A dashboard selection alone must not turn a document link into that action.
+    if (/^\/(qubit-workbench|wb)(\/|$)/i.test(pathname)) return;
     const urlProfileNow = searchParams.get("profile");
     if (urlProfileNow !== null) return;
     if (!profile) return;

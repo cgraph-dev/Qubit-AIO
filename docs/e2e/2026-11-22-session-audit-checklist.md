@@ -30,6 +30,10 @@ The session route update now uses the runtime's atomic model and route write whe
 
 The 2026-11-25 recheck passed with repair `6c15a8cb2e117bbae819e854a7dbe3e276e8bc27`. Chromium exercised `/models`, `/qubit-models`, `/model`, `/providers`, `/model-providers` and `/models/providers` at 390 or 1440 pixels, retaining the selected profile on navigation. The Models picker retained its choice after an injected save refusal, then confirmed the other provider for the same model ID. Independent GET, reload and config read-back agreed. Qubit Chat saved to the named session only. The terminal picker retained the active provider and returned the same queued pair after reload. The subsequent ticketed PTY rehearsal applied the queued model on the next prompt, refused a below-floor choice, and verified a credentialed loopback fallback and transcript read-back. Repair `8bdbb9c793b4d14c7a596df2fe5d3011d85208c5` also reattached a detached PTY using only the authenticated resume ID. Deployed and external provider checks remain open.
 
+## Dashboard route reconciliation (2026-11-25)
+
+The [current route reconciliation](2026-11-22-dashboard-cli-audit-results.json) lists 70 built-in patterns, 14 checked-in overlay routes, and 51 built-in sidebar destinations. The comparison covers registry entries and destinations. Browser confirmation is recorded separately for the tested Workbench handoffs and aliases. The full action and accessibility row is still open.
+
 ## Compatibility across all four ecosystems
 
 | Ecosystem | Evidence | Remaining |

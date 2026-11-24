@@ -82,7 +82,7 @@ ROUTE_HEADINGS = [
     ("/reports", "Reports"),
     ("/qubit-runtime", "Runtime Inventory"),
     ("/qubit-gateway", "Gateway"),
-    ("/qubit-models", "Models & Providers"),
+    ("/qubit-models", "Models"),
 ]
 
 
@@ -229,6 +229,37 @@ def test_workbench_session_deep_links_reload_the_same_session(browser, ui_server
             context.close()
 
 
+@pytest.mark.parametrize("mount", ["/qubit-workbench", "/wb"])
+def test_spa_workbench_handoff_keeps_explicit_url_intent(browser, ui_server, mount):
+    base, token = ui_server
+    code, created = _api(base, token, "POST", "/qubit-workbench/api/session/new",
+                         {"title": "Workbench handoff fixture"})
+    assert code == 200 and created.get("session_id"), created
+    pathname = f"{mount}/session/{created['session_id']}"
+    query = "?audit=keep&tag=one&tag=two"
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    try:
+        page = context.new_page()
+        page.goto(base + "/sessions?profile=work", wait_until="domcontentloaded")
+        pw.expect(page.get_by_role("heading", name="Sessions", exact=True).first).to_be_visible()
+        with page.expect_request(lambda request: request.is_navigation_request()
+                                 and request.url.startswith(base + pathname)) as navigation:
+            page.evaluate("""url => {
+                history.pushState(null, '', url);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            }""", pathname + query + "#handoff")
+        assert navigation.value.url == base + pathname + query
+        page.wait_for_url(base + pathname + query + "#handoff")
+        pw.expect(page.locator("#profilesPanel")).to_be_attached()
+        page.reload(wait_until="domcontentloaded")
+        assert page.url == base + pathname + query + "#handoff"
+        page.go_back(wait_until="domcontentloaded")
+        page.wait_for_url(base + "/sessions?profile=work")
+        pw.expect(page.get_by_role("heading", name="Sessions", exact=True).first).to_be_visible()
+    finally:
+        context.close()
+
+
 @pytest.mark.parametrize("asset", [
     "Inter-latin.woff2",
     "Rajdhani-latin.woff2",
@@ -257,7 +288,8 @@ def test_routes_mount_real_pages(browser, ui_server):
                 timeout=20000)
             text = page.inner_text("body")
             assert len(text.strip()) > 60, (route, "blank render")
-            assert page.url.endswith(route) or route.startswith(
+            landing = "/models" if route == "/qubit-models" else route
+            assert page.url.endswith(landing) or landing.startswith(
                 page.url.split("127.0.0.1")[-1]), (route, page.url)
 
         # /chat is the real vendored terminal (xterm), independent of the
@@ -290,6 +322,7 @@ def test_dashboard_control_aliases_open_their_own_page(browser, ui_server):
     try:
         for alias, destination, title in (
             ("/keys", "/env", "Keys"),
+            ("/qubit-models", "/models", "Models"),
             ("/model", "/models", "Models"),
             ("/providers", "/models", "Models"),
             ("/model-providers", "/models", "Models"),

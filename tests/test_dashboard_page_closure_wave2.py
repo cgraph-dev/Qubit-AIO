@@ -284,7 +284,7 @@ def test_chat_routes_are_two_surfaces_one_backend():
     # everything except the root redirect so the Ruling-3 root redirect is
     # allowed while a chat-route redirect is still forbidden.
     root_redirect = re.search(r"function RootRedirect\(\).*?\n\}", text, re.S)
-    assert root_redirect and 'to="/chat"' in root_redirect.group(0), text
+    assert root_redirect and '<DashboardRouteAlias pathname="/chat"' in root_redirect.group(0), text
     without_root = text.replace(root_redirect.group(0), "")
     for bad in ('<Navigate to="/chat"', '<Navigate to="/qubit-chat"'):
         assert bad not in without_root, bad

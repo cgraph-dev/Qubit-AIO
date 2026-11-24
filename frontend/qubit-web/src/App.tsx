@@ -258,7 +258,7 @@ function RouteFallback({ label = "Loading…" }: { label?: string }) {
 
 function RootRedirect() {
   // Ruling 3 → Option A: the root lands on the Qubit chat workspace.
-  return <Navigate to="/chat" replace />;
+  return <DashboardRouteAlias pathname="/chat" />;
 }
 
 function DashboardRouteAlias({ pathname, hash }: { pathname: string; hash?: string }) {
@@ -271,7 +271,7 @@ function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
     // Render nothing during the plugin-load window — a spinner here would just flash.
     return null;
   }
-  return <Navigate to="/sessions" replace />;
+  return <DashboardRouteAlias pathname="/sessions" />;
 }
 
 /**
@@ -285,15 +285,23 @@ function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
  * clicking the sidebar row from `/chat` (and from the workbench itself) landed
  * on `/sessions`, so the surface was unreachable by clicking anywhere.
  *
- * `window.location.replace` re-requests the path from the server, which is the
- * only way to reach a non-SPA document. Through the router it would be a
- * pushState that renders this component again in an endless loop, so a real
- * document navigation is the correct tool here, not a workaround.
+ * A router push already changed the address bar. Replace that entry with
+ * a document navigation so Back still returns to the preceding SPA page.
  */
-function ServerDocumentHandoff({ path }: { path: string }) {
+function ServerDocumentHandoff() {
+  const { pathname, search, hash } = useLocation();
+  const documentPath = pathname.replace(/^\/(qubit-workbench|wb)(\/session(?=\/))?/i, (prefix) => prefix.toLowerCase());
+  const target = documentPath + search + hash;
   useEffect(() => {
-    window.location.replace(path);
-  }, [path]);
+    const current = new URL(window.location.href);
+    if (target === current.pathname + current.search + current.hash) {
+      // An identical fragment URL can become a same-document scroll. Change
+      // only the pending history entry before replacing it with the real URL.
+      current.searchParams.append("_document_handoff", "1");
+      window.history.replaceState(window.history.state, "", current);
+    }
+    window.location.replace(target);
+  }, [target]);
   return null;
 }
 
@@ -412,7 +420,10 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/qubit-office3": () => <PluginPage name="qubit-office3" />,
   // The workbench is a SERVER-served document (webui.py:_serve_workbench_ui),
   // not a plugin bundle or a React page — see ServerDocumentHandoff.
-  "/qubit-workbench": () => <ServerDocumentHandoff path="/qubit-workbench" />,
+  "/qubit-workbench": ServerDocumentHandoff,
+  "/qubit-workbench/session/:sessionId": ServerDocumentHandoff,
+  "/wb": ServerDocumentHandoff,
+  "/wb/session/:sessionId": ServerDocumentHandoff,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -1476,6 +1487,7 @@ function SidebarNavLink({
     >
       <NavLink
         to={path}
+        reloadDocument={path === "/qubit-workbench"}
         end={item.exactEnd ?? path === "/sessions"}
         data-stage-row="nav"
         onClick={(event) => {
