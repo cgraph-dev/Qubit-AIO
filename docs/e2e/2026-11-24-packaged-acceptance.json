@@ -273,7 +273,7 @@
         "qubit_runtime/tests/gateway/test_abandoned_turn_process_cleanup.py",
         "qubit_runtime/tests/qubit_cli/test_gateway_connection_reconnect.py"
       ],
-      "observed": "The ordinary daemon fixture used an authenticated HTTP listener and WebSocket for the same session. The queue and retry receipts matched independent SQLite reads. Closing read-back connections removed the SQLite warnings. A combined root run still emitted an event-loop teardown warning. Installed gateway readiness and provider-unavailable recovery remain open."
+      "observed": "The ordinary daemon fixture used an authenticated HTTP listener and WebSocket for the same session. The queue and retry receipts matched independent SQLite reads. Closing read-back connections removed the SQLite warnings. A combined root run still emitted an event-loop teardown warning. The separate packaged gateway rehearsal below verifies readiness and provider-unavailable recovery."
     },
     {
       "check": "Release archive verification and failure boundaries",
@@ -283,6 +283,24 @@
       "tests_passed": 46,
       "command": "python -m pytest -q tests/test_verify_public_release.py tests/test_release_scan_version_contract.py",
       "observed": "Archive verification passed, including the scan-budget refusal and oversized member checks."
+    },
+    {
+      "check": "Installed native gateway readiness, provider outage, reconnect and cleanup",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 wheel, disposable home, native WebSocket and loopback SSE provider",
+      "revision": "202d7751e1046da98b997eff916a0a491084db73",
+      "wheel_sha256": "b2ea7a9f3aa642b69a3ba5da75ee1bbf27b43dfbc9ce3f1f02d1c8a39d0b1882",
+      "command": "Isolated Python launches gateway.run from voicebridge.qubit_runtime.ensure_path(); control identify and session-ticket; WebSocket setup.runtime_check, session.create, session.resume, prompt.submit and prompt.receipt",
+      "observed": "The control socket reached ready and its authority epoch and instance ID matched an independent SQLite read. Authenticated runtime check passed. A provider HTTP 503 produced a terminal failure with reason overloaded. After recovery two sessions overlapped at a provider barrier, settled independently, and kept exact separate replies across fresh authenticated WebSockets. SIGINT exited cleanly and removed both listener and control socket and the PID file. A new process got a new instance ID and higher authority epoch, and read both transcripts from the same disposable database before another clean stop.",
+      "scope": "Native ticketed gateway. The optional OpenAI-compatible HTTP adapter and external provider accounts were outside the rehearsal."
+    },
+    {
+      "check": "GitHub checks for the portable restore fix",
+      "status": "PASS",
+      "environment": "GitHub Actions",
+      "revision": "aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
+      "command": "gh run list --commit aca8618c2b577f1e3cbf99b85d0f8b8ee8dad1b1",
+      "observed": "All nine workflows passed, including release qualification, artifact install, Windows and E2E."
     }
   ],
   "cancellation_fix_artifact": {

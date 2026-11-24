@@ -181,12 +181,12 @@ the complete scenario is still open.
 
 | Section | Complete | Partial | Total |
 | --- | ---: | ---: | ---: |
-| P0 packaged acceptance, reliability, and boundaries | 4 | 2 | 6 |
+| P0 packaged acceptance, reliability, and boundaries | 5 | 1 | 6 |
 | Live chat, Workbench, sessions, models, and PTY | 0 | 6 | 6 |
 | Dashboard routes and actions | 0 | 7 | 7 |
 | MCP, skills, plugins, memory, and integrations | 0 | 4 | 4 |
 | CLI and ecosystem compatibility | 0 | 7 | 7 |
-| **Total** | **4** | **26** | **30** |
+| **Total** | **5** | **25** | **30** |
 
 The completed items cover the clean authenticated Linux wheel and the
 installed remote-provider chat lifecycle. The latter includes session IDs and
@@ -196,8 +196,9 @@ cleanup. The artifact-install workflow invokes the fixture provider. Live
 inference and PTY lifecycle remain open. The third completed item covers
 process restart, populated-state wheel upgrade and rollback, failed replacement,
 and portable backup and restore. The fourth covers authorization and data-handling
-regressions in disposable fixtures. Packaged gateway readiness and provider
-unavailable recovery remain open. The counts describe whole checkboxes and do
-not estimate effort.
+regressions in disposable fixtures. The fifth covers installed native
+gateway readiness, provider outage recovery, concurrent sessions, reconnect,
+and process cleanup, plus fail-closed archive regression coverage. The
+counts describe whole checkboxes and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.
