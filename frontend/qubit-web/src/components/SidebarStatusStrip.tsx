@@ -41,7 +41,7 @@ export function SidebarStatusStrip({ status, latencyMs }: SidebarStatusStripProp
     >
       <span className="qagent-sidebar__telemetry-row">
         <span className="qagent-sidebar__telemetry-key">{strip(gatewayStatusLabel)}</span>
-        <span className={cn("qagent-sidebar__telemetry-value", gw.tone)}>{gw.label}</span>
+        <span className={cn("qagent-sidebar__telemetry-value", gw.tone)} data-state={gw.tone === "text-success" ? "up" : "down"}>{gw.label}</span>
       </span>
 
       <span className="qagent-sidebar__telemetry-row">

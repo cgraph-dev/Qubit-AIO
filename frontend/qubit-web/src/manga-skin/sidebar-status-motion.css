@@ -1,0 +1,123 @@
+/* Sidebar status motion
+ *
+ * The rail's live indicators were static in the Manga skin:
+ *
+ *  - the gateway "Running" value is a plain text-success span with no
+ *    indicator of its own (the collapsed-only GatewayDot is hidden on approved
+ *    art), so there was no green dot to animate in the open rail;
+ *  - the three golden section-title slashes were reduced to one static
+ *    `section-slashes.svg` background by manga-component-contract.css, which
+ *    hides the `<i>` children that manga-precision-repair.css animates with
+ *    `qm-gold-charge`.
+ *
+ * This file is imported LAST (see MangaSkin.tsx) and re-enables both: a real
+ * pulsing lamp on the gateway value, and the staggered gold-cell charge on the
+ * title slashes. Opt-in only — every rule is scoped to the Manga attribute and
+ * the whole file defers to `prefers-reduced-motion: reduce`, which is what the
+ * rail already honours.
+ */
+
+/* ---------------------------------------------- gateway status lamp --- */
+/* The value itself carries the lamp as a ::before so no markup change is
+   needed and the row grid still sizes the label. Only an "up" gateway gets a
+   lamp; a degraded/stopped value keeps plain text. */
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-value[data-state="up"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-value[data-state="up"]::before {
+  content: "" !important;
+  display: block !important;
+  flex: 0 0 7px !important;
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  background: #4dff88 !important;
+  box-shadow: 0 0 0 2px #06040f, 0 0 5px #4dff88 !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-qubit-manga="on"] #app-sidebar .qm-manga-gateway-plate .qagent-sidebar__telemetry-value[data-state="up"]::before {
+    animation: qm-status-lamp 2s ease-in-out infinite !important;
+  }
+}
+
+/* A lamp, not a strobe: the halo breathes between a tight lit core and a
+   wider soft bloom while the fill stays a readable green throughout. */
+@keyframes qm-status-lamp {
+  0%, 100% {
+    box-shadow: 0 0 0 2px #06040f, 0 0 3px #4dff88;
+    filter: brightness(0.92);
+  }
+  50% {
+    box-shadow: 0 0 0 2px #06040f, 0 0 11px #4dff88;
+    filter: brightness(1.28);
+  }
+}
+
+/* ------------------------------------- golden section-title slashes --- */
+/* manga-component-contract.css (an earlier pass) collapses the three `<i>`
+   cells into ONE static section-slashes.svg background. Restore the three
+   separately animatable cells and drop the static plate so the staggered
+   `qm-gold-charge` (manga-precision-repair.css) actually runs.
+
+   `>i` keeps the child combinator so the wider `i` selectors elsewhere cannot
+   re-hide them here. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 5px !important;
+  width: auto !important;
+  height: calc(100% - 9px) !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: none !important;
+  animation: none !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i {
+  display: block !important;
+  position: relative !important;
+  flex: 0 0 15px !important;
+  width: 15px !important;
+  min-width: 15px !important;
+  height: 90% !important;
+  border: 0 !important;
+  clip-path: polygon(31% 0, 100% 0, 72% 100%, 0% 100%) !important;
+  background: linear-gradient(110deg, #fff9bb 0%, #ffed50 16%, #ffbf16 48%, #9a5a13 82%, #ffe64b 100%) !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 0 3px #ffe430) !important;
+}
+
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 2px 3px 42% 5px !important;
+  background: linear-gradient(#fffefa, transparent) !important;
+  opacity: 0.85 !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i {
+    animation: qm-gold-charge 2.4s ease-in-out infinite !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i:nth-child(1) {
+    animation-delay: 0s !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i:nth-child(2) {
+    animation-delay: 0.24s !important;
+  }
+  html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) nav .qm-manga-charge-cells > i:nth-child(3) {
+    animation-delay: 0.48s !important;
+  }
+}
+
+/* The System plate uses its own approved titlebar art; keep its charge cells
+   hidden there so this file does not resurrect them inside the frame. */
+html[data-qubit-manga="on"] #app-sidebar:not([data-collapsed="true"]) .qm-manga-gateway-plate .qm-manga-charge-cells {
+  display: none !important;
+}
