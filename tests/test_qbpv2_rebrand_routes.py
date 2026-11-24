@@ -112,6 +112,14 @@ def test_root_redirects_to_chat(server):
     assert "hermes" not in (loc or "").lower()
 
 
+@pytest.mark.parametrize("path", ["/", "/index.html"])
+def test_root_redirect_preserves_chat_scope(server, path):
+    query = "?profile=work&resume=fixture%2Dchat&option=one&option=two"
+    status, location, _, _ = _raw(server, path + query)
+    assert status == 302
+    assert location == "/chat" + query
+
+
 @pytest.mark.parametrize("route", CANONICAL_ROUTES + FAMILY_ROUTES)
 def test_public_route_serves_spa_shell(server, route):
     status, loc, ctype, body = _raw(server, route)
