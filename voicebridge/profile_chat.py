@@ -42,7 +42,7 @@ def _result(outcome: str | None, reply: Any, session: str) -> dict:
     return _error("CHAT_GATEWAY_TURN_FAILED", "The profile gateway did not complete the turn.", session)
 
 
-async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id, image):
+async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id, image, options):
     from qubit_cli.gateway_client import GatewayRPCError
     from tui_gateway.owner_forward import _REFUSED_BEFORE_COMMIT, connect_owner
 
@@ -59,6 +59,8 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                 yield _result("cancelled", None, session)
                 return
             params = {"session_id": target, "text": text, "submission_id": submission_id}
+            if options:
+                params["model_override"] = options
             if image is not None:
                 upload = await client.rpc("image.attach_bytes", session_id=target, data=image)
                 path = Path(upload["path"])
@@ -151,7 +153,7 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                 staged.unlink(missing_ok=True)
 
 
-def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None, image=None):
+def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None, image=None, options=None):
     """Run the gateway relay on the calling HTTP thread and close its socket on exit."""
     from .plugins import estop_engaged
     from .power import power_control
@@ -182,7 +184,7 @@ def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submissio
         if control is not None:
             control.track(correlation, stop_turn)
         with asyncio.Runner() as runner:
-            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex, image)
+            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex, image, options)
             try:
                 while True:
                     yield runner.run(anext(stream))
@@ -304,8 +306,8 @@ def create(home: Path, name: str) -> str | None:
 
     async def mint():
         async with connect_owner(home, endpoint) as client:
-            snapshot = await client.rpc("session.create", source="gui", title=name or None,
-                                        request_id=uuid.uuid4().hex)
+            snapshot = await client.rpc("session.create", source="gui", request_id=uuid.uuid4().hex,
+                                        **({"title": name} if name else {}))
             sid = snapshot.get("stored_session_id")
             if not isinstance(sid, str) or not sid:
                 raise ValueError("The gateway did not return a stored session ID.")

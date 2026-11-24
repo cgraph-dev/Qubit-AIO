@@ -206,7 +206,8 @@ class CanonicalTurnAuthor(Params):
 
 
 class CanonicalModelOverride(Params):
-    model: str
+    # Omit the model for an effort-only turn on the owning session's current route.
+    model: str | None = None
     provider: str | None = None
     # ``/model B --once --reasoning X``: this admission alone runs level X. The owner refuses a level
     # ``parse_reasoning_effort`` cannot read (``gateway/session_cli_turn.py``).

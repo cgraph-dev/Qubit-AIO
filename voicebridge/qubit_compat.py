@@ -8346,9 +8346,21 @@ def _named_chat_events(cfg, home, body):
     text = str(body.get("text") or "").strip()
     if not session or len(session) > 80 or not text or len(text) > CT.MAX_TEXT_CHARS:
         return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat session or message."}
-    if body.get("model") or body.get("reasoning"):
-        return 400, {"ok": False, "code": "CHAT_TURN_OVERRIDE_UNSUPPORTED",
-                     "detail": "Set the model or reasoning on the gateway session before sending."}
+    from qubit_constants import parse_reasoning_effort
+
+    options = {}
+    for key in ("model", "provider", "reasoning"):
+        value = body.get(key)
+        if value is None or value == "":
+            continue
+        if not isinstance(value, str) or not 0 < len(value.strip()) <= 256:
+            return 400, {"ok": False, "code": "CHAT_TURN_OPTIONS_INVALID",
+                         "detail": "Model, provider and reasoning choices must be valid names."}
+        options[key] = value.strip()
+    if (("provider" in options and "model" not in options)
+            or ("reasoning" in options and parse_reasoning_effort(options["reasoning"]) is None)):
+        return 400, {"ok": False, "code": "CHAT_TURN_OPTIONS_INVALID",
+                     "detail": "Choose a model for the provider and a supported reasoning level."}
     from .qubit_session_store import QubitSessionStore
 
     record = QubitSessionStore(cfg, runtime_home=home)._session(session)
@@ -8367,7 +8379,8 @@ def _named_chat_events(cfg, home, body):
     if image is not None and not _valid_named_chat_image(image):
         return 400, {"ok": False, "code": "BAD_IMAGE",
                      "detail": "Attach a PNG, JPEG, GIF, or WebP image of up to 10 MiB."}
-    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg, submission_id=submission, image=image)
+    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg,
+                                    submission_id=submission, image=image, options=options)
 
 
 def _chat_execution_local(handler):

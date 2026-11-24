@@ -95,6 +95,7 @@ interface Props {
   /** If true, hides "Persist globally" checkbox — always saves to config.yaml. */
   alwaysGlobal?: boolean;
   sessionOnly?: boolean;
+  turnOnly?: boolean;
   /**
    * Session authority override for the header's current-model line. The
    * options payload reports the global picker context while a terminal
@@ -118,6 +119,7 @@ export function ModelPickerDialog(props: Props) {
     title = "Switch Model",
     alwaysGlobal = false,
     sessionOnly = false,
+    turnOnly = false,
     currentOverride = null,
     currentOverrideLabel,
   } = props;
@@ -459,9 +461,10 @@ export function ModelPickerDialog(props: Props) {
         </div>
 
         <footer className="qmodel-picker__footer">
-          {alwaysGlobal || sessionOnly ? (
+          {alwaysGlobal || sessionOnly || turnOnly ? (
             <span className="qmodel-picker__save-note">
-              {sessionOnly ? "Applies to this session." : "Saves to config.yaml — applies to new sessions."}
+              {turnOnly ? "Applies to the next message." :
+                sessionOnly ? "Applies to this session." : "Saves to config.yaml — applies to new sessions."}
             </span>
           ) : (
             <div className="qmodel-picker__persist">

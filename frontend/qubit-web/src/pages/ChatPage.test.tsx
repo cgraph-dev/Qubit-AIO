@@ -1187,7 +1187,8 @@ it("retries a missing named submission with the original text and ID", async () 
   streamChatTurn.mockResolvedValueOnce(undefined);
   profileScope.profile = "work";
   window.sessionStorage.setItem("qubit.chat.pending.work/dashboard-chat",
-    JSON.stringify({ id: "lost-response", text: "original prompt" }));
+    JSON.stringify({ id: "lost-response", text: "original prompt",
+      options: { model: "o3-mini", provider: "fixture", reasoning: "high" } }));
   apiMocks.recoverProfileChatTurn.mockResolvedValue({ status: "missing" });
   await renderChatAt("/qubit-chat?profile=work&resume=dashboard-chat");
   const button = (label: string) => [...container.querySelectorAll("button")].find(
@@ -1204,7 +1205,8 @@ it("retries a missing named submission with the original text and ID", async () 
   });
   expect(streamChatTurn).toHaveBeenCalledTimes(1);
   expect(streamChatTurn).toHaveBeenCalledWith(
-    { text: "original prompt", session: "dashboard-chat", profile: "work", submission_id: "lost-response" },
+    { text: "original prompt", session: "dashboard-chat", profile: "work", submission_id: "lost-response",
+      model: "o3-mini", provider: "fixture", reasoning: "high" },
     expect.any(Object),
     expect.anything(),
   );

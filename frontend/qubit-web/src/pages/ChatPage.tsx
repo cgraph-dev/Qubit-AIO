@@ -341,7 +341,11 @@ function storageSet(key: string, value: string): void {
   }
 }
 
-type PendingProfileTurn = { id: string; text: string; image?: true };
+type NextTurnOptions = { model?: string; provider?: string; reasoning?: string };
+type PendingProfileTurn = { id: string; text: string; image?: true; options?: NextTurnOptions };
+
+const NextTurnModelPicker = lazy(() => import("@/components/ModelPickerDialog")
+  .then(({ ModelPickerDialog }) => ({ default: ModelPickerDialog })));
 
 function savedProfileTurn(key: string): PendingProfileTurn | null {
   try {
@@ -684,6 +688,19 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   // canonical session store (PATCH) and sent with every turn; the server
   // re-validates and receipts the applied budget.
   const [reasoning, setReasoning] = useState<string | null>(null);
+  const [nextModel, setNextModel] = useState<ChatModelSelection | null>(null);
+  const [nextReasoning, setNextReasoning] = useState("");
+  const [nextPickerOpen, setNextPickerOpen] = useState(false);
+  const nextRouteLabel = nextModel
+    ? [nextModel.provider, nextModel.model].filter(Boolean).join(" / ")
+    : "";
+
+  useEffect(() => {
+    setNextModel(null);
+    setNextReasoning("");
+    setNextPickerOpen(false);
+  }, [session]);
+
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   // A26: the Qubit chat control family includes a side-panel toggle and a
   // terminal-input control. The side panel is collapsible; the terminal input
@@ -1166,8 +1183,21 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       if (retryId && retryPermission.current !== retryId) return;
       retryPermission.current = "";
       const submissionId = routed ? (retryId ?? generateChatChannel()) : undefined;
+      const options = routed
+        ? retryId ? previous?.turn.options : {
+          ...(nextModel ?? {}),
+          ...(nextReasoning ? { reasoning: nextReasoning } : {}),
+        }
+        : reasoning ? { reasoning } : undefined;
       if (submissionId) {
-        rememberTurn({ id: submissionId, text, ...(imageDataUrl ? { image: true } : {}) });
+        rememberTurn({
+          id: submissionId,
+          text,
+          ...(imageDataUrl ? { image: true } : {}),
+          ...(options && Object.keys(options).length ? { options } : {}),
+        });
+        setNextModel(null);
+        setNextReasoning("");
         setRetrySubmission("");
         setRecoveryNotice("");
       }
@@ -1201,7 +1231,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       // The reasoning selector rides along (null = session preference, which
       // the server resolves from the persisted session metadata).
       streamChatTurn(
-        { text, session, ...(reasoning ? { reasoning } : {}), ...(scopedProfile ? { profile: scopedProfile } : {}),
+        { text, session, ...options, ...(scopedProfile ? { profile: scopedProfile } : {}),
           ...(submissionId ? { submission_id: submissionId } : {}),
           ...(imageDataUrl ? { image_data_url: imageDataUrl } : {}) },
         {
@@ -1372,7 +1402,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           if (failure.startsWith("[CHAT_ADMISSION_UNCONFIRMED]")) {
             setError(routed ? "The connection dropped before the turn settled." : failure);
           } else if (routed) {
-            if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OVERRIDE_UNSUPPORTED|MALFORMED|EMERGENCY_STOP|BAD_IMAGE)\]/.test(failure)) {
+            if (/^\[(CHAT_PROFILE_WORKER_UNAVAILABLE|CHAT_SESSION_NOT_FOUND|CHAT_TURN_OPTIONS_INVALID|MALFORMED|EMERGENCY_STOP|BAD_IMAGE)\]/.test(failure)) {
               if (submissionId && !retryId) rememberTurn(null);
               setInput(text);
               setMessages((rows) => rows.slice(0, -1));
@@ -1390,7 +1420,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           if (!controller.signal.aborted) setBusy(false);
         });
     },
-    [busy, session, reasoning, followLiveVoice, routed, scopedProfile, recoveryKey, rememberTurn],
+    [busy, session, reasoning, nextModel, nextReasoning, followLiveVoice, routed, scopedProfile, recoveryKey, rememberTurn],
   );
 
   async function checkProfileTurn(cancel: boolean) {
@@ -3171,6 +3201,23 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             </div>
           ) : null}
 
+          {routed && nextPickerOpen ? (
+            <Suspense>
+              <NextTurnModelPicker
+                title="Model for next turn"
+                turnOnly
+                loader={(options) => api.getModelOptions({ profile: scopedProfile, ...options })}
+                currentOverride={nextModel ?? sessionModel}
+                currentOverrideLabel={nextModel ? "next turn" : "this chat"}
+                onClose={() => setNextPickerOpen(false)}
+                onApply={({ provider, model }) => {
+                  setNextModel({ provider, model });
+                  setNextReasoning("");
+                }}
+              />
+            </Suspense>
+          ) : null}
+
           <form
             onSubmit={onSubmit}
             className="qchat__composer mt-2 flex shrink-0 flex-wrap items-end gap-2 border-t border-current/10 pt-2"
@@ -3199,7 +3246,38 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
                 ]}
               />
             </label>
-            {supportsReasoning ? (
+            {routed && !currentRecovery ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                <NativeButton type="button" outlined className="min-h-[44px] max-w-full truncate"
+                  aria-label={nextRouteLabel ? `Model for next turn ${nextRouteLabel}` : "Model for next turn"}
+                  title={nextRouteLabel || undefined}
+                  disabled={busy}
+                  onClick={() => setNextPickerOpen(true)}>
+                  {nextRouteLabel || "Next turn model"}
+                </NativeButton>
+                {nextModel ? (
+                  <NativeButton type="button" ghost className="min-h-[44px]" disabled={busy}
+                    onClick={() => { setNextModel(null); setNextReasoning(""); }}>
+                    Clear model
+                  </NativeButton>
+                ) : null}
+              </div>
+            ) : null}
+            {routed && !currentRecovery ? (
+              <select
+                aria-label="Reasoning for next turn"
+                className="min-h-[44px]! max-w-full rounded-md border border-border bg-background px-2 text-sm text-text-primary"
+                value={nextReasoning}
+                onChange={(event) => setNextReasoning(event.target.value)}
+                disabled={busy}
+              >
+                <option value="">Next turn reasoning</option>
+                {CHAT_REASONING_LEVELS.map(({ id, budget }) => (
+                  <option key={id} value={id}>{id} · {budget}</option>
+                ))}
+              </select>
+            ) : null}
+            {!routed && supportsReasoning ? (
               <label className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary">
                 <span className="sr-only">Reasoning effort</span>
                 <Select

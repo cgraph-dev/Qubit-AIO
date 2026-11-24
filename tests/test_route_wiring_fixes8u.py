@@ -712,7 +712,7 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
         async def rpc(self, method, **kwargs):
             calls.append((method, kwargs))
             if method == "session.create":
-                assert kwargs["source"] == "gui" and kwargs["request_id"]
+                assert kwargs["source"] == "gui" and kwargs["request_id"] and "title" not in kwargs
                 db = SessionDB(work / "state.db")
                 db.create_session("native-chat", "gui")
                 db.close()
@@ -728,8 +728,11 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
                 if with_image:
                     assert kwargs["attachments"] == [{"path": str(staging), "mime": "image/png"}]
                     assert staging.is_file()
+                    assert kwargs["model_override"] == {
+                        "model": "fixture-model", "provider": "fixture-provider", "reasoning": "high"}
                 else:
                     assert "attachments" not in kwargs
+                    assert kwargs["model_override"] == {"reasoning": "low"}
                 return {"admission_id": "ours", "status": "queued"}
             if method == "prompt.receipt" and self.waiting:
                 self.waiting = False
@@ -780,9 +783,15 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
         assert status == 400 and _json_body(raw)["code"] == "BAD_IMAGE"
         status, raw = _req(port, "POST", stream, {**turn, "image_data_url": "data:image/png;base64,iVBORw0KGgo="})
         assert status == 400 and _json_body(raw)["code"] == "BAD_IMAGE"
+        for invalid in ({"provider": "fixture-provider"}, {"reasoning": "not-an-effort"}):
+            status, raw = _req(port, "POST", stream, {**turn, **invalid})
+            assert status == 400 and _json_body(raw)["code"] == "CHAT_TURN_OPTIONS_INVALID"
         assert calls == []
         if with_image:
-            turn["image_data_url"] = image
+            turn.update(image_data_url=image, model="fixture-model",
+                        provider="fixture-provider", reasoning="high")
+        else:
+            turn["reasoning"] = "low"
         status, raw = _req(port, "POST", stream, turn)
         assert status == 200
         assert b": keep-alive\n\n" in raw and b"event: heartbeat" not in raw
