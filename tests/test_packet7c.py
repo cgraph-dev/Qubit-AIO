@@ -309,6 +309,48 @@ def test_low_disk_rejects_restore(tmp_path, monkeypatch):
         P.plan_restore(cfg, payload, dry_run=False)
 
 
+def test_restore_snapshots_are_distinct_within_one_second(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from voicebridge import portable as P
+
+    cfg = _FakeCfg(tmp_path)
+    report = tmp_path / "reports" / "fixture.txt"
+    report.parent.mkdir()
+    report.write_text("first original")
+    payload = {"state": {"reports": [{"name": report.name, "content": "first restore"}]}}
+    monkeypatch.setattr(P, "time", SimpleNamespace(time=lambda: 100))
+
+    first = Path(P.restore_state(cfg, payload, dry_run=False)["backup"])
+    payload["state"]["reports"][0]["content"] = "second restore"
+    second = Path(P.restore_state(cfg, payload, dry_run=False)["backup"])
+
+    assert first != second
+    assert (first / "reports" / report.name).read_text() == "first original"
+    assert (second / "reports" / report.name).read_text() == "first restore"
+    assert report.read_text() == "second restore"
+
+
+def test_restore_refuses_incomplete_backup_before_writing(tmp_path, monkeypatch):
+    from voicebridge import portable as P
+
+    cfg = _FakeCfg(tmp_path)
+    report = tmp_path / "reports" / "fixture.txt"
+    report.parent.mkdir()
+    report.write_text("original")
+    payload = {"state": {"reports": [{"name": report.name, "content": "replacement"}]}}
+
+    def failed_copy(*_args, **_kwargs):
+        raise OSError("fixture snapshot failure")
+
+    monkeypatch.setattr(P.shutil, "copytree", failed_copy)
+    with pytest.raises(P.PortableError, match="pre-restore backup"):
+        P.restore_state(cfg, payload, dry_run=False)
+
+    assert report.read_text() == "original"
+    assert not list(tmp_path.glob("pre-restore-*"))
+
+
 @pytest.mark.skipif(not D.openssl_ok(), reason="DEGRADED: system OpenSSL missing")
 def test_restore_dry_run_writes_nothing(tmp_path):
     from voicebridge import portable as P

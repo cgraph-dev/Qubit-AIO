@@ -185,6 +185,29 @@ def test_d5_backup_apply_requires_enrollment(tmp_path, monkeypatch):
                   sensitive={"passphrase": pw})
     assert applied["state"] == "failed", applied
     assert "enroll" in json.dumps(applied).lower(), applied
+    assert not list(Path(cfg.state_dir()).glob("pre-restore-*"))
+
+
+def test_cli_unenrolled_restore_creates_no_backup(tmp_path, monkeypatch, capsys):
+    from argparse import Namespace
+
+    from voicebridge import cli, portable
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    pw = "disposable restore fixture"
+    monkeypatch.setenv("VOICE_BRIDGE_PASSPHRASE", pw)
+    report = Path(cfg.state_dir()) / "reports" / "report.txt"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("archived", encoding="utf-8")
+    bundle = tmp_path / "fixture.vbp"
+    bundle.write_bytes(portable.export_bundle(cfg, pw))
+    report.write_text("newer", encoding="utf-8")
+
+    status = cli._cmd_import_state(cfg, Namespace(bundle=bundle, passphrase=None, apply=True))
+    assert status == 2
+    assert "not enrolled" in capsys.readouterr().out
+    assert report.read_text(encoding="utf-8") == "newer"
+    assert not list(Path(cfg.state_dir()).glob("pre-restore-*"))
 
 
 def test_d5_export_import_state_preview_only(tmp_path, monkeypatch):

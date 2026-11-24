@@ -1716,8 +1716,8 @@ def _extra_backup_restore(cfg: Any, args: Dict[str, Any],
     info = PT.bundle_info(blob)
     payload = PT.read_bundle(blob, args["passphrase"])
     apply = (args.get("apply", "false") == "true")
-    plan = PT.plan_restore(cfg, payload, dry_run=not apply)
     if not apply:
+        plan = PT.plan_restore(cfg, payload, dry_run=True)
         try:
             _Dev.require_enrolled(cfg)
             enrolled = True
@@ -1729,7 +1729,7 @@ def _extra_backup_restore(cfg: Any, args: Dict[str, Any],
     _Dev.require_enrolled(cfg)
     result = PT.restore_state(cfg, payload, dry_run=False)
     return {"restored": True, "backup": str(result.get("backup", "")),
-            "plan": [str(a) for a in plan.actions]}
+            "plan": [str(a) for a in result["actions"]]}
 
 
 # ---- Typed refusal parity for dashboard surfaces that must stay refused.
