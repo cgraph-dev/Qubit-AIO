@@ -195,19 +195,38 @@ def test_workbench_closed_workspace_panel_stays_within_viewport(browser, ui_serv
         context.close()
 
 
-@pytest.mark.parametrize("mount", ["/qubit-workbench", "/wb"])
-def test_workbench_session_deep_link_serves_the_workbench(ui_server, mount):
+def test_workbench_session_deep_links_reload_the_same_session(browser, ui_server):
     base, token = ui_server
-    code, created = _api(base, token, "POST", f"{mount}/api/session/new",
+    code, created = _api(base, token, "POST", "/qubit-workbench/api/session/new",
                          {"title": "Workbench deep-link regression"})
     assert code == 200 and created.get("session_id"), created
     session_id = created["session_id"]
-    with urllib.request.urlopen(f"{base}{mount}/session/{session_id}", timeout=5) as response:
-        assert response.status == 200
-        assert response.headers.get_content_type() == "text/html"
-        assert f'<base href="{mount}/">'.encode() in response.read()
-    code, restored = _api(base, token, "GET", f"{mount}/api/session?session_id={session_id}")
-    assert code == 200 and restored["session"]["session_id"] == session_id
+
+    for width in (390, 1440):
+        context = browser.new_context(viewport={"width": width, "height": 900})
+        try:
+            page = context.new_page()
+            page.add_init_script("localStorage.setItem('qubit-wb-workspace-panel', 'closed')")
+            for mount in ("/qubit-workbench", "/wb"):
+                path = f"{base}{mount}/session/{session_id}"
+                session_api = f"{base}{mount}/api/session?"
+                for load in (lambda: page.goto(path), page.reload):
+                    with page.expect_response(lambda response: response.url.startswith(session_api)
+                                              and f"session_id={session_id}" in response.url) as read:
+                        response = load()
+                    assert response.status == 200
+                    assert page.url == path
+                    assert page.evaluate("document.baseURI") == f"{base}{mount}/"
+                    assert read.value.status == 200
+                    code, restored = _api(base, token, "GET",
+                                          f"{mount}/api/session?session_id={session_id}")
+                    assert code == 200 and restored["session"]["session_id"] == session_id
+                    assert page.evaluate(
+                        "document.documentElement.scrollWidth === "
+                        "document.documentElement.clientWidth"
+                    ), (mount, width)
+        finally:
+            context.close()
 
 
 @pytest.mark.parametrize("asset", [
