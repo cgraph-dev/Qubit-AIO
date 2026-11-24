@@ -83,8 +83,8 @@ These merges establish tested components, not end-to-end production acceptance o
 ## Work stages
 
 1. Inventory code and existing tests; record exact routes, handlers, and integration contracts.
-2. Implement focused fixes in Qubit-AIO feature branches with regression tests.
-3. Run CI and acceptance gates, review diffs, and merge only validated changes into Qubit-AIO/main.
+2. Implement and verify focused fixes in the local Qubit-AIO checkout. Keep concurrent changes separate from the commit being validated.
+3. Fetch `origin/main`, verify the diff and acceptance evidence, then integrate and push the checked commits directly to Qubit-AIO `main`. Fast-forward the local `main` to match GitHub.
 4. Reconcile docs with verified behavior and update documentation in Qubit-AIO and Qubit/production; do not modify Qubit runtime code.
 5. Validate a local or disposable port-8890 instance, record known limitations, and publish release notes.
 

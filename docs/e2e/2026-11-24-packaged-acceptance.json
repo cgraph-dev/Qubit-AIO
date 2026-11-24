@@ -86,7 +86,7 @@
       "environment": "Disposable Linux install",
       "revision": null,
       "command": null,
-      "observed": "Remaining installed cases include quiet-turn keep-alives, timeout, transport disconnect, and a populated-state package upgrade and rollback."
+      "observed": "Remaining installed cases include quiet-turn keep-alives, transport disconnect, and a populated-state package upgrade and rollback."
     },
     {
       "check": "Deployed named-profile inference and PTY",
@@ -152,6 +152,15 @@
       "revision": "decb1591c85d7f485614b2548c1329deff4fd58b",
       "command": "gh pr checks 48",
       "observed": "21 checks passed, including Linux artifact install, release qualification, eight E2E shards and Windows. The macOS core install and launchd job was skipped."
+    },
+    {
+      "check": "Installed provider read timeout",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 installed wheel, disposable home and loopback provider",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "command": "Authenticated POST /agent/api/qubit/chat/stream followed by session GET and POST /agent/api/qubit/chat/cancel",
+      "observed": "The provider sent one delta and stayed quiet beyond the configured 0.8-second read timeout. The dashboard sent start, delta and error TIMEOUT. The canonical transcript contained only the user message, the cancel endpoint returned NO_ACTIVE_TURN after settlement, and the provider saw one request.",
+      "wheel_sha256": "df7590609749c1646397171699863157717acebdd4232747792f2b33be746205"
     }
   ],
   "cancellation_fix_artifact": {

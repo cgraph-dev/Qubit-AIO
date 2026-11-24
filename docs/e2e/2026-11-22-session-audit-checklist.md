@@ -190,8 +190,8 @@ the complete scenario is still open.
 
 The completed item is the clean authenticated Linux wheel, health verifier,
 version, assets, CLI and byte-identical rebuild check. The next packaged row now
-also has installed evidence for typed provider refusal and two overlapping
-turns. Timeout, disconnect and quiet-turn keep-alives still need installed
-coverage. The counts describe whole checkboxes and do not estimate effort.
+also has installed evidence for typed provider refusal, two overlapping
+turns, and a provider read timeout after one delta. Disconnect and quiet-turn
+keep-alives still need installed coverage. The counts describe whole checkboxes and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.
