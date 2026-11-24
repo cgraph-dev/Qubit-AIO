@@ -391,6 +391,27 @@ def test_env_reference_add_update_remove(cfg):
     assert "CLOSURE_REF" not in out, out
 
 
+@pytest.mark.parametrize(("field", "malformed"), [
+    ("value", "env:INVALID NAME"),
+    ("value", "file:relative"),
+    ("value", "vault:"),
+    ("ref", "unknown:fixture"),
+])
+def test_invalid_key_reference_cannot_replace_a_saved_secret(cfg, field, malformed):
+    from voicebridge.env_store import _runtime_env_path
+
+    name = "CLOSURE_FIXTURE_PROVIDER_KEY"
+    request = {"key": name, "confirm": True}
+    status, _ = _dispatch(cfg, "PUT", "/api/env", {**request, "value": "fixture-key-initial"})
+    assert status == 200
+    path = _runtime_env_path(cfg)
+    original = path.read_bytes()
+
+    status, refused = _dispatch(cfg, "PUT", "/api/env", {**request, field: malformed})
+    assert (status, refused.get("code")) == (400, "ENV_REFERENCE_INVALID"), refused
+    assert path.read_bytes() == original
+
+
 def test_env_write_accepts_referenceless_value_and_stays_estop_gated(cfg):
     """A raw pasted value is stored as a secret, never refused (2e2377168).
 
