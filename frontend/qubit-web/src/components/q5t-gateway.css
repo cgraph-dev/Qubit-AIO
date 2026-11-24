@@ -100,3 +100,22 @@ html[data-qubit-manga="on"] .q5t-gateway__content dd[data-state]::before {
   background: currentColor;
   box-shadow: 0 0 0.55em currentColor;
 }
+
+/* Live lamp on the status dot: an "up" gateway breathes, anything else stays a
+   flat indicator (a stopped gateway must not look alive). */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-qubit-manga="on"] .q5t-gateway__content dd[data-state="up"]::before {
+    animation: q5t-gateway-lamp 2s ease-in-out infinite;
+  }
+}
+
+@keyframes q5t-gateway-lamp {
+  0%, 100% {
+    box-shadow: 0 0 0.35em currentColor;
+    filter: brightness(0.85);
+  }
+  50% {
+    box-shadow: 0 0 1.15em currentColor;
+    filter: brightness(1.4);
+  }
+}

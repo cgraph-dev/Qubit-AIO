@@ -42,3 +42,34 @@
   color: #fff5fc;
   text-shadow: 1px 2px 0 #17051f, 0 0 4px rgba(255, 80, 190, .55);
 }
+
+/* The three gold chevrons on the title plate. A staggered glow walks left to
+   right across them so the plate reads as live without touching the artwork
+   geometry (which is owner-supplied and must not shift). `filter` on the path
+   is GPU-composited and does not trigger relayout of the inline SVG. */
+@media (prefers-reduced-motion: no-preference) {
+  .qubit-sidebar-title__chev {
+    animation: qubit-title-chev-charge 2.4s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .qubit-sidebar-title__chev--1 { animation-delay: 0s; }
+  .qubit-sidebar-title__chev--2 { animation-delay: .24s; }
+  .qubit-sidebar-title__chev--3 { animation-delay: .48s; }
+}
+
+@keyframes qubit-title-chev-charge {
+  0%, 13%, 100% {
+    filter: brightness(.78) drop-shadow(0 0 1px #e4a517);
+    opacity: .72;
+  }
+  24%, 41% {
+    filter: brightness(1.32) drop-shadow(0 0 6px #ffec64);
+    opacity: 1;
+  }
+  59% {
+    filter: brightness(1) drop-shadow(0 0 3px #ffd934);
+    opacity: .88;
+  }
+}
+

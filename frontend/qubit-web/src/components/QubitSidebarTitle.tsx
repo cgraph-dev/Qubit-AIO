@@ -60,9 +60,9 @@ export function QubitSidebarTitle({ label = "QUBIT AIO", index, className }: { l
         <path d="M13 51H202L237 13" fill="none" stroke="#ff58bd" strokeWidth="2" />
 
         <g fill={`url(#${uid}-gold)`} stroke="#963300" strokeWidth="2">
-          <path d="M242 14H260L223 55H205Z" />
-          <path d="M264 14H282L248 51H230Z" />
-          <path d="M286 14H304L270 51H252Z" />
+          <path className="qubit-sidebar-title__chev qubit-sidebar-title__chev--1" d="M242 14H260L223 55H205Z" />
+          <path className="qubit-sidebar-title__chev qubit-sidebar-title__chev--2" d="M264 14H282L248 51H230Z" />
+          <path className="qubit-sidebar-title__chev qubit-sidebar-title__chev--3" d="M286 14H304L270 51H252Z" />
         </g>
         <path d="M208 53L243 16H257 M233 49L265 16H279 M255 49L287 16H301" fill="none" stroke="#fff7b2" strokeWidth="1.5" />
 

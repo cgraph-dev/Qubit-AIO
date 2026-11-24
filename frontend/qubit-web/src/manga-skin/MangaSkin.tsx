@@ -228,6 +228,3 @@ import "./sweep-text.css";
 import "./sweep-position.css";
 import "./sweep-system-actions.css";
 import "./manga-plugin-controls.css";
-// Loaded last on purpose: re-enables the rail's live indicators (gateway lamp,
-// gold section-title charge) that earlier passes collapsed to static art.
-import "./sidebar-status-motion.css";
