@@ -22,6 +22,8 @@ import http.client
 import json
 import time
 
+import pytest
+
 
 def _cfg(tmp_path, monkeypatch, backend: bool = True):
     from voicebridge import config as C
@@ -772,15 +774,20 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
         ui.stop()
 
 
-def test_profile_chat_cancel_targets_only_the_admitted_turn(tmp_path, monkeypatch):
+@pytest.mark.parametrize("stop", ["explicit", "emergency", "emergency_during_submit"])
+def test_profile_chat_cancel_targets_only_the_admitted_turn(tmp_path, monkeypatch, stop):
     import asyncio
-    from contextlib import asynccontextmanager
+    from contextlib import asynccontextmanager, closing
+    from pathlib import Path
 
-    from voicebridge import profile_chat, qubit_runtime
+    from voicebridge import power, profile_chat, qubit_runtime
 
     qubit_runtime.ensure_path()
     from tui_gateway import owner_forward
 
+    cfg, state = _cfg(tmp_path, monkeypatch)
+    assert Path(power.power_control_store(cfg).health()["path"]).is_relative_to(state)
+    control = power.power_control(cfg)
     calls = []
 
     class Client:
@@ -792,6 +799,9 @@ def test_profile_chat_cancel_targets_only_the_admitted_turn(tmp_path, monkeypatc
             if method == "session.resume":
                 return {"session_id": "live", "stored_session_id": "same-chat"}
             if method == "prompt.submit":
+                if stop == "emergency_during_submit":
+                    control.emergency_stop()
+                    assert [m for m, _ in calls] == ["session.resume", "prompt.submit"]
                 return {"admission_id": "selected", "status": "queued"}
             if method == "prompt.cancel":
                 return {"status": "terminal", "outcome": "cancelled"}
@@ -804,14 +814,17 @@ def test_profile_chat_cancel_targets_only_the_admitted_turn(tmp_path, monkeypatc
 
     monkeypatch.setattr(owner_forward, "connect_owner", connect)
     monkeypatch.setattr(owner_forward, "discover_owner", lambda _home: "owner")
-    from contextlib import closing
 
-    with closing(profile_chat.events(tmp_path, "owner", "same-chat", "query")) as events:
+    with closing(profile_chat.events(tmp_path, "owner", "same-chat", "query", cfg=cfg)) as events:
         assert next(events)["event"] == "start"
         assert profile_chat.cancel(tmp_path / "sibling", "same-chat")[0] == 404
-        assert profile_chat.cancel(tmp_path, "same-chat")[0] == 200
+        if stop == "explicit":
+            assert profile_chat.cancel(tmp_path, "same-chat")[0] == 200
+        elif stop == "emergency":
+            control.emergency_stop()
         assert calls[-1] == ("prompt.cancel", {"session_id": "live", "admission_id": "selected"})
     assert profile_chat.cancel(tmp_path, "same-chat")[0] == 404
+    assert control.active_runs() == []
 
 
 def test_profile_chat_disconnect_does_not_resubmit(tmp_path, monkeypatch):

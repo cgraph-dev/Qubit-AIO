@@ -19,6 +19,7 @@ _HEARTBEAT_INTERVAL = 10
 class _Turn:
     target: str = ""
     admission: str = ""
+    stop_requested: bool = False
 
 
 _lock = threading.Lock()
@@ -40,7 +41,7 @@ def _result(outcome: str | None, reply: Any, session: str) -> dict:
     return _error("CHAT_GATEWAY_TURN_FAILED", "The profile gateway did not complete the turn.", session)
 
 
-async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn):
+async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped):
     from qubit_cli.gateway_client import GatewayRPCError
     from tui_gateway.owner_forward import _REFUSED_BEFORE_COMMIT, connect_owner
 
@@ -51,6 +52,9 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn):
             target = attached.get("session_id")
             if not target or attached.get("stored_session_id") != session:
                 yield _error("CHAT_SESSION_MOVED", "Reopen the chat to use its current session.", session)
+                return
+            if turn.stop_requested or stopped():
+                yield _result("cancelled", None, session)
                 return
             submitted = True
             admitted = await client.rpc("prompt.submit", session_id=target, text=text,
@@ -64,6 +68,9 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn):
                 return
             with _lock:
                 turn.target, turn.admission = target, admission
+                stop_pending = turn.stop_requested
+            if stop_pending or stopped():
+                await client.rpc("prompt.cancel", session_id=target, admission_id=admission)
             yield {"event": "start", "session_id": session, "route": "gateway"}
             started_at = time.monotonic()
             deadline = started_at + _WAIT_SECONDS
@@ -117,8 +124,24 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn):
         yield _error(code, detail, session)
 
 
-def events(home: Path, endpoint, session: str, text: str):
+def events(home: Path, endpoint, session: str, text: str, *, cfg=None):
     """Run the gateway relay on the calling HTTP thread and close its socket on exit."""
+    from .plugins import estop_engaged
+    from .power import power_control
+
+    control = power_control(cfg) if cfg is not None else None
+    correlation = uuid.uuid4().hex
+
+    def stopped():
+        return cfg is not None and estop_engaged(cfg)
+
+    def stop_turn():
+        with _lock:
+            turn.stop_requested = True
+            target, admission = turn.target, turn.admission
+        if admission:
+            _cancel_admission(home, target, admission)
+
     key = (home, session)
     turn = _Turn()
     with _lock:
@@ -129,8 +152,10 @@ def events(home: Path, endpoint, session: str, text: str):
         yield _error("CHAT_SESSION_BUSY", "This chat already has an active dashboard turn.", session)
         return
     try:
+        if control is not None:
+            control.track(correlation, stop_turn)
         with asyncio.Runner() as runner:
-            stream = _events(home, endpoint, session, text, turn)
+            stream = _events(home, endpoint, session, text, turn, stopped)
             try:
                 while True:
                     yield runner.run(anext(stream))
@@ -139,13 +164,13 @@ def events(home: Path, endpoint, session: str, text: str):
             finally:
                 runner.run(stream.aclose())
     finally:
+        if control is not None:
+            control.untrack(correlation)
         with _lock:
             _active.pop(key, None)
 
 
 def cancel(home: Path, session: str) -> tuple[int, dict]:
-    from tui_gateway.owner_forward import connect_owner, discover_owner
-
     with _lock:
         turn = _active.get((home, session))
         target, admission = (turn.target, turn.admission) if turn else ("", "")
@@ -154,15 +179,21 @@ def cancel(home: Path, session: str) -> tuple[int, dict]:
     if not admission:
         return 409, {"ok": False, "code": "CHAT_ADMISSION_PENDING"}
 
+    try:
+        _cancel_admission(home, target, admission)
+    except Exception:
+        return 409, {"ok": False, "code": "CHAT_CANCELLATION_UNCONFIRMED"}
+    return 200, {"ok": True, "session_id": session}
+
+
+def _cancel_admission(home: Path, target: str, admission: str) -> None:
+    from tui_gateway.owner_forward import connect_owner, discover_owner
+
     async def stop(endpoint):
         async with connect_owner(home, endpoint) as client:
             await client.rpc("prompt.cancel", session_id=target, admission_id=admission)
 
-    try:
-        asyncio.run(stop(discover_owner(home)))
-    except Exception:
-        return 409, {"ok": False, "code": "CHAT_CANCELLATION_UNCONFIRMED"}
-    return 200, {"ok": True, "session_id": session}
+    asyncio.run(stop(discover_owner(home)))
 
 
 def create(home: Path, name: str) -> str | None:
