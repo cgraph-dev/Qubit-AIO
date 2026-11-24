@@ -9140,6 +9140,59 @@ def h_chat_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return (200 if res.get("ok") else 404), res
 
 
+def _chat_approval(cfg, q, b, p, *, settle=False):
+    from . import profile_chat
+    from .qubit_session_store import QubitSessionStore
+    from qubit_cli.gateway_client import GatewayRPCError
+
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is None:
+        return 404, {"ok": False, "code": "CHAT_APPROVAL_UNAVAILABLE"}
+    session = p["id"]
+    record = QubitSessionStore(cfg, runtime_home=home)._session(session)
+    if not record or record.get("source") != "gui" or record.get("archived"):
+        return 404, {"ok": False, "code": "CHAT_SESSION_NOT_FOUND"}
+
+    response = None
+    if settle:
+        prompt_id = b.get("prompt_id")
+        generation = b.get("execution_generation")
+        choice = b.get("choice")
+        if (not isinstance(prompt_id, str) or not 0 < len(prompt_id) <= 256
+                or type(generation) is not int or generation < 0 or choice not in ("once", "deny")):
+            return 400, {"ok": False, "code": "MALFORMED"}
+        if choice == "once" and _estop(cfg):
+            return 403, {"ok": False, "code": "EMERGENCY_STOP"}
+        response = {"prompt_id": prompt_id, "execution_generation": generation, "choice": choice}
+
+    changed = {"ok": False, "code": "CHAT_APPROVAL_CHANGED",
+               "detail": "The gateway no longer has this approval pending."}
+    try:
+        result = profile_chat.approval(home, session, response)
+    except GatewayRPCError as exc:
+        if settle and exc.data.get("reason") in ("stale_generation", "not_found"):
+            return 409, changed
+        return 409, {"ok": False, "code": "CHAT_APPROVAL_UNAVAILABLE"}
+    except Exception:
+        return 409, {"ok": False, "code": "CHAT_APPROVAL_UNAVAILABLE"}
+
+    if settle:
+        if result.get("status") != "resolved":
+            return 409, changed
+        return _ok(status="resolved")
+    return _ok(approval=result["approval"])
+
+
+def h_chat_approval(cfg, q, b, p):
+    return _chat_approval(cfg, q, b, p)
+
+
+def h_chat_approval_respond(cfg, q, b, p):
+    return _chat_approval(cfg, q, b, p, settle=True)
+
+
 @_chat_execution_local
 def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
@@ -12888,6 +12941,8 @@ _r("POST", r"/api/qubit/chat/stream", "h_chat_stream", "stream")
 _r("GET", r"/api/qubit/chat/sessions", "h_chat_sessions_list")
 _r("POST", r"/api/qubit/chat/sessions/import", "h_chat_session_import")
 _r("POST", r"/api/qubit/chat/sessions", "h_chat_session_create")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/approval", "h_chat_approval")
+_r("POST", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/approval", "h_chat_approval_respond")
 _r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/messages",
    "h_chat_session_messages")
 # S5 projection reads: specific subpaths precede the bare session-id row.
@@ -21364,6 +21419,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_chat_session_export": h_chat_session_export,
     "h_chat_session_import": h_chat_session_import,
     "h_chat_cancel": h_chat_cancel, "h_chat_pty": h_chat_pty,
+    "h_chat_approval": h_chat_approval, "h_chat_approval_respond": h_chat_approval_respond,
     "h_chat_retry": h_chat_retry, "h_chat_stream": h_chat_stream,
     "h_plugins": h_plugins, "h_themes": h_themes, "h_theme_get": h_theme_get,
     "h_theme_set": h_theme_set,

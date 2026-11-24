@@ -13,6 +13,7 @@
  */
 
 import { Button, Checkbox, FileField, HoverTooltip, ListItem, Select, SakugaLoading, Textarea, emitFx, emitFxAt } from "@/sakuga/ui";
+import { ProfileChatApprovalBanner } from "./ProfileChatApprovalBanner";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
@@ -2934,6 +2935,10 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             >
               Attach failed: {attachError}
             </div>
+          ) : null}
+
+          {routed && isActive && session !== DEFAULT_SESSION && (busy || transcriptState === "ready") ? (
+            <ProfileChatApprovalBanner key={transcriptKey} session={session} profile={scopedProfile} />
           ) : null}
 
           {pendingConfirm ? (
