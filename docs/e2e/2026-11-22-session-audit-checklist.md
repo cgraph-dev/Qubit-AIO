@@ -28,6 +28,8 @@ The [initial report](2026-11-21-dashboard-cli-audit.md) and [follow-up](2026-11-
 
 The session route update now uses the runtime's atomic model and route write when the provider is known. The API projects the provider slug only. Both chat hosts retain the pair. The picker identifies its session scope, surfaces failed writes in the dialog, forwards explicit refresh, and preserves the pinned terminal model when the server reports the terminal stayed on its current route. Normal catalog reads reuse a successfully refreshed cache entry. Chromium passed the regression with the production bundle, a synthetic catalog, real session handler and disposable state. It sent a catalog refresh request, selected a second provider for the same model ID, checked PATCH 200 and independent GET read-back, and confirmed the provider after reloading and reopening the picker. Repair commit `ff93824ed10434c06faf243c5d9de9baea01eac3`.
 
+The 2026-11-25 recheck passed with repair `6c15a8cb2e117bbae819e854a7dbe3e276e8bc27`. Chromium exercised `/models`, `/qubit-models`, `/model`, `/providers`, `/model-providers` and `/models/providers` at 390 or 1440 pixels, retaining the selected profile on navigation. The Models picker retained its choice after an injected save refusal, then confirmed the other provider for the same model ID. Independent GET, reload and config read-back agreed. Qubit Chat saved to the named session only. The terminal picker retained the active provider and returned the same queued pair after reload. The next-turn PTY handoff and deployed inference checks remain open.
+
 ## Compatibility across all four ecosystems
 
 | Ecosystem | Evidence | Remaining |
@@ -184,11 +186,11 @@ the complete scenario is still open.
 | Section | Complete | Partial | Total |
 | --- | ---: | ---: | ---: |
 | P0 packaged acceptance, reliability, and boundaries | 6 | 0 | 6 |
-| Live chat, Workbench, sessions, models, and PTY | 1 | 5 | 6 |
+| Live chat, Workbench, sessions, models, and PTY | 2 | 4 | 6 |
 | Dashboard routes and actions | 0 | 7 | 7 |
 | MCP, skills, plugins, memory, and integrations | 0 | 4 | 4 |
 | CLI and ecosystem compatibility | 0 | 7 | 7 |
-| **Total** | **7** | **23** | **30** |
+| **Total** | **8** | **22** | **30** |
 
 The completed items cover the clean authenticated Linux wheel and the
 installed remote-provider chat lifecycle. The latter includes session IDs and
@@ -203,8 +205,9 @@ gateway readiness, provider outage recovery, concurrent sessions, reconnect,
 and process cleanup, plus fail-closed archive regression coverage. The
 sixth covers published artifact evidence, dashboard and native CI, and
 the recorded scope of opt-in checks. The seventh covers session history and
-maintenance in authenticated disposable sibling profiles. The counts describe
-whole checkboxes and do not estimate effort.
+maintenance in authenticated disposable sibling profiles. The eighth covers the
+provider-aware model pickers on both chat hosts and the Models entry paths in
+a disposable build. The counts describe whole checkboxes and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.
 
