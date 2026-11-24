@@ -29,22 +29,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
   border:0!important; border-radius:0!important;
   box-shadow:none!important;
 }
-/* The atom emblem and the eye artwork are baked into 01_sidebar_header.webp /
-   12_anime_eye_panel.webp, and the .qm-brand-emblem wrapper is display:none in
-   the open rail — so the logo cannot be animated as an element (its rect is
-   0x0 and getAnimations() is empty, however the CSS is written). Animate the
-   painted layer instead: a slow luminance breathe over the whole plate, which
-   reads as light moving across the logo. transform/filter only, so nothing
-   relayouts. */
-@media (prefers-reduced-motion: no-preference) {
-  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar:not([data-collapsed="true"]) .qagent-sidebar__brand-row {
-    animation:qm-header-plate-breathe 6.4s ease-in-out infinite!important;
-  }
-}
-@keyframes qm-header-plate-breathe {
-  0%,100% { filter:brightness(1) saturate(1); }
-  50%     { filter:brightness(1.09) saturate(1.12); }
-}
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row::before {
   content:"";position:absolute;inset:6px 5px 5px;pointer-events:none;
   border:2px solid rgba(255,190,250,.75);border-radius:3px;
@@ -405,26 +389,6 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar nav .q
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::before,
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate::after {
   animation:none!important;
-}
-/* Owner asked for the logo to move again: the static pass above froze the atom
-   emblem. Restore a slow breathing glow ONLY on the atom (the star, charge
-   bars and plate reflections stay static per the studio pass above).
-   Declared after the freeze so it wins by source order at equal specificity. */
-@media (prefers-reduced-motion: no-preference) {
-  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-studio-brand-atom {
-    animation:qm-studio-atom-breathe 5.2s ease-in-out infinite!important;
-    transform-origin:center!important;
-    will-change:filter!important;
-  }
-  html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagent-sidebar__brand-row:hover .qm-studio-brand-atom {
-    animation-duration:2.1s!important;
-  }
-}
-/* Brightness + a soft halo, no scale: scaling a raster emblem resamples it and
-   the pixel edges visibly crawl. */
-@keyframes qm-studio-atom-breathe {
-  0%,100% { filter:brightness(.94) drop-shadow(0 0 3px rgba(255,190,40,.45)); }
-  50%     { filter:brightness(1.22) drop-shadow(0 0 11px rgba(255,214,70,.95)); }
 }
 /* Do not stack the old chrome gateway frame behind the nine-slice art. */
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qm-manga-gateway-plate {

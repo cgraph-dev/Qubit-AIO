@@ -675,14 +675,14 @@ html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar .qagen
    review, but DO NOT disable animations across every sidebar descendant.
    The old universal * rule suppressed Sakuga button interaction feedback.
 
-   The brand atom and the two brand-row edge rails are deliberately EXCLUDED:
-   the owner asked for the logo and the header panel edges to move, so those
-   are animated in manga-approved-production.css (qm-studio-atom-breathe) and
-   just below (qm-header-edge-sweep). Leaving them in this freeze silently won
-   the cascade — `:is()` adopts its most specific argument, so an equal-
-   specificity later rule inside the freeze still lost. */
+   The brand-row edge rails are deliberately EXCLUDED: the owner asked for the
+   header panel edges to move, so those are animated below (qm-header-edge-
+   sweep). Leaving them in this freeze silently won the cascade — `:is()`
+   adopts its most specific argument, so an equal-specificity later rule
+   inside the freeze still lost. The atom stays frozen: the logo is painted
+   into the header webp and its element is display:none, so it cannot move. */
 html[data-qubit-manga="on"][data-qm-approved-assets="ready"] #app-sidebar :is(
-  .qm-manga-outer-frame,.qm-studio-title-corner__star,
+  .qm-manga-outer-frame,.qm-studio-title-corner__star,.qm-studio-brand-atom,
   .qagent-sidebar__backdrop,.qm-studio-charge-bars,.qm-manga-charge-cells
 ) {
   animation:none!important;
