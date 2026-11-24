@@ -17897,8 +17897,12 @@ def _env_confirmation(cfg: Any, q: Dict[str, str], b: Dict[str, Any]):
                      "detail": "Emergency stop is latched."}
     if _truthy(q.get("confirm")) or _truthy(b.get("confirm")):
         return None
-    return 409, {"ok": False, "code": "CONFIRM_REQUIRED",
-                 "detail": "Confirm the key change in the Keys page."}
+    # Staged, not ad-hoc: the shared envelope carries the typed `state` the
+    # dashboard's confirm path switches on. A bare {code, detail} answered 409
+    # but read as an untyped refusal, so the Keys page could not tell a staged
+    # confirmation from a hard error. No confirmation_id here — the Keys page
+    # re-submits with confirm=1 rather than settling an approval row.
+    return _staged("Confirm the key change in the Keys page.", "")
 
 
 def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
