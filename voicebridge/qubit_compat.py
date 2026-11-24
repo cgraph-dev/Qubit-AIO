@@ -9152,7 +9152,11 @@ def _chat_approval(cfg, q, b, p, *, settle=False):
         return 404, {"ok": False, "code": "CHAT_APPROVAL_UNAVAILABLE"}
     session = p["id"]
     record = QubitSessionStore(cfg, runtime_home=home)._session(session)
-    if not record or record.get("source") != "gui" or record.get("archived"):
+    if not record or record.get("archived"):
+        return 404, {"ok": False, "code": "CHAT_SESSION_NOT_FOUND"}
+    # Native GUI chats are stamped desktop and can project as local after a turn.
+    source = record.get("source")
+    if source != "gui" and (source, record.get("created_source")) != ("local", "desktop"):
         return 404, {"ok": False, "code": "CHAT_SESSION_NOT_FOUND"}
 
     response = None
