@@ -18067,7 +18067,12 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not value:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "env reference value required"}
-    if not env_store.is_reference(value):
+    expects_reference = ("value" not in b and "ref" in b) or bool(env_store.reference_kind(value))
+    if expects_reference:
+        valid, detail = env_store.validate_reference(value)
+        if not valid:
+            return 400, {"ok": False, "code": "ENV_REFERENCE_INVALID", "detail": detail}
+    else:
         # 1:1 with the reference Keys page: a pasted raw secret is written to
         # the canonical runtime ``.env`` (secrets only), never refused. The
         # value is stored, never echoed or logged; ``is_set`` flips on the

@@ -2075,5 +2075,27 @@
       "Application by the running gateway after restart",
       "Deployed and cross-process concurrency checks"
     ]
+  },
+  "current_keys_rotation_and_restart": {
+    "date": "2026-11-25",
+    "base_revision": "5f08f8eb6",
+    "environment": "Authenticated disposable dashboard HTTP listener, local OpenAI-compatible provider fixture and two separate provider-gateway worker processes",
+    "checks": {
+      "malformed_reference": "Four inputs reproduced the overwrite in the baseline. Keys now returns ENV_REFERENCE_INVALID for malformed reference forms and leaves the previously stored value unchanged.",
+      "rotation": "The same worker sent a request with the initial fixture credential and used the rotated one on its next request despite a stale inherited value. The local provider authenticated both requests. Credential values were absent from the dashboard responses.",
+      "file_reference": "A named profile's file reference moved from unresolved to resolved after the provisioner wrote the file. Its value stayed masked while the provider accepted the credential. Removing the file made the reference unresolved, and confirmed deletion removed the record. Independent CLI reference lists agreed before and after deletion and the default profile did not acquire the record.",
+      "external_vault": "A vault reference was stored and reported unresolved. A provider call returned AUTH_MISSING before any outbound request. The provider resolver currently implements env and file references.",
+      "restart": "Authenticated Config approval saved a narrower allowlist with a gateway restart receipt. The running worker retained its startup policy. A fresh worker loaded the new configuration, returned UNKNOWN_MODEL, and sent no provider request."
+    },
+    "focused_tests": {
+      "passed": 15,
+      "deselected": 15
+    },
+    "remaining": [
+      "Field-by-field settings sweep",
+      "External vault provider integration",
+      "Managed gateway restart and deployed acceptance",
+      "Cross-process concurrency"
+    ]
   }
 }
