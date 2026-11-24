@@ -390,6 +390,14 @@
       "tests_passed": 26,
       "command": "From qubit_runtime: python -m pytest -q tests/gateway/test_shared_session_controls.py tests/gateway/test_stored_history_mount.py. From the root: python -m pytest --import-mode=importlib -o 'pythonpath=qubit_runtime tests' -q tests/gateway/test_authority_approval_projection.py tests/gateway/test_session_approval_commands.py",
       "observed": "The native selection passed 24 tests and emitted dependency deprecation warnings. The root selection passed two tests and emitted event-loop and socket teardown warnings."
+    },
+    {
+      "check": "Named-profile dashboard approval presentation and settlement",
+      "status": "PASS",
+      "environment": "Dashboard relay from source, installed Linux 0.0.15 gateway and disposable named profile with gated SSE provider",
+      "command": "Poll GET /agent/api/qubit/chat/sessions/{id}/approval?profile=work; POST the returned prompt ID and execution generation with once or deny",
+      "observed": "Repeated authenticated reads agreed on the pending request. The default profile and conflicting profile selectors could not settle it. A permanent choice, stale generation, wrong prompt ID, and duplicate response were refused. One disposable run settled Approve once and performed the fixture effect. A separate run settled Deny without performing it. Both streams reached the expected saved reply. The 20 Python route tests and seven dashboard confirmation tests passed. Chromium exercised the banner with a fixture API at 390px and 1440px.",
+      "scope": "The browser component, HTTP bridge, and installed gateway were verified in disposable state. The deployed page, a rebuilt wheel, and automatic transcript refresh after reload remain open."
     }
   ],
   "cancellation_fix_artifact": {
