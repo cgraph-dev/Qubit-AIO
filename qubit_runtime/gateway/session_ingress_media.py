@@ -592,6 +592,17 @@ def release_unheld_media(db, references, *, retain_history=True):
     return db._execute_write(collect)
 
 
+def hold_retained_media(references):
+    """Pin a previous admission's bytes against collection while a new one commits."""
+    scope = _lease_scope.get()
+    with _lease_lock:
+        for reference in references:
+            path = reference['path']
+            scope.append(path)
+            _leases[path] += 1
+    restore_native_media(references)
+
+
 def restore_native_media(references):
     if not references:
         return []

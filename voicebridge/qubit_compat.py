@@ -8344,7 +8344,8 @@ def _named_chat_events(cfg, home, body):
         return 403, {"ok": False, "code": "EMERGENCY_STOP", "detail": "Emergency stop is latched."}
     session = str(body.get("session") or CT.DEFAULT_SESSION).strip()
     text = str(body.get("text") or "").strip()
-    if not session or len(session) > 80 or not text or len(text) > CT.MAX_TEXT_CHARS:
+    retry_of = body.get("retry_of")
+    if not session or len(session) > 80 or (retry_of is None and not text) or len(text) > CT.MAX_TEXT_CHARS:
         return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat session or message."}
     from qubit_constants import parse_reasoning_effort
 
@@ -8376,11 +8377,14 @@ def _named_chat_events(cfg, home, body):
     if submission is not None and not _valid_chat_submission(submission):
         return 400, {"ok": False, "code": "MALFORMED", "detail": "Invalid chat submission ID."}
     image = body.get("image_data_url")
+    if retry_of is not None and (not _valid_chat_submission(retry_of) or submission is None
+                                 or retry_of == submission or options or image is not None):
+        return 400, {"ok": False, "code": "MALFORMED", "detail": "Retry requires the original and new submission IDs."}
     if image is not None and not _valid_named_chat_image(image):
         return 400, {"ok": False, "code": "BAD_IMAGE",
                      "detail": "Attach a PNG, JPEG, GIF, or WebP image of up to 10 MiB."}
     return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg,
-                                    submission_id=submission, image=image, options=options)
+                                    submission_id=submission, image=image, options=options, retry_of=retry_of)
 
 
 def _chat_execution_local(handler):
@@ -9302,7 +9306,6 @@ def h_chat_approval_respond(cfg, q, b, p):
     return _chat_approval(cfg, q, b, p, settle=True)
 
 
-@_chat_execution_local
 def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/qubit/chat/retry -> re-run the last unanswered user message.
@@ -9311,6 +9314,13 @@ def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     re-invokes the model without duplicating the transcript. Nothing is
     fabricated when the model is still unavailable.
     """
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is not None:
+        if b.get("retry_of") is None:
+            return 400, {"ok": False, "code": "MALFORMED", "detail": "Provide the failed submission ID."}
+        return h_chat_turn(cfg, q, b, p)
     from . import chat_transport as CT
     if _estop(cfg):
         return 403, {"ok": False, "state": "UNAVAILABLE",
