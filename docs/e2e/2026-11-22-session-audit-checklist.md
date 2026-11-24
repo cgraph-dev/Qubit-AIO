@@ -34,6 +34,10 @@ The 2026-11-25 recheck passed with repair `6c15a8cb2e117bbae819e854a7dbe3e276e8b
 
 The [current route reconciliation](2026-11-22-dashboard-cli-audit-results.json) lists 70 built-in patterns, 14 checked-in overlay routes, and 51 built-in sidebar destinations. The comparison covers registry entries and destinations. Browser confirmation is recorded separately for the tested Workbench handoffs and aliases. The full action and accessibility row is still open.
 
+## Original dashboard defect recheck (2026-11-25)
+
+QAI-001 through QAI-007 passed on the current source build. The browser and canonical API checks covered collapsed Workbench width and session reload, Cron approval and decline, manifest rescan with a pending hub request, removal of an unresolved reference after Keys reload, and provider read-back from both chat sidebars. Inter and Rajdhani were served as WOFF2. Bundled Manga header and composer artwork passed at mobile and desktop widths. The [recheck results](2026-11-22-dashboard-cli-audit-results.json) record the fixtures and the deployed revision, which still needs the updated build.
+
 ## Compatibility across all four ecosystems
 
 | Ecosystem | Evidence | Remaining |
@@ -191,10 +195,10 @@ the complete scenario is still open.
 | --- | ---: | ---: | ---: |
 | P0 packaged acceptance, reliability, and boundaries | 6 | 0 | 6 |
 | Live chat, Workbench, sessions, models, and PTY | 2 | 4 | 6 |
-| Dashboard routes and actions | 0 | 7 | 7 |
+| Dashboard routes and actions | 1 | 6 | 7 |
 | MCP, skills, plugins, memory, and integrations | 0 | 4 | 4 |
 | CLI and ecosystem compatibility | 0 | 7 | 7 |
-| **Total** | **8** | **22** | **30** |
+| **Total** | **9** | **21** | **30** |
 
 The completed items cover the clean authenticated Linux wheel and the
 installed remote-provider chat lifecycle. The latter includes session IDs and
@@ -211,7 +215,9 @@ sixth covers published artifact evidence, dashboard and native CI, and
 the recorded scope of opt-in checks. The seventh covers session history and
 maintenance in authenticated disposable sibling profiles. The eighth covers the
 provider-aware model pickers on both chat hosts and the Models entry paths in
-a disposable build. The counts describe whole checkboxes and do not estimate effort.
+a disposable build. The ninth covers the seven repaired dashboard defects on the
+current source build and the bundled Manga presentation. The counts describe
+whole checkboxes and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.
 
