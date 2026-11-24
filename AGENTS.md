@@ -17,7 +17,7 @@ hotspots), no LLM, no key.
   for understanding or editing, the top node IS the answer — cite its
   `covers:` file:line spans and edit straight from `--source`. For
   exhaustive tasks ("every occurrence / every caller of this pattern"), ranked
-  results are top-N, not complete — run `graft grep "<literal>"` instead
+  results are top-N, not complete — run `graft grep --fixed "<literal>"` instead
   (exhaustive over indexed files, grouped by enclosing symbol), falling back
   to raw `grep -rn` only for unindexed files.
 - `graft skeleton <file>` → every definition's signature + span, ~10× cheaper
@@ -102,8 +102,8 @@ no API key, $0).
   behavioral evidence required by the archived release gate and `docs/PLAN.md`.
 - **A typed refusal is never a working capability.** Preserve the
   voice-actionability, full-parity, and deep-rebrand requirements.
-- Graft (v0.12.0) indexes code only; markdown docs are NOT in the graph. Doc
-  authority is carried by this file and the `opencode.json` `instructions` list.
+- Graft indexes source code. The living docs named here and in the
+  `opencode.json` `instructions` list carry documentation authority.
 
 ## Voice Bridge docs (read before editing audio/voice)
 Three docs were once listed here — `AUDIO_SETUP.md`, `STEAL_LIST.md` and
