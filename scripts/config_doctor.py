@@ -26,7 +26,6 @@ import re
 import socket
 import subprocess
 import sys
-import tomllib
 import urllib.request
 from pathlib import Path
 
@@ -45,55 +44,17 @@ OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
                     # optional extras / guarded imports that degrade typed
                     # when absent (orb-qt, embedding router).
                     "pyside6", "onnxruntime", "tokenizers"}
-LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
-             # Qubit-owned vendored upstream fork (qubit_runtime/): local source,
-             # not a PyPI distribution. The fork's modules are top-level once
-             # ``qubit_runtime.ensure_path()`` puts the fork root on sys.path;
-             # ``toolsets`` is the toolset registry imported by the Qubit
-             # config overlay in voicebridge/qubit_asgi.py, and ``providers``
-             # is the fork's provider-profile registry imported (lazily, after
-             # ensure_path) by voicebridge/pty_ws.py.
-             "qubit_cli", "toolsets", "providers",
-             # Other vendored fork top-level modules imported lazily after
-             # ``qubit_runtime.ensure_path()``: ``agent`` (credential pool /
-             # runtime), ``tools`` (skills), ``qubit_state`` (SessionDB),
-             # ``gateway`` (control plane), ``plugins`` (plugin runtime),
-             # ``cron`` (scheduler), ``utils`` (atomic writes),
-             # ``qubit_state_timeline`` (session timeline reads),
-             # ``qubit_constants`` (home resolution), and ``acp_adapter``
-             # (ACP entry). All are local fork source, not PyPI distributions.
-             "agent", "tools", "qubit_state", "gateway", "plugins", "cron",
-             "utils", "qubit_state_timeline", "qubit_constants", "acp_adapter",
-             # Additional vendored fork top-level modules imported after
-             # ``qubit_runtime.ensure_path()``: the oneshot agent facade, the
-             # TUI gateway, logging, roles and recipes.
-             "run_agent", "tui_gateway", "qubit_logging", "roles", "recipes"}
-
-
-# Distribution-name -> import-name corrections (pip name differs from module).
-DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper"}
-
-
-def _declared_modules() -> set[str]:
-    data = tomllib.loads((REPO / "pyproject.toml").read_text())
-    mods: set[str] = set()
-    deps = list(data.get("project", {}).get("dependencies", []))
-    for extra in data.get("project", {}).get("optional-dependencies", {}).values():
-        deps.extend(extra)
-    for req in deps:
-        name = re.split(r"[<>=!\[;\s]", req.strip(), maxsplit=1)[0]
-        name = name.split("/")[-1] if "/" in name else name
-        if name:
-            mods.add(name.replace("-", "_").split(".")[0].lower())
-    mods |= {imp for d, imp in DIST_ALIASES.items() if d in mods and imp}
-    return {m for m in mods if m}
+LOCAL_TOP = {"voicebridge", "scripts", "browser_auto"}
 
 
 def _import_scan() -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """AST-scan production code for third-party imports not declared in
     pyproject.toml. Returns (failures, warnings) as (module, location)."""
-    declared = _declared_modules()
-    stdlib = set(sys.stdlib_module_names)
+    from voicebridge.release import declared_module_names, _vendored_top_level_names
+
+    known = (declared_module_names(REPO / "pyproject.toml")
+             | set(sys.stdlib_module_names) | LOCAL_TOP
+             | _vendored_top_level_names(REPO / "voicebridge"))
     failures: list[tuple[str, str]] = []
     warnings: list[tuple[str, str]] = []
     for py in sorted((REPO / "voicebridge").rglob("*.py")) + sorted((REPO / "scripts").glob("*.py")):
@@ -112,7 +73,7 @@ def _import_scan() -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
             for m in mods:
                 top = m.split(".")[0]
                 key = top.lower()
-                if key in stdlib | declared | LOCAL_TOP:
+                if key in known:
                     continue
                 loc = f"{rel}:{node.lineno}"
                 if key in OPTIONAL_GUARDED:
