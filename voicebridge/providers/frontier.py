@@ -189,6 +189,7 @@ class AbortableChatStream:
         self._timeout_s = float(timeout_s)
         self._lock = threading.RLock()
         self._conn: Any = None
+        self._sock: Optional[socket.socket] = None
         self._aborted = False
 
     def abort(self) -> bool:
@@ -196,10 +197,12 @@ class AbortableChatStream:
         with self._lock:
             self._aborted = True
             conn = self._conn
+            sock = self._sock
         if conn is None:
             return False
         try:
-            sock = getattr(conn, "sock", None)
+            if sock is None:
+                sock = conn.sock
             if sock is not None:
                 sock.shutdown(socket.SHUT_RDWR)
         except Exception:  # noqa: BLE001 - abort is best-effort
@@ -230,6 +233,12 @@ class AbortableChatStream:
             conn.request("POST", self._path, body=self._body,
                          headers={**self._headers,
                                   "Accept": "text/event-stream"})
+            with self._lock:
+                if self._aborted:
+                    raise _StreamAborted("request aborted during send")
+                # getresponse() detaches the socket on close-delimited replies.
+                # Retain it so abort() can still wake a blocked response read.
+                self._sock = conn.sock
             resp = conn.getresponse()
             if int(getattr(resp, "status", 200) or 200) != 200:
                 # Surface the error body so the caller can map it with the
@@ -240,9 +249,14 @@ class AbortableChatStream:
                     raw = ""
                 raise _StreamHTTPError(int(resp.status or 0), raw)
             yield resp
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            if self.aborted:
+                raise _StreamAborted("request aborted mid-stream") from exc
+            raise
         finally:
             with self._lock:
                 self._conn = None
+                self._sock = None
             if resp is not None:
                 try:
                     resp.close()
@@ -290,6 +304,8 @@ class AbortableChatStream:
                     continue
                 if isinstance(obj, dict):
                     yield obj
+            if self.aborted:
+                raise _StreamAborted("request aborted mid-stream")
 
 
 class _StreamAborted(Exception):

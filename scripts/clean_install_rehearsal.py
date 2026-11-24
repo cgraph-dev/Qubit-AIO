@@ -505,7 +505,7 @@ def raw(path, headers=None, method="GET", body=None):
         c.close()
 
 
-def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt):
+def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt, *, cancel_path=None):
     """Run the installed dashboard and provider client against a loopback SSE peer."""
     from voicebridge.providers import resolver
 
@@ -532,8 +532,10 @@ def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt):
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
             for index, chunk in enumerate(chunks):
-                if index and not release_second_delta.wait(10):
-                    return
+                if index:
+                    released = release_second_delta.wait(10)
+                    if cancel_path or not released:
+                        return
                 event = json.dumps({"choices": [{"delta": {"content": chunk}}]})
                 self.wfile.write(f"data: {event}\n\n".encode())
                 self.wfile.flush()
@@ -552,7 +554,7 @@ def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt):
 
         worker = threading.Thread(target=provider.serve_forever, daemon=True)
         worker.start()
-        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5 if cancel_path else 15)
         events = []
         try:
             connection.request("POST", stream_path, json.dumps({
@@ -567,9 +569,15 @@ def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt):
                     continue
                 event = json.loads(line[6:])
                 events.append(event)
-                if event.get("event") == "delta":
-                    # The provider blocks until the dashboard delivers its first chunk.
-                    release_second_delta.set()
+                if event.get("event") == "delta" and len(events) == 2:
+                    # The provider stays quiet until the dashboard delivers its first chunk.
+                    if cancel_path:
+                        status, _, body = raw(
+                            cancel_path, {**headers, "Content-Type": "application/json"},
+                            method="POST", body=json.dumps({"session": session_id}).encode())
+                        assert status == 200 and json.loads(body).get("ok") is True, (status, body)
+                    else:
+                        release_second_delta.set()
         finally:
             release_second_delta.set()
             connection.close()
@@ -577,9 +585,13 @@ def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt):
             worker.join(2)
 
     assert requests_seen == [prompt], requests_seen
-    assert [event["event"] for event in events] == ["start", "delta", "delta", "done"], events
     assert all(event["session_id"] == session_id for event in events), events
-    assert tuple(event["text"] for event in events[1:3]) == chunks, events
+    sequence = ["start", "delta", "cancelled"] if cancel_path else ["start", "delta", "delta", "done"]
+    assert [event["event"] for event in events] == sequence, events
+    assert events[1]["text"] == chunks[0], events
+    if cancel_path:
+        return
+    assert events[2]["text"] == chunks[1], events
     reply = "".join(chunks)
     assert events[-1]["reply"] == reply, events[-1]
     assert events[-1]["receipt"]["streaming"] is True, events[-1]
@@ -853,6 +865,20 @@ try:
             method="POST", body=json.dumps({"session": persisted_id}).encode())
         assert settled_cancel_status == 404, (settled_cancel_status, settled_cancel_body)
         assert json.loads(settled_cancel_body).get("code") == "NO_ACTIVE_TURN"
+
+        cancelled_id = persisted_id + "-cancelled"
+        cancelled_prompt = "Please say hello. Cancellation fixture."
+        stream_fixture_turn(cfg, stream_path, session_headers, cancelled_id,
+                            cancelled_prompt, cancel_path=cancel_path)
+        cancelled = canonical.show(cancelled_id)
+        assert cancelled.get("state") == "OK", cancelled
+        assert [(msg["role"], msg["content"]) for msg in cancelled["messages"]] == [
+            ("user", cancelled_prompt),
+        ], cancelled
+        status, _, body = raw(
+            cancel_path, {**session_headers, "Content-Type": "application/json"},
+            method="POST", body=json.dumps({"session": cancelled_id}).encode())
+        assert status == 404 and json.loads(body).get("code") == "NO_ACTIVE_TURN", (status, body)
         show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
         for unauthorized_headers in (
             {},
