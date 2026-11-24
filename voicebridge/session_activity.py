@@ -209,8 +209,10 @@ class SessionActivityStore:
                 "count": len(rows)}
 
 
-def store(cfg: Any) -> SessionActivityStore:
-    state_dir = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(".")
+def store(cfg: Any, *, runtime_home: Optional[Path] = None) -> SessionActivityStore:
+    state_dir = runtime_home
+    if state_dir is None:
+        state_dir = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(".")
     st = SessionActivityStore(Path(state_dir))
     st.reload()
     return st
@@ -301,7 +303,8 @@ def _summary_section(cfg: Any, session_id: str, session_store: Any,
 def build_projection(cfg: Any, session_id: str, *, git_root: str = "",
                      limit: int = 20, session_store: Any = None,
                      activity_store: Optional[SessionActivityStore] = None,
-                     summarize_fn: Optional[Callable[..., str]] = None
+                     summarize_fn: Optional[Callable[..., str]] = None,
+                     include_listener_status: bool = True
                      ) -> Dict[str, Any]:
     """Compose git scope + media + summary + recent events for one session.
 
@@ -319,8 +322,10 @@ def build_projection(cfg: Any, session_id: str, *, git_root: str = "",
         "schema": SCHEMA,
         "session_id": sid,
         "generated_at": time.time(),
-        "git_scope": _git_section(cfg, git_root),
-        "media": _media_section(cfg),
+        "git_scope": (_git_section(cfg, git_root) if include_listener_status else
+                      _unavailable("GIT_SCOPE_UNAVAILABLE", "Git status belongs to the dashboard listener's workspace.")),
+        "media": (_media_section(cfg) if include_listener_status else
+                  _unavailable("MEDIA_GEN_UNAVAILABLE", "Media readiness belongs to the dashboard listener.")),
         "summary": _summary_section(cfg, sid, session_store, events,
                                     summarize_fn),
         "events": events,
