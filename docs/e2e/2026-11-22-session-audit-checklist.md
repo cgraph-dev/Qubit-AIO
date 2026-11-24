@@ -171,3 +171,27 @@ GitHub reports the installed-dashboard PRs #38–#43 and the log-search PR #45 a
 ## Packaged acceptance and deployed baseline (2026-11-24)
 
 The [packaged acceptance results](2026-11-24-packaged-acceptance.json) record the current main and deployed baseline, the release qualification failure and fix, and the exact Linux wheel exercised with a loopback provider. Deployed inference and PTY, provider interruption and concurrency in the installed artifact, and a populated-state package upgrade and rollback remain open.
+
+## Continuation checklist coverage (2026-11-24)
+
+The full continuation prompt has 30 top-level checkboxes. Count a box as complete
+when every requirement in it has evidence at the requested scope. Earlier
+isolated, historical, and current deployed checks support partial credit where
+the complete scenario is still open.
+
+| Section | Complete | Partial | Total |
+| --- | ---: | ---: | ---: |
+| P0 packaged acceptance, reliability, and boundaries | 1 | 5 | 6 |
+| Live chat, Workbench, sessions, models, and PTY | 0 | 6 | 6 |
+| Dashboard routes and actions | 0 | 7 | 7 |
+| MCP, skills, plugins, memory, and integrations | 0 | 4 | 4 |
+| CLI and ecosystem compatibility | 0 | 7 | 7 |
+| **Total** | **1** | **29** | **30** |
+
+The completed item is the clean authenticated Linux wheel, health verifier,
+version, assets, CLI and byte-identical rebuild check. The next packaged row now
+also has installed evidence for typed provider refusal and two overlapping
+turns. Timeout, disconnect and quiet-turn keep-alives still need installed
+coverage. The counts describe whole checkboxes and do not estimate effort.
+[Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
+candidate revision, wheel identity and CI results.

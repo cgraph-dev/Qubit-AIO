@@ -86,7 +86,7 @@
       "environment": "Disposable Linux install",
       "revision": null,
       "command": null,
-      "observed": "Remaining installed cases include quiet-turn keep-alives, timeout, transport disconnect, concurrent provider turns, and a populated-state package upgrade and rollback."
+      "observed": "Remaining installed cases include quiet-turn keep-alives, timeout, transport disconnect, and a populated-state package upgrade and rollback."
     },
     {
       "check": "Deployed named-profile inference and PTY",
@@ -135,6 +135,23 @@
       "revision": "0bd213a95d27fd5c6d6d46a35c6a30fdd606cc9c",
       "command": "gh pr checks 48",
       "observed": "Release qualification and Artifact install E2E (Linux) passed on this PR revision. The updated head requires its own checks."
+    },
+    {
+      "check": "Installed provider error and concurrent turns",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 installed wheel, disposable home and loopback provider",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "command": "Authenticated session create, POST /agent/api/qubit/chat/stream, and independent GET /agent/api/qubit/chat/sessions/{id}",
+      "observed": "A loopback provider HTTP 401 produced start then error with AUTH_INVALID and no assistant row. In two separate sessions the provider held both first deltas at a barrier before either reply could finish. Both streams settled with their own exact messages and no duplicate provider requests.",
+      "wheel_sha256": "df7590609749c1646397171699863157717acebdd4232747792f2b33be746205"
+    },
+    {
+      "check": "Candidate GitHub checks",
+      "status": "PASS",
+      "environment": "GitHub Actions",
+      "revision": "decb1591c85d7f485614b2548c1329deff4fd58b",
+      "command": "gh pr checks 48",
+      "observed": "21 checks passed, including Linux artifact install, release qualification, eight E2E shards and Windows. The macOS core install and launchd job was skipped."
     }
   ],
   "cancellation_fix_artifact": {
