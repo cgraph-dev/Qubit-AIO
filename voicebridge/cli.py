@@ -11041,7 +11041,7 @@ def _cmd_import_state(cfg, args) -> int:
               f"openssl {info.openssl_version} kdf_iter {info.kdf_iter}")
         pw = _passphrase(args)
         payload = P.read_bundle(bundle, pw)
-        plan = P.plan_restore(cfg, payload, dry_run=not args.apply)
+        plan = P.plan_restore(cfg, payload, dry_run=True)
         # trusted-device enrollment gate: a restore to a NEW device requires
         # an explicitly enrolled device; never automatic.
         try:

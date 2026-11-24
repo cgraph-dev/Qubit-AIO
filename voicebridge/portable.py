@@ -345,18 +345,18 @@ def plan_restore(cfg: Any, payload: Dict[str, Any], *,
             f"target has < {dist.MIN_DISK_FREE_GIB} GiB free")
     backup = None
     if not dry_run:
-        backup = target / f"pre-restore-{int(time.time())}"
-        backup.mkdir(parents=True, exist_ok=True)
-        for name in ("memory", "learning.jsonl", "reports", "shared_memory.jsonl"):
-            src = target / name
-            if src.exists():
-                try:
-                    if src.is_dir():
-                        shutil.copytree(src, backup / name)
-                    else:
-                        shutil.copy2(src, backup / name)
-                except OSError:
-                    pass
+        backup = Path(tempfile.mkdtemp(prefix=f"pre-restore-{int(time.time())}-",
+                                       dir=target))
+        try:
+            for name in ("memory", "learning.jsonl", "reports", "shared_memory.jsonl"):
+                src = target / name
+                if src.is_dir():
+                    shutil.copytree(src, backup / name)
+                elif src.exists():
+                    shutil.copy2(src, backup / name)
+        except OSError as exc:
+            shutil.rmtree(backup, ignore_errors=True)
+            raise PortableError("could not complete the pre-restore backup") from exc
     actions = []
     mem = state.get("memory") or []
     if mem:
