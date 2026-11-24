@@ -50,14 +50,14 @@ describe("appearance preferences", () => {
       });
       await act(async () => {
         themes.resolve({
-          themes: [{ name: "q2", label: "Old Q2", description: "" }],
-          active: "q2",
+          themes: [{ name: "q4", label: "Q3", description: "" }],
+          active: "q4",
         });
         font.resolve({ font: "inter" });
       });
       expect(preferences.themeName).toBe("q6");
       expect(preferences.fontId).toBe("system-serif");
-      expect(preferences.availableThemes[0].label).toBe("Q1");
+      expect(preferences.availableThemes[0].label).toBe("Q3");
       expect(document.documentElement.style.getPropertyValue("--theme-font-display")).toContain("Georgia");
       expect(document.documentElement.style.getPropertyValue("--theme-font-mono")).toContain("JetBrains Mono");
       await act(async () => preferences.setFont("theme"));

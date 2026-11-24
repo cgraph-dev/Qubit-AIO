@@ -7,14 +7,15 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme ids are Qubit-owned (`q2`..`q6`); the picker presents them in normal
- * order as Q1..Q4. Q1, Q1-L, Q5 and Q5-L were retired at owner request (the
- * old IDs still migrate when they are read). Every remaining theme ships a "-L" large variant (Q1-L .. Q4-L)
- * that keeps the same look with a bigger root size and roomier spacing. Theme names must stay in sync
- * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
- * `qubit_cli/web_server_dashboard.py`.
+ * Theme ids are Qubit-owned (`q4`, `q6`); the picker presents them in display
+ * order as Q3/Q3-L and Q4/Q4-L. Q1/Q1-L (navy, internal `q2`) and Q2/Q2-L
+ * (grayscale, internal `q3`) were removed at owner request; those ids still
+ * migrate on read. Q5/Q5-L were removed the same way earlier. Every surviving
+ * theme ships a "-L" large variant that keeps the same look with a bigger root
+ * size and roomier spacing. Theme names must stay in sync with the backend's
+ * `_BUILTIN_DASHBOARD_THEMES` list in `qubit_cli/web_server_dashboard.py`.
  *
- * The fallback is `midnightTheme` (internal q2, shown as Q1).
+ * The fallback is `cyberpunkTheme` (internal q4, shown as Q3).
  */
 
 // ---------------------------------------------------------------------------
@@ -53,56 +54,7 @@ const LARGE_LAYOUT: Partial<ThemeLayout> = {
 // Themes
 // ---------------------------------------------------------------------------
 
-/** Q2 — deep blue-violet night canvas. */
-export const midnightTheme: DashboardTheme = {
-  name: "q2",
-  label: "Q1",
-  description: "Near-black navy with lilac text and a violet glow",
-  palette: {
-    background: { hex: "#0a0a1f", alpha: 1 },
-    midground: { hex: "#d4c8ff", alpha: 1 },
-    foreground: { hex: "#ffffff", alpha: 0 },
-    warmGlow: "rgba(167, 139, 250, 0.32)",
-    noiseOpacity: 0.8,
-  },
-  typography: {
-    ...DEFAULT_TYPOGRAPHY,
-    fontSans: `"Inter", ${SYSTEM_SANS}`,
-    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
-    letterSpacing: "-0.005em",
-  },
-  layout: {
-    ...DEFAULT_LAYOUT,
-    radius: "0.75rem",
-  },
-};
-
-/** Q3 — grayscale, square corners. */
-export const monoTheme: DashboardTheme = {
-  name: "q3",
-  label: "Q2",
-  description: "Neutral grayscale with square corners",
-  palette: {
-    background: { hex: "#0e0e0e", alpha: 1 },
-    midground: { hex: "#eaeaea", alpha: 1 },
-    foreground: { hex: "#ffffff", alpha: 0 },
-    warmGlow: "rgba(255, 255, 255, 0.1)",
-    noiseOpacity: 0.6,
-  },
-  typography: {
-    ...DEFAULT_TYPOGRAPHY,
-    fontSans: `"IBM Plex Sans", ${SYSTEM_SANS}`,
-    fontMono: `"IBM Plex Mono", ${SYSTEM_MONO}`,
-    fontUrl:
-      "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap",
-  },
-  layout: {
-    ...DEFAULT_LAYOUT,
-    radius: "0",
-  },
-};
-
-/** Q4 — high-chroma terminal look, monospace throughout. */
+/** Q3 — black canvas, monospace throughout, bright mint signal colour. */
 export const cyberpunkTheme: DashboardTheme = {
   name: "q4",
   label: "Q3",
@@ -214,16 +166,13 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
   };
 }
 
-export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 1);
-export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 2);
+// The third argument is the DISPLAY number, not a list index: the picker still
+// presents these as Q3/Q3-L and Q4/Q4-L even though the two lower themes were
+// removed, so the surviving pair keeps its labels.
 export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 3);
 export const bigMangaTheme = largeVariant(mangaTheme, "q6-l", 4);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
-  q2: midnightTheme,
-  "q2-l": bigMidnightTheme,
-  q3: monoTheme,
-  "q3-l": bigMonoTheme,
   q4: cyberpunkTheme,
   "q4-l": bigCyberpunkTheme,
   q6: mangaTheme,

@@ -62,20 +62,19 @@ def test_themes_serve_vendored_builtins_plus_overlay(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     out = HC.themes_response(cfg)
     names = [t["name"] for t in out["themes"]]
-    for expected in ("q2", "q2-l", "q3", "q3-l",
-                     "q4", "q4-l", "q6", "q6-l"):
+    for expected in ("q4", "q4-l", "q6", "q6-l"):
         assert expected in names, names
     # The retired themes are gone from the served list, and the legacy ids are
     # only ever read-old.
     for retired in ("rose", "ember", "qubit-blue", "nous-blue", "midnight",
                     "mono", "cyberpunk", "default-large", "default", "q1-l",
-                    "q5", "q5-l", "qubit"):
+                    "q5", "q5-l", "qubit", "q2", "q2-l", "q3", "q3-l"):
         assert retired not in names, names
     code, res = HC.dispatch(cfg, "PUT", "/api/dashboard/theme",
-                            {}, {"theme": "q2"})
+                            {}, {"theme": "q4"})
     assert code == 200 and res.get("persisted") is True, res
     code, res = HC.dispatch(cfg, "GET", "/api/dashboard/theme", {}, {})
-    assert res.get("theme") == "q2", res
+    assert res.get("theme") == "q4", res
     code, res = HC.dispatch(cfg, "PUT", "/api/dashboard/theme",
                             {}, {"theme": "nope"})
     assert code == 400 and res.get("code") == "NOT_FOUND", res
@@ -90,25 +89,29 @@ def test_legacy_theme_id_read_old_alias():
         _BUILTIN_DASHBOARD_THEMES, normalize_theme_name,
     )
 
-    assert normalize_theme_name("nous-blue") == "q3"
-    assert normalize_theme_name("qubit-blue") == "q3"
-    assert normalize_theme_name("midnight") == "q2"
-    assert normalize_theme_name("default-large") == "q2-l"
-    assert normalize_theme_name("default") == "q2"
-    assert normalize_theme_name("q1") == "q2"
-    assert normalize_theme_name("q1-l") == "q2-l"
-    assert normalize_theme_name("q5") == "q2"
-    assert normalize_theme_name("q5-l") == "q2-l"
-    assert normalize_theme_name("qubit") == "q2"
-    assert normalize_theme_name("qubit-contrast") == "q2"
+    assert normalize_theme_name("nous-blue") == "q4"
+    assert normalize_theme_name("qubit-blue") == "q4"
+    assert normalize_theme_name("midnight") == "q4"
+    assert normalize_theme_name("default-large") == "q4-l"
+    assert normalize_theme_name("default") == "q4"
+    assert normalize_theme_name("q1") == "q4"
+    assert normalize_theme_name("q1-l") == "q4-l"
+    assert normalize_theme_name("q5") == "q4"
+    assert normalize_theme_name("q5-l") == "q4-l"
+    assert normalize_theme_name("qubit") == "q4"
+    assert normalize_theme_name("qubit-contrast") == "q4"
+    # The removed Q1/Q2 ids migrate too.
+    assert normalize_theme_name("q2") == "q4"
+    assert normalize_theme_name("q3") == "q4"
     # Canonical and unknown ids are untouched.
-    assert normalize_theme_name("q2") == "q2"
+    assert normalize_theme_name("q4") == "q4"
     assert normalize_theme_name("nope") == "nope"
     # The served built-in list carries only the canonical Q2..Q6 ids, and every
     # legacy id maps onto one of them.
     served = {t["name"] for t in _BUILTIN_DASHBOARD_THEMES}
-    assert "q2" in served and "q3" in served and "q4" in served
+    assert "q4" in served and "q4-l" in served
     assert "q6" in served and "q6-l" in served
+    assert "q2" not in served and "q3" not in served
     for legacy in ("nous-blue", "qubit-blue", "midnight", "mono",
                    "cyberpunk", "default-large"):
         assert legacy not in served

@@ -11,7 +11,7 @@ describe("appearance catalog", () => {
       { name: "custom", label: "Duplicate", description: "" },
     ]);
     expect(themes.map((theme) => theme.label)).toEqual([
-      "Q1", "Q1-L", "Q2", "Q2-L", "Q3", "Q3-L", "Q4", "Q4-L", "My theme",
+      "Q3", "Q3-L", "Q4", "Q4-L", "My theme",
     ]);
     expect(themes.find((theme) => theme.name === "q6")?.description).toContain("Manga");
     expect(themes.find((theme) => theme.name === "q6")?.description).not.toContain("Q6");

@@ -238,7 +238,7 @@ WAVE1_DISPATCH = [
      {}, {"confirm": True}),
     ("GET", "/api/dashboard/plugins/rescan", {}, {}),
     ("PUT", "/api/dashboard/font", {}, {"font": "Inter"}),
-    ("PUT", "/api/dashboard/theme", {}, {"theme": "q2"}),
+    ("PUT", "/api/dashboard/theme", {}, {"theme": "q4"}),
     ("POST", "/api/dashboard/plugins/wave1-plugin/visibility",
      {}, {"visible": False}),
     ("POST", "/api/gateway/drain", {}, {"action": "drain"}),
@@ -385,10 +385,10 @@ def test_dashboard_font_theme_and_visibility_persist(tmp_path, monkeypatch):
     assert code == 200 and out["font"] == "Inter", out
 
     code, _out = HC.dispatch(cfg, "PUT", "/api/dashboard/theme", {},
-                             {"theme": "q2"})
+                             {"theme": "q4"})
     assert code == 200
     code, out = HC.dispatch(cfg, "GET", "/api/dashboard/themes", {}, {})
-    assert code == 200 and out["active"] == "q2", out
+    assert code == 200 and out["active"] == "q4", out
 
     code, out = HC.dispatch(
         cfg, "POST", "/api/dashboard/plugins/wave1/plugin/visibility", {},

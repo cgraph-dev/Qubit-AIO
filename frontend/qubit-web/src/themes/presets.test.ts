@@ -3,36 +3,23 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_THEMES, isMangaThemeName } from "./presets";
 import { THEME_NAME_ALIASES, migrateThemeName } from "./themeAliases";
 
-const EXPECTED_IDS = [
-  "q2",
-  "q2-l",
-  "q3",
-  "q3-l",
-  "q4",
-  "q4-l",
-  "q6",
-  "q6-l",
-];
+const EXPECTED_IDS = ["q4", "q4-l", "q6", "q6-l"];
 
 describe("built-in theme ids", () => {
-  it("serves exactly four base themes plus one large variant each", () => {
+  it("serves exactly two base themes plus one large variant each", () => {
     expect(Object.keys(BUILTIN_THEMES).sort()).toEqual([...EXPECTED_IDS].sort());
   });
 
-  it("no longer lists Q1/Q1-L/Q5/Q5-L", () => {
-    for (const gone of ["default", "q1-l", "q5", "q5-l"]) {
+  it("no longer lists Q1/Q1-L/Q2/Q2-L/Q5/Q5-L", () => {
+    for (const gone of ["default", "q1-l", "q2", "q2-l", "q3", "q3-l", "q5", "q5-l"]) {
       expect(BUILTIN_THEMES[gone]).toBeUndefined();
     }
   });
 
   it("labels every theme with its Q-number", () => {
     for (const [id, label] of [
-      ["q2", "Q1"],
-      ["q3", "Q2"],
       ["q4", "Q3"],
       ["q6", "Q4"],
-      ["q2-l", "Q1-L"],
-      ["q3-l", "Q2-L"],
       ["q4-l", "Q3-L"],
       ["q6-l", "Q4-L"],
     ]) {
@@ -62,8 +49,6 @@ describe("built-in theme ids", () => {
 
 describe("large variants", () => {
   const pairs: Array<[string, string]> = [
-    ["q2", "q2-l"],
-    ["q3", "q3-l"],
     ["q4", "q4-l"],
     ["q6", "q6-l"],
   ];
@@ -96,16 +81,20 @@ describe("large variants", () => {
 
 describe("read-old theme name migration", () => {
   it("maps every retired built-in id onto a surviving theme", () => {
-    expect(migrateThemeName("default")).toBe("q2");
-    expect(migrateThemeName("q1")).toBe("q2");
-    expect(migrateThemeName("q1-l")).toBe("q2-l");
-    expect(migrateThemeName("q5")).toBe("q2");
-    expect(migrateThemeName("q5-l")).toBe("q2-l");
-    expect(migrateThemeName("qubit")).toBe("q2");
-    expect(migrateThemeName("qubit-contrast")).toBe("q2");
-    expect(migrateThemeName("default-large")).toBe("q2-l");
-    expect(migrateThemeName("midnight")).toBe("q2");
-    expect(migrateThemeName("mono")).toBe("q3");
+    expect(migrateThemeName("default")).toBe("q4");
+    expect(migrateThemeName("q1")).toBe("q4");
+    expect(migrateThemeName("q1-l")).toBe("q4-l");
+    expect(migrateThemeName("q2")).toBe("q4");
+    expect(migrateThemeName("q2-l")).toBe("q4-l");
+    expect(migrateThemeName("q3")).toBe("q4");
+    expect(migrateThemeName("q3-l")).toBe("q4-l");
+    expect(migrateThemeName("q5")).toBe("q4");
+    expect(migrateThemeName("q5-l")).toBe("q4-l");
+    expect(migrateThemeName("qubit")).toBe("q4");
+    expect(migrateThemeName("qubit-contrast")).toBe("q4");
+    expect(migrateThemeName("default-large")).toBe("q4-l");
+    expect(migrateThemeName("midnight")).toBe("q4");
+    expect(migrateThemeName("mono")).toBe("q4");
     expect(migrateThemeName("cyberpunk")).toBe("q4");
   });
 
@@ -116,7 +105,7 @@ describe("read-old theme name migration", () => {
   });
 
   it("passes canonical and unknown names through untouched", () => {
-    expect(migrateThemeName("q2")).toBe("q2");
+    expect(migrateThemeName("q4")).toBe("q4");
     expect(migrateThemeName("q4-l")).toBe("q4-l");
     expect(migrateThemeName("q6-l")).toBe("q6-l");
     expect(migrateThemeName("does-not-exist")).toBe("does-not-exist");

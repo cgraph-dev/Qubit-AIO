@@ -11,24 +11,27 @@
  * `qubit_cli/web_server_dashboard.py`.
  */
 export const THEME_NAME_ALIASES: Record<string, string> = {
-  // The old light-blue-ish ids were the greyscale/light family; they now
-  // resolve to Q3 (greyscale), the closest surviving look.
-  "nous-blue": "q3",
-  "lens-5i": "q3",
-  "qubit-blue": "q3",
-  // Q1/Q1-L/Q5/Q5-L/Qubit Command were retired at owner request. Existing
-  // stored ids move to the closest surviving theme; no hidden id is ever
-  // re-listed in the picker.
-  default: "q2",
-  q1: "q2",
-  "q1-l": "q2-l",
-  q5: "q2",
-  "q5-l": "q2-l",
-  qubit: "q2",
-  "qubit-contrast": "q2",
-  "default-large": "q2-l",
-  midnight: "q2",
-  mono: "q3",
+  // Q1 (navy) and Q2 (grayscale) were removed at owner request; stored ids
+  // from either family resolve to Q3 (q4) — the closest surviving dark look.
+  // Q4 (manga) is never used as a migration target: it is a deliberate choice,
+  // not a safe default for a stale id.
+  "nous-blue": "q4",
+  "lens-5i": "q4",
+  "qubit-blue": "q4",
+  default: "q4",
+  q1: "q4",
+  "q1-l": "q4-l",
+  q2: "q4",
+  "q2-l": "q4-l",
+  q3: "q4",
+  "q3-l": "q4-l",
+  q5: "q4",
+  "q5-l": "q4-l",
+  qubit: "q4",
+  "qubit-contrast": "q4",
+  "default-large": "q4-l",
+  midnight: "q4",
+  mono: "q4",
   cyberpunk: "q4",
 };
 

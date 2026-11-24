@@ -10,8 +10,8 @@ import {
 } from "react";
 import {
   BUILTIN_THEMES,
+  cyberpunkTheme,
   isMangaThemeName,
-  midnightTheme,
 } from "./presets";
 import {
   applyMangaAttribute,
@@ -459,7 +459,7 @@ function applyTheme(theme: DashboardTheme) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Name of the currently active theme (built-in id or user YAML name). */
   const [themeName, setThemeName] = useState<string>(() => {
-    if (typeof window === "undefined") return "q2";
+    if (typeof window === "undefined") return "q4";
     // The server injects the persisted active theme into the HTML; trust it
     // first so the initial render (and first paint) is already correct and
     // there is no flash while the async theme list loads.
@@ -470,7 +470,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored =
       injected ||
       readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ||
-      "q2";
+      "q4";
     const migrated = migrateThemeName(stored);
     // Write the migrated name back so future reads converge on the new
     // key and we eventually retire the alias entry.
@@ -524,7 +524,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       return (
         (Object.hasOwn(BUILTIN_THEMES, name) ? BUILTIN_THEMES[name] : undefined) ??
         (Object.hasOwn(userThemeDefs, name) ? userThemeDefs[name] : undefined) ??
-        midnightTheme
+        cyberpunkTheme
       );
     },
     [userThemeDefs],
@@ -638,7 +638,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         ...availableThemes.map((t) => t.name),
         ...Object.keys(userThemeDefs),
       ]);
-      const next = knownNames.has(name) ? name : "q2";
+      const next = knownNames.has(name) ? name : "q4";
       themeChanged.current = true;
       setThemeName(next);
       writePreference(STORAGE_KEY, next);
@@ -676,7 +676,7 @@ export function useTheme(): ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: midnightTheme,
+  theme: cyberpunkTheme,
   themeName: "default",
   availableThemes: Object.values(BUILTIN_THEMES).map((t) => ({
     name: t.name,
