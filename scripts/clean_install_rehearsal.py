@@ -732,17 +732,25 @@ try:
         assert session_payload["total"] >= len(session_payload["sessions"]), (
             "installed session inventory has inconsistent total", session_payload)
 
-        # Persist an actual canonical chat-store record and message (without
-        # invoking a model provider), then read them through the installed
-        # dashboard HTTP API. This tests shared storage and restart durability,
-        # not agent turn execution.
+        # Create over authenticated HTTP, append through the canonical store,
+        # then read both surfaces to prove they share the persisted record.
         from voicebridge import chat_transport as _chat_transport
         canonical = _chat_transport.store(cfg)
         persisted_id = "release-acceptance-" + os.urandom(8).hex()
         persisted_text = "isolated-restart-proof-" + os.urandom(8).hex()
-        created = canonical.create("release acceptance persistence",
-                                   session_id=persisted_id)
-        assert created.get("state") == "OK", created
+        created_status, _, created_body = raw(
+            create_path, {**session_headers, "Content-Type": "application/json"},
+            method="POST", body=json.dumps({
+                "id": persisted_id, "name": "release acceptance persistence",
+            }).encode())
+        assert created_status in (200, 201), (created_status, created_body[:200])
+        created = json.loads(created_body)
+        assert created.get("ok") is True, created
+        assert created.get("session", {}).get("id") == persisted_id, created
+        assert created.get("messages") == [], created
+        stored = canonical.show(persisted_id)
+        assert stored.get("state") == "OK", stored
+        assert stored.get("session", {}).get("id") == persisted_id, stored
         appended = canonical.append(persisted_id, "user", persisted_text)
         assert appended.get("state") == "OK", appended
         show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
@@ -766,9 +774,8 @@ try:
                    for m in show_payload.get("messages", [])), (
             "canonical persisted message missing over HTTP", show_payload)
 
-        # A fresh server instance must serve the same installed dashboard
-        # against the same isolated state after a graceful listener restart.
-        # This proves restart liveness, not agent-session persistence.
+        # Restart the listener and verify the transcript independently in a
+        # separate installed interpreter using the same disposable state.
         ui.stop()
         # A separate interpreter must recover the same persisted transcript
         # from the installed wheel, not from an in-memory store retained by
