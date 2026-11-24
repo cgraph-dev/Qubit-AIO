@@ -858,7 +858,8 @@ def test_profile_chat_disconnect_does_not_resubmit(tmp_path, monkeypatch):
     assert profile_chat.cancel(tmp_path, "chat")[0] == 404
 
 
-def test_named_dashboard_approval_is_scoped_and_generation_bound(tmp_path, monkeypatch):
+@pytest.mark.parametrize("source", ["gui", "local"])
+def test_named_dashboard_approval_is_scoped_and_generation_bound(tmp_path, monkeypatch, source):
     from contextlib import asynccontextmanager, closing
 
     from voicebridge import qubit_runtime
@@ -874,7 +875,9 @@ def test_named_dashboard_approval_is_scoped_and_generation_bound(tmp_path, monke
     for home in (root, work):
         (home / "config.yaml").write_text("{}\n")
         with closing(SessionDB(home / "state.db")) as db:
-            db.create_session("same-chat", "gui")
+            db.create_session("same-chat", source)
+            if source == "local":
+                db._write_sql("UPDATE sessions SET created_source='desktop' WHERE id=?", ("same-chat",))
 
     prompt = {"kind": "approval", "prompt_id": "request-1", "execution_generation": 4,
               "command": "fixture action", "description": "fixture reason",
