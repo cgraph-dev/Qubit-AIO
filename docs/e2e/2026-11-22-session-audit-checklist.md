@@ -144,6 +144,8 @@ Foreign skill discovery now reads Markdown frontmatter through its closing delim
 
 ## Sessions history ownership and maintenance
 
+- Repair `fc8f341119a1d4a99bb19f0f21e0967c600c5041` verifies scoped list, search, counts, messages, activity, drafts, comments, export/import, latest descendant, rename, archive/restore, prune, empty cleanup and bulk deletion. The disposable fixture restored an archived transcript before pruning, rejected a confirmation reused with a different profile or age threshold, and read back the retained sibling, archived, pinned, open and compressed-lineage rows independently. It also verified additive import and replay. The deployed dashboard still serves an older build.
+
 - The audit branch also incorporates GitHub main at `19f2750f`. That revision includes the commits from PR #45's head. The audit branch retains log snapshots and adopts main's first-page and filter-only regression cases. Fifteen focused log and static authentication checks passed.
 
 - Repair `9cd006c10f7c2389e3efb2b0fdcdb6ce7d6265a6` routes history, search, counts, messages, import, prune and mutations to the selected profile. Conflicting query and body selectors return a typed 400. The dashboard binds the confirmation dialog to the row and clears pending state when the management profile changes.
@@ -182,11 +184,11 @@ the complete scenario is still open.
 | Section | Complete | Partial | Total |
 | --- | ---: | ---: | ---: |
 | P0 packaged acceptance, reliability, and boundaries | 6 | 0 | 6 |
-| Live chat, Workbench, sessions, models, and PTY | 0 | 6 | 6 |
+| Live chat, Workbench, sessions, models, and PTY | 1 | 5 | 6 |
 | Dashboard routes and actions | 0 | 7 | 7 |
 | MCP, skills, plugins, memory, and integrations | 0 | 4 | 4 |
 | CLI and ecosystem compatibility | 0 | 7 | 7 |
-| **Total** | **6** | **24** | **30** |
+| **Total** | **7** | **23** | **30** |
 
 The completed items cover the clean authenticated Linux wheel and the
 installed remote-provider chat lifecycle. The latter includes session IDs and
@@ -200,8 +202,9 @@ regressions in disposable fixtures. The fifth covers installed native
 gateway readiness, provider outage recovery, concurrent sessions, reconnect,
 and process cleanup, plus fail-closed archive regression coverage. The
 sixth covers published artifact evidence, dashboard and native CI, and
-the recorded scope of opt-in checks. The counts describe whole checkboxes
-and do not estimate effort.
+the recorded scope of opt-in checks. The seventh covers session history and
+maintenance in authenticated disposable sibling profiles. The counts describe
+whole checkboxes and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.
 
