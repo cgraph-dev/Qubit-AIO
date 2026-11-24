@@ -468,6 +468,16 @@
       "command": "Open both chat hosts and the Models aliases, refresh the catalog, select the second provider for o3-mini, inspect save and queue responses and compare independent GET, reload, YAML and SQLite.",
       "observed": "Six Models entry paths preserved the profile and fit the tested viewports. An injected 400 left the picker actionable and the stored pair intact. A subsequent save changed the named main model to custom:beta/o3-mini. Named reasoning read-back was true for beta and false for alpha. Qubit Chat persisted beta and its endpoint on the named conversation while the duplicate in the listener stayed on alpha. The terminal persisted beta as queued and retained alpha as active across reload. The build, 37 Python tests and 63 frontend tests passed.",
       "scope": "Catalog and provider endpoints were fixtures. Deployed source revision 3d6595549328b150b9dcfc432adcc7119aae40f5 predates the repair. Live provider authentication and application of the queued selection on the next PTY prompt remain open."
+    },
+    {
+      "check": "Owning PTY model handoff, resume and loopback failover",
+      "date": "2026-11-25",
+      "status": "PASS",
+      "environment": "Authenticated source dashboard, actual terminal WebSocket and PTY, disposable named Qubit home and two credential-checking loopback providers",
+      "revision": "8bdbb9c793b4d14c7a596df2fe5d3011d85208c5",
+      "command": "Mint a named PTY ticket and resume the seeded conversation. Queue a provider for the same model ID, submit a terminal prompt, inspect receipts, provider requests and saved transcript. Reattach using a new ticket without an attach token and trigger a fixture HTTP 503.",
+      "observed": "The active provider stayed on alpha until inference used beta and the request settled applied. A separate 4,096-token candidate settled context_refused and the active provider answered. Two simultaneous requests produced distinct IDs and one queued receipt. Reattach replayed the previous output; beta retried its 503 and alpha answered through the configured fallback. Both accepted their own fixture credentials. The named transcript preserved its earlier messages and both successful replies. The listener\u2019s duplicate session had no queued request or new reply. The scoped selections passed 59 Python route and model tests and three native handoff tests.",
+      "scope": "The native tests simulate the confirmation boundary. The PTY and provider HTTP exchanges ran locally. External authentication, provider and deployed verification are pending."
     }
   ],
   "cancellation_fix_artifact": {
