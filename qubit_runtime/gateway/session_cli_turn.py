@@ -40,17 +40,23 @@ def admit_cli_turn(params):
     override = params.get('model_override')
     if override is not None:
         from qubit_constants import parse_reasoning_effort
-        if (not isinstance(override, dict) or set(override) - {'model', 'provider', 'reasoning'}
-                or not isinstance(override.get('model'), str) or not override['model'].strip()
-                or not isinstance(override.get('provider', ''), str)
-                or ('reasoning' in override and (not isinstance(override['reasoning'], str)
-                                                 or parse_reasoning_effort(override['reasoning']) is None))):
+        if not isinstance(override, dict) or set(override) - {'model', 'provider', 'reasoning'}:
             raise RuntimeStoreError('invalid_params')
-        # ``reasoning``: ``/model B --once --reasoning X`` runs X for this admission only; the session's
-        # reasoning policy (and its ``session_pins``) is never written.
-        committed['model_override'] = {'model': override['model'].strip(),
-                                       **({'provider': override['provider']} if override.get('provider') else {}),
-                                       **({'reasoning': override['reasoning']} if 'reasoning' in override else {})}
+        model = override.get('model')
+        provider = override.get('provider', '')
+        effort = override.get('reasoning')
+        if (('model' in override and (not isinstance(model, str) or not model.strip()))
+                or not isinstance(provider, str) or (provider and not model)
+                or ('reasoning' in override and (not isinstance(effort, str)
+                                                 or parse_reasoning_effort(effort) is None))
+                or (not model and effort is None)):
+            raise RuntimeStoreError('invalid_params')
+        # Choices belong to this admission. An effort-only turn keeps its resolved route.
+        committed['model_override'] = {
+            **({'model': model.strip()} if model else {}),
+            **({'provider': provider} if provider else {}),
+            **({'reasoning': effort} if effort is not None else {}),
+        }
     batch = params.get('clarify_batch')
     if batch is not None and type(batch) is not bool:
         raise RuntimeStoreError('invalid_params')
@@ -191,7 +197,7 @@ def take_cli_result_fields(result, *, aux_before=None, session_db=None, session_
 def one_turn_route(turn, policy, model, runtime_kwargs):
     """The executing admission's ``model_override`` applied to the resolved route (unchanged without one)."""
     override = cli_turn(turn._ctx.inbound_message_id).get('model_override')
-    if not override:
+    if not override or 'model' not in override:
         return model, runtime_kwargs
     from gateway.session_authorities import active_authority
     config = policy.config(active_authority(turn._runner)) if policy else turn._ctx.user_config

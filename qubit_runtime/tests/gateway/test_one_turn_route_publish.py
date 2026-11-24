@@ -349,3 +349,22 @@ def test_a_one_turn_override_carries_its_reasoning_level_for_that_admission_only
         assert one_turn_reasoning(turn, session_level) == {"enabled": True, "effort": "high"}
     with cli_turn_scope("other", committed["cli_turn_v1"]):
         assert one_turn_reasoning(turn, session_level) is session_level
+
+
+def test_effort_only_override_uses_existing_route_and_expires_with_admission():
+    from types import SimpleNamespace
+
+    from gateway.session_cli_turn import admit_cli_turn, cli_turn_scope, one_turn_reasoning, one_turn_route
+    from qubit_state_runtime import RuntimeStoreError
+
+    ctx = SimpleNamespace(inbound_message_id="one")
+    turn = SimpleNamespace(_ctx=ctx)
+    runtime = {"provider": "fixture"}
+    session_reasoning = {"enabled": True, "effort": "low"}
+    data = admit_cli_turn({"model_override": {"reasoning": "high"}})["cli_turn_v1"]
+    with cli_turn_scope("one", data):
+        assert one_turn_route(turn, None, "fixture-model", runtime) == ("fixture-model", runtime)
+        assert one_turn_reasoning(turn, session_reasoning) == {"enabled": True, "effort": "high"}
+    assert one_turn_reasoning(turn, session_reasoning) == session_reasoning
+    with pytest.raises(RuntimeStoreError, match="invalid_params"):
+        admit_cli_turn({"model_override": {"provider": "fixture", "reasoning": "high"}})

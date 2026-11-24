@@ -4117,6 +4117,7 @@ export async function streamChatTurn(
     profile?: string;
     submission_id?: string;
     image_data_url?: string;
+    provider?: string;
   },
   handlers: ChatStreamHandlers,
   signal?: AbortSignal,
