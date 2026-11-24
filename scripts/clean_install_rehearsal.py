@@ -440,7 +440,7 @@ def _run(cmd: List[str], *, cwd: Optional[Path], env: Dict[str, str],
 
 
 _PROBE = r'''
-import http.client, json, os, pathlib, re, subprocess, sys, tempfile, time
+import http.client, http.server, json, os, pathlib, re, subprocess, sys, tempfile, threading, time
 
 # Isolation guard: the installed artifact must never read or write a live
 # QUBIT_HOME/HERMES_HOME. The engine passes those paths in VB_FORBIDDEN_HOMES.
@@ -479,7 +479,12 @@ import yaml
 state = pathlib.Path(tempfile.mkdtemp(dir=os.environ["VB_REHEARSAL_STATE"]))
 p = state / "voice.yaml"
 p.write_text(yaml.safe_dump({"logging": {"jsonl_path": str(state)},
-                             "webui": {"token": "rehearsal-token"}}))
+                             "webui": {"token": "rehearsal-token"},
+                             "intent": {"frontier": {
+                                 "enabled": True,
+                                 "allowlist": ["openai/rehearsal-model"],
+                                 "max_retries": 0,
+                             }}}))
 cfg = Config.load(p)
 class _F:
     _route = "local"; _web_active = 0
@@ -498,6 +503,93 @@ def raw(path, headers=None, method="GET", body=None):
         return r.status, r.getheader("Location"), r.read()
     finally:
         c.close()
+
+
+def stream_fixture_turn(cfg, stream_path, headers, session_id, prompt):
+    """Run the installed dashboard and provider client against a loopback SSE peer."""
+    from voicebridge.providers import resolver
+
+    release_second_delta = threading.Event()
+    requests_seen = []
+    chunks = ("fixture ", "response")
+    credential = "rehearsal-provider-value"
+    os.environ["QUBIT_REHEARSAL_PROVIDER"] = credential
+
+    class FixtureProvider(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if (self.path != "/v1/chat/completions"
+                    or self.headers.get("Authorization") != "Bearer " + credential
+                    or body.get("model") != "rehearsal-model"
+                    or body.get("stream") is not True):
+                self.send_error(400)
+                return
+            requests_seen.append(body["messages"][-1]["content"])
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for index, chunk in enumerate(chunks):
+                if index and not release_second_delta.wait(10):
+                    return
+                event = json.dumps({"choices": [{"delta": {"content": chunk}}]})
+                self.wfile.write(f"data: {event}\n\n".encode())
+                self.wfile.flush()
+            self.wfile.write(b"data: [DONE]\n\n")
+
+    with http.server.ThreadingHTTPServer(("127.0.0.1", 0), FixtureProvider) as provider:
+        provider_port = provider.server_address[1]
+        profile = resolver.ModelProfile(
+            id="installed-rehearsal", kind="api", provider="openai",
+            model="rehearsal-model", base_url=f"http://127.0.0.1:{provider_port}/v1",
+            key_ref="env:QUBIT_REHEARSAL_PROVIDER", locality="external",
+            egress_consent="allow", roles=["chat"],
+        )
+        saved = resolver.upsert_model_profile(cfg, profile, confirm=True)
+        assert saved.get("state") == "OK", saved
+
+        worker = threading.Thread(target=provider.serve_forever, daemon=True)
+        worker.start()
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
+        events = []
+        try:
+            connection.request("POST", stream_path, json.dumps({
+                "session": session_id, "text": prompt, "model": profile.id,
+            }), {**headers, "Content-Type": "application/json"})
+            response = connection.getresponse()
+            content_type = response.getheader("Content-Type") or ""
+            assert response.status == 200 and content_type.startswith("text/event-stream"), (
+                response.status, content_type)
+            for line in iter(response.readline, b""):
+                if not line.startswith(b"data: "):
+                    continue
+                event = json.loads(line[6:])
+                events.append(event)
+                if event.get("event") == "delta":
+                    # The provider blocks until the dashboard delivers its first chunk.
+                    release_second_delta.set()
+        finally:
+            release_second_delta.set()
+            connection.close()
+            provider.shutdown()
+            worker.join(2)
+
+    assert requests_seen == [prompt], requests_seen
+    assert [event["event"] for event in events] == ["start", "delta", "delta", "done"], events
+    assert all(event["session_id"] == session_id for event in events), events
+    assert tuple(event["text"] for event in events[1:3]) == chunks, events
+    reply = "".join(chunks)
+    assert events[-1]["reply"] == reply, events[-1]
+    assert events[-1]["receipt"]["streaming"] is True, events[-1]
+    return reply
+
+
+def assert_transcript(messages, prompt, reply):
+    assert [(msg["role"], msg["content"]) for msg in messages] == [
+        ("user", prompt), ("assistant", reply),
+    ], messages
 
 
 try:
@@ -732,12 +824,12 @@ try:
         assert session_payload["total"] >= len(session_payload["sessions"]), (
             "installed session inventory has inconsistent total", session_payload)
 
-        # Create over authenticated HTTP, append through the canonical store,
-        # then read both surfaces to prove they share the persisted record.
+        # Create and stream over authenticated HTTP, then read the canonical
+        # store and dashboard to prove they share the persisted transcript.
         from voicebridge import chat_transport as _chat_transport
         canonical = _chat_transport.store(cfg)
         persisted_id = "release-acceptance-" + os.urandom(8).hex()
-        persisted_text = "isolated-restart-proof-" + os.urandom(8).hex()
+        persisted_text = "Please say hello. Fixture " + os.urandom(8).hex()
         created_status, _, created_body = raw(
             create_path, {**session_headers, "Content-Type": "application/json"},
             method="POST", body=json.dumps({
@@ -751,8 +843,16 @@ try:
         stored = canonical.show(persisted_id)
         assert stored.get("state") == "OK", stored
         assert stored.get("session", {}).get("id") == persisted_id, stored
-        appended = canonical.append(persisted_id, "user", persisted_text)
-        assert appended.get("state") == "OK", appended
+        persisted_reply = stream_fixture_turn(
+            cfg, stream_path, session_headers, persisted_id, persisted_text)
+        settled = canonical.show(persisted_id)
+        assert settled.get("state") == "OK", settled
+        assert_transcript(settled["messages"], persisted_text, persisted_reply)
+        settled_cancel_status, _, settled_cancel_body = raw(
+            cancel_path, {**session_headers, "Content-Type": "application/json"},
+            method="POST", body=json.dumps({"session": persisted_id}).encode())
+        assert settled_cancel_status == 404, (settled_cancel_status, settled_cancel_body)
+        assert json.loads(settled_cancel_body).get("code") == "NO_ACTIVE_TURN"
         show_path = "/agent/api/qubit/chat/sessions/" + persisted_id
         for unauthorized_headers in (
             {},
@@ -770,9 +870,7 @@ try:
         assert show_payload.get("ok") is True, show_payload
         assert show_payload.get("session", {}).get("id") == persisted_id, (
             "canonical session ID differs over HTTP", show_payload)
-        assert any(m.get("content") == persisted_text
-                   for m in show_payload.get("messages", [])), (
-            "canonical persisted message missing over HTTP", show_payload)
+        assert_transcript(show_payload["messages"], persisted_text, persisted_reply)
 
         # Restart the listener and verify the transcript independently in a
         # separate installed interpreter using the same disposable state.
@@ -789,13 +887,14 @@ cfg = Config.load(sys.argv[1])
 res = chat_transport.store(cfg).show(sys.argv[2])
 assert res.get("state") == "OK", res
 assert res.get("session", {}).get("id") == sys.argv[2], res
-assert any(m.get("content") == sys.argv[3]
-           for m in res.get("messages", [])), res
+assert [(m["role"], m["content"]) for m in res.get("messages", [])] == [
+    ("user", sys.argv[3]), ("assistant", sys.argv[4]),
+], res
 print(json.dumps({"ok": True, "session_id": sys.argv[2]}))
 """
         child = subprocess.run(
             [sys.executable, "-c", child_code, str(p),
-             persisted_id, persisted_text],
+             persisted_id, persisted_text, persisted_reply],
             capture_output=True, text=True, timeout=30, check=False)
         assert child.returncode == 0, (
             "fresh installed process could not recover persisted transcript",
@@ -892,9 +991,7 @@ assert marker.get("prompt") == sys.argv[3], marker
             "dashboard still offers an already-cleared interrupted turn",
             cleared_payload)
         assert resumed.get("session", {}).get("id") == persisted_id, resumed
-        assert any(m.get("content") == persisted_text
-                   for m in resumed.get("messages", [])), (
-            "persisted message lost across dashboard restart", resumed)
+        assert_transcript(resumed["messages"], persisted_text, persisted_reply)
 finally:
     ui.stop()
 
