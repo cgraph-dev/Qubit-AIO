@@ -674,8 +674,10 @@ def test_qubit_chat_lifecycle_and_worker_boundary_use_the_selected_profile(tmp_p
         ui.stop()
 
 
-def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatch):
+@pytest.mark.parametrize("with_image", [False, True])
+def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatch, with_image):
     import asyncio
+    import base64
     from contextlib import asynccontextmanager
 
     from voicebridge import chat_transport as CT, profile_chat, qubit_runtime
@@ -695,6 +697,8 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
         db.close()
 
     calls = []
+    image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGN8JqLBAANMDEgANwcAOmYBKqTjcAwAAAAASUVORK5CYII="
+    staging = work / "cache" / "images" / "upload_fixture.png"
 
     def discover(home):
         assert home == work
@@ -715,7 +719,17 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
                 return {"stored_session_id": "native-chat"}
             if method == "session.resume":
                 return {"session_id": "owner-live-handle", "stored_session_id": "same-chat"}
+            if method == "image.attach_bytes":
+                assert kwargs == {"session_id": "owner-live-handle", "data": image}
+                staging.parent.mkdir(parents=True)
+                staging.write_bytes(base64.b64decode(image.split(",", 1)[1]))
+                return {"path": str(staging), "mime": "image/png"}
             if method == "prompt.submit":
+                if with_image:
+                    assert kwargs["attachments"] == [{"path": str(staging), "mime": "image/png"}]
+                    assert staging.is_file()
+                else:
+                    assert "attachments" not in kwargs
                 return {"admission_id": "ours", "status": "queued"}
             if method == "prompt.receipt" and self.waiting:
                 self.waiting = False
@@ -760,13 +774,24 @@ def test_named_qubit_chat_stream_uses_its_gateway_admission(tmp_path, monkeypatc
         assert _req(port, "GET", sessions + "/native-chat")[0] == 404
         assert [method for method, _ in calls] == ["session.create"]
         calls.clear()
-        status, raw = _req(port, "POST", "/agent/api/qubit/chat/stream?profile=work",
-                           {"session": "same-chat", "text": "fixture question"})
+        stream = "/agent/api/qubit/chat/stream?profile=work"
+        turn = {"session": "same-chat", "text": "fixture question"}
+        status, raw = _req(port, "POST", stream, {**turn, "image_data_url": image.replace("/png", "/gif")})
+        assert status == 400 and _json_body(raw)["code"] == "BAD_IMAGE"
+        status, raw = _req(port, "POST", stream, {**turn, "image_data_url": "data:image/png;base64,iVBORw0KGgo="})
+        assert status == 400 and _json_body(raw)["code"] == "BAD_IMAGE"
+        assert calls == []
+        if with_image:
+            turn["image_data_url"] = image
+        status, raw = _req(port, "POST", stream, turn)
         assert status == 200
         assert b": keep-alive\n\n" in raw and b"event: heartbeat" not in raw
         assert b"event: delta" in raw and b"named delta" in raw and b"foreign delta" not in raw
         assert b"event: done" in raw and b"named reply" in raw
-        assert [method for method, _ in calls] == ["session.resume", "prompt.submit", "prompt.receipt", "prompt.receipt"]
+        assert [method for method, _ in calls] == [
+            "session.resume", *(["image.attach_bytes"] if with_image else []),
+            "prompt.submit", "prompt.receipt", "prompt.receipt"]
+        assert not staging.exists()
         path = "/agent/api/qubit/chat/sessions/same-chat/messages"
         assert _json_body(_req(port, "GET", path + "?profile=work")[1])["total"] == 2
         assert _json_body(_req(port, "GET", path)[1])["total"] == 0

@@ -4109,7 +4109,15 @@ export const CHAT_REASONING_LEVELS = [
 ] as const;
 
 export async function streamChatTurn(
-  body: { text: string; session?: string; model?: string; reasoning?: string; profile?: string; submission_id?: string },
+  body: {
+    text: string;
+    session?: string;
+    model?: string;
+    reasoning?: string;
+    profile?: string;
+    submission_id?: string;
+    image_data_url?: string;
+  },
   handlers: ChatStreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {

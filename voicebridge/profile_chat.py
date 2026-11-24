@@ -1,4 +1,4 @@
-"""Bridge dashboard text turns to the gateway that owns a named profile."""
+"""Bridge dashboard turns to the gateway that owns a named profile."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import threading
 import time
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,11 +42,12 @@ def _result(outcome: str | None, reply: Any, session: str) -> dict:
     return _error("CHAT_GATEWAY_TURN_FAILED", "The profile gateway did not complete the turn.", session)
 
 
-async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id):
+async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, stopped, submission_id, image):
     from qubit_cli.gateway_client import GatewayRPCError
     from tui_gateway.owner_forward import _REFUSED_BEFORE_COMMIT, connect_owner
 
     submitted = False
+    staged = None
     try:
         async with connect_owner(home, endpoint) as client:
             attached = await client.rpc("session.resume", session_id=session, omit_messages=True)
@@ -56,9 +58,25 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
             if turn.stop_requested or stopped():
                 yield _result("cancelled", None, session)
                 return
+            params = {"session_id": target, "text": text, "submission_id": submission_id}
+            if image is not None:
+                upload = await client.rpc("image.attach_bytes", session_id=target, data=image)
+                path = Path(upload["path"])
+                if (not path.is_absolute() or path.parent.resolve() != (home / "cache" / "images").resolve()
+                        or not path.name.startswith("upload_")):
+                    raise ValueError("The gateway returned an invalid staging path.")
+                staged = path
+                params["attachments"] = [{"path": str(path), "mime": upload["mime"]}]
+                if turn.stop_requested or stopped():
+                    yield _result("cancelled", None, session)
+                    return
             submitted = True
-            admitted = await client.rpc("prompt.submit", session_id=target, text=text,
-                                        submission_id=submission_id)
+            admitted = await client.rpc("prompt.submit", **params)
+            # The owner captures immutable bytes before acknowledging admission.
+            if staged is not None:
+                with suppress(OSError):
+                    staged.unlink(missing_ok=True)
+                staged = None
             admission = admitted.get("admission_id")
             if not isinstance(admission, str) or not admission:
                 if admitted.get("voice_stopped") is True:
@@ -111,10 +129,12 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
         yield _error("CHAT_ADMISSION_UNCONFIRMED", "Check the last turn before sending again.", session)
     except GatewayRPCError as exc:
         reason = str(exc.data.get("reason") or exc)
+        if reason in _REFUSED_BEFORE_COMMIT and not turn.admission:
+            submitted = False
         if reason == "session_read_only" and not turn.admission:
             yield _error("CHAT_GATEWAY_REFUSED", "This history is read-only. Start a new chat to send your draft.",
                          session)
-        elif not submitted or (not turn.admission and reason in _REFUSED_BEFORE_COMMIT):
+        elif not submitted:
             yield _error("CHAT_GATEWAY_REFUSED", f"The profile gateway refused the turn ({reason}).", session)
         else:
             yield _error("CHAT_ADMISSION_UNCONFIRMED", "Check the last turn before sending again.", session)
@@ -123,8 +143,15 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
         detail = "Check the last turn before sending again." if submitted else "The selected profile gateway is unavailable."
         yield _error(code, detail, session)
 
+    finally:
+        # An ambiguous submit may still be copying the staging file. Let the
+        # owner's cache sweep collect that upload after its retention window.
+        if staged is not None and not submitted:
+            with suppress(OSError):
+                staged.unlink(missing_ok=True)
 
-def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None):
+
+def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None, image=None):
     """Run the gateway relay on the calling HTTP thread and close its socket on exit."""
     from .plugins import estop_engaged
     from .power import power_control
@@ -155,7 +182,7 @@ def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submissio
         if control is not None:
             control.track(correlation, stop_turn)
         with asyncio.Runner() as runner:
-            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex)
+            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex, image)
             try:
                 while True:
                     yield runner.run(anext(stream))
