@@ -428,6 +428,57 @@ def test_cron_pause_persists(browser, ui_server):
         ctx.close()
 
 
+@pytest.mark.parametrize(("action", "enabled"), [("pause", True), ("resume", False)])
+def test_cron_declining_confirmation_keeps_job_state(browser, ui_server, action, enabled):
+    base, token = ui_server
+    jobs = "/agent/api/cron/jobs"
+    name = f"Cron decline {action}"
+    status, created = _api(base, token, "POST", jobs,
+                           {"name": name, "prompt": "echo fixture",
+                            "schedule": "every 1h", "confirm": True})
+    assert status == 200, created
+    job = f"{jobs}/{created['id']}"
+    if not enabled:
+        status, paused = _api(base, token, "POST", f"{job}/pause", {"confirm": True})
+        assert status == 200 and paused["enabled"] is False, paused
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    staged_requests = []
+    dialogs = []
+    mutation = base + f"{job}/{action}"
+
+    def is_mutation(request):
+        return request.url.split("?", 1)[0] == mutation and request.method == "POST"
+
+    def record_request(request):
+        if is_mutation(request):
+            staged_requests.append(request)
+
+    def decline(dialog):
+        dialogs.append(dialog.type)
+        dialog.dismiss()
+
+    page.on("request", record_request)
+    page.on("dialog", decline)
+    try:
+        page.goto(base + "/cron", wait_until="domcontentloaded")
+        button = _row_for(page, name, action.title()).get_by_role("button", name=action.title())
+        with page.expect_response(lambda response: is_mutation(response.request)) as staged:
+            button.click()
+        assert staged.value.status == 409
+        assert staged.value.json()["code"] == "CONFIRM_REQUIRED"
+        pw.expect(button).to_be_enabled()
+        status, readback = _api(base, token, "GET", job)
+        assert status == 200 and readback["enabled"] is enabled, readback
+        page.reload(wait_until="domcontentloaded")
+        pw.expect(button).to_be_visible()
+        assert dialogs == ["confirm"]
+        assert len(staged_requests) == 1
+    finally:
+        context.close()
+
+
 def test_cron_named_profile_and_blueprint_confirmation(browser, ui_server):
     from urllib.parse import parse_qs, urlsplit
 
@@ -588,18 +639,23 @@ def test_plugins_rescan_returns_manifests(browser, ui_server):
 
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
     page = ctx.new_page()
+    pending_hub_requests = []
+    page.route("**/api/dashboard/plugins/hub*", lambda route: pending_hub_requests.append(route))
+    rescan_button = page.get_by_role("button", name="Rescan dashboard extensions")
     try:
-        page.goto(base + "/plugins", wait_until="domcontentloaded",
-                  timeout=30000)
+        with page.expect_request("**/api/dashboard/plugins/hub*"):
+            page.goto(base + "/plugins", wait_until="domcontentloaded", timeout=30000)
         with page.expect_response(
                 lambda r: "/dashboard/plugins/rescan" in r.url) as info:
-            page.get_by_role(
-                "button", name="Rescan dashboard extensions").click()
+            rescan_button.click()
         assert info.value.status == 200, info.value.status
         # The visible control fires the canonical rescan and returns the real
         # overlay manifest set (not an empty 200).
         payload = info.value.json()
         assert payload.get("rescanned") is True and payload.get("count", 0) >= 1, payload
+        assert "qubit-boards" in payload["plugins"], payload
+        pw.expect(rescan_button).to_be_enabled()
+        assert pending_hub_requests
         assert page.locator("nav, aside, [role=navigation]").count() >= 1
     finally:
         ctx.close()
@@ -1309,12 +1365,21 @@ def test_env_custom_key_set_and_remove(browser, ui_server):
     the saved reference from a resolved credential.
     Clear -> confirm dialog DELETEs it and the read-back drops it.
     """
+    from urllib.parse import parse_qs, urlsplit
+
     base, token = ui_server
+    env_path = "/agent/api/env?profile=default"
     key = "PHASE4_TEST_REF"
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
     page = ctx.new_page()
+    def env_mutation(response, method):
+        url = urlsplit(response.url)
+        return (url.path.endswith("/api/env")
+                and parse_qs(url.query).get("profile") == ["default"]
+                and response.request.method == method)
+
     try:
-        page.goto(base + "/env", wait_until="domcontentloaded", timeout=30000)
+        page.goto(base + "/env?profile=default", wait_until="domcontentloaded", timeout=30000)
         card = page.locator("#section-custom")
         card.wait_for(timeout=20000)
         card.locator("input[aria-label='Variable name']").fill(key)
@@ -1323,14 +1388,12 @@ def test_env_custom_key_set_and_remove(browser, ui_server):
         value.wait_for(timeout=10000)
         assert value.get_attribute("type") == "password"
         value.fill("vault:phase4-ref")
-        with page.expect_response(
-                lambda r: r.url.endswith("/api/env")
-                and r.request.method == "PUT") as info:
+        with page.expect_response(lambda response: env_mutation(response, "PUT")) as info:
             card.get_by_role("button", name="Save", exact=True).first.click()
         assert info.value.status == 200, info.value.status
         assert info.value.json().get("ok") is True, info.value.json()
 
-        code, env = _api(base, token, "GET", "/agent/api/env")
+        code, env = _api(base, token, "GET", env_path)
         assert code == 200, (code, env)
         assert env.get(key, {}).get("category") == "references", env.get(key)
         assert env[key]["is_set"] is False
@@ -1341,19 +1404,16 @@ def test_env_custom_key_set_and_remove(browser, ui_server):
         card.get_by_role("button", name="Clear", exact=True).first.click()
         dialog = page.get_by_role("alertdialog", name="Clear this key?")
         dialog.wait_for(timeout=10000)
-        with page.expect_response(
-                lambda r: r.url.endswith("/api/env")
-                and r.request.method == "DELETE") as info:
+        with page.expect_response(lambda response: env_mutation(response, "DELETE")) as info:
             dialog.get_by_role("button", name="Delete").click()
         assert info.value.status == 200, info.value.status
 
-        code, env2 = _api(base, token, "GET", "/agent/api/env")
+        code, env2 = _api(base, token, "GET", env_path)
         assert code == 200, (code, env2)
-        assert key not in env2 or env2.get(key, {}).get("is_set") is not True, \
-            env2.get(key)
+        assert key not in env2, env2.get(key)
     finally:
         ctx.close()
-    _api(base, token, "DELETE", "/agent/api/env", {"key": key, "confirm": True})
+        _api(base, token, "DELETE", env_path, {"key": key, "confirm": True})
 
 
 def test_system_doctor_action_and_gateway_gating(browser, ui_server, monkeypatch):

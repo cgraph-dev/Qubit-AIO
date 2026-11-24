@@ -2025,5 +2025,31 @@
       "tests": "Five HTTP route tests, eight frontend tests and five focused Chromium regressions passed."
     },
     "scope": "Static registry reconciliation and focused browser navigation. Full route action read-back, focus and accessibility, error states and deployed checks are open. The deployed dashboard reported source revision 3d6595549328b150b9dcfc432adcc7119aae40f5."
+  },
+  "current_original_defect_recheck": {
+    "date": "2026-11-25",
+    "source_revision": "3e745ea50e2672af02387933a7ad8990761c382e",
+    "bundle_index_sha256": "751efa4031402a4e43e58b83cf9f0a80457ebcb01dd8b8878defb3d70cc20b48",
+    "environment": "Authenticated loopback server, production Vite build, disposable profiles and Chromium",
+    "focused_recheck": {"passed": 13, "failed": 0, "deselected": 27},
+    "cases": {
+      "QAI-001": "Collapsed Workbench panel stayed within the viewport.",
+      "QAI-002": "Workbench session deep links reloaded the same conversation.",
+      "QAI-003": "Pause and Resume persisted on approval. Declining either showed the confirmation, issued no confirmed retry and kept the job state through reload.",
+      "QAI-004": "Inter and Rajdhani assets returned font/woff2 and the wOF2 byte signature.",
+      "QAI-005": "The dashboard rescan returned qubit-boards and other manifests and re-enabled the control while the hub request remained pending.",
+      "QAI-006": "A saved unresolved reference remained masked and clearable after reload. A confirmed delete removed its record from the same profile's inventory.",
+      "QAI-007": "Both chat sidebars switched between fixture providers with the same model ID. Independent GET and reload retained the provider after the terminal fixture acknowledged its queued switch."
+    },
+    "manga": "Bundled header and composer SVGs returned successfully. Chromium checked the Plugins header and its single Rescan action, hidden module header in chat, and one in-viewport composer frame at 390 and 1440 CSS pixels. The desktop sidebar retained Chat and Workspace groups on collapse.",
+    "additional_observations": [
+      "The optional Manga ZIP manifest returned 404 in the disposable home. The bundled header and composer used the checked-in assets.",
+      "Unscoped first entry to Qubit Chat also requested the default session before it existed and received a 404. The composer still mounted. Capture the empty-state request in the wider dashboard audit."
+    ],
+    "deployed_build": {
+      "source_revision": "3d6595549328b150b9dcfc432adcc7119aae40f5",
+      "source_dirty": true,
+      "disposition": "Older dashboard build, recheck pending on deployment"
+    }
   }
 }
