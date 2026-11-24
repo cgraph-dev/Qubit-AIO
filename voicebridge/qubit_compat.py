@@ -9185,6 +9185,44 @@ def _chat_approval(cfg, q, b, p, *, settle=False):
     return _ok(approval=result["approval"])
 
 
+def h_chat_continue_history(cfg, q, b, p):
+    from . import profile_chat
+    from .qubit_session_store import QubitSessionStore
+    from qubit_cli.gateway_client import GatewayRPCError
+
+    home, refusal = _chat_request_profile(cfg, q, b)
+    if refusal is not None:
+        return refusal
+    if home is None:
+        return 404, {"ok": False, "code": "CHAT_HISTORY_NOT_FOUND"}
+    if _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP", "detail": "Emergency stop is latched."}
+    request_id = b.get("request_id")
+    if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,100}", request_id):
+        return 400, {"ok": False, "code": "MALFORMED"}
+
+    legacy = p["id"]
+    if not 0 < len(legacy) <= 80:
+        return 404, {"ok": False, "code": "CHAT_HISTORY_NOT_FOUND"}
+    store = QubitSessionStore(cfg, runtime_home=home)
+    source = store._session(legacy)
+    if not source or source.get("source") != "dashboard" or source.get("archived"):
+        return 404, {"ok": False, "code": "CHAT_HISTORY_NOT_FOUND"}
+
+    try:
+        sid = profile_chat.continue_history(home, legacy, request_id)
+        child = store._session(sid)
+        if child and child.get("parent_session_id") == legacy:
+            return _ok(session=_rebrand_chat_record(store._rec(child)))
+    except GatewayRPCError as exc:
+        if exc.data.get("reason") in ("not_found", "permission_denied"):
+            return 404, {"ok": False, "code": "CHAT_HISTORY_NOT_FOUND"}
+    except Exception:
+        pass  # A lost gateway response is retried with the existing request ID.
+    return 409, {"ok": False, "code": "CHAT_HISTORY_COPY_UNCONFIRMED",
+                 "detail": "The history copy could not be confirmed. Retry to check the same request."}
+
+
 def h_chat_approval(cfg, q, b, p):
     return _chat_approval(cfg, q, b, p)
 
@@ -12941,6 +12979,7 @@ _r("POST", r"/api/qubit/chat/stream", "h_chat_stream", "stream")
 _r("GET", r"/api/qubit/chat/sessions", "h_chat_sessions_list")
 _r("POST", r"/api/qubit/chat/sessions/import", "h_chat_session_import")
 _r("POST", r"/api/qubit/chat/sessions", "h_chat_session_create")
+_r("POST", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/continue", "h_chat_continue_history")
 _r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/approval", "h_chat_approval")
 _r("POST", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/approval", "h_chat_approval_respond")
 _r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/messages",
@@ -21420,6 +21459,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_chat_session_import": h_chat_session_import,
     "h_chat_cancel": h_chat_cancel, "h_chat_pty": h_chat_pty,
     "h_chat_approval": h_chat_approval, "h_chat_approval_respond": h_chat_approval_respond,
+    "h_chat_continue_history": h_chat_continue_history,
     "h_chat_retry": h_chat_retry, "h_chat_stream": h_chat_stream,
     "h_plugins": h_plugins, "h_themes": h_themes, "h_theme_get": h_theme_get,
     "h_theme_set": h_theme_set,

@@ -211,8 +211,8 @@ readable legacy dashboard history. An active named turn survived the original
 dashboard emergency stop. The patched dashboard cancelled the admitted turn
 through the installed owner and checked the terminal admission and transcript.
 A real approval-blocked turn continued after an authenticated native viewer
-reconnected and approved the exact request. The dashboard now reads the pending
-owner request over authenticated HTTP and can approve once or deny it. Exporting legacy messages and sending them as quoted context in a
-new named chat worked. The manual handoff preserves the source transcript and
-does not recreate its rows in the new chat. The row still requires
-transcript-preserving transfer and deployed verification.
+reconnected and approved the exact request. The dashboard can also approve once
+or deny over authenticated HTTP. Chromium exercised Continue in new chat and
+reloaded the same copied session. A separate provider turn consumed the copied
+messages in their original roles. An exact retry after gateway restart resolved
+to the same copy. The row still requires deployed verification.

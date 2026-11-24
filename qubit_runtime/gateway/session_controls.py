@@ -509,6 +509,17 @@ class AuthorityConnection:
         hidden = params.pop('hidden', False)
         if type(hidden) is not bool:
             raise RuntimeStoreError('invalid_params', field='hidden', detail='must be a boolean')
+        history_id = params.pop('dashboard_history_id', None)
+        if history_id is not None:
+            from gateway.session_history_mount import is_history_mount
+            if (not self.native_owner or params.get('source') != 'gui' or hidden or title is not None
+                    or set(params) != {'source', 'request_id'}
+                    or not isinstance(history_id, str) or not 0 < len(history_id) <= 80):
+                raise RuntimeStoreError('invalid_params', field='dashboard_history_id')
+            history = SessionRef(self.actor.profile_id, history_id)
+            self.authority.authorize(self.actor, history, 'session:read')
+            if not is_history_mount(self.authority.sessions[history_id]):
+                raise RuntimeStoreError('not_found')
         ref = title and resolve_titled_session(self.authority, self.actor, title, missing_ok=True)
         if (not ref and title == 'Bot Chat'
                 and not any(params.get(name) is True for name in BYPASS_FIELDS)
@@ -531,7 +542,8 @@ class AuthorityConnection:
             # Host-bound client values apply only over the gateway's own ticketed attach (run_api).
             ref = stage_local_session(self.authority, self.actor, params, skills_prompt=skills_prompt,
                                       client_local=self.native_owner,
-                                      desktop_local=getattr(self.transport, 'desktop_local', False))
+                                      desktop_local=getattr(self.transport, 'desktop_local', False),
+                                      dashboard_history_id=history_id)
             if isinstance(ref, dict):
                 # The creation commit runs off the owner loop: a held writer must not freeze
                 # every session behind one new chat (N50).
@@ -549,7 +561,7 @@ class AuthorityConnection:
                 await tracked_write(self.authority, partial(title_new_session, self.authority, ref, title))
             if hidden:
                 await tracked_write(self.authority, partial(self.authority.db.set_session_hidden, ref.session_id, True))
-        return await self.resume(ref, {})
+        return await self.resume(ref, {'omit_messages': True} if history_id is not None else {})
 
     async def ping(self, ref, params):
         if not self.actor.capabilities:

@@ -14,6 +14,7 @@
 
 import { Button, Checkbox, FileField, HoverTooltip, ListItem, Select, SakugaLoading, Textarea, emitFx, emitFxAt } from "@/sakuga/ui";
 import { ProfileChatApprovalBanner } from "./ProfileChatApprovalBanner";
+import { Button as NativeButton } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
@@ -547,6 +548,9 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
     loadTranscript(transcriptKey),
   );
   const [transcriptSession, setTranscriptSession] = useState(session);
+  const [legacySession, setLegacySession] = useState<string | null>(null);
+  const [copyingHistory, setCopyingHistory] = useState(false);
+  const historyCopy = useRef<{ key: string; requestId: string; busy: boolean } | null>(null);
   const [transcriptState, setTranscriptState] = useState<
     "loading" | "ready" | "error"
   >("loading");
@@ -809,6 +813,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         if (loadReqRef.current !== myReq) return;
         setReasoning(normalizeReasoning(info.meta?.reasoning));
         setSessionModel(chatModelSelection(info.session));
+        setLegacySession(info.session?.source === "dashboard" ? session : null);
         setPendingConfirm(extractPendingConfirm(info));
         return withBackoff(() => readMessages(session), {
           shouldStop: () => loadReqRef.current !== myReq,
@@ -1593,6 +1598,38 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         }
       });
   }, [pointerKey, scopedProfile, setSearchParams]);
+
+  async function continueHistory() {
+    if (historyCopy.current?.busy || legacySession !== session || busy) return;
+    const key = `qubit-chat-history-copy.${transcriptKey}`;
+    const requestId = storageGet(key)
+      || (historyCopy.current?.key === key ? historyCopy.current.requestId : generateChatChannel());
+    const resumeAtStart = resumeParamRef.current;
+    historyCopy.current = { key, requestId, busy: true };
+    storageSet(key, requestId);
+    setCopyingHistory(true);
+    setError(null);
+    try {
+      const { session: child } = await api.continueChatHistory(session, scopedProfile, requestId);
+      storageSet(key, "");
+      historyCopy.current = null;
+      setSessionListNonce((nonce) => nonce + 1);
+      if (resumeParamRef.current !== resumeAtStart) return;
+      storageSet(pointerKey, child.id);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("resume", child.id);
+        return next;
+      });
+    } catch (err) {
+      historyCopy.current = { key, requestId, busy: false };
+      if (resumeParamRef.current === resumeAtStart) {
+        setError(err instanceof Error ? err.message : "The history copy could not be confirmed.");
+      }
+    } finally {
+      setCopyingHistory(false);
+    }
+  }
 
   // One-click "follow the live voice session": point the surface at the newest
   // `voice-*` row the chat store exposed, so the live poll above starts. Uses
@@ -2934,6 +2971,23 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
               className="mt-2 border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-warning"
             >
               Attach failed: {attachError}
+            </div>
+          ) : null}
+
+          {routed && legacySession === session && transcriptState === "ready" ? (
+            <div className="mt-2 flex flex-col items-start gap-2 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center">
+              <p className="min-w-0 flex-1 text-sm text-text-secondary">
+                Copy this read-only history into a new chat.
+              </p>
+              <NativeButton
+                type="button"
+                className="min-h-[44px]"
+                disabled={copyingHistory || busy}
+                aria-busy={copyingHistory}
+                onClick={() => void continueHistory()}
+              >
+                {copyingHistory ? "Copying history…" : "Continue in new chat"}
+              </NativeButton>
             </div>
           ) : null}
 

@@ -14,6 +14,7 @@ from gateway.session_contract import SessionRef
 from qubit_state_runtime import RuntimeStoreError
 
 ROWS = {
+    'dashboard-legacy': ('dashboard', {}),
     'cron_job1_20261001_120000': ('cron', {}),
     'sub-1': ('subagent', {}),
     'api-1': ('api_server', {'session_key': 'agent:main:api_server:dm:api-1', 'chat_id': 'api-1'}),
@@ -59,6 +60,37 @@ async def test_old_stored_history_opens_read_only_for_its_owner(tmp_path, monkey
     with pytest.raises(RuntimeStoreError, match='session_read_only'):
         await conn.submit(ref, {'text': 'more', 'submission_id': 's1'})
     assert conn.authority.db.get_session(sid)['message_count'] == 2
+
+
+@pytest.mark.asyncio
+async def test_continuing_dashboard_history_copies_rows_once(tmp_path, monkeypatch):
+    conn, ref = await _connect(tmp_path, monkeypatch, 'dashboard-legacy')
+    db = conn.authority.db
+    db.create_session('other-history', source='dashboard', user_id='other-owner')
+    original = db.get_messages_as_conversation(ref.session_id)
+    params = {'source': 'gui', 'request_id': 'fixture-copy', 'dashboard_history_id': ref.session_id}
+
+    async def create(**changes):
+        return await conn.dispatch({'id': 1, 'method': 'session.create', 'params': {**params, **changes}})
+
+    attempt = await create(dashboard_history_id='other-history')
+    assert attempt.get('error', {}).get('data', {}).get('reason') == 'not_found', attempt
+    assert db.session_count() == 2
+
+    first = await create()
+    assert 'result' in first, first
+    child = first['result']['stored_session_id']
+    assert child != ref.session_id
+    assert first['result']['messages_omitted']
+    assert db.get_session(child)['parent_session_id'] == ref.session_id
+    assert [(m['role'], m['content']) for m in db.get_messages_as_conversation(child)] == [
+        ('user', 'q'), ('assistant', 'a')]
+    assert db.get_messages_as_conversation(ref.session_id) == original
+    retry = await create()
+    assert retry['result']['stored_session_id'] == child
+    plain = await create(dashboard_history_id=None)
+    assert plain.get('error', {}).get('data', {}).get('reason') == 'invalid_params', plain
+    assert db.session_count() == 3
 
 
 @pytest.mark.asyncio
