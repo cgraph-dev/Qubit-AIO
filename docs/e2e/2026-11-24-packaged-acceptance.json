@@ -70,7 +70,7 @@
       "environment": "Isolated loopback HTTP",
       "revision": "fe342b27e",
       "command": "pytest tests/test_webui_http11_keepalive9u.py tests/test_workbench_config_extensions.py tests/test_workbench_stream_deadlock.py",
-      "observed": "71 tests passed. The new test independently read canonical health and both unauthenticated Workbench aliases with the same query shape used by the browser."
+      "observed": "71 tests passed. The new test independently read canonical health and both unauthenticated Workbench aliases with the same query shape used by the browser. Isolated Chromium also mounted both composers and read the actual mount-relative health URL at 390px and 1440px without horizontal overflow."
     },
     {
       "check": "Backup refusal and update rehearsal",
@@ -86,7 +86,7 @@
       "environment": "Disposable Linux install",
       "revision": null,
       "command": null,
-      "observed": "Remaining installed cases include quiet-turn keep-alives, timeout, active provider cancellation, transport disconnect, concurrent provider turns, and an actual populated-state upgrade and rollback. Lower-level cancellation regressions do not exercise those installed provider paths."
+      "observed": "Remaining installed cases include quiet-turn keep-alives, timeout, transport disconnect, concurrent provider turns, and a populated-state package upgrade and rollback."
     },
     {
       "check": "Deployed named-profile inference and PTY",
@@ -95,6 +95,52 @@
       "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
       "command": null,
       "observed": "Live writes need an approved disposable profile and provider endpoint. Read-only route checks do not establish inference, session deep links, PTY lifecycle or restart settlement."
+    },
+    {
+      "check": "Installed cancellation during a quiet close-delimited provider response",
+      "status": "FAIL",
+      "environment": "Linux installed wheel and synthetic loopback provider",
+      "revision": "92ef8fd7178feb279318cb6491f58afc4a756096",
+      "command": "POST /agent/api/qubit/chat/stream, then POST /agent/api/qubit/chat/cancel after the first delta",
+      "observed": "The cancel endpoint accepted the request, but the dashboard stream exceeded the client read deadline. The HTTP client had released its socket reference for the close-delimited provider response."
+    },
+    {
+      "check": "Installed cancellation after the socket retention fix",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 in a disposable home with a close-delimited loopback SSE provider",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "command": "python scripts/artifact_install_e2e.py --wheel WHEEL --require-network --require-clean",
+      "observed": "The provider stayed quiet after one delta. HTTP cancel settled the dashboard stream with start, delta, cancelled. The canonical store contained only the user prompt, exactly one provider request arrived, and a second cancel returned NO_ACTIVE_TURN. The same wheel passed the fresh-install verifier."
+    },
+    {
+      "check": "Live dashboard font assets (QAI-004)",
+      "status": "PASS",
+      "environment": "Read-only HTTP on localhost:8890",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": "GET /fonts-dashboard/Inter-latin.woff2 and /fonts-dashboard/Rajdhani-latin.woff2",
+      "observed": "Both responses returned 200, font/woff2, and the wOF2 file signature."
+    },
+    {
+      "check": "Unsigned release qualification with active cancellation fix",
+      "status": "PASS",
+      "environment": "Linux Python 3.12, committed checkout and disposable install",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "command": "python scripts/release_qualify.py --build --install --reproduce --unsigned-ok --json --out OUTPUT",
+      "observed": "Both archive scans, all 18 installed smoke checks, and a byte-identical wheel rebuild passed."
+    },
+    {
+      "check": "Candidate GitHub release and installed jobs before the cancellation fix",
+      "status": "PASS",
+      "environment": "GitHub Actions Linux",
+      "revision": "0bd213a95d27fd5c6d6d46a35c6a30fdd606cc9c",
+      "command": "gh pr checks 48",
+      "observed": "Release qualification and Artifact install E2E (Linux) passed on this PR revision. The updated head requires its own checks."
     }
-  ]
+  ],
+  "cancellation_fix_artifact": {
+    "version": "0.0.15",
+    "source_commit": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+    "dashboard_build_commit": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+    "wheel_sha256": "df7590609749c1646397171699863157717acebdd4232747792f2b33be746205"
+  }
 }
