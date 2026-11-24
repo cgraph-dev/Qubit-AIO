@@ -1,0 +1,146 @@
+{
+  "date": "2026-11-24",
+  "baseline_commit": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+  "installed_artifact": {
+    "version": "0.0.15",
+    "source_commit": "92ef8fd7178feb279318cb6491f58afc4a756096",
+    "dashboard_build_commit": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+    "wheel_sha256": "ceaa3e5ec6fe62d6c39c9a53f710087682e522a6f37ae00f0de7b49d112f63a0"
+  },
+  "checks": [
+    {
+      "check": "GitHub release qualification",
+      "status": "FAIL",
+      "environment": "GitHub Actions Linux",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": "gh run view 45279086048 --job 138073885448",
+      "observed": "The Build, install, and reproduce artifacts step exited 2. The only failing installed smoke check was deps.installed_contract. It flagged the bundled runtime fallback import and two imports from the declared python-dotenv distribution."
+    },
+    {
+      "check": "GitHub Linux artifact install",
+      "status": "PASS",
+      "environment": "GitHub Actions Linux",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": "gh run view 45279085840",
+      "observed": "The standalone install-e2e workflow passed. Its pre-repair probe verified health, assets, auth, and session persistence using the canonical store."
+    },
+    {
+      "check": "Deployed navigation",
+      "status": "PASS",
+      "environment": "Read-only Chromium and HTTP on localhost:8890",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": "GET /build-info.json and /api/health, and Chromium direct entry at 390px and 1440px",
+      "observed": "Both services were active. The clean build SHA matched both local and remote main at the start of the audit. The listener reported ok=true and DEGRADED. /chat, /qubit-chat, /webchat, /qubit-workbench and /wb mounted with page scroll width equal to viewport width. Writes and WebSockets were blocked for this run."
+    },
+    {
+      "check": "Deployed Workbench recovery probe",
+      "status": "FAIL",
+      "environment": "Read-only Chromium and HTTP on localhost:8890",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": "GET /qubit-workbench/health?offline_probe=1 and /wb/health?offline_probe=1",
+      "observed": "Both aliases returned 404. Chromium repeated the failing mount-relative probe. The branch fix reuses the canonical public health handler."
+    },
+    {
+      "check": "Rebuilt unsigned release qualification",
+      "status": "PASS",
+      "environment": "Linux Python 3.12, committed checkout and disposable install",
+      "revision": "92ef8fd7178feb279318cb6491f58afc4a756096",
+      "command": "python scripts/release_qualify.py --build --install --reproduce --unsigned-ok --json --out OUTPUT",
+      "observed": "Wheel and source archive scans passed, all 18 installed smoke checks passed, and a second build produced a byte-identical wheel. The ignored local inventory was present in the checkout and excluded from the source archive. The build reused the clean 912268aff dashboard bundle because the frontend sources in this packaging slice were unchanged."
+    },
+    {
+      "check": "Installed dashboard and persisted streaming turn",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 in a disposable home, dashboard and synthetic provider on separate loopback ports",
+      "revision": "92ef8fd7178feb279318cb6491f58afc4a756096",
+      "command": "python scripts/artifact_install_e2e.py --wheel WHEEL --require-network --require-clean",
+      "observed": "Authenticated create returned the expected ID. The provider released its second chunk only after the dashboard forwarded the first. The probe observed start, delta, delta, done, exact text and one provider request. Canonical-store, HTTP and child-process reads agreed on both messages. Listener restart preserved the transcript and interrupted-turn marker, and the completed turn left no cancellable registration."
+    },
+    {
+      "check": "Fresh-install verification",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 in a disposable home",
+      "revision": "92ef8fd7178feb279318cb6491f58afc4a756096",
+      "command": "python scripts/verify_fresh_install.py --wheel WHEEL --require-network --require-clean",
+      "observed": "Version identity, real HTTP health and dashboard assets, packaged TUI load outside the checkout, and installed source-path scan passed. The TUI smoke used a non-TTY stdin."
+    },
+    {
+      "check": "Workbench health fix",
+      "status": "PASS",
+      "environment": "Isolated loopback HTTP",
+      "revision": "fe342b27e",
+      "command": "pytest tests/test_webui_http11_keepalive9u.py tests/test_workbench_config_extensions.py tests/test_workbench_stream_deadlock.py",
+      "observed": "71 tests passed. The new test independently read canonical health and both unauthenticated Workbench aliases with the same query shape used by the browser. Isolated Chromium also mounted both composers and read the actual mount-relative health URL at 390px and 1440px without horizontal overflow."
+    },
+    {
+      "check": "Backup refusal and update rehearsal",
+      "status": "PASS",
+      "environment": "Isolated fixtures",
+      "revision": "5a0ea00f1",
+      "command": "pytest tests/test_qubit_d5_backup_portable.py tests/test_update_apply_rehearsal9u.py",
+      "observed": "11 tests passed. The corrected regression supplies the passphrase through the actual confirmation flow and verifies a wrong passphrase leaves the newer version of a report in place and creates no restore snapshot."
+    },
+    {
+      "check": "Additional installed streaming cases and packaged upgrade",
+      "status": "NOT RUN",
+      "environment": "Disposable Linux install",
+      "revision": null,
+      "command": null,
+      "observed": "Remaining installed cases include quiet-turn keep-alives, timeout, transport disconnect, concurrent provider turns, and a populated-state package upgrade and rollback."
+    },
+    {
+      "check": "Deployed named-profile inference and PTY",
+      "status": "NOT RUN",
+      "environment": "localhost:8890",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": null,
+      "observed": "Live writes need an approved disposable profile and provider endpoint. Read-only route checks do not establish inference, session deep links, PTY lifecycle or restart settlement."
+    },
+    {
+      "check": "Installed cancellation during a quiet close-delimited provider response",
+      "status": "FAIL",
+      "environment": "Linux installed wheel and synthetic loopback provider",
+      "revision": "92ef8fd7178feb279318cb6491f58afc4a756096",
+      "command": "POST /agent/api/qubit/chat/stream, then POST /agent/api/qubit/chat/cancel after the first delta",
+      "observed": "The cancel endpoint accepted the request, but the dashboard stream exceeded the client read deadline. The HTTP client had released its socket reference for the close-delimited provider response."
+    },
+    {
+      "check": "Installed cancellation after the socket retention fix",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 in a disposable home with a close-delimited loopback SSE provider",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "command": "python scripts/artifact_install_e2e.py --wheel WHEEL --require-network --require-clean",
+      "observed": "The provider stayed quiet after one delta. HTTP cancel settled the dashboard stream with start, delta, cancelled. The canonical store contained only the user prompt, exactly one provider request arrived, and a second cancel returned NO_ACTIVE_TURN. The same wheel passed the fresh-install verifier."
+    },
+    {
+      "check": "Live dashboard font assets (QAI-004)",
+      "status": "PASS",
+      "environment": "Read-only HTTP on localhost:8890",
+      "revision": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+      "command": "GET /fonts-dashboard/Inter-latin.woff2 and /fonts-dashboard/Rajdhani-latin.woff2",
+      "observed": "Both responses returned 200, font/woff2, and the wOF2 file signature."
+    },
+    {
+      "check": "Unsigned release qualification with active cancellation fix",
+      "status": "PASS",
+      "environment": "Linux Python 3.12, committed checkout and disposable install",
+      "revision": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+      "command": "python scripts/release_qualify.py --build --install --reproduce --unsigned-ok --json --out OUTPUT",
+      "observed": "Both archive scans, all 18 installed smoke checks, and a byte-identical wheel rebuild passed."
+    },
+    {
+      "check": "Candidate GitHub release and installed jobs before the cancellation fix",
+      "status": "PASS",
+      "environment": "GitHub Actions Linux",
+      "revision": "0bd213a95d27fd5c6d6d46a35c6a30fdd606cc9c",
+      "command": "gh pr checks 48",
+      "observed": "Release qualification and Artifact install E2E (Linux) passed on this PR revision. The updated head requires its own checks."
+    }
+  ],
+  "cancellation_fix_artifact": {
+    "version": "0.0.15",
+    "source_commit": "1b92ddb25c3aaa952861318f22372343dcd1af18",
+    "dashboard_build_commit": "912268affa235d9db0e134d3f8f3bb796a89bd6f",
+    "wheel_sha256": "df7590609749c1646397171699863157717acebdd4232747792f2b33be746205"
+  }
+}

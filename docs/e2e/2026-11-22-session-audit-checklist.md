@@ -167,3 +167,7 @@ Run the focused dashboard Vitest files `ChatSidebar.test.tsx`, `ModelPickerDialo
 The remaining release evidence includes gateway socket bootstrap, named live provider and memory integrations, action coverage still marked above, and a re-check of the repaired flows on `:8890`. The requested audit excludes `:8895`. The audit branch does not modify the VS Code checkout or the observed live profile.
 
 GitHub reports the installed-dashboard PRs #38–#43 and the log-search PR #45 as merged. Their commits are in the audit branch through `origin/main` at `19f2750f`. Open PR #44 at `c6585976` adds 44 commits beyond the audit branch across installed session checks, cancellation, models, portability and release workflows. A Git merge preview found no file conflicts. The combined installed checks remain open.
+
+## Packaged acceptance and deployed baseline (2026-11-24)
+
+The [packaged acceptance results](2026-11-24-packaged-acceptance.json) record the current main and deployed baseline, the release qualification failure and fix, and the exact Linux wheel exercised with a loopback provider. Deployed inference and PTY, provider interruption and concurrency in the installed artifact, and a populated-state package upgrade and rollback remain open.

@@ -139,7 +139,14 @@ def test_d5_failed_restore_does_not_change_operator_state(tmp_path,
     from voicebridge import dashboard_ops as OPS
 
     password = "correct portable archive password"
-    staged = OPS.run_op(cfg, "backup_create", {"label": "before-failure"},
+    wrong_password = "incorrect password"
+    state = Path(cfg.state_dir())
+    sentinel = state / "reports" / "operator-sentinel.txt"
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text("archived report data\n", encoding="utf-8")
+
+    staged = OPS.run_op(cfg, "backup_create",
+                        {"label": "before-failure", "passphrase": password},
                         actor="dashboard:user", session="d5")
     assert staged["state"] == "needs-confirm", staged
     created = OPS.confirm_op(cfg, staged["confirmation_id"],
@@ -148,18 +155,18 @@ def test_d5_failed_restore_does_not_change_operator_state(tmp_path,
     assert created["state"] == "executed", created
     bundle = Path(created["receipt"]["result"]["path"])
 
-    sentinel = Path(cfg.state_dir()) / "operator-sentinel.txt"
-    sentinel.write_text("preserve this operator data\\n", encoding="utf-8")
+    sentinel.write_text("preserve this newer report data\n", encoding="utf-8")
     before = sentinel.read_bytes()
     refused = _op(cfg, "backup_restore",
-                  {"bundle": str(bundle), "apply": "true"},
-                  sensitive={"passphrase": "incorrect password"})
+                  {"bundle": str(bundle), "apply": "true", "passphrase": wrong_password},
+                  sensitive={"passphrase": wrong_password})
     assert refused["state"] == "failed", refused
     assert refused["code"] == "WrongPassphraseError", refused
     assert sentinel.read_bytes() == before
+    assert not list(state.glob("pre-restore-*"))
     assert bundle.exists()
-    assert password not in json.dumps(refused)
-    assert "incorrect password" not in _journal_text(cfg)
+    assert password not in _journal_text(cfg)
+    assert wrong_password not in _journal_text(cfg)
 
 
 def test_d5_backup_apply_requires_enrollment(tmp_path, monkeypatch):

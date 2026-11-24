@@ -234,6 +234,27 @@ def test_import_scan_installed_flags_rogue(tmp_path):
     assert any("frobnicate" in f for f in fails)
 
 
+def test_installed_dependency_scan_resolves_declared_alias_and_bundled_runtime(
+    tmp_path, monkeypatch,
+):
+    from importlib import metadata
+
+    pkg = tmp_path / "voicebridge"
+    runtime = pkg / "_data" / "qubit_runtime"
+    runtime.mkdir(parents=True)
+    (pkg / "compat.py").write_text(
+        "import dotenv\nfrom qubit_runtime.qubit_cli import foreign_config\n"
+    )
+    monkeypatch.setattr(metadata, "requires", lambda _: ["python-dotenv==1.2.2"])
+
+    declared = R.declared_module_names_from_metadata()
+    assert R.import_scan_installed(pkg, declared) == []
+    assert R.import_scan_installed(pkg, set()) == ["dotenv at compat.py:1"]
+
+    runtime.rmdir()
+    assert R.import_scan_installed(pkg, declared) == ["qubit_runtime at compat.py:2"]
+
+
 def test_import_scan_installed_syntax_error_reported(tmp_path):
     pkg = tmp_path / "badpkg"
     pkg.mkdir()

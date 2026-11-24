@@ -31,11 +31,13 @@ A merged change is not equivalent to a verified deployment. Code changes must be
 
 The Linux artifact-install probe in `scripts/clean_install_rehearsal.py`
 currently exercises a built wheel with isolated state and a real HTTP listener.
-PRs #40-#43 added protected-route token rejection, authenticated plugin
-catalog reads, listener restart, and authenticated session-inventory reads.
-These are **partial** acceptance checks, not proof of a live agent turn or
-persisted conversation messages. PR #44 is tightening the session response
-envelope; do not count it as merged until its checks and merge complete.
+PRs #40-#44 merged protected-route token rejection, authenticated plugin
+catalog and session reads, listener restart, and canonical transcript
+persistence checks. PR #47 merged the fresh-install health verifier repair.
+The [November 24 results](e2e/2026-11-24-packaged-acceptance.json) record the
+local candidate's authenticated create, loopback-provider streaming, and
+active cancellation coverage. The deployed provider and full release checks
+remain open.
 
 Implement the remaining P0 release acceptance as a coherent milestone rather
 than separate PRs for each assertion:

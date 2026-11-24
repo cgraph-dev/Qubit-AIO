@@ -665,9 +665,11 @@ def _vendored_top_level_names(base: Path) -> set[str]:
         checkout = Path(base).parent / "qubit_runtime"
         if checkout.is_dir():
             root = checkout
-    names: set[str] = set()
     if not root.is_dir():
-        return names
+        return set()
+    # Checkout-only imports can use the namespace rooted at qubit_runtime.
+    # Their installed branches import the same tree via voicebridge._data.
+    names = {root.name}
     for entry in root.iterdir():
         if entry.is_dir():
             if (entry / "__init__.py").is_file():
@@ -742,11 +744,10 @@ def declared_module_names(pyproject: Optional[Path] = None) -> set[str]:
     names = {d["name"] for d in data["main"]}
     for reqs in data["extras"].values():
         names |= {d["name"] for d in reqs}
-    names |= _DIST_ALIASES.keys() | set(_DIST_ALIASES.values())
-    return {_normalize_import(n) for n in names}
+    return _module_names_for_distributions(names)
 
 
-_DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper"}
+_DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper", "python_dotenv": "dotenv"}
 
 # Modules imported through guarded optional paths (try/except ImportError) as
 # inventoried in docs/archive/2026-09-21/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
@@ -763,6 +764,11 @@ def _normalize_import(name: str) -> str:
     return name.replace("-", "_").split(".")[0].lower()
 
 
+def _module_names_for_distributions(distributions: set[str]) -> set[str]:
+    names = {_normalize_import(name) for name in distributions}
+    return names | {_DIST_ALIASES[name] for name in names & _DIST_ALIASES.keys()}
+
+
 def declared_module_names_from_metadata(dist_name: str = "qubit-voicebridge"
                                         ) -> set[str]:
     """Import names allowed by the INSTALLED package metadata (Requires-Dist
@@ -775,8 +781,7 @@ def declared_module_names_from_metadata(dist_name: str = "qubit-voicebridge"
         base = base.split("/")[-1] if "/" in base else base
         if base:
             names.add(base)
-    names |= _DIST_ALIASES.keys() | set(_DIST_ALIASES.values())
-    return {_normalize_import(n) for n in names}
+    return _module_names_for_distributions(names)
 
 
 # ---------------------------------------------------------------------------
