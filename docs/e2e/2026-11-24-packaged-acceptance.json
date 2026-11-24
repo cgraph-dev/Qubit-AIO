@@ -414,6 +414,14 @@
       "command": "POST the named stream with a submission_id, reset the HTTP connection after the start event, wait for relay cleanup, then POST /agent/api/qubit/chat/recover with the same profile, session and submission ID",
       "observed": "One detached turn completed and the correct provider reply appeared in the transcript. An exact retry returned the terminal result with one provider invocation and one SQLite admission. A separate detached turn stopped through the recovery endpoint and did not persist the late provider reply. A different ID did not match either receipt. Native tests resolved an identical submission ID independently for two authenticated principals. Chromium at 390px and 1440px restored the pending turn after reload, blocked Send, and fetched the canonical transcript when Check turn settled. The dashboard and API selection passed 97 tests, the Python route selection passed 21, and the native receipt selection passed four.",
       "scope": "The deployed build, image inputs, turn-scoped overrides and recovery under load remain open."
+    },
+    {
+      "check": "Named-profile dashboard image admission and exact retry",
+      "status": "PASS",
+      "environment": "Source dashboard and gateway, disposable named profile, authenticated HTTP and loopback native-vision provider",
+      "command": "POST the named chat stream with image_data_url and submission_id; verify the provider image_url bytes, admission digest, staging cleanup and saved transcript",
+      "observed": "The PNG reached the selected profile’s provider as an image part with matching bytes. The admission contained the exact digest and retained media path under the named profile. The finished reply matched the transcript. The same submission ID returned the saved result with one provider request and one admission. Bad PNG and MIME mismatch were refused in route tests. Chromium uploaded the PNG from the named chat and reloaded its reply at 390px and 1440px. The route selection passed 22 tests, the gateway image selection passed three, and the dashboard selection passed 38.",
+      "scope": "The real provider probe used a deterministic native-vision fixture and PNG input. The deployed build and external providers remain unverified."
     }
   ],
   "cancellation_fix_artifact": {
