@@ -8360,7 +8360,7 @@ def _named_chat_events(cfg, home, body):
     except (OwnerUnavailable, OSError, TimeoutError):
         return 409, {"ok": False, "code": "CHAT_PROFILE_WORKER_UNAVAILABLE",
                      "detail": "Start the gateway serving this profile or open it in /chat."}
-    return 200, profile_chat.events(home, endpoint, session, text)
+    return 200, profile_chat.events(home, endpoint, session, text, cfg=cfg)
 
 
 def _chat_execution_local(handler):

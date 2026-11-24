@@ -350,6 +350,21 @@
       "revision": "a0774f332ebb2589bc4490533e3682a86286c692",
       "command": "pytest -m ui -q tests/test_dashboard_e2e_phase4.py -k workbench; focused PTY, Workbench stream and HTTP transport tests",
       "observed": "Both aliases loaded and reloaded the same session at 390px and 1440px, fetched its session API successfully and fit the viewport. Independent API read-back matched the ID. The focused 56-test selection passed, including resize, named-profile ownership, reconnect, detach, reattach and orphan cleanup. The deployed dashboard's two health aliases still returned 404. Live inference and deployed PTY remain open."
+    },
+    {
+      "check": "Installed named gateway and offline draft adoption",
+      "status": "PASS",
+      "environment": "Linux Python 3.12 wheel, disposable default and named homes, loopback dashboard and gateway with an SSE fixture provider",
+      "revision": "202d7751e1046da98b997eff916a0a491084db73",
+      "wheel_sha256": "b2ea7a9f3aa642b69a3ba5da75ee1bbf27b43dfbc9ce3f1f02d1c8a39d0b1882",
+      "observed": "Offline submission returned 409 CHAT_PROFILE_WORKER_UNAVAILABLE. After startup, the gateway descriptor served only the named profile. The draft retained its ID across HTTP and fresh authenticated WebSocket resume. Exactly one provider call and one terminal admission matched the saved reply. The default profile returned 404 for the same ID. An older dashboard transcript stayed readable and the native gateway refused to submit on it. Explicit cancel settled a second disposable turn."
+    },
+    {
+      "check": "Dashboard emergency stop on an admitted named-profile turn",
+      "status": "PASS",
+      "environment": "Patched dashboard relay from source and installed Linux 0.0.15 gateway, disposable profile and gated loopback provider",
+      "observed": "On the installed baseline, dashboard emergency stop returned OK and blocked new submissions, while an already admitted named turn completed and persisted its reply. The patched relay used the same gateway to cancel that exact admission. The stream reported cancellation, the admission became terminal, and the fixture provider reply did not appear in the transcript. Both probes checked graceful gateway cleanup.",
+      "scope": "The patched dashboard ran from source. A rebuilt wheel, the deployed dashboard, cross-process stop, and approval continuations were outside this check."
     }
   ],
   "cancellation_fix_artifact": {
