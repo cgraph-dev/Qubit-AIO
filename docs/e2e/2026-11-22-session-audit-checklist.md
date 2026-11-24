@@ -204,3 +204,11 @@ the recorded scope of opt-in checks. The counts describe whole checkboxes
 and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.
+
+The named-profile row now has disposable Linux evidence for gateway startup,
+profile isolation, exact offline draft adoption, saved-result correlation, and
+readable legacy dashboard history. An active named turn survived the original
+dashboard emergency stop. The patched dashboard cancelled the admitted turn
+through the installed owner and checked the terminal admission and transcript.
+The row still requires approval continuation, a supported transfer of legacy
+history to an active conversation, and verification on the deployed build.
