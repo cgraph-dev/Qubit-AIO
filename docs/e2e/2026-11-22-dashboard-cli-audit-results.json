@@ -2338,6 +2338,12 @@
       "production_build": "passed",
       "chromium": "passed"
     },
-    "remaining": "Spoken reorder, touch reordering, deployed control checks, advanced Kanban options, agent management and broader Operations forms remain open."
+    "deployment": {
+      "build": "f54f701eb95b5c7b6cbd3da2fac19e6c5cd9b46e",
+      "scope": "Local development checkout on port 8890. VoiceBridge restarted while the active gateway process was preserved.",
+      "result": "The clean build reported READY. Workbench, Chat and the workspace API returned 200. The deployed reorder handler rejected an empty order with 400 PROJECT_BAD_ORDER. Real workspace order changes were exercised on disposable state.",
+      "provider": "The system Ollama service was active at read-back."
+    },
+    "remaining": "Spoken reorder, touch reordering, deployed mutation read-back, advanced Kanban options, agent management and broader Operations forms remain open."
   }
 }
