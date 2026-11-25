@@ -6671,7 +6671,7 @@ function renderWorkspacesPanel(workspaces){
         aria-keyshortcuts="ArrowUp ArrowDown">${li('grip-vertical',12)}</button>
       <div class="ws-row-info">
         <div class="ws-row-name">${esc(w.name)}${activeBadge}</div>
-        <div class="ws-row-path">${esc(w.path)}</div>
+        <div class="ws-row-path"><bdi dir="ltr">${esc(w.path)}</bdi></div>
       </div>
       <div class="ws-move-actions">
         <button type="button" class="ws-move-btn ws-move-up"

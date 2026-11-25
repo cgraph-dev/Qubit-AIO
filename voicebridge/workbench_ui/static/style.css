@@ -3726,6 +3726,10 @@
   .ws-move-btn:not(:disabled):active{background:var(--accent-bg-strong);}
   .ws-move-btn:focus-visible{outline:2px solid var(--accent-text);outline-offset:-2px;}
 }
+@media (max-width:640px){
+  /* Keep the folder name visible when a long path runs out of room. */
+  .ws-row-path{direction:rtl;text-align:left;}
+}
 .ws-row.dragging{opacity:.35;border:1px dashed var(--accent-bg-strong);}
 .ws-row.drag-over{border-color:var(--accent-text);background:var(--accent-bg);}
 .workspaces-list{flex:1;overflow-y:auto;padding:8px;min-height:0;}
