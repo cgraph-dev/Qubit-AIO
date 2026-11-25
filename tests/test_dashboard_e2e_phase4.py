@@ -443,6 +443,8 @@ def test_cron_declining_confirmation_keeps_job_state(browser, ui_server, action,
         assert status == 200 and paused["enabled"] is False, paused
 
     context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.route("**/*", lambda route: route.continue_()
+                  if route.request.url.startswith(base + "/") else route.abort())
     page = context.new_page()
     staged_requests = []
     dialogs = []
@@ -464,11 +466,22 @@ def test_cron_declining_confirmation_keeps_job_state(browser, ui_server, action,
     try:
         page.goto(base + "/cron", wait_until="domcontentloaded")
         button = _row_for(page, name, action.title()).get_by_role("button", name=action.title())
-        with page.expect_response(lambda response: is_mutation(response.request)) as staged:
+        with (
+            page.expect_response(lambda response: is_mutation(response.request)) as staged,
+            page.expect_response(lambda response: response.url.endswith("/agent/api/ops/cancel")) as canceled,
+        ):
             button.click()
         assert staged.value.status == 409
         assert staged.value.json()["code"] == "CONFIRM_REQUIRED"
+        approval = staged.value.json()["confirmation_id"]
+        assert canceled.value.status == 200
+        assert canceled.value.request.post_data_json == {"confirmation_id": approval}
         pw.expect(button).to_be_enabled()
+        status, pending = _api(base, token, "GET", "/agent/api/ops/approvals")
+        assert status == 200 and all(row["id"] != approval for row in pending["approvals"])
+        status, replay = _api(base, token, "POST", "/agent/api/ops/confirm",
+                              {"confirmation_id": approval})
+        assert status == 400 and replay["code"] == "NO_CONFIRMATION", replay
         status, readback = _api(base, token, "GET", job)
         assert status == 200 and readback["enabled"] is enabled, readback
         page.reload(wait_until="domcontentloaded")
@@ -499,6 +512,8 @@ def test_cron_named_profile_and_blueprint_confirmation(browser, ui_server):
         assert status == 200, job
 
     context = browser.new_context(viewport={"width": 1440, "height": 1000})
+    context.route("**/*", lambda route: route.continue_()
+                  if route.request.url.startswith(base + "/") else route.abort())
     page = context.new_page()
     dialogs = []
     page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.accept()))
@@ -506,20 +521,21 @@ def test_cron_named_profile_and_blueprint_confirmation(browser, ui_server):
         page.goto(base + "/cron", wait_until="domcontentloaded")
         page.get_by_text("Default fixture", exact=True).wait_for()
         page.get_by_text("Scoped fixture", exact=True).wait_for()
-        page.locator("#cron-profile-filter").click()
-        page.get_by_role("option", name="cron-audit", exact=True).click()
+        page.locator("#cron-profile-filter").get_by_role("combobox", name="Profile").click()
+        options = page.get_by_role("dialog", name="Profile options")
+        options.locator('label[part="option"]').filter(has_text="cron-audit").click()
         page.get_by_text("Scoped fixture", exact=True).wait_for()
-        assert not page.get_by_text("Default fixture", exact=True).count()
-        page.get_by_text("Blueprints", exact=True).click()
+        pw.expect(page.get_by_text("Default fixture", exact=True)).to_have_count(0)
+        page.get_by_role("button", name="Blueprints", exact=True).click()
         card = page.get_by_text("Custom reminder", exact=True).locator(
-            "xpath=ancestor::div[.//button[normalize-space()='Set up']][1]")
-        card.get_by_role("button", name="Set up").click()
-        page.get_by_role("textbox", name="Remind me to…").fill("verify the scheduled fixture")
+            "xpath=ancestor::div[.//sakuga-button[normalize-space()='Set up']][1]")
+        card.locator("sakuga-button").locator("button").click()
+        page.locator('input[aria-label="Remind me to…"]').fill("verify the scheduled fixture")
         path = "/agent/api/cron/blueprints/instantiate"
         with page.expect_response(lambda response: urlsplit(response.url).path == path
                                   and response.request.method == "POST"
                                   and response.status == 200) as created:
-            page.get_by_role("button", name="Schedule it").click()
+            page.get_by_role("button", name="Schedule it").last.click()
         assert parse_qs(urlsplit(created.value.url).query)["profile"] == ["cron-audit"]
         assert len(dialogs) == 1
         row = created.value.json()
