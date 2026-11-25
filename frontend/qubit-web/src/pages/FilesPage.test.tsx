@@ -92,6 +92,43 @@ describe("FilesPage empty-root reason", () => {
   });
 });
 
+describe("FilesPage folder confirmation", () => {
+  it("closes the editor while confirmation is pending and restores the draft on decline", async () => {
+    const { ConfirmRequiredError } = await import("@/lib/api");
+    const settle = vi.fn();
+    apiMocks.listFiles.mockResolvedValue({
+      ok: true, root: "/repo", path: "/repo", locked_root: "/repo", entries: [],
+    });
+    apiMocks.createDirectory.mockRejectedValueOnce(
+      new ConfirmRequiredError("Confirm the folder creation.", "folder-stage", settle),
+    );
+    await renderFiles();
+    const create = [...container.querySelectorAll<HTMLElement>("sakuga-button, button")].find(
+      (button) => button.textContent?.trim() === "Create",
+    );
+    expect(create).toBeDefined();
+    await act(async () => { create?.click(); });
+    const input = () => document.querySelector<HTMLElement>('sakuga-input[aria-label="Folder name"]');
+    await waitFor(() => input() !== null);
+    await act(async () => { typeIntoSakuga(input(), "audit-folder"); });
+    const edit = input()?.closest('[role="dialog"]');
+    const submit = [...(edit?.querySelectorAll<HTMLElement>("sakuga-button, button") ?? [])].find(
+      (button) => button.textContent?.trim() === "Create",
+    );
+    expect(submit).toBeDefined();
+    await act(async () => { submit?.click(); });
+    const confirmation = () => document.querySelector("[data-confirm-backdrop]");
+    await waitFor(() => confirmation() !== null);
+    await waitFor(() => input() === null);
+    const decline = confirmation()?.querySelector<HTMLElement>(".qm-confirm-dialog__cancel");
+    await act(async () => { decline?.click(); });
+    await waitFor(() => input()?.getAttribute("value") === "audit-folder");
+    expect(confirmation()).toBeNull();
+    expect(settle).not.toHaveBeenCalled();
+    expect(apiMocks.createDirectory).toHaveBeenCalledExactlyOnceWith("/repo/audit-folder");
+  });
+});
+
 describe("FilesPage root-level download path resolution", () => {
   it("resolves an entry with an empty path from the listing directory + name", async () => {
     apiMocks.listFiles.mockResolvedValue({

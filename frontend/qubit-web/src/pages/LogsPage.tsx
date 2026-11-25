@@ -210,7 +210,10 @@ export default function LogsPage() {
   // Download the exact lines currently shown (the server tail + filters are the
   // source of truth; no second backend fetch is invented).
   const exportLogs = useCallback(() => {
-    const blob = new Blob([lines.join("\n")], {
+    const contents = lines.map((line, index) =>
+      index < lines.length - 1 && !line.endsWith("\n") ? line + "\n" : line,
+    );
+    const blob = new Blob(contents, {
       type: "text/plain;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);

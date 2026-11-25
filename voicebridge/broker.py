@@ -1097,6 +1097,15 @@ def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
     Returns the capability names registered.
     """
     from . import file_patch as _fp
+    from .config import Config
+
+    # Workers need the same project store and durable stop latch. The live
+    # dashboard config also holds process-local services and locks.
+    if cfg is not None:
+        cfg = Config({
+            "logging": {"jsonl": True, "jsonl_path": str(cfg.state_dir())},
+            "power": {"control_path": cfg.get("power", "control_path", default="")},
+        })
 
     def _apply(args: Dict[str, Any]) -> str:
         try:

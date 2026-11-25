@@ -1005,9 +1005,12 @@ def test_files_upload_is_real_text_broker_with_binary_gate(tmp_path,
 # confirm-gated confined operations, not blanket refusals.
 # ===========================================================================
 def test_files_mkdir_is_real_confined_confirm_gated(tmp_path, monkeypatch):
+    from threading import Lock
+
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
+    cfg._live_service_lock = Lock()
     root, _ = _repo(tmp_path)
     _project(cfg, root)
     target = root / "newdir"

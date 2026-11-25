@@ -153,7 +153,34 @@ describe("LogsPage pagination", () => {
   });
 });
 
-describe("LogsPage export disabled reason", () => {
+describe("LogsPage export", () => {
+  it("exports server lines with exactly their original line breaks", async () => {
+    const lines = ["one\r\n", "two\n", "\n", "three", "four"];
+    apiMocks.fetchJSON.mockResolvedValue({ file: "agent", lines });
+    const createObjectURL = vi.fn((_blob: Blob) => "blob:logs-fixture");
+    const URLMock = Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL: vi.fn() });
+    vi.stubGlobal("URL", URLMock);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    try {
+      await renderLogs();
+      const exportButton = container.querySelector<HTMLButtonElement>('[aria-label="Export log lines"]');
+      expect(exportButton?.disabled).toBe(false);
+      await act(async () => { exportButton?.click(); });
+      const blob = createObjectURL.mock.calls[0][0];
+      const contents = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(blob);
+      });
+      expect(contents).toBe("one\r\ntwo\n\nthree\nfour");
+    } finally {
+      click.mockRestore();
+    }
+  });
+
+
   it("disables Export and names the truthful reason when no lines are loaded", async () => {
     apiMocks.fetchJSON.mockResolvedValue({
       file: "agent",
