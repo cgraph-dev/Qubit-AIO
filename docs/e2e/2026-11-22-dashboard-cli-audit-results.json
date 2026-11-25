@@ -2131,5 +2131,19 @@
       "graft": "Both systemd user services now find Node and Graft through mise shims. Both launched a Graft MCP child. A stdio session with that PATH initialized and listed six tools."
     },
     "remaining": "The live read-only smoke check leaves deployed provider calls and per-control mutations open."
+  },
+  "live_health_and_log_snapshot_recheck": {
+    "date": "2026-11-25",
+    "health_repair": "addca5fa1",
+    "frontend_revision": "45c56f4888f0877843208d61bfebd629ee994272",
+    "health_before": "DEGRADED",
+    "health_after": "READY",
+    "details": "Live platform and model checks reported OK, provider and service READY, and branding MIGRATED. Browser CDP remained MISSING and the communications timer PENDING. Both opt-in checks stayed visible and were marked optional because the monitor was disabled. Regression tests retained degradation for configured or enabled monitoring.",
+    "live_logs": "Authenticated read-only HTTP checks passed for the current page, pinned next page, empty search, and the LOG_SNAPSHOT_EXPIRED response. No production log lines were copied into the evidence.",
+    "fixture_logs": "A named fixture found sparse matches across 4,500 filler rows, retained its extent after append, isolated the default profile, and rejected the older snapshot after rotation.",
+    "focused_tests": {
+      "health": 17,
+      "logs": 1
+    }
   }
 }
