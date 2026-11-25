@@ -3235,7 +3235,7 @@
         defaultWorkspaceKind: (props.boardMeta && props.boardMeta.default_workspace_kind) || "scratch",
         defaultWorkspacePath: (props.boardMeta && props.boardMeta.default_workdir) || "",
         onSubmit: function (body) {
-          props.onCreate(body).then(function () { setShowCreate(false); });
+          return props.onCreate(body).then(function () { setShowCreate(false); });
         },
         onCancel: function () { setShowCreate(false); },
       }) : null,
@@ -3495,9 +3495,14 @@
     const [goalMode, setGoalMode] = useState(false);
     const [goalMaxTurns, setGoalMaxTurns] = useState("");
 
-    const submit = function () {
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState(null);
+
+    const submit = async function () {
       const trimmed = title.trim();
-      if (!trimmed) return;
+      if (!trimmed || submitting) return;
+      setSubmitting(true);
+      setSubmitError(null);
       const body = {
         title: trimmed,
         assignee: assignee.trim() || null,
@@ -3527,10 +3532,15 @@
         const gmt = parseInt(goalMaxTurns, 10);
         if (Number.isFinite(gmt) && gmt > 0) body.goal_max_turns = gmt;
       }
-      props.onSubmit(body);
-      setTitle(""); setAssignee(""); setPriority(0); setParent(""); setSkills("");
-      setWorkspaceKind(defaultWorkspaceKind); setWorkspacePath(defaultWorkspacePath);
-      setGoalMode(false); setGoalMaxTurns("");
+      try {
+        await props.onSubmit(body);
+      } catch (error) {
+        if (!error || error.name !== "ConfirmRequiredError") {
+          setSubmitError(parseApiErrorMessage(error));
+        }
+      } finally {
+        setSubmitting(false);
+      }
     };
 
     const showPathInput = workspaceKind !== "scratch";
@@ -3685,6 +3695,8 @@
             }) : null,
           ),
         ),
+        submitError ? h("p", { role: "alert", className: "text-sm text-destructive" },
+          submitError) : null,
         h("div", { className: "qubit-kanban-dialog-actions" },
           h(SakugaButton, {
             type: "button",
@@ -3694,7 +3706,7 @@
           h(SakugaButton, {
             type: "submit",
             size: "sm",
-            disabled: !title.trim(),
+            disabled: !title.trim() || submitting,
           }, tx(t, "create", "Create")),
         ),
       ),

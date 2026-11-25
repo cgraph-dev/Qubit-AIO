@@ -22,7 +22,7 @@ import React, {
   type ComponentType,
   type ReactNode,
 } from "react";
-import { api, fetchJSON, authedFetch, buildWsUrl, buildWsAuthParam } from "@/lib/api";
+import { api, fetchJSON, authedFetch, buildWsUrl, buildWsAuthParam, runMutationWithConfirm } from "@/lib/api";
 import { cn, timeAgo, isoTimeAgo } from "@/lib/utils";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
@@ -44,6 +44,20 @@ import { Separator } from "@nous-research/ui/ui/components/separator";
 import { Tabs, TabsList, TabsTrigger } from "@nous-research/ui/ui/components/tabs";
 import { useI18n } from "@/i18n";
 import { registerSlot, PluginSlot } from "./slots";
+
+function fetchPluginJSON<T = unknown>(
+  url: string,
+  init?: RequestInit,
+  options?: Parameters<typeof fetchJSON>[2],
+): Promise<T> {
+  const call = () => fetchJSON<T>(url, init, options);
+  const method = init?.method?.toUpperCase();
+  if (url.startsWith("/api/plugins/kanban/") &&
+      (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE")) {
+    return runMutationWithConfirm(call, undefined, true);
+  }
+  return call();
+}
 
 /* Plugin SDK checkbox.
  *
@@ -191,8 +205,7 @@ export function exposePluginSDK() {
 
     // Qubit API client
     api,
-    // Raw fetchJSON for plugin-specific JSON endpoints
-    fetchJSON,
+    fetchJSON: fetchPluginJSON,
     // Authenticated fetch for non-JSON endpoints (uploads / blob downloads).
     // Handles loopback-token vs gated-cookie auth so plugins never read
     // window.__QUBIT_SESSION_TOKEN__ directly.
