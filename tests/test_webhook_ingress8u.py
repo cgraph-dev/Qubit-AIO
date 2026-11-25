@@ -329,6 +329,9 @@ def test_http_signed_channel_envelope_dispatches_once(tmp_path, monkeypatch, cap
                        "--config", str(tmp_path / "voice.yaml")]
             assert cli(command) == 3
             assert json.loads(capsys.readouterr().out)["code"] == IG.CONFIRM_CODE
+            assert cli([*command, "--confirm", "--dry-run"]) == 0
+            assert json.loads(capsys.readouterr().out)["state"] == "preview"
+            assert IG.dm_allowed(cfg, channel, "fixture-sender") == (False, IG.NO_POLICY_CODE)
             assert cli([*command, "--confirm"]) == 0
             capsys.readouterr()
             assert cli(["channels", "dm-policy", channel,

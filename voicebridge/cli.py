@@ -8627,8 +8627,13 @@ def _cmd_channels(cfg, args) -> int:
         elif cmd == "dm-policy":
             out = IG.dm_policy_show(cfg, CI.canonical_channel_id(args.channel))
         elif cmd == "set-dm-policy":
-            out = IG.dm_policy_configure(cfg, CI.canonical_channel_id(args.channel),
-                                         allow=args.allow, deny=args.deny, confirmed=confirm)
+            channel = CI.canonical_channel_id(args.channel)
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "channel": channel,
+                       "would": "replace inbound sender policy"}
+            else:
+                out = IG.dm_policy_configure(cfg, channel, allow=args.allow,
+                                             deny=args.deny, confirmed=confirm)
         elif cmd == "receive":
             payload = Path(args.payload_file).read_bytes()
             out = CI.receive(
