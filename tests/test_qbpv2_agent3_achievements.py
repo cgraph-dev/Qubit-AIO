@@ -122,6 +122,11 @@ def test_reset_requires_confirmation_and_then_clears_unlocks(tmp_path,
 
     status, payload = _dispatch(
         cfg, "POST", "/api/plugins/qubit-achievements/reset-state",
+        body={"confirm": "false"})
+    assert status == 409 and payload["code"] == "CONFIRM_REQUIRED"
+
+    status, payload = _dispatch(
+        cfg, "POST", "/api/plugins/qubit-achievements/reset-state",
         body={"confirm": True})
     assert status == 200 and payload.get("ok") is True, payload
 

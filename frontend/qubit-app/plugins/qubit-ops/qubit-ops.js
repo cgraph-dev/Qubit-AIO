@@ -21,7 +21,7 @@
     bar: {display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12},
     col: {display: "flex", gap: 16, alignItems: "flex-start",
           flexWrap: "wrap"},
-    panel: {flex: "1 1 420px", minWidth: 300},
+    panel: {flex: "1 1 420px", minWidth: 0},
     list: {maxHeight: 460, overflowY: "auto", border: "1px solid #2a3443",
            borderRadius: 8},
     row: {padding: "8px 10px", borderBottom: "1px solid #222c39",
@@ -147,15 +147,23 @@
     }
 
     function settle(id, action) {
+      if (working) return;
       setWorking(id + ":" + action);
-      postJS("/api/ops/" + action, {confirmation_id: id}).then(function () {
+      postJS("/api/ops/" + action, {confirmation_id: id}).then(function (response) {
+        setResult({status: response.status, body: response.body, action: action});
         refreshPending();
-        setWorking("");
       }).catch(function (ex) {
-        setErr(String((ex && ex.message) || ex));
+        setResult({status: 0, body: {ok: false, code: "NETWORK",
+                                     detail: String((ex && ex.message) || ex)}});
+      }).finally(function () {
         setWorking("");
       });
     }
+
+    var awaitingConfirmation = result && result.status === 409 &&
+      Boolean(result.body.confirmation_id);
+    var failed = result && !awaitingConfirmation &&
+      (result.status === 0 || result.status >= 400 || result.body.ok === false);
 
     return e("div", {style: S.wrap},
       e("h1", {style: S.h}, "Operations"),
@@ -179,11 +187,11 @@
             e("span", {style: {flex: "1 1 260px"}},
               e("code", null, String(a.capability || "").slice(0, 48)), " — ",
               String(a.summary || "").slice(0, 120)),
-            e("button", {style: S.btn, disabled: !!busy,
+            e("button", {style: S.btn, disabled: Boolean(working),
               "aria-label": "Confirm " + (a.capability || a.id),
               onClick: function () { settle(a.id, "confirm"); }},
               busy ? "Working…" : "Confirm"),
-            e("button", {style: S.btn, disabled: !!busy,
+            e("button", {style: S.btn, disabled: Boolean(working),
               "aria-label": "Cancel " + (a.capability || a.id),
               onClick: function () { settle(a.id, "cancel"); }}, "Cancel"));
         })
@@ -253,33 +261,30 @@
                   }}));
             }) : e("p", {"data-state": "empty",
               style: {opacity: 0.7, fontSize: 13}}, "No arguments."),
-            e("button", {style: S.btn, disabled: working === "run",
+            e("button", {style: S.btn, disabled: Boolean(working),
               "aria-label": "Run " + sel.id,
               onClick: runOp},
-              working === "run" ? "Running…" : "Run operation"),
-            result ? e("div", {style: {marginTop: 12},
-              "data-state": result.status === 409 ? "pending"
-                : (result.status >= 400 ? "degraded" : "ready")},
-              e("div", {role: result.status >= 400 ? "alert" : "status",
-                  "aria-live": "polite",
-                  style: {fontSize: 13, marginBottom: 6,
-                    color: result.status >= 400 ? "#e5484d" : "#3fb950"}},
-                "HTTP " + result.status + " · " +
-                (result.body.state || result.body.code || "ok")),
-              result.status === 409 && result.body.confirmation_id ?
-                e("div", {style: {marginBottom: 8}},
-                  e("button", {style: S.btn, onClick: function () {
-                      settle(result.body.confirmation_id, "confirm"); }},
-                    "Confirm"),
-                  " ",
-                  e("button", {style: S.btn, onClick: function () {
-                      settle(result.body.confirmation_id, "cancel"); }},
-                    "Cancel")) : null,
-              e("pre", {style: S.code},
-                JSON.stringify(result.body, null, 2).slice(0, 6000))) : null,
+              working === "run" ? "Running…" : "Run operation")),
+          result ? e("section", {style: {marginTop: 12},
+              "aria-label": "Operation result",
+              "data-state": awaitingConfirmation ? "pending" : (failed ? "degraded" : "ready")},
+            e("div", {role: failed ? "alert" : "status",
+                style: {fontSize: 13, marginBottom: 6,
+                  color: failed ? "#e5484d" : (awaitingConfirmation ? "inherit" : "#3fb950")}},
+              awaitingConfirmation ? "Awaiting confirmation" :
+                result.status === 0 ? "Could not reach Qubit" :
+                result.action === "cancel" && !failed ? "Cancelled" :
+                "HTTP " + result.status + " · " + (result.body.state || result.body.code || "ok")),
+            awaitingConfirmation ? e("div", {style: {marginBottom: 8}},
+              e("button", {style: S.btn, disabled: Boolean(working), onClick: function () {
+                  settle(result.body.confirmation_id, "confirm"); }}, "Confirm"),
+              " ",
+              e("button", {style: S.btn, disabled: Boolean(working), onClick: function () {
+                  settle(result.body.confirmation_id, "cancel"); }}, "Cancel")) : null,
+            e("pre", {style: S.code}, JSON.stringify(result.body, null, 2).slice(0, 6000))) : null,
             err ? e("div", {role: "alert",
               style: {color: "#e5484d", marginTop: 8, fontSize: 13}},
-              err) : null))));
+              err) : null)));
   }
 
   window.__QUBIT_PLUGINS__.register("qubit-ops", Operations);
