@@ -2380,5 +2380,15 @@
     "verification": "59 native, compatibility, and Workbench Kanban tests and 3 voice registry checks passed. The production Vite build and the browser rehearsal passed.",
     "deployment": "VoiceBridge restarted from local source 338e9200d. Port 8890 reported READY and the authenticated Operations catalog listed the confirm-gated task completion with an optional summary. The gateway process stayed active.",
     "remaining": "Completion-note entry from the card, parent dependencies, Goal mode and other advanced settings, physical microphone and device checks, and deployed mutation read-back remain open."
+  },
+  "current_kanban_card_completion": {
+    "date": "2026-11-26",
+    "revision": "5f086c78f",
+    "environment": "Production Vite build, authenticated Chromium, disposable native Kanban store, independent CLI and SQLite",
+    "card": "Chromium completed a task from its drawer. The first approval was declined, the second approved, and the note appeared after reload. The dialog sends the same note under result and summary. The native adapter treats matching values as one note and rejects conflicting text before approval.",
+    "bulk": "Selecting two running cards and dragging into Done staged the exact selected IDs and saved the note on both tasks. A focused test confirmed that a changed selection needs a new approval.",
+    "read_back": "The journal recorded a denied single-card approval and distinct executed single and bulk approvals. The CLI and SQLite found the exact note and one completion event per card. Approval records contained a proof of the note without its text.",
+    "verification": "Sixty focused native, compatibility, and Workbench Kanban tests passed along with the production Vite build and authenticated browser and CLI rehearsals.",
+    "remaining": "Parent dependencies, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
   }
 }

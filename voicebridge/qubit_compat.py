@@ -20592,6 +20592,18 @@ def _kanban_edit_fields(kb: Any, body: Dict[str, Any]) -> Dict[str, Any]:
     return fields
 
 
+def _kanban_completion_summary(kb: Any, body: Dict[str, Any], status: str) -> str:
+    # Older Kanban controls send the same note as both result and summary.
+    notes = [kb._check_summary(body[key]) for key in ("summary", "result")
+             if body.get(key) is not None]
+    if len(set(notes)) > 1:
+        raise kb.KanbanError(kb.BAD_INPUT_CODE, "summary and result must contain the same completion note")
+    note = notes[0] if notes else ""
+    if note and status != "done":
+        raise kb.KanbanError(kb.BAD_INPUT_CODE, "a completion summary requires status done")
+    return note
+
+
 def _kanban_apply_status(cfg: Any, kb: Any, tid: int, status: str, *, summary: str = "") -> None:
     """Apply a vendored column status through the native transition verbs."""
     if status in ("running", "review"):
@@ -20691,7 +20703,7 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
     from . import kanban as KB
 
     unsupported = _kanban_unsupported_options(
-        b, frozenset({"title", "body", "assignee", "priority", "status", "board", "summary"}))
+        b, frozenset({"title", "body", "assignee", "priority", "status", "board", "summary", "result"}))
     if unsupported is not None:
         return unsupported
 
@@ -20708,9 +20720,7 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
     try:
         current = _kanban_native_show(cfg, tid)
         fields = _kanban_edit_fields(KB, b)
-        summary = KB._check_summary(b["summary"] if b.get("summary") is not None else "")
-        if summary and status != "done":
-            raise KB.KanbanError(KB.BAD_INPUT_CODE, "a completion summary requires status done")
+        summary = _kanban_completion_summary(KB, b, status)
         assignment = str(b["assignee"] or "").strip() if b.get("assignee") is not None else None
         if status == "archived" and (fields or assignment is not None):
             raise KB.KanbanError(KB.BAD_INPUT_CODE, "archive must be a separate action")
@@ -20774,7 +20784,9 @@ def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
     """POST /api/plugins/kanban/tasks/bulk -> per-id native patch."""
     from . import kanban as KB
 
-    unsupported = _kanban_unsupported_options(b, frozenset({"ids", "title", "body", "assignee", "priority", "status", "archive", "board"}))
+    unsupported = _kanban_unsupported_options(
+        b, frozenset({"ids", "title", "body", "assignee", "priority", "status",
+                      "archive", "board", "summary", "result"}))
     if unsupported is not None:
         return unsupported
 
@@ -20790,6 +20802,7 @@ def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
                      "qubit_counterpart": "CLI `qubit kanban`"}
     try:
         fields = _kanban_edit_fields(KB, b)
+        summary = _kanban_completion_summary(KB, b, status)
         archive = bool(b.get("archive"))
         if (archive or status == "archived") and (fields or b.get("assignee") or (archive and status)):
             raise KB.KanbanError(KB.BAD_INPUT_CODE, "archive must be a separate action")
@@ -20799,7 +20812,7 @@ def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
     gate = _kanban_confirm(
         cfg, "kanban.bulk", f"bulk-updating {len(ids)} kanban tasks", q, b,
         {"ids": [str(i) for i in ids], "status": status, "archive": archive,
-         "assignee": assignee, **fields})
+         "assignee": assignee, "summary": summary, **fields})
     if gate is not None:
         return gate
     results = []
@@ -20811,7 +20824,7 @@ def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
             if archive:
                 KB.archive_task(cfg, tid, requested_by="dashboard:user", confirmed=True)
             if status:
-                _kanban_apply_status(cfg, KB, tid, status)
+                _kanban_apply_status(cfg, KB, tid, status, summary=summary)
             if assignee:
                 KB.assign(cfg, tid, assignee, requested_by="dashboard:user", confirmed=True)
             if fields:
