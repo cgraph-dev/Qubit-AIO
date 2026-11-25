@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import hmac
 import json
 import math
 from contextlib import closing, contextmanager
@@ -16607,6 +16608,11 @@ def webhooks_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(ok=True, **res)
 
 
+# Raw credentials stay in the originating form. The process key binds the
+# approval to those values without making the journal a credential store.
+_CHANNEL_APPROVAL_KEY = secrets.token_bytes(32)
+
+
 def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/messaging/platforms/{id} -> confirmed, audited channel update.
@@ -16668,11 +16674,24 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     }
     detail = (f"changing messaging channel {pid!r} requires explicit "
               "confirmation: re-PUT with {\"confirm\": true}")
+    account_label = str(b.get("label", b.get("name", "")) or "") if kind == "account" else ""
+    payload = {
+        "id": pid, "kind": kind, "enabled": enabled,
+        "env": {str(k): str(v) for k, v in store_env.items()},
+        "clear_env": [str(k) for k in clear_in],
+    }
+    if account_label:
+        payload["label"] = account_label
+    if raw_secret_keys:
+        raw_values = {k: str(env_in[k]).strip() for k in raw_secret_keys}
+        encoded = json.dumps(raw_values, sort_keys=True).encode()
+        payload["raw_proof"] = hmac.digest(_CHANNEL_APPROVAL_KEY, encoded, "sha256").hex()
+    if b.get("confirmation_id") or q.get("confirmation_id"):
+        b = {key: value for key, value in b.items() if key != "confirm"}
+        q = {key: value for key, value in q.items() if key != "confirm"}
     guard = _compat_confirm(
         cfg, "messaging.platform_update", detail, q, b,
-        payload={"id": pid, "enabled": enabled,
-                 "env": {str(k): str(v) for k, v in store_env.items()},
-                 "clear_env": [str(k) for k in clear_in]})
+        payload=payload, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -16690,8 +16709,7 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                clear=clear_in)
         if kind == "account":
             M.account_update(cfg, pid,
-                             label=str(b.get("label", b.get("name", "")) or ""),
-                             enabled=enabled,
+                             label=account_label, enabled=enabled,
                              requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
