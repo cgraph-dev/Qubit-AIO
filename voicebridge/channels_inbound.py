@@ -3,21 +3,20 @@
 Qubit recognizes the Qubit-breadth channel set and gives each an honest,
 credential-reference-derived state. It starts NO socket listener and opens
 NO outbound connection: inbound delivery is expected to arrive through the
-dashboard/CLI HTTP ingress, which calls :func:`receive` with an
-already-authenticated payload. Until a channel has both a configured
-credential *reference* and a real transport adapter, every state resolves to a
-typed ``CHANNEL_UNAVAILABLE`` -- never a fabricated ``CONNECTED``.
+dashboard HTTP ingress, which verifies signed delivery envelopes before
+handing them to the communications broker. Native gateway connections are
+reported separately from the signed HTTP receiver.
 
 * ``catalog``/``status`` project the static :data:`CHANNEL_CAPS` registry; a
   channel is ``UNCONFIGURED``, ``NO_CREDENTIAL``, ``UNAVAILABLE``, or
-  ``DISABLED``, and the ``connected`` list is always empty.
+  ``DISABLED``, and gateway state supplies the connected-platform list.
 * ``configure``/``unconfigure`` record only an ``env:``/``file:`` credential
   reference (never a value), with events, confirmation, estop, and bounds.
 * ``receive`` reuses the webhook ingress kernel: body cap, event allowlist,
   HMAC-SHA256 signature, timestamp freshness, and a bounded replay nonce
   store. A fully verified delivery still resolves to the typed
-  ``CHANNEL_UNAVAILABLE`` gate (signature evidence only) because no listener
-  transport exists; nothing is dispatched or executed.
+  ``CHANNEL_UNAVAILABLE`` gate. This entry point checks the signature and
+  records verification. Dispatch goes through ``ChannelListener``.
 
 References/state live in ``<state_dir>/channels-inbound.json``; replay nonces
 in ``channel-nonces.json``; redacted receipts in ``channel-log.jsonl``.
@@ -27,11 +26,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 SCHEMA = "qubit-channels-inbound/1"
 STORE_NAME = "channels-inbound.json"
@@ -290,9 +290,9 @@ def runtime_platform_id(channel: str) -> str:
 
 LISTENER = {
     "state": "NONE",
-    "detail": "Qubit starts no socket listener; the dashboard/CLI provides "
-              "the HTTP ingress and calls channels_inbound.receive with an "
-              "already-authenticated payload",
+    "detail": "The dashboard HTTP service accepts signed Qubit delivery "
+              "envelopes. This registry starts no separate socket or provider "
+              "listener.",
 }
 
 # The dashboard writes channel config to ``msg-platforms.json``
@@ -901,27 +901,30 @@ def status(cfg: Any, *, gateway_reader: Optional[Any] = None
                       "adapter aliases)."}
 
 
-def _nonce_seen(cfg: Any, nonce: str) -> bool:
+def _nonce_seen(cfg: Any, *nonces: str) -> bool:
+    from filelock import FileLock, Timeout
+
     path = _nonce_path(cfg)
     try:
-        raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except (OSError, ValueError):
-        raw = {}
-    now = _now()
-    live = {k: v for k, v in raw.items()
-            if isinstance(v, (int, float)) and now - float(v) < NONCE_TTL_S}
-    seen = nonce in live
-    live[nonce] = now
-    pruned = dict(sorted(live.items(), key=lambda kv: kv[1])[-MAX_NONCES:])
-    try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(pruned), encoding="utf-8")
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
-    except OSError:
-        pass
-    return seen
+        with FileLock(f"{path}.lock", timeout=5):
+            raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            if not isinstance(raw, dict):
+                raise ValueError("replay state must be an object")
+            now = _now()
+            live = {k: v for k, v in raw.items()
+                    if isinstance(v, (int, float)) and now - float(v) < NONCE_TTL_S}
+            if any(nonce in live for nonce in nonces):
+                return True
+            live.update(dict.fromkeys(nonces, now))
+            pruned = dict(sorted(live.items(), key=lambda kv: kv[1])[-MAX_NONCES:])
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(pruned), encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, path)
+            return False
+    except (OSError, ValueError, Timeout) as exc:
+        raise ChannelError(CORRUPT_CODE, "channel replay state is unavailable") from exc
 
 
 def _receipt(cfg: Any, channel: str, verdict: str, detail: str) -> None:
@@ -947,7 +950,8 @@ def _verify(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
             timestamp: Optional[float] = None, delivery_id: str = "",
             sender: str = "", event: str = "message",
             verdict: str = "VERIFIED_UNAVAILABLE",
-            detail: str = "") -> Dict[str, Any]:
+            detail: str = "",
+            authorize: Optional[Callable[[str, str], None]] = None) -> Dict[str, Any]:
     """Ordered signed-delivery kernel shared by receive/verify_delivery.
 
     Validation order: estop -> channel configured -> body cap -> event
@@ -998,7 +1002,7 @@ def _verify(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
         _receipt(cfg, rec["channel"], "STALE", "unparseable timestamp")
         raise ChannelError(STALE_CODE,
                            "missing or unparseable timestamp") from None
-    if abs(_now() - ts) > TS_TOLERANCE_S:
+    if not math.isfinite(ts) or abs(_now() - ts) > TS_TOLERANCE_S:
         _receipt(cfg, rec["channel"], "STALE", "timestamp outside tolerance")
         raise ChannelError(
             STALE_CODE, f"timestamp outside ±{TS_TOLERANCE_S:.0f}s tolerance")
@@ -1007,15 +1011,15 @@ def _verify(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
     if not hmac.compare_digest(expected, sig.lower()):
         _receipt(cfg, rec["channel"], "BAD_SIGNATURE", "hmac mismatch")
         raise ChannelError(BAD_SIGNATURE_CODE, "signature mismatch")
+    if authorize is not None:
+        authorize(rec["channel"], clean_sender)
     nonce = hashlib.sha256(
         f"{rec['channel']}:{ts}:{hashlib.sha256(body).hexdigest()}"
         .encode()).hexdigest()
     delivery_nonce = (hashlib.sha256(f"delivery:{delivery_id}".encode())
                       .hexdigest() if delivery_id else "")
-    replayed = _nonce_seen(cfg, nonce)
-    if delivery_nonce and _nonce_seen(cfg, delivery_nonce):
-        replayed = True
-    if replayed:
+    nonces = (nonce, delivery_nonce) if delivery_nonce else (nonce,)
+    if _nonce_seen(cfg, *nonces):
         _receipt(cfg, rec["channel"], "REPLAY", "nonce already seen")
         raise ChannelError(REPLAY_CODE, "duplicate delivery (replay)")
     _receipt(cfg, rec["channel"], verdict, detail)
@@ -1028,7 +1032,8 @@ def _verify(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
 def verify_delivery(cfg: Any, *, channel: str, payload: bytes,
                     signature: str = "", timestamp: Optional[float] = None,
                     delivery_id: str = "", sender: str = "",
-                    event: str = "message") -> Dict[str, Any]:
+                    event: str = "message",
+                    authorize: Optional[Callable[[str, str], None]] = None) -> Dict[str, Any]:
     """Validate a signed delivery and return the verified facts.
 
     Identical ordered kernel to :func:`receive`, but returns the verified
@@ -1039,7 +1044,7 @@ def verify_delivery(cfg: Any, *, channel: str, payload: bytes,
     info = _verify(cfg, channel=channel, payload=payload,
                    signature=signature, timestamp=timestamp,
                    delivery_id=delivery_id, sender=sender, event=event,
-                   verdict="VERIFIED",
+                   verdict="VERIFIED", authorize=authorize,
                    detail=f"{len(payload or b'')} bytes; signature valid")
     _audit("verify", "channel-ingress",
            {"channel": info["channel"], "event": info["event"],

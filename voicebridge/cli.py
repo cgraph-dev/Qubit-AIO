@@ -2288,6 +2288,17 @@ def build_parser() -> argparse.ArgumentParser:
                                   help="remove a configured channel (needs --confirm)")
     ch_unconf.add_argument("channel")
     ch_unconf.add_argument("--confirm", action="store_true")
+    ch_policy = ch_sub.add_parser("dm-policy", parents=[common],
+                                  help="show a channel's inbound sender policy")
+    ch_policy.add_argument("channel")
+    ch_set_policy = ch_sub.add_parser("set-dm-policy", parents=[common],
+                                      help="replace the sender policy; deny by default")
+    ch_set_policy.add_argument("channel")
+    ch_set_policy.add_argument("--allow", action="append", metavar="SENDER",
+                               help="allow this sender (repeat for each sender)")
+    ch_set_policy.add_argument("--deny", action="append", metavar="SENDER",
+                               help="deny this sender (repeat for each sender)")
+    ch_set_policy.add_argument("--confirm", action="store_true")
     ch_recv = ch_sub.add_parser("receive", parents=[common],
                                 help="validate a signed raw delivery (HMAC; no listener)")
     ch_recv.add_argument("channel")
@@ -8582,7 +8593,7 @@ def _cmd_plugins(cfg, args) -> int:
 
 def _cmd_channels(cfg, args) -> int:
     """voicebridge channels status|catalog|accounts|configure|unconfigure|
-    receive|doctor.
+    dm-policy|set-dm-policy|receive|doctor.
 
     The registry records credential *references* only (never values); no
     listener is started and ``connected`` is never fabricated. Configure/
@@ -8591,6 +8602,7 @@ def _cmd_channels(cfg, args) -> int:
     """
     import json as _json
     from . import channels_inbound as CI
+    from .communications import ingress as IG
     cmd = getattr(args, "channels_command", None) or "status"
     confirm = bool(getattr(args, "confirm", False))
     try:
@@ -8612,6 +8624,11 @@ def _cmd_channels(cfg, args) -> int:
         elif cmd == "unconfigure":
             out = CI.unconfigure(cfg, args.channel, requested_by="cli:user",
                                  confirmed=confirm)
+        elif cmd == "dm-policy":
+            out = IG.dm_policy_show(cfg, CI.canonical_channel_id(args.channel))
+        elif cmd == "set-dm-policy":
+            out = IG.dm_policy_configure(cfg, CI.canonical_channel_id(args.channel),
+                                         allow=args.allow, deny=args.deny, confirmed=confirm)
         elif cmd == "receive":
             payload = Path(args.payload_file).read_bytes()
             out = CI.receive(
@@ -8626,8 +8643,8 @@ def _cmd_channels(cfg, args) -> int:
             return 2
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0
-    except CI.ChannelError as exc:
-        rc = 3 if exc.code == CI.CONFIRM_CODE else 2
+    except (CI.ChannelError, IG.IngressError) as exc:
+        rc = 3 if exc.code in {CI.CONFIRM_CODE, IG.CONFIRM_CODE} else 2
         print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
                            "code": exc.code, "detail": exc.detail[:300],
                            "owner": "qubit-policy",

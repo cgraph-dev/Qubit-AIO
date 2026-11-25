@@ -36,9 +36,12 @@ import json
 import os
 import re
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+from filelock import FileLock, Timeout
 
 SCHEMA = "qubit-communications-ingress/1"
 DM_SCHEMA = "qubit-dm-policy/1"
@@ -67,6 +70,7 @@ NO_POLICY_CODE = "INGRESS_NO_POLICY"
 TOO_LARGE_CODE = "INGRESS_TOO_LARGE"
 BAD_ATTACHMENT_CODE = "INGRESS_BAD_ATTACHMENT"
 BAD_TRANSPORT_CODE = "INGRESS_BAD_TRANSPORT"
+RECEIPT_UNAVAILABLE_CODE = "INGRESS_RECEIPT_UNAVAILABLE"
 
 PART_KINDS = frozenset({
     "text", "image", "video", "audio", "file", "location", "sticker",
@@ -164,6 +168,17 @@ def _save_dm(cfg: Any, state: Dict[str, Any]) -> None:
                            f"dm policy write failed: {exc}") from exc
 
 
+@contextmanager
+def _locked_dm_policy(cfg: Any) -> Iterator[None]:
+    path = _dm_path(cfg)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with FileLock(f"{path}.lock", timeout=5):
+            yield
+    except (OSError, Timeout) as exc:
+        raise IngressError(BAD_INPUT_CODE, "dm policy store is unavailable") from exc
+
+
 def _clean_channel(channel: str) -> str:
     clean = (channel or "").strip().lower()
     if not _CHANNEL_RE.match(clean):
@@ -209,13 +224,14 @@ def dm_policy_configure(cfg: Any, channel: str, *, allow: Optional[List[str]] = 
     if "*" in deny_list and "*" in allow_list:
         raise IngressError(BAD_INPUT_CODE,
                            "wildcard allow and wildcard deny cannot coexist")
-    state = _load_dm(cfg)
-    state["policies"][clean] = {
-        "channel": clean, "allow": allow_list, "deny": deny_list,
-        "default_deny": bool(default_deny),
-        "configured_at": _now(), "updated_by": requested_by,
-    }
-    _save_dm(cfg, state)
+    with _locked_dm_policy(cfg):
+        state = _load_dm(cfg)
+        state["policies"][clean] = {
+            "channel": clean, "allow": allow_list, "deny": deny_list,
+            "default_deny": bool(default_deny),
+            "configured_at": _now(), "updated_by": requested_by,
+        }
+        _save_dm(cfg, state)
     _audit("dm.configure", requested_by,
            {"channel": clean, "allow": len(allow_list),
             "deny": len(deny_list), "default_deny": bool(default_deny)})
@@ -247,11 +263,12 @@ def dm_policy_remove(cfg: Any, channel: str, *,
         raise IngressError(CONFIRM_CODE,
                            "dm policy remove requires explicit --confirm")
     clean = _clean_channel(channel)
-    state = _load_dm(cfg)
-    if clean not in state["policies"]:
-        raise IngressError(NO_POLICY_CODE, f"no dm policy for {clean!r}")
-    del state["policies"][clean]
-    _save_dm(cfg, state)
+    with _locked_dm_policy(cfg):
+        state = _load_dm(cfg)
+        if clean not in state["policies"]:
+            raise IngressError(NO_POLICY_CODE, f"no dm policy for {clean!r}")
+        del state["policies"][clean]
+        _save_dm(cfg, state)
     _audit("dm.remove", requested_by, {"channel": clean})
     return {"state": "OK", "removed": clean}
 
@@ -335,7 +352,7 @@ def _parse_attachment(raw: Any) -> MessagePart:
     if declared is not None:
         try:
             declared = int(declared)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise IngressError(BAD_ATTACHMENT_CODE,
                                "attachment size is not an integer") from None
         if declared < 0 or declared > MAX_PART_BYTES:
@@ -398,16 +415,24 @@ def parse_message(payload: Any) -> Dict[str, Any]:
         raw_parts = obj.get("attachments")
         if raw_parts is None:
             raw_parts = obj.get("parts")
-        for raw in raw_parts or []:
-            parts.append(_parse_attachment(raw))
-        for raw in obj.get("buttons") or []:
-            parts.append(_parse_attachment(
-                {"kind": "button", "text": raw if isinstance(raw, str)
-                 else str(raw.get("text") or raw.get("label") or "")}))
-        for raw in obj.get("cards") or []:
-            parts.append(_parse_attachment(
-                {"kind": "card", "text": raw if isinstance(raw, str)
-                 else str(raw.get("title") or raw.get("text") or "")}))
+        groups = {"attachment": raw_parts, "button": obj.get("buttons"),
+                  "card": obj.get("cards")}
+        for kind, items in groups.items():
+            if items is None:
+                continue
+            if not isinstance(items, list):
+                raise IngressError(BAD_ATTACHMENT_CODE, f"{kind} entries must be an array")
+            if len(parts) + len(items) > MAX_PARTS:
+                raise IngressError(TOO_LARGE_CODE, f"message has more than {MAX_PARTS} parts")
+            for raw in items:
+                if kind != "attachment":
+                    if isinstance(raw, str):
+                        raw = {"kind": kind, "text": raw}
+                    elif isinstance(raw, dict):
+                        label = (raw.get("title") or raw.get("text") if kind == "card"
+                                 else raw.get("text") or raw.get("label"))
+                        raw = {"kind": kind, "text": label or ""}
+                parts.append(_parse_attachment(raw))
         album_id = str(obj.get("album_id") or "").strip()
         if album_id and not _ALBUM_RE.match(album_id):
             raise IngressError(BAD_INPUT_CODE, f"bad album id {album_id!r}")
@@ -430,17 +455,22 @@ def _receipt(cfg: Any, rec: Dict[str, Any]) -> None:
     path = _receipt_path(cfg)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            os.chmod(path.parent, 0o700)
-        except OSError:
-            pass
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec, sort_keys=True) + "\n")
-        lines = path.read_text(encoding="utf-8").splitlines()
-        if len(lines) > MAX_LINES:
-            _atomic_write(path, "\n".join(lines[-MAX_LINES:]) + "\n")
-    except OSError:
-        pass
+        with FileLock(f"{path}.lock", timeout=5):
+            try:
+                os.chmod(path.parent, 0o700)
+            except OSError:
+                pass
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(rec, sort_keys=True) + "\n")
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+                if len(lines) > MAX_LINES:
+                    _atomic_write(path, "\n".join(lines[-MAX_LINES:]) + "\n")
+            except OSError:
+                pass
+    except (OSError, Timeout) as exc:
+        raise IngressError(RECEIPT_UNAVAILABLE_CODE,
+                           "could not save the inbound receipt") from exc
 
 
 def _public_receipt(rec: Dict[str, Any]) -> Dict[str, Any]:
@@ -537,6 +567,28 @@ def records(cfg: Any, *, channel: str = "", limit: int = 100) -> Dict[str, Any]:
             "count": len(rows)}
 
 
+CHANNEL_ENVELOPE_SCHEMA = "qubit.channel.delivery.v1"
+
+
+def channel_http_envelope(payload: bytes, channel: str) -> Optional[Dict[str, str]]:
+    """Extract routing metadata from the signed body of a Qubit delivery."""
+    try:
+        obj = json.loads(payload)
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(obj, dict) or obj.get("schema") != CHANNEL_ENVELOPE_SCHEMA:
+        return None
+    if obj.get("channel") != _clean_channel(channel):
+        raise IngressError(BAD_INPUT_CODE, "envelope channel must match the request path")
+    metadata = {key: obj.get(key) for key in ("sender", "event", "delivery_id")}
+    if not all(isinstance(value, str) and value for value in metadata.values()):
+        raise IngressError(BAD_INPUT_CODE, "envelope requires sender, event and delivery_id")
+    _norm_sender(metadata["sender"])
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}", metadata["delivery_id"]):
+        raise IngressError(BAD_INPUT_CODE, "invalid envelope delivery identifier")
+    return metadata
+
+
 # --------------------------------------------------------------- listeners
 class ChannelListener:
     """In-process channel listener over the existing verification kernel.
@@ -556,20 +608,17 @@ class ChannelListener:
                 source: str = "channel-listener") -> Dict[str, Any]:
         from .. import channels_inbound as CI
 
-        # DM access is checked BEFORE verification so a denied sender cannot
-        # burn the replay nonce of a later legitimate delivery. Only an
-        # allowed sender reaches the signature/freshness/replay kernel; the
-        # broker re-checks the policy before dispatch.
-        allowed, why = dm_allowed(self.cfg, channel, sender)
-        if not allowed:
-            _audit("dm.refused", "channel-listener",
-                   {"channel": channel, "code": why})
-            raise IngressError(why, "sender is not permitted to DM this "
-                                    "channel (fail closed)")
+        def authorize(verified_channel: str, verified_sender: str) -> None:
+            allowed, why = dm_allowed(self.cfg, verified_channel, verified_sender)
+            if not allowed:
+                _audit("dm.refused", "channel-listener",
+                       {"channel": verified_channel, "code": why})
+                raise IngressError(why, "sender is not permitted to DM this channel")
+
         info = CI.verify_delivery(
             self.cfg, channel=channel, payload=payload, signature=signature,
             timestamp=timestamp, sender=sender, event=event,
-            delivery_id=delivery_id)
+            delivery_id=delivery_id, authorize=authorize)
         return dispatch(self.cfg, transport="channel",
                         channel=info["channel"], sender=info["sender"],
                         payload=payload, source=source,
