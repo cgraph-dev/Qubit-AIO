@@ -254,7 +254,8 @@ def _extract(
     rest_bare = re.sub(r"'[^']+'|\"[^\"]+\"", " ", rest)
     remainder_consumed = False
     typed_consumed = False
-    for spec in entry.args:
+    specs = entry.args[:1] if entry.split == "completion-note" else entry.args
+    for spec in specs:
         value: Any = None
         if spec.type == "choice":
             for choice in spec.choices:
@@ -487,6 +488,14 @@ def resolve(text: str, *, pending_confirmation: bool = False,
     norm = _norm(text)
     if not norm:
         return Resolution(UNKNOWN, speech="I didn't catch that.")
+    completion_note = None
+    marker = re.search(r"\bwith\s+note\b", text, re.IGNORECASE)
+    if marker:
+        command = _norm(text[:marker.start()])
+        if any(command == alias or command.startswith(alias + " ")
+               for alias in REGISTRY["kanban_complete"].aliases):
+            norm = command
+            completion_note = text[marker.end():].strip().removeprefix(":").strip()
     tokens = [t for t in norm.split(" ") if t]
     addressed = "qubit" in (text or "").lower()
     hits: List[Tuple[int, VoiceCommand, str, str]] = []
@@ -540,6 +549,12 @@ def resolve(text: str, *, pending_confirmation: bool = False,
     if significant < 2 and not addressed and " " not in entry.aliases[0]:
         return Resolution(UNKNOWN)
     args, missing = _extract(entry, remainder, alias_text)
+    if entry.split == "completion-note" and completion_note is not None:
+        if completion_note:
+            args["summary"] = completion_note
+        else:
+            return Resolution(CLARIFY, entry=entry, args=args,
+                              speech="What completion note should I save?")
     # Alias-implied choice args (e.g. "create checkpoint" implies action=create)
     if missing:
         still_missing: List[VoiceArg] = []
@@ -1448,6 +1463,7 @@ def _b_kanban(ctx, args):
         return KB.complete(
             ctx.cfg,
             _int_arg(args, "task_id"),
+            summary=args.get("summary", ""),
             requested_by="voice:user",
             confirmed=True,
         )
@@ -6723,10 +6739,10 @@ _E("kanban_claim", "Claim task",
 _E("kanban_complete", "Complete task",
    ("complete task", "finish task", "done with task", "close task",
     "kanban complete", "complete kanban task", "mark task complete"),
-   "kanban", ("kanban",), args=(_I("task_id"),),
-   fixed=(("action", "complete"),), confirm=True,
-   examples=("qubit, complete task 5",),
-   help="Mark a task done (confirmed).")
+   "kanban", ("kanban",), args=(_I("task_id"), _R("summary", False)),
+   fixed=(("action", "complete"),), confirm=True, split="completion-note",
+   examples=("qubit, complete task 5", "qubit, complete task 5 with note QA passed."),
+   help="Mark a task done with an optional completion note (confirmed).")
 _E("kanban_comment", "Comment on task",
    ("comment on task",),
    "kanban", ("kanban",), args=(_I("task_id"), _R("body")),
@@ -13335,6 +13351,12 @@ def execute(ctx, resolution: Resolution) -> Outcome:
                    {"entry": entry.id, "session": ctx.session})
             return Outcome(REFUSED, entry,
                            "Emergency stop is latched. Reset it first.", {})
+        if entry.id == "kanban_complete" and "summary" in merged:
+            from . import kanban as KB
+            try:
+                merged["summary"] = KB._check_summary(merged["summary"])
+            except KB.KanbanError as exc:
+                return Outcome(FAILED, entry, _speak(exc.detail), {"code": exc.code})
         wording = ""
         if entry.id == "workspaces_move":
             from . import projects as PJ

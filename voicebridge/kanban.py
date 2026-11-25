@@ -47,6 +47,7 @@ DB_NAME = "kanban.db"
 MAX_TITLE_LEN = 200
 MAX_BODY_LEN = 8000
 MAX_COMMENT_LEN = 2000
+MAX_SUMMARY_LEN = 2000
 MAX_BOARDS = 64
 MAX_OPEN_TASKS_PER_BOARD = 2000
 LIST_DEFAULT = 50
@@ -154,6 +155,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # a later restore returns it there (Qubit workboard "Restore from
     # archive" parity) instead of silently resetting to ``open``.
     _ensure_column(conn, "tasks", "archived_from", "TEXT")
+    _ensure_column(conn, "tasks", "completion_summary", "TEXT NOT NULL DEFAULT ''")
 
 
 def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
@@ -192,12 +194,19 @@ def _check_body(body: str, limit: int = MAX_BODY_LEN) -> str:
     return body or ""
 
 
+def _check_summary(summary: str) -> str:
+    if not isinstance(summary, str) or len(summary) > MAX_SUMMARY_LEN:
+        raise KanbanError(BAD_INPUT_CODE, f"completion summary must be text up to {MAX_SUMMARY_LEN} chars")
+    return summary.strip()
+
+
 def _task_dict(row: sqlite3.Row) -> Dict[str, Any]:
     return {"id": row["id"], "board": row["board"],
             "title": redact_spec(row["title"]),
             "body": redact_spec(row["body"]), "status": row["status"],
             "assignee": redact_spec(row["assignee"] or ""),
             "priority": row["priority"],
+            "completion_summary": redact_spec(row["completion_summary"]),
             "created_at": row["created_at"], "updated_at": row["updated_at"]}
 
 
@@ -482,7 +491,8 @@ def current_task(cfg: Any) -> Dict[str, Any]:
 
 def _transition(cfg: Any, task_id: int, to: str, *,
                 requested_by: str, confirmed: bool, op: str,
-                assignee: str = "", event_detail: str = "") -> Dict[str, Any]:
+                assignee: str = "", event_detail: str = "",
+                completion_summary: str = "") -> Dict[str, Any]:
     if not confirmed:
         raise KanbanError(CONFIRM_CODE,
                           f"kanban {op} requires explicit --confirm")
@@ -516,6 +526,9 @@ def _transition(cfg: Any, task_id: int, to: str, *,
                 params.append(who)
             if op == "reclaim":
                 updates += ", assignee=NULL"
+            if completion_summary:
+                updates += ", completion_summary=?"
+                params.append(completion_summary)
             if op == "archive":
                 # Remember the pre-archive column so ``restore`` can return the
                 # task exactly where it was (never a fabricated default).
@@ -587,11 +600,12 @@ def reclaim(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
                        confirmed=confirmed, op="reclaim")
 
 
-def complete(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
+def complete(cfg: Any, task_id: int, *, summary: str = "", requested_by: str = "cli:user",
              confirmed: bool = False) -> Dict[str, Any]:
     """Mark a task done (archived tasks cannot be completed)."""
     return _transition(cfg, task_id, "done", requested_by=requested_by,
-                       confirmed=confirmed, op="complete")
+                       confirmed=confirmed, op="complete",
+                       completion_summary=_check_summary(summary))
 
 
 def block(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
@@ -979,6 +993,7 @@ def _validate_snapshot(snapshot: Dict[str, Any]) -> None:
                               "snapshot task title must be 1..200 chars")
         if len(str(t.get("body", "") or "")) > MAX_BODY_LEN:
             raise KanbanError(BAD_INPUT_CODE, "snapshot task body too long")
+        _check_summary(t.get("completion_summary", ""))
         if t.get("id") is not None:
             task_ids.add(t.get("id"))
     for c in comments:
@@ -1028,13 +1043,14 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
                               b.get("created_at", _now())))
             for t in snapshot.get("tasks", []):
                 conn.execute("INSERT INTO tasks(id, board, title, body, status,"
-                             " assignee, priority, created_at, updated_at)"
-                             " VALUES(?,?,?,?,?,?,?,?,?)",
+                             " assignee, priority, created_at, updated_at, completion_summary)"
+                             " VALUES(?,?,?,?,?,?,?,?,?,?)",
                              (t.get("id"), t["board"], t["title"],
                               t.get("body", ""), t["status"], t.get("assignee"),
                               t.get("priority", "normal"),
                               t.get("created_at", _now()),
-                              t.get("updated_at", _now())))
+                              t.get("updated_at", _now()),
+                              _check_summary(t.get("completion_summary", ""))))
             for c in snapshot.get("comments", []):
                 conn.execute("INSERT INTO comments(id, task_id, author, body,"
                              " created_at) VALUES(?,?,?,?,?)",
@@ -1252,7 +1268,12 @@ def _ensure_column(conn: sqlite3.Connection, table: str, name: str,
     every legacy read keeps working unchanged."""
     have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
     if name not in have:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+        except sqlite3.OperationalError:
+            # Another connection may have added the column after our read.
+            if name not in {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}:
+                raise
 
 
 def sanitize_widget_content(text: str) -> Dict[str, Any]:

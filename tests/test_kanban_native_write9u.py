@@ -194,9 +194,66 @@ def test_extra_board_options_refuse_without_staging_or_writing(tmp_path, monkeyp
     status, created = QC.h_plugin_kanban_tasks_create(
         cfg, {}, {**defaults, "confirmation_id": staged["confirmation_id"]}, {})
     assert status == 200
-    tid = created["task"]["id"]
-    status, refused = QC.h_plugin_kanban_tasks_patch(
-        cfg, {}, {"status": "done", "summary": "Completion notes", "confirm": True},
-        {"task_id": tid})
-    assert status == 400 and refused["code"] == "UNSUPPORTED_FIELD"
     assert _tasks_in_board(cfg)["Fixture card"]["status"] == "todo"
+
+
+def test_completion_note_binds_approval_and_survives_restore(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import kanban as KB
+    from voicebridge import qubit_compat as QC
+    from voicebridge import qubit_plugins as QP
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    tid = KB.create(cfg, "Fixture card", confirmed=True)["task"]["id"]
+    target = {"task_id": str(tid)}
+    note = "QA passed. Release checklist signed."
+    form = {"status": "done", "summary": note}
+    status, refused = QC.h_plugin_kanban_tasks_patch(cfg, {}, {**form, "status": "todo"}, target)
+    assert status == 400 and refused["code"] == KB.BAD_INPUT_CODE
+    status, refused = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {**form, "summary": "x" * (KB.MAX_SUMMARY_LEN + 1)}, target)
+    assert status == 400 and refused["code"] == KB.BAD_INPUT_CODE
+    assert not OPS._journal(cfg).pending()
+    status, approval = QC.h_plugin_kanban_tasks_patch(cfg, {}, form, target)
+    assert status == 409
+    cid = approval["confirmation_id"]
+    staged = OPS._journal(cfg).get(cid).meta["payload"]
+    assert staged["form_proof"] and "summary" not in staged and note not in repr(staged)
+    status, next_approval = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {**form, "summary": "A different note", "confirmation_id": cid}, target)
+    assert status == 409 and next_approval["confirmation_id"] != cid
+    assert KB.show(cfg, tid)["task"]["status"] == "open"
+
+    status, saved = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {**form, "confirmation_id": cid}, target)
+    assert status == 200 and saved["task"]["latest_summary"] == note
+    assert _tasks_in_board(cfg)["Fixture card"]["latest_summary"] == note
+    status, details = QP.h_plugin_kanban_task(cfg, {}, {}, target)
+    assert status == 200 and details["task"]["latest_summary"] == note
+    snapshot = KB.export(cfg)["snapshot"]
+    KB.archive_task(cfg, tid, confirmed=True)
+    assert KB.restore_task(cfg, tid, confirmed=True)["task"]["completion_summary"] == note
+    KB.import_snapshot(cfg, snapshot, confirmed=True)
+    restored = KB.show(cfg, tid)["task"]
+    assert restored["status"] == "done" and restored["completion_summary"] == note
+    assert sum(event["kind"] == "complete" for event in restored["events"]) == 1
+
+
+def test_voice_completion_note_keeps_exact_words(tmp_path, monkeypatch):
+    from voicebridge import kanban as KB
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    tid = KB.create(cfg, "Fixture card", confirmed=True)["task"]["id"]
+    note = "QA passed! Discuss “restart gateway” tomorrow."
+    resolved = VC.resolve(f"Qubit, complete task {tid} with note: {note}")
+    assert resolved.entry.id == "kanban_complete"
+    assert resolved.args == {"task_id": tid, "summary": note}
+    assert VC.resolve(f"Qubit, complete task {tid} with note").kind == VC.CLARIFY
+    ctx = VC.make_ctx(cfg)
+    staged = VC.execute(ctx, resolved)
+    assert staged.kind == VC.NEEDS_CONFIRM
+    assert KB.show(cfg, tid)["task"]["completion_summary"] == ""
+    completed = VC.confirm_pending(ctx, staged.confirmation_id)
+    assert completed.kind == VC.EXECUTED
+    assert KB.show(cfg, tid)["task"]["completion_summary"] == note

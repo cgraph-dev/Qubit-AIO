@@ -414,7 +414,7 @@ def _card(task: Dict[str, Any]) -> Dict[str, Any]:
         "goal_mode": False,
         "runs": [],
         "diagnostics": [],
-        "latest_summary": None,
+        "latest_summary": task.get("completion_summary") or None,
     }
 
 

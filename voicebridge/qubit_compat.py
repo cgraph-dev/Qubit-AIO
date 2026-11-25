@@ -20551,9 +20551,10 @@ def _kanban_confirm(cfg: Any, action: str, detail: str, q: Dict[str, str],
                     b: Dict[str, Any], payload: Dict[str, Any]
                     ) -> Optional[Tuple[int, Dict[str, Any]]]:
     staged = {"version": 1, **payload}
-    text = staged.pop("body", "")
-    if text:
-        staged["form_proof"] = hmac.digest(_KANBAN_APPROVAL_KEY, text.encode(), "sha256").hex()
+    form_text = {key: staged.pop(key) for key in ("body", "summary") if key in staged}
+    if any(form_text.values()):
+        text = json.dumps(form_text, sort_keys=True).encode()
+        staged["form_proof"] = hmac.digest(_KANBAN_APPROVAL_KEY, text, "sha256").hex()
     if q.get("confirmation_id") or b.get("confirmation_id"):
         q = {key: value for key, value in q.items() if key != "confirm"}
         b = {key: value for key, value in b.items() if key != "confirm"}
@@ -20591,14 +20592,14 @@ def _kanban_edit_fields(kb: Any, body: Dict[str, Any]) -> Dict[str, Any]:
     return fields
 
 
-def _kanban_apply_status(cfg: Any, kb: Any, tid: int, status: str) -> None:
+def _kanban_apply_status(cfg: Any, kb: Any, tid: int, status: str, *, summary: str = "") -> None:
     """Apply a vendored column status through the native transition verbs."""
     if status in ("running", "review"):
         kb.claim(cfg, tid, requested_by="dashboard:user", confirmed=True)
     elif status == "blocked":
         kb.block(cfg, tid, requested_by="dashboard:user", confirmed=True)
     elif status == "done":
-        kb.complete(cfg, tid, requested_by="dashboard:user", confirmed=True)
+        kb.complete(cfg, tid, summary=summary, requested_by="dashboard:user", confirmed=True)
     elif status == "archived":
         kb.archive_task(cfg, tid, requested_by="dashboard:user", confirmed=True)
     else:  # todo/triage/scheduled/ready -> the native "open" column
@@ -20689,7 +20690,8 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
     """PATCH /api/plugins/kanban/tasks/{id} -> native edit/assign/transition."""
     from . import kanban as KB
 
-    unsupported = _kanban_unsupported_options(b, frozenset({"title", "body", "assignee", "priority", "status", "board"}))
+    unsupported = _kanban_unsupported_options(
+        b, frozenset({"title", "body", "assignee", "priority", "status", "board", "summary"}))
     if unsupported is not None:
         return unsupported
 
@@ -20706,6 +20708,9 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
     try:
         current = _kanban_native_show(cfg, tid)
         fields = _kanban_edit_fields(KB, b)
+        summary = KB._check_summary(b["summary"] if b.get("summary") is not None else "")
+        if summary and status != "done":
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "a completion summary requires status done")
         assignment = str(b["assignee"] or "").strip() if b.get("assignee") is not None else None
         if status == "archived" and (fields or assignment is not None):
             raise KB.KanbanError(KB.BAD_INPUT_CODE, "archive must be a separate action")
@@ -20713,11 +20718,11 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
             raise KB.KanbanError(KB.BAD_INPUT_CODE, "clear the assignee in a separate action")
         gate = _kanban_confirm(cfg, "kanban.update", f"updating kanban task #{tid}", q, b,
                                {"task_id": tid, "status": status, "assignee": assignment,
-                                "board": current["board"], **fields})
+                                "board": current["board"], "summary": summary, **fields})
         if gate is not None:
             return gate
         if status:
-            _kanban_apply_status(cfg, KB, tid, status)
+            _kanban_apply_status(cfg, KB, tid, status, summary=summary)
         if assignment:
             KB.assign(cfg, tid, assignment, requested_by="dashboard:user", confirmed=True)
         elif assignment == "" and not status:

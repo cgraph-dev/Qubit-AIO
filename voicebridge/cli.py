@@ -1221,6 +1221,8 @@ def build_parser() -> argparse.ArgumentParser:
         _p.add_argument("task_id", type=int)
         if _kb_mut in ("claim", "assign", "reassign"):
             _p.add_argument("--assignee", default="")
+        if _kb_mut == "complete":
+            _p.add_argument("--summary", default="", help="record an optional completion note")
         _p.add_argument("--confirm", action="store_true")
     kb_comment = kb_sub.add_parser("comment", parents=[common],
                                    help="append a comment (dry-run unless --confirm)")
@@ -7823,6 +7825,7 @@ def _cmd_kanban(cfg, args) -> int:
                              requested_by="cli:user", confirmed=confirm)
         elif cmd == "complete":
             out = KB.complete(cfg, args.task_id,
+                              summary=getattr(args, "summary", ""),
                               requested_by="cli:user", confirmed=confirm)
         elif cmd == "edit":
             out = KB.edit(cfg, args.task_id, title=args.title, body=args.body,
