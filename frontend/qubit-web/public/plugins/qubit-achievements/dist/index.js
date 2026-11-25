@@ -826,7 +826,7 @@
           React.createElement("p", null, tx(t, "hero.subtitle", "Collectible Qubit badges earned from real session history. Known unfinished achievements are shown as Discovered; Secret achievements stay hidden until the first matching behavior appears."))
         ),
         React.createElement(React.Fragment, null,
-          React.createElement(SakugaButton, { onClick: function () { api("/rescan", { method: "POST" }).then(function () { return load(); }).catch(function () {}); }, className: "ha-refresh" }, tx(t, "actions.rescan", "Rescan")),
+          React.createElement(SakugaButton, { onClick: function () { api("/rescan", { method: "POST" }).then(function () { return load(); }).catch(function (err) { setError(String(err)); }); }, className: "ha-refresh" }, tx(t, "actions.rescan", "Rescan")),
           resetArmed
             ? React.createElement(React.Fragment, null,
                 React.createElement(SakugaButton, { onClick: resetState, className: "ha-refresh ha-danger" }, tx(t, "actions.reset_confirm", "Confirm reset")),

@@ -642,7 +642,7 @@ def h_plugin_achievements_reset_state(
     if _estop(cfg):
         return 403, {"ok": False, "state": "ESTOP", "code": "ESTOP_ENGAGED",
                      "detail": "Emergency stop is engaged; state reset refused."}
-    if not bool(b.get("confirm")):
+    if b.get("confirm") is not True:
         return _need_confirm(
             "Resetting achievement unlock history and cached scans requires "
             "confirm=true.")
