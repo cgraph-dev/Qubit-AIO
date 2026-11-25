@@ -2325,5 +2325,19 @@
       "chromium": "passed"
     },
     "remaining": "Workspace reorder and advanced Kanban options need native support. Agent management, broader operation forms, and deployed verification remain open."
+  },
+  "current_workspace_order": {
+    "date": "2026-11-25",
+    "workspace_revision": "3bc34c70f",
+    "operations_revision": "dea02007f",
+    "environment": "Disposable Workbench listener, production Vite build, Chromium at 1440 pixels, separate CLI and registry read-back",
+    "browser": "Dragging a workspace across projects saved the order with the exact approval ID and retained it after reload. A keyboard move was cancelled with the displayed ID and kept the order. A second keyboard move saved and restored focus to the moved row. Reload showed the confirmed order.",
+    "read_back": "The native qubit project list and projects.json agreed on workspace_order, active project, primary folder and folder membership. A focused regression covered stale orders and duplicate physical paths in different projects. Operations executed the recorded order when the confirmation request supplied a replacement order.",
+    "verification": {
+      "focused_backend_tests": 101,
+      "production_build": "passed",
+      "chromium": "passed"
+    },
+    "remaining": "Spoken reorder, touch reordering, deployed control checks, advanced Kanban options, agent management and broader Operations forms remain open."
   }
 }

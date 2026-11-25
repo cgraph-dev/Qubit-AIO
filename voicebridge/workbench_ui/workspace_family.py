@@ -75,29 +75,22 @@ def row_for(path: str, project: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def rows(cfg: Any) -> List[Dict[str, Any]]:
-    """Every registered folder, in registry order (primary first)."""
-    PJ = _projects()
-    listed = PJ.list_projects(cfg)
-    out: List[Dict[str, Any]] = []
-    for rec in (listed.get("projects") if isinstance(listed, dict) else []) or []:
-        if not isinstance(rec, dict):
-            continue
-        folders = [str(r) for r in (rec.get("folders") or []) if str(r or "").strip()]
-        primary = str(rec.get("primary") or "")
-        if primary in folders:
-            folders.remove(primary)
-            folders.insert(0, primary)
-        for folder in folders:
-            out.append(row_for(folder, rec))
-    return out
-
-
 def list_payload(cfg: Any, q: Any = None, b: Any = None,
                  p: Any = None) -> Tuple[int, Dict[str, Any]]:
     """``GET /api/workspaces`` — rows, ``last``, and the terminal backend flag."""
     try:
-        items = rows(cfg)
+        listed = _projects().list_projects(cfg)
+        by_slug = {project["slug"]: project for project in listed["projects"]}
+        items = [row_for(path, by_slug[slug]) for slug, path in listed["workspace_order"]]
+        # Some Workbench views use "last" as a fallback CWD. Keep the legacy
+        # registry selection independent of the user's display order.
+        last = ""
+        for project in reversed(listed["projects"]):
+            folders = project["folders"]
+            if folders:
+                last = next((path for path in reversed(folders)
+                             if path != project["primary"]), folders[-1])
+                break
     except Exception as exc:  # noqa: BLE001 - typed, never a bare 500
         code = getattr(exc, "code", "") or "WORKSPACE_STORE_UNAVAILABLE"
         return _refuse(
@@ -109,7 +102,7 @@ def list_payload(cfg: Any, q: Any = None, b: Any = None,
         "ok": True,
         "workspaces": items,
         "count": len(items),
-        "last": items[-1]["path"] if items else "",
+        "last": last,
         # The pane keeps its "embedded terminal is only for local backends"
         # path. Qubit's terminal is agent-backed, not a local shell, so False is
         # the truthful value: the emulator IS mounted, and what it runs says so.
@@ -270,7 +263,8 @@ def cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _refuse("MALFORMED", "confirmation_id is required")
     try:
         approval = OPS._journal(cfg).get(cid)
-        allowed = {"qubit.workspaces.add", "qubit.workspaces.rename", "qubit.workspaces.remove"}
+        allowed = {"qubit.workspaces.add", "qubit.workspaces.rename", "qubit.workspaces.remove",
+                   "qubit.workspaces.reorder"}
         if approval is None or approval.capability not in allowed:
             return _refuse("NO_CONFIRMATION", "Workspace confirmation is unavailable.", status=404)
         result = OPS.cancel_compat_op(cfg, cid, actor="dashboard:user", session="dashboard")
@@ -282,39 +276,27 @@ def cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def reorder(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """``POST /api/workspaces/reorder {paths}`` — preview only.
-
-    The panel drag-sorts rows and posts the new order. Qubit's registry orders
-    folders by registration and offers no order field, so honouring this would
-    mean writing an ordering the CLI, the Projects page and the voice surfaces
-    do not share — a second source of truth for the same list. The request is
-    answered with a typed refusal plus the order Qubit actually holds, and
-    nothing is written.
-    """
-    wanted = (b or {}).get("paths")
-    if not isinstance(wanted, list) or not wanted:
-        return _refuse("MALFORMED", "paths must be a non-empty list")
+    """Reorder the existing registrations without changing project membership."""
+    PJ = _projects()
+    b = b or {}
     try:
-        current = rows(cfg)
-    except Exception as exc:  # noqa: BLE001
-        return _refuse(str(getattr(exc, "code", "") or "STORE_UNAVAILABLE"),
-                       f"the project registry could not be read "
-                       f"({type(exc).__name__})", status=503)
-    return 501, {
-        "ok": False,
-        "state": "UNSUPPORTED",
-        "code": "WORKSPACE_ORDER_UNSUPPORTED",
-        "endpoint": ENDPOINT + "/reorder",
-        "detail": (
-            "Qubit's project registry has no explicit workspace order — it lists "
-            "folders in registration order for the CLI, the Projects page and "
-            "voice. The drag order was not saved, and the list is unchanged."),
-        "workspaces": current,
-        "requested_order": [str(x) for x in wanted][:200],
-        "owner": "qubit-policy",
-        "rollback": "nothing was written; nothing to roll back",
-        "qubit_counterpart": "CLI `qubit project list` (registration order)",
-    }
+        current = PJ.list_projects(cfg)["workspace_order"]
+        if "previous" in b and b["previous"] != current:
+            raise PJ.ProjectError(PJ.ORDER_CONFLICT_CODE,
+                                  "Workspaces changed. Refresh the list and reorder again.")
+        requested = PJ.validate_workspace_order(b.get("order", b.get("paths")), current)
+        if requested == current:
+            return list_payload(cfg)
+        staged = _gate(cfg, "workspaces.reorder", "Save this workspace order?",
+                       q, b, {"previous": current, "order": requested})
+        if staged is not None:
+            return staged
+        PJ.reorder_workspaces(cfg, requested, expected=current,
+                              requested_by="dashboard:user", confirmed=True)
+    except PJ.ProjectError as exc:
+        status = {PJ.ORDER_CONFLICT_CODE: 409, PJ.CORRUPT_CODE: 503}.get(exc.code, 400)
+        return _refuse(exc.code, exc.detail, status=status)
+    return list_payload(cfg)
 
 
 def _project_for_path(cfg: Any, path: Path) -> Dict[str, Any]:

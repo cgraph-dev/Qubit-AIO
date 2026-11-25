@@ -11409,7 +11409,7 @@ def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "lastActive": rec.get("updated_at"), "previewSessions": [],
         })
     active = res.get("active_slug") if isinstance(res, dict) else None
-    return _ok(projects=projects, active_id=active, scoped_session_ids=[],
+    return _ok(projects=projects, active_id=active, workspace_order=res["workspace_order"], scoped_session_ids=[],
                errors=[])
 
 
@@ -11457,7 +11457,7 @@ def h_chat_workspaces(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         default_cwd = str((active.get("project") or {}).get("primary") or "")
     if not default_cwd:
         default_cwd = str(Path.home())
-    return _ok(projects=projects, repos=[], default_cwd=default_cwd,
+    return _ok(projects=projects, repos=[], default_cwd=default_cwd, workspace_order=res["workspace_order"],
                home=str(Path.home()), scan_enabled=False,
                qubit_counterpart="CLI `qubit project list` + dashboard Projects")
 

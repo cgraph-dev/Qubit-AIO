@@ -31,6 +31,7 @@ import re
 import shutil
 import subprocess
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -56,6 +57,8 @@ ARCHIVED_CODE = "PROJECT_ARCHIVED"
 NO_BOARD_CODE = "PROJECT_NO_BOARD"
 CORRUPT_CODE = "PROJECT_STORE_CORRUPT"
 ROLLBACK_CODE = "PROJECT_NO_ROLLBACK"
+ORDER_CODE = "PROJECT_BAD_ORDER"
+ORDER_CONFLICT_CODE = "PROJECT_ORDER_CHANGED"
 CLONE_REMOTE_CODE = "PROJECT_CLONE_REMOTE_REFUSED"
 CLONE_FAILED_CODE = "PROJECT_CLONE_FAILED"
 CLONE_DEST_CODE = "PROJECT_CLONE_DEST_EXISTS"
@@ -158,13 +161,41 @@ def _backups(cfg: Any) -> List[Path]:
         return []
 
 
-def _save(cfg: Any, state: Dict[str, Any]) -> None:
+@contextmanager
+def _write_lock(cfg: Any):
+    from filelock import FileLock, Timeout
+
+    path = _store_path(cfg)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with FileLock(f"{path}.lock", timeout=5):
+            yield
+    except (OSError, Timeout) as exc:
+        raise ProjectError(CORRUPT_CODE, f"project store write unavailable: {exc}") from exc
+
+
+def _save(cfg: Any, state: Dict[str, Any], *, restore_order: bool = False) -> None:
+    with _write_lock(cfg):
+        if not restore_order:
+            current_order = _load(cfg).get("workspace_order")
+            if current_order is not None:
+                state["workspace_order"] = current_order
+            else:
+                state.pop("workspace_order", None)
+        _write_store(cfg, state)
+
+
+def _write_store(cfg: Any, state: Dict[str, Any]) -> None:
+    if "workspace_order" in state:
+        state["workspace_order"] = _ordered_workspaces(state)
+    content = json.dumps(state, indent=2, sort_keys=True).encode("utf-8")
+    if len(content) > MAX_FILE_BYTES:
+        raise ProjectError(CORRUPT_CODE, f"project store would exceed its {MAX_FILE_BYTES}-byte limit")
     path = _store_path(cfg)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f"{STORE_NAME}.tmp.{os.getpid()}")
-        tmp.write_text(json.dumps(state, indent=2, sort_keys=True),
-                       encoding="utf-8")
+        tmp.write_bytes(content)
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
         try:
@@ -353,6 +384,67 @@ def create(cfg: Any, name: str, folders: List[str], *, slug: str = "",
     return {"state": "OK", "project": _public(rec, state["active_slug"] == clean_slug)}
 
 
+def _ordered_workspaces(state: Dict[str, Any]) -> List[List[str]]:
+    """Resolve saved ranks against the folders that are still registered."""
+    registered = {}
+    for slug, project in sorted(state["projects"].items()):
+        if project.get("archived"):
+            continue
+        folders = list(project.get("folders") or [])
+        primary = project.get("primary")
+        if primary in folders:
+            folders.remove(primary)
+            folders.insert(0, primary)
+        registered.update(dict.fromkeys((slug, path) for path in folders))
+
+    ordered = []
+    if isinstance(state.get("workspace_order"), list):
+        for pair in state["workspace_order"]:
+            if isinstance(pair, list) and len(pair) == 2 and all(isinstance(part, str) for part in pair):
+                key = tuple(pair)
+                if key in registered:
+                    ordered.append(pair)
+                    del registered[key]
+    return ordered + [list(pair) for pair in registered]
+
+
+def validate_workspace_order(requested: Any, current: List[List[str]]) -> List[List[str]]:
+    """Accept project/path pairs and the path-only form when unambiguous."""
+    if not isinstance(requested, list) or len(requested) != len(current) or not requested:
+        raise ProjectError(ORDER_CODE, "Include each registered workspace exactly once.")
+    if all(isinstance(path, str) for path in requested):
+        by_path = {path: [slug, path] for slug, path in current}
+        if len(by_path) != len(current):
+            raise ProjectError(ORDER_CODE, "Use project and path pairs for shared folders.")
+        requested = [by_path.get(path) for path in requested]
+    if not all(
+        isinstance(pair, list) and len(pair) == 2 and all(isinstance(part, str) for part in pair)
+        for pair in requested
+    ) or {tuple(pair) for pair in requested} != {tuple(pair) for pair in current}:
+        raise ProjectError(ORDER_CODE, "Include each registered workspace exactly once.")
+    return requested
+
+
+def reorder_workspaces(cfg: Any, requested: Any, *, expected: List[List[str]],
+                       requested_by: str = "cli:user", confirmed: bool = False
+                       ) -> Dict[str, Any]:
+    if not confirmed:
+        raise ProjectError(CONFIRM_CODE, "workspace reorder requires explicit confirmation")
+    with _write_lock(cfg):
+        state = _load(cfg)
+        current = _ordered_workspaces(state)
+        if current != expected:
+            raise ProjectError(ORDER_CONFLICT_CODE, "Workspaces changed. Refresh the list and reorder again.")
+        approved = validate_workspace_order(requested, current)
+        if approved == current:
+            return {"state": "OK", "workspace_order": current}
+        state["workspace_order"] = approved
+        _backup(cfg)
+        _write_store(cfg, state)
+    _audit("reorder-workspaces", requested_by, {"count": len(approved)})
+    return {"state": "OK", "workspace_order": approved}
+
+
 def list_projects(cfg: Any, include_archived: bool = False) -> Dict[str, Any]:
     """List workspaces (archived hidden unless asked)."""
     state = _load(cfg)
@@ -361,7 +453,8 @@ def list_projects(cfg: Any, include_archived: bool = False) -> Dict[str, Any]:
     recs.sort(key=lambda r: r.get("slug", ""))
     active = state.get("active_slug")
     return {"state": "OK", "active_slug": active,
-            "projects": [_public(r, r["slug"] == active) for r in recs]}
+            "projects": [_public(r, r["slug"] == active) for r in recs],
+            "workspace_order": _ordered_workspaces(state)}
 
 
 def show(cfg: Any, slug: str) -> Dict[str, Any]:
@@ -804,7 +897,7 @@ def rollback(cfg: Any, *, requested_by: str = "cli:user",
             or not isinstance(snap.get("projects"), dict):
         raise ProjectError(ROLLBACK_CODE, "backup has an unknown schema")
     _backup(cfg)
-    _save(cfg, snap)
+    _save(cfg, snap, restore_order=True)
     _audit("rollback", requested_by, {})
     return {"state": "OK", "restored_projects": sorted(snap["projects"])}
 
