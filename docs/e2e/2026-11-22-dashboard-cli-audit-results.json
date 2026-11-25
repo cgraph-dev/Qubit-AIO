@@ -2183,5 +2183,18 @@
     "webhook_delivery": "A local receiver verified both HMAC signatures. The initial test returned 502, and the enabled retry returned 204. Retry did not contact the receiver while either the subscription or store was disabled. Receipt read-back contained FAILED then DELIVERED. Deletion returned successfully and independent read-back returned 404.",
     "focused_tests": 65,
     "remaining": "Webhook editing, explicit channel send and receive targets, physical devices, broader pairing lifecycle and deployed mutations remain open."
+  },
+  "current_webhook_subscription_edit": {
+    "date": "2026-11-25",
+    "revision": "237713fe795e2248f993b42ba398e2070f632d58",
+    "environment": "Production Vite build and Chromium on an authenticated disposable loopback dashboard",
+    "browser": "At 1440 pixels, an events-only edit kept the existing destination and left the signing reference out of both requests. At 390 pixels, the dialog fit the viewport and saved a new destination and file-backed signing reference. Both saves replayed the exact approval ID. Independent HTTP read-back and the disposable registry confirmed the saved values and isolated the second subscription. Credential references stayed redacted in the HTTP responses.",
+    "approval_and_storage": "Focused tests rejected a changed field or target on replay, consumed an approved edit once, and rejected a stale form or approval for a subscription deleted and recreated under the same ID. A concurrent toggle made before approval was preserved.",
+    "verification": {
+      "focused_python_tests": 25,
+      "typescript_check": "passed",
+      "vite_build": "passed"
+    },
+    "remaining": "Explicit channel send and receive fixtures, pairing lifecycle, physical devices, and deployed mutations remain open for the combined checklist row."
   }
 }

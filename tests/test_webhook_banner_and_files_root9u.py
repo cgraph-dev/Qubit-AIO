@@ -116,6 +116,52 @@ def test_webhook_approval_keeps_target_and_toggle_value(tmp_path, monkeypatch):
     assert {row["id"] for row in webhooks.list_subs(cfg)["subscriptions"]} == {"second", "third"}
 
 
+def test_webhook_edit_replays_only_approved_fields_on_the_same_record(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as ops, qubit_compat as compat, webhooks
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = "/api/webhooks"
+    route = root + "/first"
+    url = "http://127.0.0.1:9999/hook"
+    for name in ("first", "second"):
+        webhooks.add(cfg, name, url, ["test"], "env:PROBE_HOOK", confirmed=True)
+
+    def stage(changes):
+        status, result = compat.dispatch(cfg, "PATCH", route, {}, changes)
+        assert status == 409 and result["confirmation_id"], result
+        return result["confirmation_id"]
+
+    def settle(approval, sensitive=None):
+        return ops.confirm_op(cfg, approval, actor="dashboard:user", session="dashboard",
+                               sensitive=sensitive)
+
+    approval = stage({"events": ["task.completed"]})
+    status, wrong = compat.dispatch(cfg, "PATCH", root + "/second", {},
+                                    {"events": ["task.completed"], "confirmation_id": approval})
+    assert status == 409 and wrong["confirmation_id"] != approval
+    status, wrong = compat.dispatch(cfg, "PATCH", route, {},
+                                    {"events": ["test"], "confirmation_id": approval})
+    assert status == 409 and wrong["confirmation_id"] != approval
+    webhooks.set_sub_enabled(cfg, "first", False, confirmed=True)
+    result = settle(approval, {"id": "second", "changes": {"events": ["test"]}})
+    assert result["state"] == "executed", result
+    original = webhooks.show(cfg, "first")["subscription"]
+    assert original["events"] == ["task.completed"] and original["enabled"] is False
+    assert original["secret"] == "env:<reference>" and original["url"] == url
+    assert webhooks.show(cfg, "second")["subscription"]["events"] == ["test"]
+    assert settle(approval)["code"] == "NO_CONFIRMATION"
+
+    stale = stage({"url": url + "/updated"})
+    webhooks.remove(cfg, "first", confirmed=True)
+    webhooks.add(cfg, "first", url, ["test"], "env:PROBE_HOOK", confirmed=True)
+    result = settle(stale)
+    assert result["state"] == "failed" and result["code"] == "WEBHOOK_EDIT_CONFLICT", result
+    assert webhooks.show(cfg, "first")["subscription"]["url"] == url
+    status, result = compat.dispatch(cfg, "PATCH", route, {},
+                                     {"events": ["task.completed"], "expected_created_at": original["created_at"]})
+    assert status == 409 and result["code"] == "WEBHOOK_EDIT_CONFLICT", result
+
+
 def test_invalid_webhook_secret_cannot_enter_approval_journal(tmp_path, monkeypatch):
     from voicebridge import dashboard_ops as ops, qubit_compat as compat
 

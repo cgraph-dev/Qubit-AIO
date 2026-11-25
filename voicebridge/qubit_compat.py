@@ -4715,7 +4715,7 @@ def h_webhooks_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "deliver_only": True,
             "prompt": "",
             "skills": [],
-            "created_at": None,
+            "created_at": s.get("created_at"),
             "url": str(s.get("url", "")),
             "secret_set": bool(s.get("secret_ref") or s.get("secret")),
             "enabled": bool(s.get("enabled", True)),
@@ -12775,6 +12775,7 @@ _r("POST", r"/api/webhooks/(?P<id>[^/]+)/test", "webhooks_test")
 _r("GET", r"/api/webhooks/(?P<id>[^/]+)/deliveries", "webhooks_deliveries")
 _r("POST", r"/api/webhooks/(?P<id>[^/]+)/retry", "webhooks_retry")
 _r("DELETE", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_delete")
+_r("PATCH", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_update")
 _r("GET", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_show")
 _r("POST", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_mutate")
 _r("GET", r"/api/messaging/platforms", "h_platforms")
@@ -16414,6 +16415,42 @@ def mcp_oauth_deliver(server_name: str,
                      "<p>Return to Qubit for details.</p>")
     return 200, ("<h1>Authorization received</h1>"
                  "<p>You can close this tab and return to Qubit.</p>")
+
+
+def webhooks_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PATCH /api/webhooks/{id} -> confirm and apply only the submitted fields."""
+    from . import webhooks as W
+
+    allowed = frozenset({"url", "events", "secret_ref", "confirm", "confirmation_id",
+                         "expected_created_at"})
+    invalid = _unsupported_fields(b, allowed)
+    if invalid[0] != 200:
+        return invalid
+    try:
+        current = W.show(cfg, str(p.get("id") or ""))["subscription"]
+        changes = W.validate_edit({key: b[key] for key in ("url", "events", "secret_ref") if key in b})
+        created_at = b.get("expected_created_at", current["created_at"])
+        if created_at != current["created_at"]:
+            raise W.WebhookError("WEBHOOK_EDIT_CONFLICT",
+                                 "The subscription was replaced. Open it again to edit.")
+        payload = {"id": current["id"], "changes": changes, "created_at": created_at}
+        guard = _compat_confirm(
+            cfg, "webhook_update",
+            f"Save changes to webhook subscription {current['id']!r}?",
+            q, b, payload=payload, match_payload=True,
+        )
+        if guard is not None:
+            return guard
+        result = W.update(cfg, current["id"], changes, expected_created_at=created_at,
+                          requested_by="dashboard:user", confirmed=True)
+    except W.WebhookError as exc:
+        if exc.code == "WEBHOOK_EDIT_CONFLICT":
+            return 409, {"ok": False, "code": exc.code, "detail": exc.detail}
+        return _webhook_error(exc)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(subscription=_webhook_route(result["subscription"]))
 
 
 def webhooks_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -21293,6 +21330,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "pairing_approve": lambda cfg, q, b, p: h_pairing_mutate("approve", cfg, q, b),
     "pairing_revoke": lambda cfg, q, b, p: h_pairing_mutate("revoke", cfg, q, b),
     "webhooks_add": lambda cfg, q, b, p: h_webhooks_mutate("add", cfg, q, b, p),
+    "webhooks_update": webhooks_update,
     "webhooks_show": lambda cfg, q, b, p: h_webhooks_mutate("show", cfg, q, b, p),
     "webhooks_mutate": lambda cfg, q, b, p: h_webhooks_mutate("remove", cfg, q, b, p),
     "blueprints": h_blueprints,
