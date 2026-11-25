@@ -80,8 +80,6 @@ export const ROUTE_TITLES: Record<string, string> = {
   // grouped in the System section. Without this the header fell through to the
   // naive fallback and rendered "Qubit-hud".
   "/qubit-hud": "Qubit HUD",
-  "/qubit-office2": "Agent Quest",
-  "/qubit-office3": "Voice Chat",
   "/qubit-taskflows": "Qubit Taskflows",
   "/qubit-tasks": "Qubit Tasks",
   "/qubit-memory": "Memory Providers",

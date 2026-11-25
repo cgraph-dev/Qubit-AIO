@@ -477,8 +477,8 @@ def test_overlay_manifests_valid_and_qubit_labelled():
     manifests = HC._overlay_manifests()
     assert sorted(m["name"] for m in manifests) == [
         "qubit-approvals", "qubit-boards", "qubit-brand",
-        "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
-        "qubit-office", "qubit-office2", "qubit-office3",
+        "qubit-devices", "qubit-gateway", "qubit-hud", "qubit-memory",
+        "qubit-models", "qubit-office",
         "qubit-ops", "qubit-reports", "qubit-runtime"], manifests
     for m in manifests:
         for field in ("name", "label", "description", "version", "tab", "entry"):

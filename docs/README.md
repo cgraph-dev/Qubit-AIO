@@ -88,7 +88,6 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `OFFICE-LIVE-VERIFICATION.md` | Habblaud-in-Qubit-Office: live verification (this session) |
 | `OFFICE-SURFACE-SECURITY-AUDIT.md` | Office REST/SSE Surface — Security + Correctness Audit |
 | `OFFICE-UI-THEMES.md` | Qubit Office UI themes — creator and operator guide |
-| `OFFICE23_SPEC.md` | office2 / office3 integration spec — verified facts |
 | `OFFICE_UNBLOCK_2026-10-17_1812.md` | Office unblock — 2026-10-17 18:12 tick (lead-quality) |
 | `OMNIROUTE_CHAT_FALLBACK.md` | OmniRoute /chat fallback — diagnosis, fix, verification, rollback |
 | `OPEN_THREADS.md` | OPEN_THREADS.md — durable handoff ledger |

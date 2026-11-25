@@ -27,8 +27,6 @@ EXPECTED_PAGES = {
     "memory",
     "models",
     "office",
-    "office2",
-    "office3",
     "operations",
     "reports",
     "runtime",

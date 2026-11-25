@@ -40,7 +40,7 @@ const routes = [...new Set((process.env.ROUTES?.split(",") ?? await builtinRoute
 if (routes.some((route) => !/^\/(?!\/)[\w\/-]*$/.test(route))) {
   throw new Error("ROUTES must contain dashboard paths without query strings");
 }
-const mangaExcluded = ["/qubit-workbench", "/workbench", "/qubit-hud", "/qubit-office", "/qubit-office2", "/qubit-office3"];
+const mangaExcluded = ["/qubit-workbench", "/workbench", "/qubit-hud", "/qubit-office"];
 // Use screenshots only against a fixture dashboard. These routes never save
 // captures, even when requested. Reports contain no DOM text or request URLs.
 const sensitive = ["/env", "/config", "/admin", "/profiles", "/sessions", "/chat", "/qubit-chat", "/webchat", "/qubit-bot"];

@@ -3,8 +3,8 @@
    --------------------------------------------------------------------------
    Everything in this file is scoped behind `html[data-qubit-manga="on"]`.
    The gate (MangaSkin.tsx) adds the attribute only on eligible routes, so the
-   excluded surfaces (/qubit-workbench, /qubit-hud, /qubit-office,
-   /qubit-office2, /qubit-office3 and their descendants) never see a rule.
+   excluded surfaces (/qubit-workbench, /qubit-hud, /qubit-office and their
+   descendants) never see a rule.
 
    Layering strategy (no component rewrite):
      1. theme tokens        — recolours the entire DS/utility vocabulary

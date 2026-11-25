@@ -450,8 +450,7 @@ def test_office_route_invalid_override_is_classic(tmp_path, themed_home):
     assert payload["active"] is False
 
 
-@pytest.mark.parametrize("path", ["/chat", "/sessions", "/qubit-office2",
-                                  "/qubit-office-extra"])
+@pytest.mark.parametrize("path", ["/chat", "/sessions", "/qubit-office-extra"])
 def test_other_shell_routes_get_no_office_theme_global(tmp_path, themed_home,
                                                        path):
     body = _shell_body(tmp_path, path)

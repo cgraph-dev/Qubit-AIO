@@ -41,7 +41,7 @@ PUBLIC_PLUGINS = REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
 EXPECTED_PLUGINS = [
     "qubit-approvals", "qubit-boards", "qubit-brand",
     "qubit-devices", "qubit-gateway", "qubit-hud", "qubit-memory",
-    "qubit-models", "qubit-office", "qubit-office2", "qubit-office3",
+    "qubit-models", "qubit-office",
     "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
 
@@ -186,11 +186,6 @@ def test_every_overlay_backend_literal_is_real_or_known():
                 bridged = OFFICE_BRIDGE_PREFIX + lit[len("/api/"):]
                 assert any(re.fullmatch(p, bridged) for p in known_patterns), \
                     f"{name}: office bridge target unmapped {bridged}"
-                seen.add(lit)
-                continue
-            # ``/api/result/`` is the office3 result read, a webui prefix route
-            # (``path.startswith("/api/result/")``), not a compat pattern.
-            if lit == "/api/result":
                 seen.add(lit)
                 continue
             assert any(re.fullmatch(p, lit) for p in known_patterns), \

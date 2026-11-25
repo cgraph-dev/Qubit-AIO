@@ -6,19 +6,12 @@ Serving a plugin app is generic: ``WebUIHandler._serve_plugin_app`` takes the
 first path segment as the plugin directory name under
 ``resources.resource_path("frontend/qubit-app/plugins")``, applies a
 ``..``/confinement check, an extension ALLOWLIST, and a loopback-only session
-token injection for ``.html`` (see ``voicebridge/webui.py`` ~2029-2169 and
-``docs/OFFICE23_SPEC.md`` §2). That single code path is supposed to give every
-office page the SAME guarantees — the point of this file is to PIN that claim
-per-page rather than trust it:
-
-* ``qubit-office`` sat in the tree first and is effectively the REFERENCE.
-* ``qubit-office2`` (Agent-Quest concept) and ``qubit-office3`` (starnet design
-  reimplementation) are added later. They MUST behave identically; a divergence
-  here is a real regression, not a cosmetic one.
-
-The third name is deliberately a CONTROL: it is parametrized exactly like the
-other two, so a future reader cannot read a passing office/office2 pair as
-"the contract holds" without office3 having been exercised too.
+token injection for ``.html`` (see ``voicebridge/webui.py`` ~2029-2169). That
+single code path is supposed to give every office page the SAME guarantees —
+the point of this file is to PIN that claim per-page rather than trust it.
+``qubit-office`` is the surface the contract is written against; if another
+office-style plugin is added later, add it to ``PLUGINS`` so it is exercised
+too rather than assumed.
 
 HARNESS LAYER
 -------------
@@ -32,10 +25,10 @@ handler layer is the layer that proves the server's own confinement; see
 
 METHOD FOR A MISSING PLUGIN DIR
 -------------------------------
-office2/office3 page files do not exist in every checkout (this branch adds
-docs + this test, not the page dirs). The tests SKIP CLEANLY — with a reason
-naming the missing path — instead of erroring at collection, so the file stays
-green on a partial tree and becomes meaningful the moment the dirs land.
+A plugin page dir does not exist in every checkout. The tests SKIP CLEANLY —
+with a reason naming the missing path — instead of erroring at collection, so
+the file stays green on a partial tree and becomes meaningful the moment the
+dirs land.
 """
 from __future__ import annotations
 
@@ -54,7 +47,7 @@ from voicebridge import webui as W  # noqa: E402
 pytestmark = pytest.mark.unit
 
 PREFIX = "/plugin-apps/"
-PLUGINS = ["qubit-office", "qubit-office2", "qubit-office3"]
+PLUGINS = ["qubit-office"]
 SAMPLE_HTML = b"<!doctype html><html><head></head><body>office</body></html>"
 TOKEN = "s3cret-token"
 
@@ -283,9 +276,9 @@ def test_real_plugin_dir_exists_and_ships_what_its_manifest_declares(name):
     """The REAL checkout ships ``<name>/`` with the entry its manifest declares.
 
     WHY THIS DOES NOT ASSERT AN .html. An earlier version of this test required
-    every plugin dir to contain an ``.html``, and failed on office2/office3. That
-    rule was generalised from ``qubit-office``, which is the ABNORMAL case: it
-    embeds a vendored standalone app (``habblaud/index.html``) inside an iframe.
+    every plugin dir to contain an ``.html``. That rule was generalised from
+    ``qubit-office``, which is the ABNORMAL case: it embeds a vendored
+    standalone app (``habblaud/index.html``) inside an iframe.
     The other TEN plugin dirs in this tree (qubit-approvals, qubit-boards,
     qubit-brand, qubit-devices, qubit-gateway, qubit-memory, qubit-models,
     qubit-ops, qubit-reports, qubit-runtime) ship manifest + entry JS and NO
@@ -295,8 +288,8 @@ def test_real_plugin_dir_exists_and_ships_what_its_manifest_declares(name):
 
     What is actually universal: the dir exists and the file its manifest's
     ``entry`` names is present. For ``qubit-office`` that entry is the game
-    bundle; for office2/office3 it is the panel script. Skips CLEANLY — naming
-    the missing path — when a page dir has not landed yet.
+    bundle. Skips CLEANLY — naming the missing path — when a page dir has not
+    landed yet.
     """
     d = _require_real_dir(name)
     mf = d / "manifest.json"

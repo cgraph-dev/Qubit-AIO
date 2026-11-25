@@ -30,12 +30,12 @@ sys.path.insert(0, str(REPO_ROOT))
 PLUGDIR = REPO_ROOT / "frontend" / "qubit-app" / "plugins"
 MANIFESTS = sorted(PLUGDIR.glob("*/manifest.json"))
 # The shipped overlay manifest set. Derived from the tree rather than pinned to a
-# count: hud/office/office2/office3/browser-ext were added after this test was
-# written, and a hard-coded 10 made every later plugin look like a regression.
+# count: hud/office/browser-ext were added after this test was written, and a
+# hard-coded 10 made every later plugin look like a regression.
 EXPECTED = [
     "qubit-approvals", "qubit-boards", "qubit-brand",
     "qubit-devices", "qubit-gateway", "qubit-hud", "qubit-memory",
-    "qubit-models", "qubit-office", "qubit-office2", "qubit-office3",
+    "qubit-models", "qubit-office",
     "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
 ENDPOINT_RE = re.compile(r"""["'](/api/[A-Za-z0-9_./-]+)["']""")
@@ -141,7 +141,6 @@ def _served_through_office_front_door(path: str, method: str) -> bool:
 POST_ONLY_PATHS = {
     "/api/spawn": "office-api.ts: POST queues a real office task",
     "/api/rooms/rename": "office-api.ts: POST writes the office store",
-    "/api/type": "qubit-office3.js: POST /api/type (body {text})",
 }
 
 # Paths a plugin source names ONLY to explain that the host does not serve them
@@ -153,6 +152,14 @@ POST_ONLY_PATHS = {
 DOCUMENTED_UNSERVED = {
     "/api/models": "qubit-hud header: specified-against route, not served by this "
                    "build; tab reads /api/model/options + /api/model/info",
+    # Bare BASE prefixes, not requests: business-api.ts/etsy-connection.ts hold
+    # these as constants and always append a real endpoint (e.g.
+    # `/api/office/business/overview`, `/api/office/business/etsy/status`,
+    # `/api/office/world/tower`). The composed paths are audited above; the
+    # bare prefix has no handler by design.
+    "/api/office/business": "business-api.ts BUSINESS_PATH base constant",
+    "/api/office/business/etsy": "etsy-connection.ts base constant",
+    "/api/office/world": "outside-world.ts base constant",
 }
 
 # Paths served DIRECTLY by webui's do_GET/do_POST rather than through HC

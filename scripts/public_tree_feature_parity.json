@@ -56,36 +56,6 @@
       ]
     },
     {
-      "id": "office2",
-      "label": "Agent Quest",
-      "routes": ["/qubit-office2"],
-      "app_routes": ["/qubit-office2"],
-      "plugin": "qubit-office2",
-      "plugin_tab": "/qubit-office2",
-      "plugin_hidden": true,
-      "plugin_has_api": true,
-      "dirs": ["frontend/qubit-app/plugins/qubit-office2"],
-      "backend": [],
-      "deliberate_backend_omission": "frontend/qubit-app/plugins/qubit-office2/qubit-office2.js is an authored static placeholder; it makes no network request and labels every value placeholder."
-    },
-    {
-      "id": "office3",
-      "label": "Voice Chat",
-      "routes": ["/qubit-office3"],
-      "app_routes": ["/qubit-office3"],
-      "plugin": "qubit-office3",
-      "plugin_tab": "/qubit-office3",
-      "plugin_hidden": true,
-      "plugin_has_api": true,
-      "dirs": ["frontend/qubit-app/plugins/qubit-office3"],
-      "backend": [
-        {
-          "path": "voicebridge/webui.py",
-          "needles": ["/api/talk", "submit_talk", "/api/interrupt"]
-        }
-      ]
-    },
-    {
       "id": "tv",
       "label": "Qubit TV",
       "routes": ["/qubit-tv"],
@@ -327,11 +297,6 @@
       "kind": "internal_docs",
       "reason": "Every docs/ path outside PUBLIC_DOC_FILES is an internal report, audit, plan, handoff, generated ledger, or frozen history. The explicit public docs allowlist is the only docs surface required.",
       "source": "scripts/export_public_tree.py"
-    },
-    {
-      "kind": "nav",
-      "reason": "/qubit-office2 (Agent Quest) and /qubit-office3 (Voice Chat) are intentionally hidden URL-reachable pages, not sidebar rows; their manifests declare tab.hidden=true.",
-      "source": "frontend/qubit-web/src/App.tsx:513"
     }
   ]
 }

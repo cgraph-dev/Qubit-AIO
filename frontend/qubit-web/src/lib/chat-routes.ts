@@ -55,8 +55,6 @@ export const FULL_HEIGHT_ROUTE_PATHS = [
   "/webchat",
   "/qubit-bot",
   "/qubit-office",
-  "/qubit-office2",
-  "/qubit-office3",
 ] as const;
 
 export function isFullHeightPath(pathname: string): boolean {

@@ -98,7 +98,7 @@ describe("Qubit Manga sidebar and gateway visual contract", () => {
     for (const route of ["/workbench","/qubit-workbench"]) {
       expect(routes).toContain('"' + route + '"');
     }
-    for (const route of ["/qubit-office","/qubit-office2","/qubit-office3"]) {
+    for (const route of ["/qubit-office"]) {
       expect(routes).not.toContain('"' + route + '"');
     }
     expect(routes).not.toContain('"/chat",');

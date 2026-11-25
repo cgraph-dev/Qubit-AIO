@@ -416,8 +416,6 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   // Hidden developer/owner surface: the live Sakuga VFX component gallery.
   "/sakuga-gallery": SakugaGalleryPage,
   "/qubit-office": () => <PluginPage name="qubit-office" />,
-  "/qubit-office2": () => <PluginPage name="qubit-office2" />,
-  "/qubit-office3": () => <PluginPage name="qubit-office3" />,
   // The workbench is a SERVER-served document (webui.py:_serve_workbench_ui),
   // not a plugin bundle or a React page — see ServerDocumentHandoff.
   "/qubit-workbench": ServerDocumentHandoff,
@@ -585,10 +583,6 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // Grouped first under Work (sidebar-sections.ts).
   { path: "/qubit-workbench", label: "Qubit Workbench", icon: PanelsTopLeft },
   { path: "/qubit-office", labelKey: "office", label: "Qubit Office", icon: Users, exactEnd: true },
-  // `/qubit-office2` (Agent Quest) and `/qubit-office3` (Voice Chat) are no
-  // longer listed: office2 duplicates the Office roster under a colliding
-  // "office" name, and office3 is a second voice-conversation surface beside
-  // Voice & Speech. Both routes stay mounted and reachable by URL.
 ];
 
 // The usage guide that replaces the raw OpenAPI dump in the sidebar. `/docs`

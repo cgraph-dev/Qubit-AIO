@@ -921,7 +921,7 @@ SPA_ROUTE_PATHS = (
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
-    "/qubit-models", "/qubit-office", "/qubit-office2", "/qubit-office3",
+    "/qubit-models", "/qubit-office",
     "/qubit-runtime", "/qubit-hud", "/qubit-workbench",
 )
 SPA_ROUTE_SET = frozenset(SPA_ROUTE_PATHS)

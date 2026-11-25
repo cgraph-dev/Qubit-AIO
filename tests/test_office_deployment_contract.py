@@ -401,13 +401,12 @@ def test_the_SERVED_bundle_still_carries_the_office_in_the_full_height_list():
 
     # The minifier emits the full-height array as the concatenation of the chat
     # list plus the literal full-height routes:
-    #   `var jt=[...Dt,`/webchat`,`/qubit-bot`,`/qubit-office`,`/qubit-office2`,`/qubit-office3`]`
+    #   `var jt=[...Dt,`/webchat`,`/qubit-bot`,`/qubit-office`]`
     # and the chat list is built from VARIABLES (`Tt=/chat`,`Et=/qubit-chat`),
     # so pin the full-height literal and require `/qubit-office` to be one of
     # its members. It is NOT required to be the LAST member: the page family
-    # grows (`/qubit-office2`, `/qubit-office3` are appended after it), so a
-    # "last member" assertion goes red for a legitimate addition and reports a
-    # deployment break that does not exist.
+    # grows, so a "last member" assertion goes red for a legitimate addition and
+    # reports a deployment break that does not exist.
     m = re.search(
         r"\[\.\.\.[A-Za-z_$][\w$]*,\s*`/webchat`\s*,\s*`/qubit-bot`\s*,"
         r"([^\]]*)\]",

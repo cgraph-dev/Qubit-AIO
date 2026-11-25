@@ -2482,7 +2482,6 @@ def _b_open_page(ctx, args):
     page = str((args or {}).get("page", "") or "").strip().lower()
     urls = {
         "office": "http://127.0.0.1:8890/qubit-office",
-        "quest": "http://127.0.0.1:8890/qubit-office2",
     }
     url = urls.get(page)
     if not url:
@@ -10528,9 +10527,8 @@ _CB("skills_install", "Install a skill manifest",
     help="Validate + stage a local reviewed skill manifest disabled; remote "
          "identifiers are typed-refused and never fetched (confirmed).")
 # Dashboard pages that voice could previously only reach by accident: the L1.5
-# semantic layer mapped "open office" to the worktree sweep and "open agent
-# quest" to the skills workshop. These deterministic entries win at L0 and open
-# the actual page. They are READ-ONLY navigation, so they are never confirm-tier
+# semantic layer mapped "open office" to the worktree sweep. This deterministic
+# entry wins at L0 and opens the actual page. They are READ-ONLY navigation, so they are never confirm-tier
 # (the same immediate class as "open youtube"), and the spoken text is the
 # opener's own reply, never a fabricated success. Kept in the additive bridge
 # registry so the frozen wave-1..3 example table is not disturbed.
@@ -10542,12 +10540,6 @@ _CB("office_page", "Open Qubit Office",
     "pages", fixed=(("page", "office"),), summary="guidance",
     examples=("qubit, open office",),
     help="Opens /qubit-office in the browser (read-only navigation).")
-_CB("quest_page", "Open Agent Quest",
-    ("open agent quest", "agent quest", "open the agent quest",
-     "open qubit quest", "qubit quest", "quest page", "show agent quest"),
-    "pages", fixed=(("page", "quest"),), summary="guidance",
-    examples=("qubit, open agent quest",),
-    help="Opens /qubit-office2 (Agent Quest) in the browser (read-only).")
 _CB("recipe_morning_digest", "Morning digest",
     ("give me my morning digest", "morning digest", "my morning digest",
      "daily digest", "run my morning digest", "get my morning digest"),
