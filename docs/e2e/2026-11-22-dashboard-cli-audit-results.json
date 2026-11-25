@@ -2369,5 +2369,15 @@
     "verification": "Five focused workspace and voice checks, the production Vite build, static JavaScript checks, and both Chromium device contexts passed.",
     "deployment": "VoiceBridge restarted and port 8890 reported READY. Build 2570ff58f88e0116a24b994f8e634318b8fb8064 served the new Workbench scripts and styles. The gateway process stayed active.",
     "remaining": "Physical touch-device and microphone checks, deployed workspace mutation read-back, advanced Kanban options, and broader Agents and Operations controls remain open."
+  },
+  "current_kanban_completion_note": {
+    "date": "2026-11-25",
+    "revision": "9d7913c43",
+    "environment": "Disposable native Kanban store, independent CLI and SQLite, authenticated Chromium against a production dashboard build",
+    "completion": "The native transition saves the note and status together. The browser Kanban PATCH form binds changed text to a fresh approval and records a proof of the note in the approval payload. Board and task projections read the native completion note. Archive and restore and a JSON snapshot round-trip retained it.",
+    "browser": "Operations ran kanban_complete with a task ID and summary. Cancelling the exact ID kept the task open. Confirming a fresh ID saved once. Independently fetched task details returned the note. The completed card drawer showed the note after reload.",
+    "voice_and_cli": "The voice resolver preserved case and punctuation and treated command words inside the note as text. A transcript-driven confirmation saved that note. CLI complete --summary and a separate show run agreed with SQLite, including one completion event.",
+    "verification": "59 native, compatibility, and Workbench Kanban tests and 3 voice registry checks passed. The production Vite build and the browser rehearsal passed.",
+    "remaining": "Completion-note entry from the card, parent dependencies, Goal mode and other advanced settings, physical microphone and device checks, and deployed mutation read-back remain open."
   }
 }
