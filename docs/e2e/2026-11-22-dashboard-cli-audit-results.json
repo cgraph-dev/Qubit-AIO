@@ -2353,6 +2353,7 @@
     "voice": "List workspaces read numbered positions and supported another page. Move workspace three to position one spoke the selected project and folder before asking for confirmation. Cancel left the order unchanged. Confirm saved once. A stale confirmation refused after a concurrent registry change, and invalid positions did not stage an approval.",
     "read_back": "The native CLI confirmed the displayed ID and separately read the new order and unchanged project fields and active project. The authenticated Operations HTTP route cancelled an exact ID, then settled a new ID. The Workbench HTTP route returned the saved order.",
     "verification": "The focused rerun passed 12 tests including every registry example, alias uniqueness, the mutation gate and workspace regressions. The pre-fix combined run passed the other 136 tests and caught two missing example rows, which were added and rechecked.",
+    "deployment": "The local source checkout at 8ebec8c71 reloaded VoiceBridge. Port 8890 reported READY. The live authenticated Operations catalog listed workspaces_list_order as read-only and workspaces_move as confirmation-gated. The gateway process stayed active.",
     "remaining": "Physical microphone and touch input verification, deployed mutation read-back, advanced Kanban options, and broader Agents and Operations controls remain open."
   }
 }
