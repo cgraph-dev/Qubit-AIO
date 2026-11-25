@@ -2622,6 +2622,19 @@ export const api = {
         }),
       confirm,
     ),
+  updateWebhook: (
+    name: string,
+    changes: Partial<Omit<WebhookCreate, "name">>,
+    expectedCreatedAt: WebhookRoute["created_at"],
+  ) =>
+    runMutationWithConfirm(
+      () => fetchJSON<{ subscription: WebhookRoute }>(`/api/webhooks/${encodeURIComponent(name)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...changes, expected_created_at: expectedCreatedAt }),
+      }),
+      () => true,
+    ),
   deleteWebhook: (
     name: string,
     confirm?: (detail: string) => boolean | Promise<boolean>,
@@ -3395,7 +3408,7 @@ export interface WebhookRoute {
   deliver_only: boolean;
   prompt: string;
   skills: string[];
-  created_at: string | null;
+  created_at: number | null;
   url: string;
   secret_set: boolean;
   enabled: boolean;

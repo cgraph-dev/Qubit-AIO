@@ -1083,6 +1083,10 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                         "events": list(staged.get("events", []) or []),
                         "secret_ref": str(staged.get("secret_ref", "") or "")}
                 return HC.h_webhooks_mutate("add", cfg, {}, body, {})
+            if action == "webhook_update":
+                body = {**staged["changes"], "confirm": True,
+                        "expected_created_at": staged["created_at"]}
+                return HC.webhooks_update(cfg, {}, body, {"id": sid})
             if action in {"webhook_enable", "webhook_enabled"}:
                 if "enabled" not in staged:
                     return 409, {"ok": False, "code": "WEBHOOK_APPROVAL_INCOMPLETE",

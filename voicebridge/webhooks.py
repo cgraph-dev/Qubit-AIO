@@ -104,6 +104,14 @@ def _store_path(cfg: Any) -> Path:
     return Path(cfg.state_dir()) / STORE_NAME
 
 
+def _write_lock(cfg: Any):
+    from filelock import FileLock
+
+    path = _store_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return FileLock(f"{path}.lock")
+
+
 def _blank() -> Dict[str, Any]:
     return {"schema": SCHEMA, "subscriptions": {}}
 
@@ -229,11 +237,36 @@ def validate_subscription(sub_id: str, url: str, events: List[str], secret_ref: 
                            "id must match ^[a-z0-9][a-z0-9_.-]{0,63}$")
     clean_url = check_url(url, extra_hosts or [])
     clean_events = _check_events(events)
-    ref = (secret_ref or "").strip()
-    if _secret_kind(ref) == "missing":
+    return clean_id, clean_url, clean_events, _check_secret_ref(secret_ref)
+
+
+def _check_secret_ref(value: str) -> str:
+    ref = (value or "").strip()
+    if _secret_kind(ref) == "missing" or not ref.split(":", 1)[1].strip():
         raise WebhookError(BAD_INPUT_CODE,
                            "secret must be an env:VAR or file:PATH reference")
-    return clean_id, clean_url, clean_events, ref
+    return ref
+
+
+def validate_edit(changes: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize only submitted fields. Omitted fields keep their saved values."""
+    if not changes or set(changes) - {"url", "events", "secret_ref"}:
+        raise WebhookError(BAD_INPUT_CODE, "supply at least one editable webhook field")
+    clean = {}
+    if "url" in changes:
+        if not isinstance(changes["url"], str):
+            raise WebhookError(BAD_INPUT_CODE, "delivery URL must be text")
+        clean["url"] = check_url(changes["url"], [])
+    if "events" in changes:
+        events = changes["events"]
+        if not isinstance(events, list) or not all(isinstance(event, str) for event in events):
+            raise WebhookError(BAD_INPUT_CODE, "events must be a list of event names")
+        clean["events"] = _check_events(events)
+    if "secret_ref" in changes:
+        if not isinstance(changes["secret_ref"], str):
+            raise WebhookError(BAD_INPUT_CODE, "signing secret reference must be text")
+        clean["secret_ref"] = _check_secret_ref(changes["secret_ref"])
+    return clean
 
 
 def add(cfg: Any, sub_id: str, url: str, events: List[str], secret_ref: str,
@@ -247,17 +280,37 @@ def add(cfg: Any, sub_id: str, url: str, events: List[str], secret_ref: str,
     clean_id, clean_url, clean_events, ref = validate_subscription(
         sub_id, url, events, secret_ref, extra_hosts=extra_hosts,
     )
-    state = _load(cfg)
-    if len(state["subscriptions"]) >= MAX_SUBS:
-        raise WebhookError(EXISTS_CODE, f"subscription limit ({MAX_SUBS})")
-    if clean_id in state["subscriptions"]:
-        raise WebhookError(EXISTS_CODE, f"subscription {clean_id!r} exists")
-    rec = {"id": clean_id, "url": clean_url, "events": clean_events,
-           "secret_ref": ref, "created_at": _now(), "updated_by": requested_by}
-    state["subscriptions"][clean_id] = rec
-    _save(cfg, state)
+    with _write_lock(cfg):
+        state = _load(cfg)
+        if len(state["subscriptions"]) >= MAX_SUBS:
+            raise WebhookError(EXISTS_CODE, f"subscription limit ({MAX_SUBS})")
+        if clean_id in state["subscriptions"]:
+            raise WebhookError(EXISTS_CODE, f"subscription {clean_id!r} exists")
+        rec = {"id": clean_id, "url": clean_url, "events": clean_events,
+               "secret_ref": ref, "created_at": _now(), "updated_by": requested_by}
+        state["subscriptions"][clean_id] = rec
+        _save(cfg, state)
     _audit("add", requested_by, {"id": clean_id, "events": clean_events})
     return {"state": "OK", "subscription": _public(rec)}
+
+
+def update(cfg: Any, sub_id: str, changes: Dict[str, Any], *,
+           expected_created_at: Any, requested_by: str = "cli:user",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Apply the approved fields to the same subscription in the canonical store."""
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE, "webhook edit requires explicit confirmation")
+    clean = validate_edit(changes)
+    with _write_lock(cfg):
+        state = _load(cfg)
+        record = _get(state, sub_id)
+        if record.get("created_at") != expected_created_at:
+            raise WebhookError("WEBHOOK_EDIT_CONFLICT",
+                               "The subscription was replaced. Open it again to edit.")
+        record.update(clean, updated_by=requested_by)
+        _save(cfg, state)
+    _audit("update", requested_by, {"id": record["id"], "fields": sorted(clean)})
+    return {"state": "OK", "subscription": _public(record)}
 
 
 def list_subs(cfg: Any) -> Dict[str, Any]:
@@ -279,10 +332,11 @@ def remove(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
     if not confirmed:
         raise WebhookError(CONFIRM_CODE,
                            "webhook remove requires explicit --confirm")
-    state = _load(cfg)
-    rec = _get(state, sub_id)
-    del state["subscriptions"][rec["id"]]
-    _save(cfg, state)
+    with _write_lock(cfg):
+        state = _load(cfg)
+        rec = _get(state, sub_id)
+        del state["subscriptions"][rec["id"]]
+        _save(cfg, state)
     _audit("remove", requested_by, {"id": rec["id"]})
     return {"state": "OK", "removed": rec["id"]}
 
@@ -293,9 +347,10 @@ def set_enabled(cfg: Any, enabled: bool, *, requested_by: str = "cli:user",
     if not confirmed:
         raise WebhookError(CONFIRM_CODE,
                            "webhook enable toggle requires explicit --confirm")
-    state = _load(cfg)
-    state["enabled"] = bool(enabled)
-    _save(cfg, state)
+    with _write_lock(cfg):
+        state = _load(cfg)
+        state["enabled"] = bool(enabled)
+        _save(cfg, state)
     _audit("set_enabled", requested_by, {"enabled": bool(enabled)})
     return {"state": "OK", "enabled": bool(enabled)}
 
@@ -308,10 +363,11 @@ def set_sub_enabled(cfg: Any, sub_id: str, enabled: bool, *,
         raise WebhookError(CONFIRM_CODE,
                            "webhook subscription toggle requires explicit "
                            "--confirm")
-    state = _load(cfg)
-    rec = _get(state, sub_id)
-    rec["enabled"] = bool(enabled)
-    _save(cfg, state)
+    with _write_lock(cfg):
+        state = _load(cfg)
+        rec = _get(state, sub_id)
+        rec["enabled"] = bool(enabled)
+        _save(cfg, state)
     _audit("set_sub_enabled", requested_by,
            {"id": rec["id"], "enabled": bool(enabled)})
     return {"state": "OK", "id": rec["id"], "enabled": bool(enabled)}
@@ -410,23 +466,24 @@ def rotate_secret(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
     if not confirmed:
         raise WebhookError(CONFIRM_CODE,
                            "secret rotation requires explicit --confirm")
-    state = _load(cfg)
-    rec = _get(state, sub_id)
-    directory = _secret_dir(cfg)
-    path = directory / f"{rec['id']}.secret"
-    try:
-        directory.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
-        tmp.write_text(secrets.token_hex(32), encoding="utf-8")
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
-    except OSError as exc:
-        raise WebhookError(CORRUPT_CODE,
-                           f"secret rotation write failed: {exc}") from exc
-    rec["secret_ref"] = f"file:{path}"
-    rec["secret_rotated_at"] = _now()
-    state["subscriptions"][rec["id"]] = rec
-    _save(cfg, state)
+    with _write_lock(cfg):
+        state = _load(cfg)
+        rec = _get(state, sub_id)
+        directory = _secret_dir(cfg)
+        path = directory / f"{rec['id']}.secret"
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+            tmp.write_text(secrets.token_hex(32), encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, path)
+        except OSError as exc:
+            raise WebhookError(CORRUPT_CODE,
+                               f"secret rotation write failed: {exc}") from exc
+        rec["secret_ref"] = f"file:{path}"
+        rec["secret_rotated_at"] = _now()
+        state["subscriptions"][rec["id"]] = rec
+        _save(cfg, state)
     _audit("rotate", requested_by, {"id": rec["id"]})
     out = _public(rec)
     return {"state": "OK", "subscription": out,

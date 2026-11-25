@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import {
   AlertTriangle,
   Check,
   Copy,
   History,
   KeyRound,
+  Pencil,
   RefreshCw,
   RotateCw,
   Send,
@@ -95,7 +96,8 @@ export default function WebhooksPage() {
   // New subscription modal state (canonical webhook contract: id/url/events/
   // secret_ref — the same record the CLI/voice write).
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const nameHostRef = useRef<HTMLElement | null>(null);
+  const [editing, setEditing] = useState<WebhookRoute | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [events, setEvents] = useState("");
@@ -129,6 +131,7 @@ export default function WebhooksPage() {
   const closeCreateModal = useCallback(() => {
     setCreateModalOpen(false);
     setCreated(null);
+    setEditing(null);
   }, []);
   const createModalRef = useModalBehavior({
     open: createModalOpen,
@@ -158,8 +161,7 @@ export default function WebhooksPage() {
     let tries = 0;
     let timer = 0;
     const attempt = () => {
-      const host =
-        nameHostRef.current ?? document.getElementById("webhook-name");
+      const host = document.getElementById(editing ? "webhook-url" : "webhook-name");
       const input = host?.shadowRoot?.querySelector("input");
       if (input) {
         input.focus();
@@ -171,7 +173,7 @@ export default function WebhooksPage() {
     attempt();
     timer = window.setInterval(attempt, 10);
     return () => window.clearInterval(timer);
-  }, [createModalOpen]);
+  }, [createModalOpen, editing]);
 
   const watchRestartOutcome = useCallback(async () => {
     for (let i = 0; i < 20; i++) {
@@ -255,9 +257,19 @@ export default function WebhooksPage() {
     setEvents("");
     setSecretRef("");
     setFormErrors({});
+    setSubmitError(null);
   }, []);
 
-  const handleCreate = async () => {
+  const openEdit = (subscription: WebhookRoute) => {
+    resetForm();
+    setCreated(null);
+    setEditing(subscription);
+    setEvents(subscription.events.join(", "));
+    setCreateModalOpen(true);
+  };
+
+  const handleSaveSubscription = async () => {
+    setSubmitError(null);
     const subId = webhookSlug(name);
     const deliveryUrl = url.trim();
     const eventsList = events
@@ -271,16 +283,16 @@ export default function WebhooksPage() {
       events?: string;
       secretRef?: string;
     } = {};
-    if (!subId) {
+    if (!editing && !subId) {
       errors.name = "Name required — use a lowercase id (e.g. github-push).";
     }
-    if (!deliveryUrl) {
+    if (!editing && !deliveryUrl) {
       errors.url = "Delivery URL required.";
     }
     if (!eventsList.length) {
       errors.events = "At least one event is required (comma-separated).";
     }
-    if (!/^(env|file):/.test(secretReference)) {
+    if ((!editing || secretReference) && !/^(env|file):/.test(secretReference)) {
       errors.secretRef =
         "Secret must be an env:VAR or file:PATH reference.";
     }
@@ -300,22 +312,33 @@ export default function WebhooksPage() {
     }
     setCreating(true);
     try {
-      // The New-subscription modal is the confirmation; settle the staged gate.
-      const res = await api.createWebhook(
-        {
-          name: subId,
-          url: deliveryUrl,
-          events: eventsList,
-          secret_ref: secretReference,
-        },
-        () => true,
-      );
-      showToast("Created ✓", "success");
-      setCreated({ url: res.url, secret: res.secret });
+      if (editing) {
+        const originalEvents = [...editing.events].sort().join(",");
+        const updatedEvents = [...new Set(eventsList)].sort().join(",");
+        const changes = {
+          ...(deliveryUrl && { url: deliveryUrl }),
+          ...(updatedEvents !== originalEvents && { events: eventsList }),
+          ...(secretReference && { secret_ref: secretReference }),
+        };
+        if (Object.keys(changes).length === 0) {
+          closeCreateModal();
+          return;
+        }
+        await api.updateWebhook(editing.name, changes, editing.created_at);
+        showToast("Subscription updated", "success");
+        closeCreateModal();
+      } else {
+        const res = await api.createWebhook(
+          { name: subId, url: deliveryUrl, events: eventsList, secret_ref: secretReference },
+          () => true,
+        );
+        showToast("Created ✓", "success");
+        setCreated({ url: res.url, secret: res.secret });
+      }
       resetForm();
       loadWebhooks();
     } catch (e) {
-      showToast(`Failed to create: ${e}`, "error");
+      setSubmitError(e instanceof Error ? e.message : String(e));
     } finally {
       setCreating(false);
     }
@@ -450,6 +473,8 @@ export default function WebhooksPage() {
         className="uppercase"
         disabled={!enabled || enabling}
         onClick={() => {
+          resetForm();
+          setEditing(null);
           setCreated(null);
           setCreateModalOpen(true);
         }}
@@ -460,7 +485,7 @@ export default function WebhooksPage() {
     return () => {
       setEnd(null);
     };
-  }, [setEnd, enabled, enabling, loading]);
+  }, [setEnd, enabled, enabling, loading, resetForm]);
 
   if (loading) {
     return (
@@ -511,9 +536,9 @@ export default function WebhooksPage() {
             <header className="p-5 pb-3 border-b border-border">
               <h2
                 id="create-webhook-title"
-                className="font-mondwest text-display text-base tracking-wider"
+                className="break-words pr-8 font-mondwest text-display text-base tracking-wider"
               >
-                New subscription
+                {editing ? `Edit subscription · ${editing.name}` : "New subscription"}
               </h2>
             </header>
 
@@ -554,26 +579,27 @@ export default function WebhooksPage() {
               </div>
             ) : (
               <div className="p-5 grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="webhook-name">Name</Label>
-                  <Input
-                    ref={nameHostRef}
-                    label="Name"
-                    id="webhook-name"
-                    placeholder="e.g. github-push"
-                    value={name}
-                    aria-invalid={formErrors.name ? "true" : undefined}
-                    aria-describedby={
-                      formErrors.name ? "webhook-name-error" : undefined
-                    }
-                    onChange={(value) => {
-                      setName(value);
-                      if (formErrors.name)
-                        setFormErrors((prev) => ({ ...prev, name: undefined }));
-                    }}
-                  />
-                  <FieldError id="webhook-name-error" message={formErrors.name} />
-                </div>
+                {!editing && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="webhook-name">Name</Label>
+                    <Input
+                      label="Name"
+                      id="webhook-name"
+                      placeholder="e.g. github-push"
+                      value={name}
+                      aria-invalid={formErrors.name ? "true" : undefined}
+                      aria-describedby={
+                        formErrors.name ? "webhook-name-error" : undefined
+                      }
+                      onChange={(value) => {
+                        setName(value);
+                        if (formErrors.name)
+                          setFormErrors((prev) => ({ ...prev, name: undefined }));
+                      }}
+                    />
+                    <FieldError id="webhook-name-error" message={formErrors.name} />
+                  </div>
+                )}
 
                 <div className="grid gap-2">
                   <Label htmlFor="webhook-url">Delivery URL</Label>
@@ -584,7 +610,7 @@ export default function WebhooksPage() {
                     value={url}
                     aria-invalid={formErrors.url ? "true" : undefined}
                     aria-describedby={
-                      formErrors.url ? "webhook-url-error" : undefined
+                      formErrors.url ? "webhook-url-error" : editing ? "webhook-url-help" : undefined
                     }
                     onChange={(value) => {
                       setUrl(value);
@@ -592,6 +618,11 @@ export default function WebhooksPage() {
                         setFormErrors((prev) => ({ ...prev, url: undefined }));
                     }}
                   />
+                  {editing && (
+                    <p id="webhook-url-help" className="text-sm text-muted-foreground">
+                      Leave blank to keep the current URL.
+                    </p>
+                  )}
                   <FieldError id="webhook-url-error" message={formErrors.url} />
                 </div>
 
@@ -627,7 +658,7 @@ export default function WebhooksPage() {
                     value={secretRef}
                     aria-invalid={formErrors.secretRef ? "true" : undefined}
                     aria-describedby={
-                      formErrors.secretRef ? "webhook-secret-ref-error" : undefined
+                      formErrors.secretRef ? "webhook-secret-ref-error" : editing ? "webhook-secret-ref-help" : undefined
                     }
                     onChange={(value) => {
                       setSecretRef(value);
@@ -638,19 +669,25 @@ export default function WebhooksPage() {
                         }));
                     }}
                   />
+                  {editing && (
+                    <p id="webhook-secret-ref-help" className="text-sm text-muted-foreground">
+                      Leave blank to keep the current reference.
+                    </p>
+                  )}
                   <FieldError
                     id="webhook-secret-ref-error"
                     message={formErrors.secretRef}
                   />
                 </div>
 
+                {submitError && <p role="alert" className="text-sm text-destructive break-words">{submitError}</p>}
                 <div className="flex justify-end">
                   <Button
                     className="uppercase"
-                    onClick={handleCreate}
+                    onClick={handleSaveSubscription}
                     disabled={creating}
                   >
-                    {creating ? "Creating…" : "Create"}
+                    {editing ? (creating ? "Saving…" : "Save changes") : (creating ? "Creating…" : "Create")}
                   </Button>
                 </div>
               </div>
@@ -886,6 +923,15 @@ export default function WebhooksPage() {
               </div>
 
               <div className="qm-webhook-actions flex flex-wrap items-center gap-1.5 sm:justify-end">
+                <Button
+                  variant="secondary"
+                  className="qm-webhook-icon-btn"
+                  title="Edit subscription"
+                  aria-label={`Edit subscription ${sub.name}`}
+                  onClick={() => openEdit(sub)}
+                >
+                  <Pencil />
+                </Button>
                 <Button
                   variant="secondary"
                   className="qm-webhook-icon-btn"
