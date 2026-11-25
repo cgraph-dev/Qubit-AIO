@@ -224,9 +224,8 @@ def remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """``POST /api/workspaces/remove {path}`` — unregister a FOLDER.
 
     Unregistering removes the path from the set the git/terminal endpoints are
-    confined to; the folder itself is never touched on disk. Removing the last
-    folder of a project archives the project (the registry's own rule) rather
-    than leaving an empty one.
+    confined to. The folder and its files stay on disk. The project registry
+    preserves the project even if it has no folders.
     """
     PJ = _projects()
     path = _body_path(b or {})
