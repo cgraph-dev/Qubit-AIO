@@ -2188,7 +2188,7 @@
     "date": "2026-11-25",
     "revision": "237713fe795e2248f993b42ba398e2070f632d58",
     "environment": "Production Vite build and Chromium on an authenticated disposable loopback dashboard",
-    "browser": "At 1440 pixels, an events-only edit kept the existing destination and left the signing reference out of both requests. At 390 pixels, the dialog fit the viewport and saved a new destination and file-backed signing reference. Both saves replayed the exact approval ID. Independent HTTP read-back and the disposable registry confirmed the saved values and isolated the second subscription. Credential references stayed redacted in the HTTP responses.",
+    "browser": "At 1440 pixels, an events-only edit kept the existing destination and left the signing reference out of both requests. At 390 pixels, the dialog fit the viewport and saved a new destination and file-backed signing reference. Both saves replayed the exact approval ID. Independent HTTP read-back and the disposable registry confirmed the saved values and isolated the second subscription. Credential references stayed redacted in the HTTP responses. With the approved mobile request held in flight, Escape left the dialog open and its Close button was disabled until the save finished.",
     "approval_and_storage": "Focused tests rejected a changed field or target on replay, consumed an approved edit once, and rejected a stale form or approval for a subscription deleted and recreated under the same ID. A concurrent toggle made before approval was preserved.",
     "verification": {
       "focused_python_tests": 25,
