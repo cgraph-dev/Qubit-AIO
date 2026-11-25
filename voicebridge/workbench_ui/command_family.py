@@ -70,6 +70,7 @@ ROUTES: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "workspaces/add": workspace_family.add,
     "workspaces/rename": workspace_family.rename,
     "workspaces/remove": workspace_family.remove,
+    "workspaces/cancel": workspace_family.cancel,
     "workspaces/reorder": workspace_family.reorder,
     "workspace/upload": workspace_family.upload,
     # -- git reads ---------------------------------------------------------

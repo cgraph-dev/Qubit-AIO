@@ -244,7 +244,8 @@ def redact(text: Any) -> str:
 def confirm_gate(cfg: Any, action: str, detail: str,
                  q: Optional[Dict[str, str]] = None,
                  b: Optional[Dict[str, Any]] = None,
-                 payload: Optional[Dict[str, Any]] = None
+                 payload: Optional[Dict[str, Any]] = None, *,
+                 match_payload: bool = False
                  ) -> Optional[Tuple[int, Dict[str, Any]]]:
     """The SHARED confirm contract for writes lacking a canonical module.
 
@@ -258,7 +259,7 @@ def confirm_gate(cfg: Any, action: str, detail: str,
 
         fn = getattr(HC, "_compat_confirm", None)
         if callable(fn):
-            staged = fn(cfg, action, detail, q, b, payload)
+            staged = fn(cfg, action, detail, q, b, payload, match_payload=match_payload)
             return staged  # type: ignore[no-any-return]
     except Exception:
         pass
