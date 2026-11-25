@@ -2196,5 +2196,20 @@
       "vite_build": "passed"
     },
     "remaining": "Explicit channel send and receive fixtures, pairing lifecycle, physical devices, and deployed mutations remain open for the combined checklist row."
+  },
+  "current_channels_transport_and_approvals": {
+    "date": "2026-11-25",
+    "revision": "d2613e5649269ce6ccbe3d0e956625a993707e2c",
+    "environment": "Disposable Qubit state, loopback HTTP dashboard, loopback Slack-shaped receiver, and synthetic credentials and senders",
+    "outbound": "Without confirmation the broker made zero requests. A confirmed send used the exact fixture recipient and message with its synthetic credential in the authorization header. Replay returned the original provider receipt with no second request. An independent CLI process read the same receipt without exposing the credential or its reference.",
+    "inbound": "The Telegram HTTP route rejected a bad signature and replay. It verified the valid request but returned CHANNEL_UNAVAILABLE and created no dispatch receipt. With an explicit allowed sender, the in-process listener dispatched a separate signed delivery and persisted one receipt with a redacted preview.",
+    "dashboard": "The authenticated platforms inventory omitted synthetic credentials. The Telegram connection probe reported an unconnected channel and sent no message.",
+    "approvals": "Channel settings replay binds the selected platform and submitted settings. Banner settlement uses the recorded settings. For a raw credential the originating form must repeat the same value, which is never stored in the approval journal. Raw approvals outstanding across a listener restart must be staged again.",
+    "pairing": "The focused selection exercised native one-time issuance, expiry, revocation and single-use grant, dashboard scope retention and redacted mint responses, and the disposable device management API.",
+    "focused_tests": {
+      "transport_and_channels": 46,
+      "approvals_pairing_and_devices": 31
+    },
+    "remaining": "Incoming channel dispatch over HTTP, deployed mutation and real provider checks, and physical device enrollment remain open. The in-process receive fixture does not close the public ingress gap."
   }
 }
