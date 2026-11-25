@@ -2145,5 +2145,19 @@
       "health": 17,
       "logs": 1
     }
+  },
+  "current_logs_files_reports_analytics": {
+    "date": "2026-11-25",
+    "revision": "01e6c2ab3",
+    "environment": "Production Vite build, Chromium, and authenticated loopback dashboard with disposable profile, project and report stores",
+    "logs": "Chromium verified combined minimum-level, component and search filters, polling after append, disabled polling and manual refresh, masked display and byte-identical export. An independent 30,002-row fixture counted exactly one traversal for the first filtered page. The sparse snapshot fixture covered rotation, append, older-page stability and profile isolation. The existing slow older-response regression passed.",
+    "files": "Chromium declined and retried folder creation without losing the draft. The confirmed request created the folder. Multipart binary upload and download preserved all bytes. The confirmed delete response and independent list agreed. The isolated file worker no longer captures live dashboard locks and still receives the current project store and durable stop-latch setting.",
+    "reports": "Chromium displayed a saved report manifest. The real report and insights broker actions returned executed receipts.",
+    "analytics": "Authenticated overview and per-model routes matched five token and API-call totals seeded independently in SQLite.",
+    "focused_tests": {
+      "frontend": 12,
+      "file_backend": 20,
+      "reports_and_route_reads": 2
+    }
   }
 }

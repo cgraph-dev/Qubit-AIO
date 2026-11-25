@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Dashboard data controls (2026-11-25).** The Logs, Files, Reports, and Analytics row is complete at the disposable scope. The next dashboard row covers Cron, scheduler, and task subpages. The earlier live service and operator verification remain tracked separately. [Audit evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Live Logs audit (2026-11-25).** Live read-only pagination and search passed. Continue control behavior and export, level and component filters, then the related Files, Reports, and Analytics workflows. The installation health follow-up is resolved on the local deployment. [Live audit evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Live source deployment (2026-11-25).** The dashboard serves the new source build and the gateway reports the replacement process. The deployed per-control sweep and approved provider calls remain open. The local service PATH now supports Graft MCP. See the later installation health follow-up above. [Live deployment evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
