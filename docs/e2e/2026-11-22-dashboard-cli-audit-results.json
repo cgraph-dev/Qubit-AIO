@@ -2345,5 +2345,14 @@
       "provider": "The system Ollama service was active at read-back."
     },
     "remaining": "Spoken reorder, touch reordering, deployed mutation read-back, advanced Kanban options, agent management and broader Operations forms remain open."
+  },
+  "current_spoken_workspace_order": {
+    "date": "2026-11-25",
+    "revision": "fe31ca20b",
+    "environment": "Transcript-driven voice entry point and authenticated loopback dashboard using disposable registries and separate CLI processes",
+    "voice": "List workspaces read numbered positions and supported another page. Move workspace three to position one spoke the selected project and folder before asking for confirmation. Cancel left the order unchanged. Confirm saved once. A stale confirmation refused after a concurrent registry change, and invalid positions did not stage an approval.",
+    "read_back": "The native CLI confirmed the displayed ID and separately read the new order and unchanged project fields and active project. The authenticated Operations HTTP route cancelled an exact ID, then settled a new ID. The Workbench HTTP route returned the saved order.",
+    "verification": "The focused rerun passed 12 tests including every registry example, alias uniqueness, the mutation gate and workspace regressions. The pre-fix combined run passed the other 136 tests and caught two missing example rows, which were added and rechecked.",
+    "remaining": "Physical microphone and touch input verification, deployed mutation read-back, advanced Kanban options, and broader Agents and Operations controls remain open."
   }
 }

@@ -95,7 +95,7 @@ MUTATING_ACTIONS = {
                "role_revoke", "snapshot_restore"},
     "projects": {"create", "use", "archive", "rename", "add_folder",
                  "remove_folder", "set_primary", "restore", "rollback",
-                 "bind_board"},
+                 "bind_board", "move_workspace"},
     "skills": {"enable", "disable", "remove", "rollback"},
     "sync": {"revoke"},
     "checkpoints": {"create", "prune"},
@@ -258,6 +258,8 @@ COMPLETE_EXAMPLES = {
     "skills_enable": "qubit, enable skill weather",
     "skills_disable": "qubit, disable skill weather",
     "projects_list": "qubit, list projects",
+    "workspaces_list_order": "qubit, list workspaces from four",
+    "workspaces_move": "qubit, move workspace three to position one",
     "projects_show": "qubit, show project shop",
     "projects_create": "qubit, create project shop",
     "projects_use": "qubit, switch to project shop",
@@ -998,6 +1000,75 @@ def test_orchestrator_confirm_and_cancel_loop(tmp_path, monkeypatch):
     VC.handle_turn(orch, "conversation", "qubit, create task second")
     VC.cancel_voice_turn(orch)
     assert VC.confirm_voice_turn(orch) is False, "cancelled is gone"
+
+
+def test_spoken_workspace_move_uses_the_workbench_order(tmp_path, monkeypatch):
+    from voicebridge import projects, voice_commands as VC
+    from voicebridge.workbench_ui import workspace_family
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    folders = [tmp_path / name for name in ("a", "b", "c", "d")]
+    for folder in folders:
+        folder.mkdir()
+    projects.create(cfg, "Alpha", [str(folders[0]), str(folders[1])], confirmed=True, use=True)
+    projects.create(cfg, "Beta", [str(folders[2]), str(folders[3])], confirmed=True)
+    before = projects.list_projects(cfg)
+    order = before["workspace_order"]
+    orch = _FakeOrch(cfg)
+
+    assert VC.handle_turn(orch, "conversation", "Qubit, list workspaces.")
+    assert "1. alpha, a" in orch.spoken[-1] and "from 4 for more" in orch.spoken[-1]
+    assert VC.handle_turn(orch, "conversation", "Qubit, list workspaces from four.")
+    assert "4. beta, d" in orch.spoken[-1]
+
+    command = "Qubit, move workspace three to position one."
+    assert VC.handle_turn(orch, "conversation", command)
+    assert "Move beta, c to position 1?" in orch.spoken[-1]
+    assert projects.list_projects(cfg)["workspace_order"] == order
+    VC.cancel_voice_turn(orch)
+    assert not VC.confirm_voice_turn(orch)
+    assert projects.list_projects(cfg)["workspace_order"] == order
+
+    assert VC.handle_turn(orch, "conversation", command)
+    assert VC.confirm_voice_turn(orch)
+    assert orch.spoken[-1] == "Workspace order saved."
+    assert not VC.confirm_voice_turn(orch)
+    after = projects.list_projects(cfg)
+    assert after["active_slug"] == before["active_slug"]
+    assert after["projects"] == before["projects"]
+    assert after["workspace_order"] == [order[2], order[0], order[1], order[3]]
+    status, payload = workspace_family.list_payload(cfg)
+    assert status == 200
+    assert [[row["slug"], row["path"]] for row in payload["workspaces"]] == after["workspace_order"]
+
+
+def test_spoken_workspace_move_rejects_stale_and_invalid_positions(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops, projects, voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    assert "no registered workspaces" in VC.voice_say(cfg, "list workspaces")["speech"]
+    folders = [tmp_path / name for name in ("a", "b", "c")]
+    for folder in folders:
+        folder.mkdir()
+    projects.create(cfg, "Demo", [str(folder) for folder in folders], confirmed=True)
+    initial = projects.list_projects(cfg)["workspace_order"]
+
+    for phrase in ("move workspace 5 to 1", "move workspace a to b", "move workspace 0 to 1"):
+        refused = VC.voice_say(cfg, phrase)
+        assert refused["code"] == projects.ORDER_CODE
+        assert "confirmation_id" not in refused
+    noop = VC.voice_say(cfg, "move workspace 1 to 1")
+    assert noop["receipt"]["result"]["state"] == "NO_CHANGE"
+    assert not VC._journal(cfg).pending()
+
+    staged = VC.voice_say(cfg, "move workspace 3 to 1")
+    assert staged["state"] == VC.NEEDS_CONFIRM
+    projects.reorder_workspaces(cfg, initial[::-1], expected=initial, confirmed=True)
+    denied = dashboard_ops.confirm_registry_op(cfg, staged["confirmation_id"])
+    assert denied["state"] == VC.FAILED
+    assert denied["receipt"]["code"] == projects.ORDER_CONFLICT_CODE
+    assert projects.list_projects(cfg)["workspace_order"] == initial[::-1]
+    assert not VC._journal(cfg).pending()
 
 
 def test_cli_voice_group(tmp_path, monkeypatch):
