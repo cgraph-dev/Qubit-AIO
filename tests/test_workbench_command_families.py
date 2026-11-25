@@ -643,3 +643,44 @@ def test_unknown_and_empty_paths_are_not_routed():
     assert command_family.handler_for("git/nope") is None
     assert command_family.handler_for("") is None
     assert command_family.handler_for("/") is None
+
+
+def test_workbench_workspace_approval_tracks_owning_project_and_cancel(env, tmp_path):
+    from voicebridge import projects as PJ
+
+    cfg, root, _outside = env
+    fresh = tmp_path / "candidate"
+    fresh.mkdir()
+    params = {"path": str(fresh)}
+    status, staged = workspace_family.add(cfg, {}, params, {})
+    assert status == 409
+    cid = staged["confirmation_id"]
+
+    other = tmp_path / "other-project"
+    other.mkdir()
+    PJ.create(cfg, "Other project", [str(other)], confirmed=True, use=True)
+    status, replacement = workspace_family.add(
+        cfg, {}, {**params, "confirm": True, "confirmation_id": cid}, {})
+    assert status == 409
+    assert str(fresh) not in PJ.show(cfg, "other-project")["project"]["folders"]
+    assert str(fresh) not in PJ.show(cfg, "ws")["project"]["folders"]
+
+    status, cancelled = workspace_family.cancel(cfg, {}, {"confirmation_id": cid}, {})
+    assert status == 200 and cancelled["ok"]
+    PJ.use(cfg, "ws", confirmed=True)
+    status, _ = workspace_family.add(cfg, {}, {**params, "confirmation_id": cid}, {})
+    assert status == 409
+    PJ.use(cfg, "other-project", confirmed=True)
+    status, applied = workspace_family.add(
+        cfg, {}, {**params, "confirmation_id": replacement["confirmation_id"]}, {})
+    assert status == 200 and applied["added"] == str(fresh)
+    assert str(fresh) in PJ.show(cfg, "other-project")["project"]["folders"]
+
+    status, renamed = workspace_family.rename(
+        cfg, {}, {"path": str(root.parent), "name": "Approved name"}, {})
+    assert status == 409
+    status, _ = workspace_family.rename(
+        cfg, {}, {"path": str(root.parent), "name": "Changed name",
+                  "confirmation_id": renamed["confirmation_id"]}, {})
+    assert status == 409
+    assert PJ.show(cfg, "ws")["project"]["name"] != "Changed name"
