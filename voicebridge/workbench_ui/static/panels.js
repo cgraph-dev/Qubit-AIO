@@ -6801,10 +6801,8 @@ async function activateCurrentWorkspace(){
 async function deleteCurrentWorkspace(){
   if (!_currentWorkspaceDetail) return;
   const path = _currentWorkspaceDetail.path;
-  const _ok = await showConfirmDialog({title:t('workspace_remove_confirm_title'),message:t('workspace_remove_confirm_message',path),confirmLabel:t('remove'),danger:true,focusCancel:true});
-  if(!_ok) return;
   try{
-    const data=await api('/api/workspaces/remove',{method:'POST',body:JSON.stringify({path})});
+    const data=await changeWorkspace('/api/workspaces/remove', {path});
     _workspaceList=data.workspaces;
     _clearWorkspaceDetail();
     renderWorkspacesPanel(data.workspaces);
@@ -6890,7 +6888,7 @@ async function saveWorkspaceForm(){
     if (_workspaceMode === 'edit' && _currentWorkspaceDetail) {
       const targetPath = _currentWorkspaceDetail.path;
       const newName = name || _currentWorkspaceDetail.name || '';
-      await api('/api/workspaces/rename', { method:'POST', body: JSON.stringify({ path: targetPath, name: newName }) });
+      await changeWorkspace('/api/workspaces/rename', { path: targetPath, name: newName });
       // Refresh list and re-render detail
       const data = await api('/api/workspaces');
       _workspaceList = data.workspaces || [];
@@ -6900,12 +6898,12 @@ async function saveWorkspaceForm(){
       openWorkspaceDetail(targetPath);
       return;
     }
-    const data = await api('/api/workspaces/add', { method:'POST', body: JSON.stringify({ path }) });
+    const data = await changeWorkspace('/api/workspaces/add', { path });
     _workspaceList = data.workspaces || [];
     _workspacePreFormDetail = null;
     // Apply rename if a friendly name was supplied
     if (name) {
-      try { await api('/api/workspaces/rename', { method:'POST', body: JSON.stringify({ path, name }) }); } catch(_) {}
+      try { await changeWorkspace('/api/workspaces/rename', { path, name }); } catch(_) {}
       const refreshed = await api('/api/workspaces');
       _workspaceList = refreshed.workspaces || _workspaceList;
     }
@@ -6971,10 +6969,8 @@ document.addEventListener('click',e=>{
 });
 
 async function removeWorkspace(path){
-  const _rmWs=await showConfirmDialog({title:t('workspace_remove_confirm_title'),message:t('workspace_remove_confirm_message',path),confirmLabel:t('remove'),danger:true,focusCancel:true});
-  if(!_rmWs) return;
   try{
-    const data=await api('/api/workspaces/remove',{method:'POST',body:JSON.stringify({path})});
+    const data=await changeWorkspace('/api/workspaces/remove', {path});
     _workspaceList=data.workspaces;
     renderWorkspacesPanel(data.workspaces);
     showToast(t('workspace_removed'));
@@ -7004,7 +7000,7 @@ async function promptWorkspacePath(){
   const path=(value||'').trim();
   if(!path)return;
   try{
-    const data=await api('/api/workspaces/add',{method:'POST',body:JSON.stringify({path})});
+    const data=await changeWorkspace('/api/workspaces/add', {path});
     _workspaceList=data.workspaces||[];
     const target=_workspaceList[_workspaceList.length-1];
     if(!target) throw new Error(t('workspace_not_added'));

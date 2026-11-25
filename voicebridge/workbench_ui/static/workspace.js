@@ -137,6 +137,45 @@ async function api(path,opts={}){
   throw lastErr;
 }
 
+async function changeWorkspace(path, body){
+  const post=(route, payload)=>api(route,{method:'POST',body:JSON.stringify(payload),retries:0});
+  const approvalFrom=(error)=>{
+    if(error.status!==409) return null;
+    try{
+      const data=JSON.parse(error.body);
+      return data.code==='CONFIRM_REQUIRED' && data.confirmation_id ? data : null;
+    }catch(_){
+      return null;
+    }
+  };
+  try{
+    return await post(path,body);
+  }catch(error){
+    const approval=approvalFrom(error);
+    if(!approval) throw error;
+    const confirmation={confirmation_id:approval.confirmation_id};
+    const removing=path==='/api/workspaces/remove';
+    const dialog={message:approval.detail,focusCancel:true,danger:removing};
+    if(removing){
+      dialog.title=t('workspace_remove_confirm_title');
+      dialog.confirmLabel=t('remove');
+    }
+    if(!await showConfirmDialog(dialog)){
+      await post('/api/workspaces/cancel',confirmation);
+      throw new Error('Workspace change cancelled.');
+    }
+    try{
+      return await post(path,{...body,...confirmation});
+    }catch(replayError){
+      const replacement=approvalFrom(replayError);
+      if(!replacement) throw replayError;
+      await post('/api/workspaces/cancel',{confirmation_id:replacement.confirmation_id});
+      await post('/api/workspaces/cancel',confirmation);
+      throw new Error('The workspace target changed. Review it and try again.');
+    }
+  }
+}
+
 function recordClientSSEError(source, details={}){
   try{
     const payload={
