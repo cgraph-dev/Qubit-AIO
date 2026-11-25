@@ -20556,6 +20556,19 @@ def _kanban_confirm(cfg: Any, action: str, detail: str, q: Dict[str, str],
     return _compat_confirm(cfg, action, detail, q, b, payload=staged, match_payload=True)
 
 
+def _kanban_unsupported_options(body: Dict[str, Any], supported: frozenset
+                               ) -> Optional[Tuple[int, Dict[str, Any]]]:
+    allowed = supported | {"confirm", "confirmation_id"}
+    submitted = {
+        key: value for key, value in body.items()
+        if value is not None and value not in ("", [], {})
+        and not (key == "workspace_kind" and value == "scratch")
+        and not (key in {"triage", "goal_mode"} and value is False)
+    }
+    status, result = _unsupported_fields(submitted, allowed)
+    return (status, result) if status != 200 else None
+
+
 def _kanban_edit_fields(kb: Any, body: Dict[str, Any]) -> Dict[str, Any]:
     fields = {}
     if body.get("title") is not None:
@@ -20595,6 +20608,10 @@ def h_plugin_kanban_boards_create(cfg: Any, q: Dict[str, str],
     """POST /api/plugins/kanban/boards -> create on the native board store."""
     from . import kanban as KB
 
+    unsupported = _kanban_unsupported_options(b, frozenset({"slug", "name"}))
+    if unsupported is not None:
+        return unsupported
+
     slug = str(b.get("slug", "") or "").strip()
     if not slug:
         return 400, {"ok": False, "code": "MALFORMED",
@@ -20628,6 +20645,10 @@ def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
                                  ) -> Tuple[int, Dict[str, Any]]:
     """POST /api/plugins/kanban/tasks -> create on the native task store."""
     from . import kanban as KB
+
+    unsupported = _kanban_unsupported_options(b, frozenset({"title", "body", "assignee", "priority", "board"}))
+    if unsupported is not None:
+        return unsupported
 
     title = str(b.get("title", "") or "").strip()
     if not title:
@@ -20663,6 +20684,10 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
                                 ) -> Tuple[int, Dict[str, Any]]:
     """PATCH /api/plugins/kanban/tasks/{id} -> native edit/assign/transition."""
     from . import kanban as KB
+
+    unsupported = _kanban_unsupported_options(b, frozenset({"title", "body", "assignee", "priority", "status", "board"}))
+    if unsupported is not None:
+        return unsupported
 
     raw = str(p.get("task_id") or "").strip()
     if not raw.isdigit():
@@ -20739,6 +20764,10 @@ def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
                                ) -> Tuple[int, Dict[str, Any]]:
     """POST /api/plugins/kanban/tasks/bulk -> per-id native patch."""
     from . import kanban as KB
+
+    unsupported = _kanban_unsupported_options(b, frozenset({"ids", "title", "body", "assignee", "priority", "status", "archive", "board"}))
+    if unsupported is not None:
+        return unsupported
 
     ids = b.get("ids")
     if not isinstance(ids, list) or not ids:

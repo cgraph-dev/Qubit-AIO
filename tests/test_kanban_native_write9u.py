@@ -176,3 +176,27 @@ def test_board_approvals_bind_form_and_replay_banner_fields(tmp_path, monkeypatc
         cfg, {}, {"status": "done", "priority": 8, "confirm": True}, {"task_id": task})
     assert code == 400
     assert KB.show(cfg, int(task))["task"]["status"] == "claimed"
+
+
+def test_extra_board_options_refuse_without_staging_or_writing(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    defaults = {"title": "Fixture card", "triage": False, "workspace_kind": "scratch",
+                "parents": [], "goal_mode": False}
+    status, staged = QC.h_plugin_kanban_tasks_create(cfg, {}, defaults, {})
+    assert status == 409 and staged["confirmation_id"]
+    status, refused = QC.h_plugin_kanban_tasks_create(
+        cfg, {}, {**defaults, "goal_mode": True, "parents": ["2"]}, {})
+    assert status == 400 and refused["code"] == "UNSUPPORTED_FIELD"
+    assert "goal_mode" in refused["detail"] and "parents" in refused["detail"]
+    assert "confirmation_id" not in refused and not _tasks_in_board(cfg)
+    status, created = QC.h_plugin_kanban_tasks_create(
+        cfg, {}, {**defaults, "confirmation_id": staged["confirmation_id"]}, {})
+    assert status == 200
+    tid = created["task"]["id"]
+    status, refused = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {"status": "done", "summary": "Completion notes", "confirm": True},
+        {"task_id": tid})
+    assert status == 400 and refused["code"] == "UNSUPPORTED_FIELD"
+    assert _tasks_in_board(cfg)["Fixture card"]["status"] == "todo"
