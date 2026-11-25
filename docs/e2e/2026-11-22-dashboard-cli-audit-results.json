@@ -2260,5 +2260,20 @@
     "generation": "Ollama's /api/generate returned READY and two generated tokens for a synthetic prompt. The native Qubit CLI used the local /v1/chat/completions endpoint and returned READY. A separate SQLite read verified one matching user entry and one assistant entry in the disposable home. The original CLI invocation used an invalid toolset name and exited before sending anything. The corrected invocation used the built-in todo toolset.",
     "deployed_reads": "Chat, Workbench, Channels, Webhooks, Pairing, and Devices documents returned 200. Authenticated System stats, Gateway status, Channels inventory, Webhooks inventory, and Pairing inventory returned JSON with HTTP 200.",
     "remaining": "Permanent local-provider restoration requires administrator authentication. Deployed dashboard chat, mutation checks, provider-native delivery to approved real accounts, and physical device enrollment remain open."
+  },
+  "current_profile_and_workspace_lifecycle": {
+    "date": "2026-11-25",
+    "profile_revision": "0f927f90be6c5c21980298207624513f17c1034f",
+    "workspace_revision": "477fbe0ec57da545f2f11b4ac7fee4e068a2fd9f",
+    "environment": "Authenticated loopback dashboard and separate CLI processes using disposable Qubit homes and project folders",
+    "profiles": "Confirmed creation persisted the description and honored no_skills. Active selection and rename moved the profile home and sticky pointer together. A separate native CLI listed the renamed profile and its sibling. The reserved default profile refused deletion. Approved cleanup removed the fixture home, reset the active pointer, and left its sibling's marker intact.",
+    "approvals": "Profile creation binds the submitted settings without storing the form values in the journal. Rename and delete bind the selected profile home. Focused regressions checked that a change to the staged settings or target required a fresh approval.",
+    "archive": "The native CLI preserved the fixture marker in the exported archive and omitted the credential file. After dashboard cleanup, a CLI import under a new name restored the description and marker. The restored profile appeared in an independent dashboard read.",
+    "workspace": "The Projects CLI created a two-folder workspace and changed the primary folder. The authenticated project tree and chat workspace API both returned the selected folder. Archive hid the workspace from the chooser, and restore brought it back with the same primary folder.",
+    "focused_tests": {
+      "profiles_identity_workspace_memory": 23,
+      "workspace_routes_and_workbench": 19
+    },
+    "remaining": "Profile-managed gateway ownership in the dashboard flow, nested workspace controls, boards, agents, operations and achievements, browser control verification, and deployed checks remain open."
   }
 }
