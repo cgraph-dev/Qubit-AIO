@@ -1701,6 +1701,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Paths are validated as existing directories before saving.',
 
     workspace_drag_hint: 'Reorder with drag or arrow keys',
+    workspace_move_up: 'Move up',
+    workspace_move_down: 'Move down',
     workspace_reorder_failed: 'Reorder failed',
     workspace_added: 'Workspace added',
     workspace_recovered_notice: (path) => `This session's deleted workspace was recovered to ${path}.`,
@@ -3600,6 +3602,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'I percorsi sono validati come directory esistenti prima del salvataggio.',
 
     workspace_drag_hint: 'Trascina per riordinare',
+    workspace_move_up: 'Sposta in alto',
+    workspace_move_down: 'Sposta in basso',
     workspace_reorder_failed: 'Riordino fallito',
     workspace_added: 'Workspace aggiunto',
     workspace_recovered_notice: (path) => `Il workspace eliminato di questa sessione è stato ripristinato in ${path}.`,
@@ -5509,6 +5513,8 @@ const LOCALES = {
     workspace_paths_validated_hint: '保存前に既存ディレクトリとして検証されます。',
 
     workspace_drag_hint: 'ドラッグして並び替え',
+    workspace_move_up: '上に移動',
+    workspace_move_down: '下に移動',
     workspace_reorder_failed: '並び替え失敗',
     workspace_added: 'ワークスペースを追加しました',
     workspace_recovered_notice: (path) => `このセッションの削除済みワークスペースを ${path} に復元しました。`,
@@ -7002,6 +7008,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Перед сохранением пути проверяются на существование.',
 
     workspace_drag_hint: 'Перетащите для изменения порядка',
+    workspace_move_up: 'Переместить вверх',
+    workspace_move_down: 'Переместить вниз',
     workspace_reorder_failed: 'Не удалось изменить порядок',
     workspace_added: 'Рабочее пространство добавлено',
     workspace_recovered_notice: (path) => `Удалённое рабочее пространство этого сеанса восстановлено в ${path}.`,
@@ -8895,6 +8903,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Paths are validated as existing directories before saving.',
 
     workspace_drag_hint: 'Arrastra para reordenar',
+    workspace_move_up: 'Mover hacia arriba',
+    workspace_move_down: 'Mover hacia abajo',
     workspace_reorder_failed: 'Error al reordenar',
     workspace_added: 'Workspace added',
     workspace_recovered_notice: (path) => `El espacio de trabajo eliminado de esta sesión se recuperó en ${path}.`,
@@ -10721,6 +10731,8 @@ const LOCALES = {
     composer_control_status: 'Status',
 
     workspace_drag_hint: 'Ziehen zum Neuordnen',
+    workspace_move_up: 'Nach oben verschieben',
+    workspace_move_down: 'Nach unten verschieben',
     workspace_reorder_failed: 'Neuordnen fehlgeschlagen',
     open_in_browser: 'Im Browser öffnen',
     settings_section_system_title: 'System',
@@ -12644,6 +12656,8 @@ const LOCALES = {
     workspace_paths_validated_hint: '保存前会校验路径是否为已存在目录。',
 
     workspace_drag_hint: '拖动以重新排序',
+    workspace_move_up: '上移',
+    workspace_move_down: '下移',
     workspace_reorder_failed: '重新排序失败',
     workspace_added: '工作区已添加',
     workspace_recovered_notice: (path) => `此会话已删除的工作区已恢复到 ${path}。`,
@@ -14897,6 +14911,8 @@ const LOCALES = {
     workspace_paths_validated_hint: '路徑會先驗證是否存在再儲存。',
 
     workspace_drag_hint: '拖曳以重新排列',
+    workspace_move_up: '上移',
+    workspace_move_down: '下移',
     workspace_reorder_failed: '重新排列失敗',
     workspace_added: '工作區已新增',
     workspace_recovered_notice: (path) => `此工作階段已刪除的工作區已復原至 ${path}。`,
@@ -18408,6 +18424,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Paths are validated as existing directories before saving.',
 
     workspace_drag_hint: '드래그하여 순서 변경',
+    workspace_move_up: '위로 이동',
+    workspace_move_down: '아래로 이동',
     workspace_reorder_failed: '순서 변경 실패',
     workspace_added: 'Workspace added',
     workspace_recovered_notice: (path) => `이 세션에서 삭제된 작업 공간을 ${path}(으)로 복구했습니다.`,
@@ -20392,6 +20410,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Les chemins sont validés en tant que répertoires existants avant d\'être enregistrés.',
 
     workspace_drag_hint: 'Faites glisser pour réorganiser',
+    workspace_move_up: 'Déplacer vers le haut',
+    workspace_move_down: 'Déplacer vers le bas',
     workspace_reorder_failed: 'Échec de la réorganisation',
     workspace_added: 'Espace de travail ajouté',
     workspace_recovered_notice: (path) => `L’espace de travail supprimé de cette session a été récupéré dans ${path}.`,
@@ -21877,6 +21897,8 @@ const LOCALES = {
     workspace_choose_path_meta: 'Přidat ověřenou cestu a přepnout tuto konverzaci',
     workspace_desc: 'Přidávejte a přepínejte pracovní prostory pro vaše relace.',
     workspace_drag_hint: 'Přetáhněte pro změnu pořadí',
+    workspace_move_up: 'Posunout nahoru',
+    workspace_move_down: 'Posunout dolů',
     workspace_manage: 'Spravovat pracovní prostory',
     workspace_manage_meta: 'Otevřít panel Prostory',
     workspace_name_label: 'Název',
@@ -24056,6 +24078,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Yollar, kaydedilmeden önce mevcut dizinler olarak doğrulanır.',
 
     workspace_drag_hint: 'Yeniden sıralamak için sürükleyin',
+    workspace_move_up: 'Yukarı taşı',
+    workspace_move_down: 'Aşağı taşı',
     workspace_reorder_failed: 'Yeniden sıralama başarısız oldu',
     workspace_added: 'Çalışma alanı eklendi',
     workspace_recovered_notice: (path) => `Bu oturumun silinen çalışma alanı ${path} konumuna kurtarıldı.`,
@@ -26051,6 +26075,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Ścieżki są weryfikowane jako istniejące katalogi przed zapisaniem.',
 
     workspace_drag_hint: 'Przeciągnij, aby zmienić kolejność',
+    workspace_move_up: 'Przenieś w górę',
+    workspace_move_down: 'Przenieś w dół',
     workspace_reorder_failed: 'Zmiana kolejności nie powiodła się',
     workspace_added: 'Dodano obszar roboczy',
     workspace_recovered_notice: (path) => `Usunięty obszar roboczy tej sesji został odzyskany w ${path}.`,
@@ -27772,6 +27798,8 @@ const LOCALES = {
     workspace_paths_validated_hint: 'Đường dẫn được xác minh là thư mục tồn tại trước khi lưu.',
 
     workspace_drag_hint: 'Kéo để sắp xếp lại',
+    workspace_move_up: 'Di chuyển lên',
+    workspace_move_down: 'Di chuyển xuống',
     workspace_reorder_failed: 'Sắp xếp lại thất bại',
     workspace_added: 'Đã thêm workspace',
     workspace_recovered_notice: (path) => `Workspace đã xóa của phiên này đã được khôi phục tại ${path}.`,

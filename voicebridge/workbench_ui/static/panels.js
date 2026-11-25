@@ -6627,7 +6627,7 @@ function renderWorkspacesPanel(workspaces){
   const activePath = S.session ? S.session.workspace : '';
   const previous = workspaces.map(w => [w.slug, w.path]);
   let reordering = false;
-  async function moveWorkspace(from, to, restoreFocus = false){
+  async function moveWorkspace(from, to, focusSelector = ''){
     if(reordering || from === to || !previous[from] || !previous[to]) return;
     const order = previous.slice();
     const [moved] = order.splice(from, 1);
@@ -6638,7 +6638,12 @@ function renderWorkspacesPanel(workspaces){
       _workspaceList = result.workspaces;
       syncWorkspaceDisplays();
       renderWorkspacesPanel(result.workspaces);
-      if(restoreFocus) panel.querySelectorAll('.ws-drag-handle')[to]?.focus();
+      if(focusSelector){
+        const movedRow = panel.children[to];
+        const focusTarget = movedRow?.querySelector(focusSelector + ':not(:disabled)')
+          || movedRow?.querySelector('.ws-move-btn:not(:disabled)');
+        focusTarget?.focus();
+      }
     } catch(error){
       if(error.message === 'Workspace change cancelled.') return;
       let detail;
@@ -6657,20 +6662,33 @@ function renderWorkspacesPanel(workspaces){
     row.draggable=true;
     const isActive = w.path === activePath;
     const activeBadge = isActive ? `<span class="detail-badge active" style="margin-left:6px;font-size:9px;padding:1px 6px">${esc(t('profile_active'))}</span>` : '';
+    const rowLabel = w.name + ' · ' + w.path;
+    const moveUp = t('workspace_move_up');
+    const moveDown = t('workspace_move_down');
     row.innerHTML=`
       <button type="button" class="ws-drag-handle" title="${esc(t('workspace_drag_hint'))}"
-        aria-label="${esc(t('workspace_drag_hint') + ' · ' + w.name + ' · ' + w.path)}"
+        aria-label="${esc(t('workspace_drag_hint') + ' · ' + rowLabel)}"
         aria-keyshortcuts="ArrowUp ArrowDown">${li('grip-vertical',12)}</button>
       <div class="ws-row-info">
         <div class="ws-row-name">${esc(w.name)}${activeBadge}</div>
         <div class="ws-row-path">${esc(w.path)}</div>
+      </div>
+      <div class="ws-move-actions">
+        <button type="button" class="ws-move-btn ws-move-up"
+          title="${esc(moveUp)}" aria-label="${esc(moveUp + ' · ' + rowLabel)}"
+          ${i === 0 ? 'disabled' : ''}>${li('chevron-up',16)}</button>
+        <button type="button" class="ws-move-btn ws-move-down"
+          title="${esc(moveDown)}" aria-label="${esc(moveDown + ' · ' + rowLabel)}"
+          ${i === workspaces.length - 1 ? 'disabled' : ''}>${li('chevron-down',16)}</button>
       </div>`;
     row.querySelector('.ws-drag-handle').addEventListener('keydown', (e) => {
       if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       e.preventDefault();
       e.stopPropagation();
-      moveWorkspace(i, i + (e.key === 'ArrowUp' ? -1 : 1), true);
+      moveWorkspace(i, i + (e.key === 'ArrowUp' ? -1 : 1), '.ws-drag-handle');
     });
+    row.querySelector('.ws-move-up').onclick = () => moveWorkspace(i, i - 1, '.ws-move-up');
+    row.querySelector('.ws-move-down').onclick = () => moveWorkspace(i, i + 1, '.ws-move-down');
     // Click on info area only — not on drag handle
     const info=row.querySelector('.ws-row-info');
     if(info) info.onclick = (e) => { e.stopPropagation(); openWorkspaceDetail(w.path, row); };
