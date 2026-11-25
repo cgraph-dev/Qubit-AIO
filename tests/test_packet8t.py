@@ -134,6 +134,48 @@ def test_setup_run_apply_with_confirm_records_journal(tmp_path):
 
 SECRET = "s3cr3t-t0k3n-value-xyz"
 
+@pytest.mark.parametrize("monitor_enabled, service_enabled, cdp_ready, expected", [
+    (False, "disabled", False, "READY"),
+    (True, "disabled", False, "DEGRADED"),
+    (False, "enabled-runtime", False, "DEGRADED"),
+    (False, "disabled", True, "READY"),
+])
+def test_health_distinguishes_opt_in_monitor_from_required_checks(
+        tmp_path, monkeypatch, monitor_enabled, service_enabled, cdp_ready, expected):
+    from types import SimpleNamespace
+
+    from voicebridge import distribution as D, permissions
+
+    cfg = _StubCfg({"communications": {"monitor": {"enabled": monitor_enabled}}})
+    monkeypatch.setattr(P, "platform_supported", lambda: {"state": "OK"})
+    monkeypatch.setattr(P, "branding_status", lambda _paths: {"state": "MIGRATED"})
+    monkeypatch.setattr(D, "model_artifact_record", lambda _cfg: {"state": "OK"})
+    monkeypatch.setattr(D, "chromium_cdp_available", lambda: cdp_ready)
+    monkeypatch.setattr(L, "_provider_state",
+                        lambda _cfg, offline: {"state": "READY"})
+    monkeypatch.setattr(L, "_dep_inventory", lambda: {"flask": {"state": "OPTIONAL_MISSING"}})
+    monkeypatch.setattr(L, "_component_state", lambda *_args: {"state": "READY"})
+    monkeypatch.setattr(permissions, "permissions_store",
+                        lambda _cfg: SimpleNamespace(mode=lambda: ("normal", [], None)))
+    monkeypatch.setattr(L, "service_inventory", lambda _paths: {"state": "READY"})
+    monkeypatch.setattr(L, "_timer_state",
+                        lambda: {"state": "PENDING", "active": "inactive", "enabled": service_enabled})
+
+    paths = _paths(tmp_path)
+    paths.state_dir.mkdir(parents=True)
+    report = L.health_inventory(cfg, paths)
+    assert report["state"] == expected
+    assert report["browser_cdp"]["state"] == ("READY" if cdp_ready else "MISSING")
+    assert report["timer"]["state"] == "PENDING"
+
+
+@pytest.mark.parametrize("state, expected", [
+    ("FRESH", "READY"), ("LEGACY_ONLY", "DEGRADED"), ("FAILED", "FAILED"), ("BLOCKED", "BLOCKED"),
+])
+def test_health_preserves_migration_and_required_problem_states(state, expected):
+    assert L._aggregate_health_state({"migration": {"state": state}}) == expected
+
+
 def test_health_inventory_redacts_secrets(tmp_path):
     cfg = _StubCfg({"webui": {"token": SECRET},
                     "agent": {"api_key": SECRET},

@@ -518,15 +518,18 @@ def _component_state(configured: str, table: Dict[str, tuple],
 
 
 def _aggregate_health_state(inv: Dict[str, Any]) -> str:
-    """Overall inventory state from section states. OPTIONAL_MISSING never
-    degrades the aggregate; any FAILED/BLOCKED propagates."""
+    """Summarize required checks while retaining their original detail states."""
     seen = set()
-    for section in ("platform", "models", "provider", "credentials",
+    for section in ("platform", "models", "provider",
                     "browser_cdp", "timer", "permissions", "storage",
                     "service", "migration"):
         v = inv.get(section)
-        if isinstance(v, dict) and isinstance(v.get("state"), str):
-            seen.add(v["state"])
+        if isinstance(v, dict) and isinstance(state := v.get("state"), str):
+            if section == "migration" and state == "MIGRATED":
+                continue
+            if v.get("optional") and state in {"MISSING", "PENDING", "UNAVAILABLE"}:
+                continue
+            seen.add(state)
     dep_states = set()
     deps = inv.get("dependencies")
     if isinstance(deps, dict):
@@ -545,7 +548,7 @@ def _aggregate_health_state(inv: Dict[str, Any]) -> str:
     if "BLOCKED" in seen or "BLOCKED" in dep_states:
         return "BLOCKED"
     degraded = seen | {s for s in dep_states if s != "OPTIONAL_MISSING"}
-    if degraded - {"READY", "SUCCESS"}:
+    if any(not _ok_state(state) for state in degraded):
         return "DEGRADED"
     return "READY"
 
@@ -687,7 +690,13 @@ def health_inventory(cfg: Any, paths: Any = None, *,
             "detail": "127.0.0.1:9222 loopback CDP answers" if cdp_ok else
                       "no loopback CDP on 127.0.0.1:9222; start Chromium with "
                       "remote debugging (the bridge never launches it)"}
-    inv["timer"] = _timer_state()
+    timer = _timer_state()
+    monitor_enabled = cfg and cfg.get("communications", "monitor", "enabled", default=False)
+    uses_monitor = (monitor_enabled
+                    or timer.get("enabled") in {"enabled", "enabled-runtime"}
+                    or timer.get("active") in {"active", "activating"})
+    inv["timer"] = {**timer, "optional": not uses_monitor}
+    inv["browser_cdp"]["optional"] = not uses_monitor
     try:
         from . import permissions as PM
         store = PM.permissions_store(cfg)
