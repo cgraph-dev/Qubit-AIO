@@ -258,6 +258,8 @@ COMPLETE_EXAMPLES = {
     "skills_enable": "qubit, enable skill weather",
     "skills_disable": "qubit, disable skill weather",
     "projects_list": "qubit, list projects",
+    "workspaces_list_order": "qubit, list workspaces from four",
+    "workspaces_move": "qubit, move workspace three to position one",
     "projects_show": "qubit, show project shop",
     "projects_create": "qubit, create project shop",
     "projects_use": "qubit, switch to project shop",
