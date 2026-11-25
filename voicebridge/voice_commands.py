@@ -1280,12 +1280,57 @@ def _b_skills(ctx, args):
     raise ValueError(f"unknown skills action {action!r}")
 
 
+def _workspace_label(workspace, order):
+    slug, path = workspace
+    name = Path(path).name or path
+    if sum(other_slug == slug and Path(other_path).name == name
+           for other_slug, other_path in order) > 1:
+        name = path
+    return f"{slug}, {name}"
+
+
+def _workspace_position(text):
+    numbers = ("one", "two", "three", "four", "five", "six",
+               "seven", "eight", "nine", "ten")
+    if re.fullmatch(r"[0-9]{1,9}", text):
+        return int(text)
+    return numbers.index(text) + 1 if text in numbers else 0
+
+
+def _workspace_move_plan(cfg, move):
+    from . import projects as PJ
+
+    source, _, destination = " ".join(move.lower().split()).partition(" to ")
+    old_position = _workspace_position(source)
+    new_position = _workspace_position(destination.removeprefix("position "))
+    if not (old_position and new_position):
+        raise PJ.ProjectError(PJ.ORDER_CODE, "Say move workspace 3 to position 1.")
+    previous = PJ.list_projects(cfg)["workspace_order"]
+    if max(old_position, new_position) > len(previous):
+        raise PJ.ProjectError(PJ.ORDER_CODE,
+                              f"There are {len(previous)} workspaces. Say list workspaces for their positions.")
+    order = previous.copy()
+    workspace = order.pop(old_position - 1)
+    order.insert(new_position - 1, workspace)
+    label = _workspace_label(workspace, previous)
+    return previous, order, label, new_position
+
+
 def _b_projects(ctx, args):
     from . import projects as PJ
 
     action = args.get("action", "list")
     if action == "list":
         return PJ.list_projects(ctx.cfg)
+    if action == "list_workspaces":
+        order = PJ.list_projects(ctx.cfg)["workspace_order"]
+        start = _workspace_position(str(args.get("start", 1)).strip().lower().removeprefix("from "))
+        if start < 1 or start > max(1, len(order)):
+            raise PJ.ProjectError(PJ.ORDER_CODE, "That workspace position is out of range.")
+        return {"state": "OK", "workspace_order": order, "start": start}
+    if action == "move_workspace":
+        return PJ.reorder_workspaces(ctx.cfg, args["order"], expected=args["previous"],
+                                     requested_by=ctx.actor, confirmed=True)
     if action == "active":
         return PJ.active_project(ctx.cfg)
     if action == "show":
@@ -5769,6 +5814,19 @@ def _sum_kanban_task(result):
     return f"Task {task.get('id', '?')}: {task.get('title', '')}, {task.get('status', '')}."
 
 
+def _sum_workspace_order(result):
+    order = result["workspace_order"]
+    if not order:
+        return "There are no registered workspaces."
+    start = result["start"]
+    end = min(start + 2, len(order))
+    rows = [f"{position}. {' '.join(_workspace_label(order[position - 1], order).split()[:5])}"
+            for position in range(start, end + 1)]
+    if end < len(order):
+        rows.append(f"Say list workspaces from {end + 1} for more.")
+    return " ".join(rows)
+
+
 def _sum_project(result):
     if isinstance(result, dict) and result.get("state") == "EMPTY":
         return "No active project. Switch to one first."
@@ -6177,6 +6235,8 @@ _SUMMARIES = {
     "ghost": _sum_ghost,
     "opencode": _sum_opencode,
     "project": _sum_project,
+    "workspace_order": _sum_workspace_order,
+    "workspace_moved": lambda result: "Workspace order saved.",
     "capabilities": _sum_capabilities,
     "dashboard": _sum_dashboard,
     "reports": _sum_reports,
@@ -6582,6 +6642,18 @@ _E("projects_list", "List projects",
    "projects", ("project",), fixed=(("action", "list"),),
    examples=("qubit, list my projects",),
    help="Named workspaces.")
+_E("workspaces_list_order", "List workspaces in order",
+   ("list workspaces", "list workspace order"),
+   "projects", ("project",), args=(_R("start", False),),
+   fixed=(("action", "list_workspaces"),), summary="workspace_order",
+   examples=("qubit, list workspaces", "qubit, list workspaces from 4"),
+   help="Read the numbered Workbench workspace order, starting at an optional position.")
+_E("workspaces_move", "Move workspace",
+   ("move workspace",), "projects", ("project",),
+   args=(_R("move", clarifier="Which workspace position should I move, and where?"),),
+   fixed=(("action", "move_workspace"),), confirm=True, summary="workspace_moved",
+   examples=("qubit, move workspace three to position one",),
+   help="Move a workspace from one position to another, then confirm.")
 _E("projects_show", "Show project",
    ("show project", "describe project", "project details"),
    "projects", ("project",), args=(_R("slug"),),
@@ -13271,14 +13343,24 @@ def execute(ctx, resolution: Resolution) -> Outcome:
                    {"entry": entry.id, "session": ctx.session})
             return Outcome(REFUSED, entry,
                            "Emergency stop is latched. Reset it first.", {})
+        wording = ""
+        if entry.id == "workspaces_move":
+            from . import projects as PJ
+
+            try:
+                previous, order, label, position = _workspace_move_plan(ctx.cfg, str(merged.get("move", "")))
+            except PJ.ProjectError as exc:
+                return Outcome(FAILED, entry, _speak(exc.detail), {"code": exc.code})
+            if previous == order:
+                return Outcome(EXECUTED, entry, f"That workspace is already in position {position}.",
+                               {"result": {"state": "NO_CHANGE", "workspace_order": previous}})
+            merged = {"action": "move_workspace", "previous": previous, "order": order}
+            wording = _speak(f"Move {label} to position {position}?")
         journal = _journal(ctx.cfg)
         _prune_session_pending(ctx, journal)
         # Credential references (or worse, a pasted raw value) must never
         # reach staged summaries, speech, or the journal wording: backend
         # outputs carry the kind only, and summaries follow the same rule.
-        shown = ", ".join(f"{k} {_redact(str(v))[:40]}" for k, v in
-                          sorted(merged.items())
-                          if k not in ("action", "key_ref"))[:160]
         # Fail fast on reference-shaped args: a raw pasted secret must be
         # refused BEFORE anything is staged or journaled (no receipt, no
         # wording, no meta.args carrying the value).
@@ -13291,7 +13373,11 @@ def execute(ctx, resolution: Resolution) -> Outcome:
                 return Outcome(FAILED, entry,
                                "key_ref must be an env:VAR or file:PATH "
                                "reference, never a secret value.", {})
-        wording = _speak(f"{entry.title}: say yes to confirm. " + shown)
+        if not wording:
+            shown = ", ".join(f"{k} {_redact(str(v))[:40]}" for k, v in
+                              sorted(merged.items())
+                              if k not in ("action", "key_ref"))[:160]
+            wording = _speak(f"{entry.title}: say yes to confirm. " + shown)
         try:
             approval = journal.create(f"voice.{entry.id}", wording,
                                       ttl_s=CONFIRM_TTL_S,
