@@ -1083,12 +1083,18 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                         "events": list(staged.get("events", []) or []),
                         "secret_ref": str(staged.get("secret_ref", "") or "")}
                 return HC.h_webhooks_mutate("add", cfg, {}, body, {})
-            if action == "webhook_enable":
-                return HC.webhooks_enable(cfg, {}, {"confirm": True}, {})
-            if action == "webhook_enabled":
-                return HC.webhooks_enabled(cfg, {}, {"confirm": True, "id": sid},
-                                           {"id": sid})
+            if action in {"webhook_enable", "webhook_enabled"}:
+                if "enabled" not in staged:
+                    return 409, {"ok": False, "code": "WEBHOOK_APPROVAL_INCOMPLETE",
+                                 "detail": "Stage the webhook toggle again to confirm its new state."}
+                body = {"confirm": True, "enabled": staged["enabled"]}
+                if action == "webhook_enable":
+                    return HC.webhooks_enable(cfg, {}, body, {})
+                return HC.webhooks_enabled(cfg, {}, body, {"id": sid})
             if action == "webhook_delete":
+                if not sid:
+                    return 409, {"ok": False, "code": "WEBHOOK_APPROVAL_INCOMPLETE",
+                                 "detail": "Stage the webhook deletion again to confirm its target."}
                 return HC.webhooks_delete(cfg, {}, {"confirm": True, "id": sid},
                                           {"id": sid})
             handler = {"webhook_rotate": HC.webhooks_rotate,
@@ -1170,7 +1176,7 @@ def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
                           "cancel it instead."}
     payload = dict(meta.get("payload") or meta.get("args") or {})
     if isinstance(supplied, dict) and not (
-            action.startswith(("cron.", "mcp_server_", "skills_", "sessions."))
+            action.startswith(("cron.", "mcp_server_", "skills_", "sessions.", "webhook_"))
             or action in {"config.write", "mcp.catalog_install"}):
         payload.update(supplied)
     if _estop(cfg):

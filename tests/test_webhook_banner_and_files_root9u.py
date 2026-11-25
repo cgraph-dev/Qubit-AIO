@@ -68,6 +68,134 @@ def test_staged_webhook_create_settles_through_banner(tmp_path, monkeypatch):
     assert again["state"] == "failed", again
 
 
+def test_webhook_approval_keeps_target_and_toggle_value(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as ops, qubit_compat as compat, webhooks
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    route = "/api/webhooks"
+    payload = {"name": "first", "url": "http://127.0.0.1:9999/hook",
+               "events": ["test"], "secret_ref": "env:PROBE_HOOK"}
+    code, _ = compat.dispatch(cfg, "POST", route, {}, {**payload, "confirm": True})
+    assert code == 200
+    code, _ = compat.dispatch(cfg, "POST", route, {},
+                              {**payload, "name": "second", "confirm": True})
+    assert code == 200
+
+    def staged(method, path, body=None):
+        code, result = compat.dispatch(cfg, method, path, {}, body or {})
+        assert code == 409 and result["confirmation_id"], result
+        return result["confirmation_id"]
+
+    def confirm(receipt, args=None):
+        result = ops.confirm_op(cfg, receipt, actor="dashboard:user", session="dashboard", sensitive=args)
+        assert result["state"] == "executed", result
+
+    create = staged("POST", route, {**payload, "name": "third"})
+    code, stale = compat.dispatch(cfg, "POST", route, {},
+                                  {**payload, "name": "fourth", "confirmation_id": create})
+    assert code == 409 and stale["confirmation_id"] != create
+    confirm(create, {"id": "fourth"})
+    assert {row["id"] for row in webhooks.list_subs(cfg)["subscriptions"]} == {"first", "second", "third"}
+
+    global_off = staged("POST", route + "/enable", {"enabled": False})
+    confirm(global_off, {"enabled": True})
+    assert webhooks.is_enabled(cfg) is False
+
+    first_off = staged("PUT", route + "/first/enabled", {"enabled": False})
+    code, other = compat.dispatch(cfg, "PUT", route + "/second/enabled", {},
+                                  {"enabled": False, "confirmation_id": first_off})
+    assert code == 409 and other["confirmation_id"] != first_off
+    confirm(first_off, {"id": "second", "enabled": True})
+    assert webhooks.show(cfg, "first")["subscription"]["enabled"] is False
+    assert webhooks.show(cfg, "second")["subscription"]["enabled"] is True
+
+    first_remove = staged("POST", route + "/first")
+    code, other = compat.dispatch(cfg, "DELETE", route + "/second", {"confirmation_id": first_remove})
+    assert code == 409 and other["confirmation_id"] != first_remove
+    confirm(first_remove, {"id": "second"})
+    assert {row["id"] for row in webhooks.list_subs(cfg)["subscriptions"]} == {"second", "third"}
+
+
+def test_invalid_webhook_secret_cannot_enter_approval_journal(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as ops, qubit_compat as compat
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    journal = ops._journal(cfg)
+    before = [entry.id for entry in journal.pending()]
+    code, response = compat.dispatch(cfg, "POST", "/api/webhooks", {},
+                                     {"name": "fixture", "url": "http://127.0.0.1:9999/hook",
+                                      "events": ["test"], "secret_ref": "synthetic-raw-canary"})
+    assert code == 400 and response["code"] == "WEBHOOK_BAD_INPUT", response
+    assert [entry.id for entry in journal.pending()] == before
+
+
+def test_webhook_signed_retry_respects_delivery_switches(tmp_path, monkeypatch):
+    import hashlib
+    import hmac
+    import json
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    from voicebridge import qubit_compat as compat
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    key = "disposable-webhook-secret"
+    secret = tmp_path / "fixture-secret"
+    secret.write_text(key)
+    calls = []
+
+    class Receiver(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            signed = self.headers["X-Qubit-Timestamp"].encode() + b"." + body
+            expected = hmac.new(key.encode(), signed, hashlib.sha256).hexdigest()
+            calls.append((json.loads(body)["event"],
+                          self.headers["X-Qubit-Signature"] == f"sha256={expected}"))
+            self.send_response(502 if len(calls) == 1 else 204)
+            self.end_headers()
+
+        def log_message(self, *_args):
+            pass
+
+    receiver = ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
+    thread = Thread(target=receiver.serve_forever, daemon=True)
+    thread.start()
+    route = "/api/webhooks"
+    sub = route + "/receiver"
+    test = sub + "/test"
+    retry = sub + "/retry"
+
+    def send(method, target, **fields):
+        return compat.dispatch(cfg, method, target, {}, {**fields, "confirm": True})
+
+    try:
+        code, created = send("POST", route, name="receiver", events=["test"],
+                             url=f"http://127.0.0.1:{receiver.server_port}/hook",
+                             secret_ref=f"file:{secret}")
+        assert code == 200 and created["secret"] == "file:<reference>", created
+        code, failed = send("POST", test)
+        assert code == 200 and failed["verdict"] == "FAILED" and failed["http_status"] == 502, failed
+        assert calls == [("webhook.test", True)]
+        assert send("PUT", sub + "/enabled", enabled=False)[0] == 200
+        assert send("POST", retry)[0] == 400 and len(calls) == 1
+        assert send("PUT", sub + "/enabled", enabled=True)[0] == 200
+        assert send("POST", route + "/enable", enabled=False)[0] == 200
+        assert send("POST", retry)[0] == 400 and len(calls) == 1
+        assert send("POST", route + "/enable", enabled=True)[0] == 200
+        code, retried = send("POST", retry)
+        assert code == 200 and retried["delivered"] is True, retried
+        assert calls == [("webhook.test", True), ("webhook.retry", True)]
+        code, receipt = compat.dispatch(cfg, "GET", sub + "/deliveries", {})
+        assert code == 200 and [row["verdict"] for row in receipt["deliveries"]] == ["FAILED", "DELIVERED"]
+        assert key not in json.dumps(receipt)
+        assert send("DELETE", sub)[0] == 200
+        assert compat.dispatch(cfg, "GET", sub, {})[0] == 404
+    finally:
+        receiver.shutdown()
+        receiver.server_close()
+        thread.join(timeout=5)
+
+
 def test_files_root_uses_active_project(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     from voicebridge import projects as PJ

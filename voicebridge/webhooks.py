@@ -220,14 +220,9 @@ def _get(state: Dict[str, Any], sub_id: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------- registry
-def add(cfg: Any, sub_id: str, url: str, events: List[str], secret_ref: str,
-        *, extra_hosts: Optional[List[str]] = None,
-        requested_by: str = "cli:user",
-        confirmed: bool = False) -> Dict[str, Any]:
-    """Record a subscription (URL policy + reference-only secret)."""
-    if not confirmed:
-        raise WebhookError(CONFIRM_CODE,
-                           "webhook add requires explicit --confirm")
+def validate_subscription(sub_id: str, url: str, events: List[str], secret_ref: str,
+                          *, extra_hosts: Optional[List[str]] = None) -> Tuple[str, str, List[str], str]:
+    """Normalize the fields before they enter the store or approval journal."""
     clean_id = (sub_id or "").strip().lower()
     if not _ID_RE.match(clean_id):
         raise WebhookError(BAD_INPUT_CODE,
@@ -238,6 +233,20 @@ def add(cfg: Any, sub_id: str, url: str, events: List[str], secret_ref: str,
     if _secret_kind(ref) == "missing":
         raise WebhookError(BAD_INPUT_CODE,
                            "secret must be an env:VAR or file:PATH reference")
+    return clean_id, clean_url, clean_events, ref
+
+
+def add(cfg: Any, sub_id: str, url: str, events: List[str], secret_ref: str,
+        *, extra_hosts: Optional[List[str]] = None,
+        requested_by: str = "cli:user",
+        confirmed: bool = False) -> Dict[str, Any]:
+    """Record a subscription (URL policy + reference-only secret)."""
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE,
+                           "webhook add requires explicit --confirm")
+    clean_id, clean_url, clean_events, ref = validate_subscription(
+        sub_id, url, events, secret_ref, extra_hosts=extra_hosts,
+    )
     state = _load(cfg)
     if len(state["subscriptions"]) >= MAX_SUBS:
         raise WebhookError(EXISTS_CODE, f"subscription limit ({MAX_SUBS})")
@@ -372,7 +381,8 @@ def _deliver(cfg: Any, rec: Dict[str, Any], *, body: Dict[str, Any], event: str,
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
             status = int(getattr(resp, "status", 0) or 0)
     except urllib.error.HTTPError as exc:
-        status = int(getattr(exc, "code", 0) or 0)
+        with exc:
+            status = int(getattr(exc, "code", 0) or 0)
         err = f"http {status}"
     except Exception as exc:  # noqa: BLE001 - network failures are typed states
         err = str(exc)[:200]
@@ -455,6 +465,15 @@ def deliveries(cfg: Any, sub_id: str = "", *, limit: int = 50
             "subscription": sub_id or None}
 
 
+def _require_delivery_enabled(state: Dict[str, Any], rec: Dict[str, Any]) -> None:
+    if not bool(rec.get("enabled", True)):
+        raise WebhookError(BAD_INPUT_CODE,
+                           f"subscription {rec['id']!r} is disabled")
+    if not bool(state.get("enabled", True)):
+        raise WebhookError(BAD_INPUT_CODE,
+                           "webhook delivery is disabled at the store level")
+
+
 def test_delivery(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
                   confirmed: bool = False,
                   timeout_s: float = DELIVERY_TIMEOUT_S) -> Dict[str, Any]:
@@ -465,12 +484,7 @@ def test_delivery(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
                            "explicit --confirm required")
     state = _load(cfg)
     rec = _get(state, sub_id)
-    if not bool(rec.get("enabled", True)):
-        raise WebhookError(BAD_INPUT_CODE,
-                           f"subscription {rec['id']!r} is disabled")
-    if not is_enabled(cfg):
-        raise WebhookError(BAD_INPUT_CODE,
-                           "webhook delivery is disabled at the store level")
+    _require_delivery_enabled(state, rec)
     body = {"event": "webhook.test", "subscription": rec["id"],
             "test": True, "sent_at": _now()}
     out = _deliver(cfg, rec, body=body, event="webhook.test",
@@ -495,6 +509,7 @@ def retry_delivery(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
                            "explicit --confirm required")
     state = _load(cfg)
     rec = _get(state, sub_id)
+    _require_delivery_enabled(state, rec)
     history = deliveries(cfg, rec["id"], limit=200).get("deliveries", [])
     failed = [r for r in history if isinstance(r, dict)
               and r.get("verdict") == "FAILED"]

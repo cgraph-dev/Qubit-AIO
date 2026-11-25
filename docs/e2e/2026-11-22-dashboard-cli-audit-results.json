@@ -2173,5 +2173,15 @@
       "chromium": 5
     },
     "remaining_live_scope": "Production Cron mutations and delivery to external accounts were outside this disposable rehearsal."
+  },
+  "current_system_gateway_webhooks": {
+    "date": "2026-11-25",
+    "revision": "b8dc1ba9e44d32ad1b7504d961a95e0b78299637",
+    "live_read_only": "The System, Gateway alias, Channels, Webhooks, Pairing, and Devices dashboard documents each returned HTTP 200. Authenticated gateway status reported an active PID and OK. Messaging, webhooks, and pairing inventories returned JSON.",
+    "gateway_fixtures": "Focused supervisor checks covered start/stop/restart, confirmation, dedicated service ownership, observed process changes, and detached timeout and recovery.",
+    "webhook_approvals": "Staged requests cannot change a subscription, destination, event list, or toggle state on replay. Banner settlement uses the recorded fields. The legacy POST delete alias now shares the same confirmation. Invalid raw signing values are rejected before journaling. Old toggle approvals without a recorded state and old delete approvals without a target require restaging.",
+    "webhook_delivery": "A local receiver verified both HMAC signatures. The initial test returned 502, and the enabled retry returned 204. Retry did not contact the receiver while either the subscription or store was disabled. Receipt read-back contained FAILED then DELIVERED. Deletion returned successfully and independent read-back returned 404.",
+    "focused_tests": 65,
+    "remaining": "Webhook editing, explicit channel send and receive targets, physical devices, broader pairing lifecycle and deployed mutations remain open."
   }
 }
