@@ -2221,5 +2221,34 @@
     "errors": "Malformed attachment containers are typed refusals. An unavailable receipt store returned HTTP 503 without reporting delivery. Replay checks persist the body and delivery nonces together.",
     "focused_tests": 68,
     "remaining": "Provider-native delivery, the deployed mutation checks, and an approved physical device enrollment remain outside the disposable HTTP rehearsal."
+  },
+  "current_native_channel_adapter_rehearsal": {
+    "date": "2026-11-25",
+    "revision": "0cd7d9e97a57c67af40ab3b69737a1f2a102e87a",
+    "environment": "Disposable native gateway processes with separate homes, real Telegram, Slack and Discord SDK adapters, loopback API stand-ins and a loopback model provider",
+    "native_delivery": "Each explicit test recipient got one complete reply. The fake model and a separate SQLite read agreed on one turn and one durable inbound entry. Group messages without a required mention stayed out of prompts and replies. Replaying an original inbound event did not produce another turn, transcript row or reply.",
+    "telegram_restart": "The gateway exited with code 75, the fixture supervisor started its replacement, and the adapter sent one restart notice. Replaying the original restart message produced no second restart and a subsequent DM received a reply.",
+    "verification": {
+      "working_directory": "qubit_runtime",
+      "native_telegram": {
+        "pytest": "tests/e2e/core/platforms/test_telegram_contract.py -k 'dm_one_reply or group_require_mention or redelivery_one_reply or planned_restart_notice'",
+        "passed": 4
+      },
+      "native_slack_discord": {
+        "pytest": "tests/e2e/core/platforms/test_slack_contract.py tests/e2e/core/platforms/test_discord_contract.py -k 'dm_one_reply or group_require_mention or redelivery_one_reply'",
+        "passed": 6
+      },
+      "telegram_admission": {
+        "pytest": "tests/plugins/test_telegram_update_admission.py",
+        "passed": 94
+      },
+      "profile_scope": {
+        "pytest": "tests/gateway/test_telegram_topic_profile_isolation.py tests/gateway/test_platform_authz_scope.py",
+        "passed": 19
+      },
+      "collection_note": "Run the last two selections in separate pytest processes. The gateway conftest replaces the Telegram SDK if imported first. The combined attempt failed the real-SDK admission cases during setup. The isolated runs passed, with an existing unawaited-coroutine warning in the admission selection."
+    },
+    "live_read_only": "Qubit gateway and VoiceBridge services were active. The dashboard served source revision 45c56f4888f0877843208d61bfebd629ee994272. The provider check reported DEGRADED on the local route, the system Ollama unit was inactive, and port 11434 refused a loopback connection.",
+    "remaining": "Real provider accounts, deployed mutations, and physical device enrollment remain open."
   }
 }
