@@ -1,6 +1,8 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-**Live source deployment (2026-11-25).** The dashboard serves the new source build and the gateway reports the replacement process. The deployed per-control sweep and approved provider calls remain open. The local service PATH now supports Graft MCP. Investigate the pre-existing degraded installation result separately. [Live deployment evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
+**Live Logs audit (2026-11-25).** Live read-only pagination and search passed. Continue control behavior and export, level and component filters, then the related Files, Reports, and Analytics workflows. The installation health follow-up is resolved on the local deployment. [Live audit evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
+**Live source deployment (2026-11-25).** The dashboard serves the new source build and the gateway reports the replacement process. The deployed per-control sweep and approved provider calls remain open. The local service PATH now supports Graft MCP. See the later installation health follow-up above. [Live deployment evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Keys rotation and restart-dependent configuration (2026-11-25).** Loopback credential rotation, file-backed reference resolution and removal, CLI read-back, and startup policy application passed. Continue the field sweep and the supervisor-managed gateway restart. The external vault reference is stored but resolves to AUTH_MISSING because the provider resolver currently supports env and file references. [Rehearsal evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
