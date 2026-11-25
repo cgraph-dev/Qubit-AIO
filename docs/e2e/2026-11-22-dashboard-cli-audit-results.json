@@ -2355,5 +2355,18 @@
     "verification": "The focused rerun passed 12 tests including every registry example, alias uniqueness, the mutation gate and workspace regressions. The pre-fix combined run passed the other 136 tests and caught two missing example rows, which were added and rechecked.",
     "deployment": "The local source checkout at 8ebec8c71 reloaded VoiceBridge. Port 8890 reported READY. The live authenticated Operations catalog listed workspaces_list_order as read-only and workspaces_move as confirmation-gated. The gateway process stayed active.",
     "remaining": "Physical microphone and touch input verification, deployed mutation read-back, advanced Kanban options, and broader Agents and Operations controls remain open."
+  },
+  "current_touch_workspace_order": {
+    "date": "2026-11-25",
+    "revisions": [
+      "6034c4f7b",
+      "2ebd5ca0f"
+    ],
+    "environment": "Chromium mobile touch emulation at 390 and 320 CSS pixels, desktop Chromium at 1440 CSS pixels, disposable Workbench registry",
+    "mobile": "Move up and Move down sent the registered project and folder identities using a real touch pointer event in the emulated browser. Cancelling left the displayed order unchanged. Confirming replayed the matching ID and saved after reload. Focus followed the moved workspace even when its original direction became disabled. The buttons measured 44 by 44 CSS pixels and the workspace folder remained visible at 320 pixels.",
+    "desktop": "Desktop drag and arrow-key moves confirmed the exact order, and focus followed the keyboard-moved workspace.",
+    "read_back": "A separate CLI process and direct projects.json read confirmed the order, active project, primary folder, and registered folder membership.",
+    "verification": "Five focused workspace and voice checks, the production Vite build, static JavaScript checks, and both Chromium device contexts passed.",
+    "remaining": "Physical touch-device and microphone checks, deployed workspace mutation read-back, advanced Kanban options, and broader Agents and Operations controls remain open."
   }
 }
