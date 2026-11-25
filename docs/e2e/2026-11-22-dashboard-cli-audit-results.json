@@ -2389,6 +2389,7 @@
     "bulk": "Selecting two running cards and dragging into Done staged the exact selected IDs and saved the note on both tasks. A focused test confirmed that a changed selection needs a new approval.",
     "read_back": "The journal recorded a denied single-card approval and distinct executed single and bulk approvals. The CLI and SQLite found the exact note and one completion event per card. Approval records contained a proof of the note without its text.",
     "verification": "Sixty focused native, compatibility, and Workbench Kanban tests passed along with the production Vite build and authenticated browser and CLI rehearsals.",
-    "remaining": "Parent dependencies, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
+    "deployment": "VoiceBridge restarted from local source a9d46a1a8. Port 8890 reported READY. The board returned 200 and an authenticated bulk request with conflicting note fields returned 400 without staging approval. The gateway stayed active.",
+    "remaining": "Parent dependencies, completion-note entry from the bulk toolbar, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
   }
 }
