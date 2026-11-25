@@ -2292,5 +2292,19 @@
       "typescript": "passed"
     },
     "remaining": "Browser coverage of additional board controls, nested workspace and board features, agents, Operations, Achievements, and deployed mutations remain open."
+  },
+  "current_operations_agents_achievements": {
+    "date": "2026-11-25",
+    "revision": "3dbd7692f77c19f1688616bc39f0e306f5cf59af",
+    "environment": "Production Vite build, Chromium, and an authenticated disposable dashboard with independent backend reads",
+    "operations": "The /ops alias opened /operations. The UI ran kanban_create and rendered the final receipts for both cancellation and confirmation, replacing the staged response. Each sent the exact displayed approval ID. Independent board read-back found one confirmed card and no cancelled card. The receipt panel fit the 390-pixel viewport.",
+    "agents": "The read-only roster displayed the canonical worker and matched the authenticated API. Chromium surfaced an injected one-time 503 on refresh and recovered against the real roster endpoint on the next refresh.",
+    "achievements": "An injected rescan failure appeared in the plugin, then a second click completed a real rescan. Cancelling the inline reset sent no request. Confirming sent one request with a JSON boolean true and preserved the badge catalog on independent read-back. The backend also refused a string false without resetting.",
+    "verification": {
+      "focused_backend_tests": 39,
+      "vite_build": "passed",
+      "chromium": "passed"
+    },
+    "remaining": "Nested workspace and board controls, agent management beyond the roster, broader operation forms, and deployed verification remain open."
   }
 }
