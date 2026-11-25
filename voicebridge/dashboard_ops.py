@@ -1138,6 +1138,12 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             handler = getattr(HC, kanban_handlers[action])
             return handler(cfg, {}, {**staged, "confirm": True}, {"task_id": tid})
         return _run
+    if action == "workspaces.reorder":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from .workbench_ui import workspace_family
+
+            return workspace_family.reorder(cfg, {}, {**payload, "confirm": True}, {})
+        return _run
     if action.startswith("family."):
         # Every ``qubit.family.<fam>.<act>`` capability stages through
         # ``_compat_confirm`` when the caller omits ``confirm``. Before this
@@ -1195,7 +1201,8 @@ def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
     payload = dict(meta.get("payload") or meta.get("args") or {})
     if isinstance(supplied, dict) and not (
             action.startswith(("cron.", "mcp_server_", "skills_", "sessions.", "webhook_", "kanban."))
-            or action in {"config.write", "mcp.catalog_install", "messaging.platform_update"}):
+            or action in {"config.write", "mcp.catalog_install", "messaging.platform_update",
+                          "workspaces.reorder"}):
         payload.update(supplied)
     if _estop(cfg):
         try:

@@ -646,7 +646,7 @@ def test_workspaces_reorder_persists_the_approved_order(env):
 
 
 def test_workspaces_reorder_distinguishes_shared_folder_registrations(env):
-    from voicebridge import projects
+    from voicebridge import dashboard_ops, projects
 
     cfg, root, _outside = env
     folder = str(root.parent)
@@ -660,10 +660,12 @@ def test_workspaces_reorder_distinguishes_shared_folder_registrations(env):
     order = [["ws", folder], ["shared", folder]]
     status, approval = workspace_family.reorder(cfg, {}, {"order": order}, {})
     assert status == 409 and approval["code"] == "CONFIRM_REQUIRED"
-    status, result = workspace_family.reorder(
-        cfg, {}, {"order": order, "confirmation_id": approval["confirmation_id"]}, {})
-    assert status == 200, result
-    assert [row["slug"] for row in result["workspaces"]] == ["ws", "shared"]
+    result = dashboard_ops.confirm_compat_op(
+        cfg, approval["confirmation_id"], args={"order": order[::-1]})
+    assert result["state"] == "executed", result
+    assert [row["slug"] for row in workspace_family.list_payload(cfg)[1]["workspaces"]] == [
+        "ws", "shared",
+    ]
 
 
 def test_workspace_upload_is_a_brokered_write_refusal(env):
