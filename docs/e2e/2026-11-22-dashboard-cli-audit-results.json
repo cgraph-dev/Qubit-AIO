@@ -2211,5 +2211,15 @@
       "approvals_pairing_and_devices": 31
     },
     "remaining": "Incoming channel dispatch over HTTP, deployed mutation and real provider checks, and physical device enrollment remain open. The in-process receive fixture does not close the public ingress gap."
+  },
+  "current_signed_channel_http_delivery": {
+    "date": "2026-11-25",
+    "revision": "e27eb2c573143321851459e5ac16f5231873ecbc",
+    "environment": "Real VoiceBridge HTTP handler on loopback, disposable channel registry and sender policies, synthetic signing keys",
+    "delivery": "The CLI required confirmation to set the sender policy and then read back the exact allowed sender under default deny. A signed Telegram envelope went through the HTTP route to the communications broker, which persisted one matching receipt. Two parallel requests for the same signed delivery returned 200 DELIVERED and 409 CHANNEL_REPLAY.",
+    "routing_and_compatibility": "The signed body supplies the channel, sender, event, and delivery ID. The route refused a sender outside policy and a body for another channel. An older signed raw-body request returned verification-only CHANNEL_UNAVAILABLE and created no dispatch receipt.",
+    "errors": "Malformed attachment containers are typed refusals. An unavailable receipt store returned HTTP 503 without reporting delivery. Replay checks persist the body and delivery nonces together.",
+    "focused_tests": 68,
+    "remaining": "Provider-native delivery, the deployed mutation checks, and an approved physical device enrollment remain outside the disposable HTTP rehearsal."
   }
 }
