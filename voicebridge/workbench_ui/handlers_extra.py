@@ -854,26 +854,10 @@ def updates_check(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
 
 def workspaces(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
                p: Dict[str, Any]) -> Tuple[int, Any]:
-    """``GET /api/workspaces`` — the approved project roots, from Qubit's own list."""
-    try:
-        from .. import qubit_compat as HC
+    """Read the canonical project registry used by the workspace mutations."""
+    from .workspace_family import list_payload
 
-        code, out = HC.dispatch(cfg, "GET", "/api/projects", query={}, body={})
-    except Exception as exc:  # noqa: BLE001
-        return _refuse("WB_BACKEND_UNAVAILABLE",
-                       f"the project list raised {type(exc).__name__}: {exc}",
-                       endpoint="workspaces", status=503)
-    roots = []
-    if isinstance(out, dict):
-        roots = out.get("projects") or out.get("items") or []
-    elif isinstance(out, list):
-        roots = out
-    names = []
-    for row in roots:
-        if isinstance(row, dict):
-            names.append({"path": row.get("path") or row.get("root"),
-                          "name": row.get("name") or row.get("path")})
-    return 200, {"ok": True, "workspaces": names, "count": len(names)}
+    return list_payload(cfg)
 
 
 def _version() -> str:

@@ -2306,5 +2306,24 @@
       "chromium": "passed"
     },
     "remaining": "Nested workspace and board controls, agent management beyond the roster, broader operation forms, and deployed verification remain open."
+  },
+  "current_nested_workspace_and_board_controls": {
+    "date": "2026-11-25",
+    "revisions": {
+      "workspace_approval": "894660d50",
+      "browser": "99e866a9b",
+      "kanban": "61b955736",
+      "workspace_readback": "5e3072d82"
+    },
+    "environment": "Disposable authenticated Workbench and Kanban dashboard, Chromium at 1440 and 390 pixels, independent project registry read-back",
+    "workspace": "Chromium staged workspace registration, declined the exact approval, kept the entered path, and saved on retry. The registered folder appeared after reload and a replacement listener. Rename and unregister settled their own approval IDs. Independent registry data showed the new project name, zero registered folders, and a cleared primary. A real marker file in the folder survived unregister.",
+    "ownership": "The focused regression changed the active project before settling a staged add and required a new approval. Cancellation consumed the old ID. A renamed project could not reuse approval for a different name.",
+    "kanban": "Unsupported non-default settings return UNSUPPORTED_FIELD before staging. The mobile Kanban form showed the Goal mode refusal, kept the entered title, and left the board unchanged. Focused tests also covered parent links and completion notes, and confirmed that neutral defaults still allow creation.",
+    "verification": {
+      "focused_backend_tests": 98,
+      "production_build": "passed",
+      "chromium": "passed"
+    },
+    "remaining": "Workspace reorder and advanced Kanban options need native support. Agent management, broader operation forms, and deployed verification remain open."
   }
 }

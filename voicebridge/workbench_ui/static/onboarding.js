@@ -511,7 +511,7 @@ async function _saveOnboardingDefaults(){
   if(!model) throw new Error(t('onboarding_error_choose_model'));
   const known=_getOnboardingWorkspaceChoices().some(ws=>ws.path===workspace);
   if(!known){
-    await api('/api/workspaces/add',{method:'POST',body:JSON.stringify({path:workspace})});
+    await changeWorkspace('/api/workspaces/add', {path:workspace});
   }
   // Model persisted by /api/onboarding/setup — no /api/default-model call needed here
   const body={default_workspace:workspace};

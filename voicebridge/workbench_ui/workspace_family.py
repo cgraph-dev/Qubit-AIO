@@ -119,10 +119,13 @@ def list_payload(cfg: Any, q: Any = None, b: Any = None,
 
 
 # ------------------------------------------------------------------ mutations
-def _gate(cfg: Any, action: str, detail: str, b: Dict[str, Any]
-          ) -> Optional[Tuple[int, Dict[str, Any]]]:
-    """Stage or settle the shared confirmation for a registry write."""
-    return confirm_gate(cfg, action, detail, {}, b or {}, {})
+def _gate(cfg: Any, action: str, detail: str, q: Dict[str, str], b: Dict[str, Any],
+          target: Dict[str, Any]) -> Optional[Tuple[int, Dict[str, Any]]]:
+    """Stage or settle exactly the workspace change shown to the operator."""
+    if q.get("confirmation_id") or b.get("confirmation_id"):
+        q = {key: value for key, value in q.items() if key != "confirm"}
+        b = {key: value for key, value in b.items() if key != "confirm"}
+    return confirm_gate(cfg, action, detail, q, b, target, match_payload=True)
 
 
 def _body_path(b: Dict[str, Any]) -> str:
@@ -153,20 +156,20 @@ def add(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             f"real folder Qubit can read and run in",
             counterpart="CLI `qubit project add-folder <path> --confirm`")
     name = str((b or {}).get("name") or resolved.name or str(resolved))
-    staged = _gate(cfg, f"workspaces.add:{resolved}", (
-        f"adding {str(resolved)!r} to Qubit's project registry, which makes it "
-        f"a workspace root the git and terminal endpoints may operate in"),
-        dict(b or {}))
-    if staged is not None:
-        return staged
     try:
-        active = PJ.active_project(cfg)
-        project = (active.get("project") or {}) if isinstance(active, dict) else {}
-        # Add the folder to the active project when there is one, else create a
-        # project named after the folder. Both are the registry's own verbs.
-        if project.get("slug"):
-            PJ.add_folder(cfg, str(project["slug"]), str(resolved),
-                          requested_by="dashboard:user", confirmed=True)
+        project = PJ.active_project(cfg).get("project") or {}
+        slug = str(project.get("slug") or "")
+        destination = f"project {slug!r}" if slug else f"new project {name!r}"
+        staged = _gate(cfg, "workspaces.add",
+                       f"Register {str(resolved)!r} in {destination}?",
+                       q, b, {"path": str(resolved), "project": slug,
+                              "project_created_at": project.get("created_at"),
+                              "name": name if not slug else ""})
+        if staged is not None:
+            return staged
+        if slug:
+            PJ.add_folder(cfg, slug, str(resolved), requested_by="dashboard:user",
+                          confirmed=True)
         else:
             PJ.create(cfg, name, [str(resolved)], requested_by="dashboard:user",
                       confirmed=True, use=True)
@@ -192,16 +195,17 @@ def rename(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         resolved = Path(path).expanduser().resolve()
     except (OSError, RuntimeError) as exc:
         return _refuse("MALFORMED", f"cannot resolve {path!r} ({exc})")
-    slug = _slug_for_path(cfg, resolved)
-    if not slug:
+    project = _project_for_path(cfg, resolved)
+    if not project:
         return _refuse(
             "WORKSPACE_NOT_FOUND",
             f"no registered workspace contains {str(resolved)!r}; nothing was "
             f"renamed", status=404,
             counterpart="CLI `qubit project list`")
-    staged = _gate(cfg, f"workspaces.rename:{slug}", (
-        f"renaming project {slug!r} to {name!r} — the project id does not "
-        f"change, so no workspace path moves"), dict(b or {}))
+    slug = project["slug"]
+    staged = _gate(cfg, "workspaces.rename", f"Rename project {slug!r} to {name!r}?",
+                   q, b, {"path": str(resolved), "project": slug,
+                          "project_created_at": project.get("created_at"), "name": name})
     if staged is not None:
         return staged
     try:
@@ -220,9 +224,8 @@ def remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """``POST /api/workspaces/remove {path}`` — unregister a FOLDER.
 
     Unregistering removes the path from the set the git/terminal endpoints are
-    confined to; the folder itself is never touched on disk. Removing the last
-    folder of a project archives the project (the registry's own rule) rather
-    than leaving an empty one.
+    confined to. The folder and its files stay on disk. The project registry
+    preserves the project even if it has no folders.
     """
     PJ = _projects()
     path = _body_path(b or {})
@@ -233,16 +236,16 @@ def remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         resolved = Path(path).expanduser().resolve()
     except (OSError, RuntimeError) as exc:
         return _refuse("MALFORMED", f"cannot resolve {path!r} ({exc})")
-    slug = _slug_for_path(cfg, resolved)
-    if not slug:
+    project = _project_for_path(cfg, resolved)
+    if not project:
         return _refuse(
             "WORKSPACE_NOT_FOUND",
             f"{str(resolved)!r} is not a registered workspace root; nothing was "
             f"removed", status=404, counterpart="CLI `qubit project list`")
-    staged = _gate(cfg, f"workspaces.remove:{resolved}", (
-        f"unregistering {str(resolved)!r}: git and terminal requests for it "
-        f"will be refused from then on. The folder on disk is not deleted."),
-        dict(b or {}))
+    slug = project["slug"]
+    staged = _gate(cfg, "workspaces.remove", f"Unregister {str(resolved)!r} from project {slug!r}? The folder stays on disk.",
+                   q, b, {"path": str(resolved), "project": slug,
+                          "project_created_at": project.get("created_at")})
     if staged is not None:
         return staged
     try:
@@ -255,6 +258,26 @@ def remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     code, payload = list_payload(cfg)
     payload["removed"] = str(resolved)
     return code, payload
+
+
+def cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Cancel the exact approval owned by a workspace control."""
+    from .. import dashboard_ops as OPS
+
+    cid = str(b.get("confirmation_id") or "").strip()
+    if not cid:
+        return _refuse("MALFORMED", "confirmation_id is required")
+    try:
+        approval = OPS._journal(cfg).get(cid)
+        allowed = {"qubit.workspaces.add", "qubit.workspaces.rename", "qubit.workspaces.remove"}
+        if approval is None or approval.capability not in allowed:
+            return _refuse("NO_CONFIRMATION", "Workspace confirmation is unavailable.", status=404)
+        result = OPS.cancel_compat_op(cfg, cid, actor="dashboard:user", session="dashboard")
+    except Exception:
+        return _refuse("CONFIRM_UNAVAILABLE", "Could not cancel the workspace approval.", status=503)
+    ok = result.get("state") == "executed"
+    return (200 if ok else 409), {"ok": ok, **result}
 
 
 def reorder(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -294,21 +317,21 @@ def reorder(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     }
 
 
-def _slug_for_path(cfg: Any, path: Path) -> str:
-    """The slug of the project that records ``path`` as one of its folders."""
+def _project_for_path(cfg: Any, path: Path) -> Dict[str, Any]:
+    """The project that records ``path`` as one of its folders."""
     try:
         listed = _projects().list_projects(cfg)
     except Exception:  # noqa: BLE001
-        return ""
+        return {}
     target = str(path)
     for rec in (listed.get("projects") if isinstance(listed, dict) else []) or []:
         if not isinstance(rec, dict):
             continue
         folders = {str(Path(str(f)).expanduser().resolve())
                    for f in (rec.get("folders") or []) if str(f or "").strip()}
-        if target in folders:
-            return str(rec.get("slug") or "")
-    return ""
+        if target in folders and rec.get("slug"):
+            return rec
+    return {}
 
 
 # --------------------------------------------------------------------- upload

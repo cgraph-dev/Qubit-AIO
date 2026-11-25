@@ -27608,7 +27608,7 @@ async function promptNewFolder(targetDir = S.currentDir || '.'){
       });
       if(addAsSpace){
         try{
-          const data=await api('/api/workspaces/add',{method:'POST',body:JSON.stringify({path:absPath})});
+          const data=await changeWorkspace('/api/workspaces/add', {path:absPath});
           if(typeof _workspaceList!=='undefined')_workspaceList=data.workspaces||_workspaceList||[];
           if(typeof renderWorkspacesPanel==='function')renderWorkspacesPanel(_workspaceList);
           showToast(t('workspace_added'));
