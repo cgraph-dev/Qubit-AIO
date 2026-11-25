@@ -3697,8 +3697,9 @@
 .ws-row-path{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ws-row.active .ws-row-path{color:var(--accent-text);opacity:.8;}
 .ws-row-actions{display:flex;gap:4px;flex-shrink:0;}
-.ws-drag-handle{display:flex;align-items:center;justify-content:center;opacity:.25;flex-shrink:0;cursor:grab;transition:opacity .15s;color:var(--muted);padding:2px;}
+.ws-drag-handle{display:flex;align-items:center;justify-content:center;opacity:.25;flex-shrink:0;cursor:grab;transition:opacity .15s;color:var(--muted);padding:2px;border:0;background:transparent;}
 .ws-row:hover .ws-drag-handle{opacity:.55;}
+.ws-drag-handle:focus-visible{opacity:1;outline:2px solid var(--accent-text);outline-offset:2px;}
 .ws-drag-handle:active{cursor:grabbing;}
 .ws-row.dragging{opacity:.35;border:1px dashed var(--accent-bg-strong);}
 .ws-row.drag-over{border-color:var(--accent-text);background:var(--accent-bg);}

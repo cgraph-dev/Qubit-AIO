@@ -608,14 +608,62 @@ def test_workspaces_rename_renames_the_project_not_the_path(env):
     assert payload["workspaces"][0]["path"] == str(root.parent)
 
 
-def test_workspaces_reorder_is_a_named_refusal_and_writes_nothing(env):
+def test_workspaces_reorder_persists_the_approved_order(env):
+    from voicebridge import projects
+
+    cfg, root, outside = env
+    projects.add_folder(cfg, "ws", str(outside), confirmed=True)
+    store = cfg.state_dir() / "projects.json"
+    before = store.read_bytes()
+    previous = [["ws", str(root.parent)], ["ws", str(outside)]]
+    order = previous[::-1]
+    request = {"previous": previous, "order": order}
+    status, approval = workspace_family.reorder(cfg, {}, request, {})
+    assert status == 409 and approval["code"] == "CONFIRM_REQUIRED"
+    confirmation = {"confirmation_id": approval["confirmation_id"]}
+    assert store.read_bytes() == before
+    assert workspace_family.cancel(cfg, {}, confirmation, {})[0] == 200
+    assert workspace_family.reorder(cfg, {}, {**request, **confirmation}, {})[0] == 409
+    assert store.read_bytes() == before
+
+    status, approval = workspace_family.reorder(cfg, {}, request, {})
+    assert status == 409
+    status, result = workspace_family.reorder(
+        cfg, {}, {**request, "confirmation_id": approval["confirmation_id"]}, {})
+    assert status == 200, result
+    listed = projects.list_projects(cfg)
+    assert listed["workspace_order"] == order
+    assert listed["active_slug"] == "ws"
+    assert listed["projects"][0]["primary"] == str(root.parent)
+    assert listed["projects"][0]["folders"] == [str(root.parent), str(outside)]
+    assert result["last"] == str(outside)
+    assert [row["path"] for row in result["workspaces"]] == [str(outside), str(root.parent)]
+    assert workspace_family.list_payload(cfg)[1] == result
+    assert (root / "a.txt").is_file()
+
+    status, conflict = workspace_family.reorder(cfg, {}, request, {})
+    assert status == 409 and conflict["code"] == "PROJECT_ORDER_CHANGED"
+
+
+def test_workspaces_reorder_distinguishes_shared_folder_registrations(env):
+    from voicebridge import projects
+
     cfg, root, _outside = env
-    before = (cfg.state_dir() / "projects.json").read_text(encoding="utf-8")
-    status, payload = workspace_family.reorder(
-        cfg, {}, {"paths": [str(root.parent)]}, {})
-    assert status == 501 and payload["code"] == "WORKSPACE_ORDER_UNSUPPORTED"
-    assert payload["workspaces"]
-    assert (cfg.state_dir() / "projects.json").read_text(encoding="utf-8") == before
+    folder = str(root.parent)
+    projects.create(cfg, "Shared", [folder], confirmed=True)
+    store = cfg.state_dir() / "projects.json"
+    before = store.read_bytes()
+    status, result = workspace_family.reorder(cfg, {}, {"paths": [folder, folder]}, {})
+    assert status == 400 and result["code"] == "PROJECT_BAD_ORDER"
+    assert store.read_bytes() == before
+
+    order = [["ws", folder], ["shared", folder]]
+    status, approval = workspace_family.reorder(cfg, {}, {"order": order}, {})
+    assert status == 409 and approval["code"] == "CONFIRM_REQUIRED"
+    status, result = workspace_family.reorder(
+        cfg, {}, {"order": order, "confirmation_id": approval["confirmation_id"]}, {})
+    assert status == 200, result
+    assert [row["slug"] for row in result["workspaces"]] == ["ws", "shared"]
 
 
 def test_workspace_upload_is_a_brokered_write_refusal(env):

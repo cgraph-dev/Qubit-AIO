@@ -6625,6 +6625,30 @@ function renderWorkspacesPanel(workspaces){
   const panel=$('workspacesPanel');
   panel.innerHTML='';
   const activePath = S.session ? S.session.workspace : '';
+  const previous = workspaces.map(w => [w.slug, w.path]);
+  let reordering = false;
+  async function moveWorkspace(from, to, restoreFocus = false){
+    if(reordering || from === to || !previous[from] || !previous[to]) return;
+    const order = previous.slice();
+    const [moved] = order.splice(from, 1);
+    order.splice(to, 0, moved);
+    reordering = true;
+    try {
+      const result = await changeWorkspace('/api/workspaces/reorder', {previous, order});
+      _workspaceList = result.workspaces;
+      syncWorkspaceDisplays();
+      renderWorkspacesPanel(result.workspaces);
+      if(restoreFocus) panel.querySelectorAll('.ws-drag-handle')[to]?.focus();
+    } catch(error){
+      if(error.message === 'Workspace change cancelled.') return;
+      let detail;
+      try { detail = JSON.parse(error.body).detail; } catch(_){}
+      showToast(detail || t('workspace_reorder_failed'), 'error');
+      if(error.status === 409) await loadWorkspacesPanel();
+    } finally {
+      reordering = false;
+    }
+  }
   for(let i=0;i<workspaces.length;i++){
     const w=workspaces[i];
     const row=document.createElement('div');
@@ -6634,11 +6658,19 @@ function renderWorkspacesPanel(workspaces){
     const isActive = w.path === activePath;
     const activeBadge = isActive ? `<span class="detail-badge active" style="margin-left:6px;font-size:9px;padding:1px 6px">${esc(t('profile_active'))}</span>` : '';
     row.innerHTML=`
-      <span class="ws-drag-handle" title="${esc(t('workspace_drag_hint'))}">${li('grip-vertical',12)}</span>
+      <button type="button" class="ws-drag-handle" title="${esc(t('workspace_drag_hint'))}"
+        aria-label="${esc(t('workspace_drag_hint') + ' · ' + w.name + ' · ' + w.path)}"
+        aria-keyshortcuts="ArrowUp ArrowDown">${li('grip-vertical',12)}</button>
       <div class="ws-row-info">
         <div class="ws-row-name">${esc(w.name)}${activeBadge}</div>
         <div class="ws-row-path">${esc(w.path)}</div>
       </div>`;
+    row.querySelector('.ws-drag-handle').addEventListener('keydown', (e) => {
+      if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      e.stopPropagation();
+      moveWorkspace(i, i + (e.key === 'ArrowUp' ? -1 : 1), true);
+    });
     // Click on info area only — not on drag handle
     const info=row.querySelector('.ws-row-info');
     if(info) info.onclick = (e) => { e.stopPropagation(); openWorkspaceDetail(w.path, row); };
@@ -6649,7 +6681,7 @@ function renderWorkspacesPanel(workspaces){
       // Only allow drag from the grip handle or the row itself
       row.classList.add('dragging');
       e.dataTransfer.effectAllowed='move';
-      e.dataTransfer.setData('text/plain', w.path);
+      e.dataTransfer.setData('application/x-qubit-workspace-index', String(i));
       // Required for Firefox drag ghost
       if(e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(row, 0, 0);
     });
@@ -6667,32 +6699,11 @@ function renderWorkspacesPanel(workspaces){
     row.addEventListener('dragleave', () => {
       row.classList.remove('drag-over');
     });
-    row.addEventListener('drop', async (e) => {
+    row.addEventListener('drop', (e) => {
       e.preventDefault();
       row.classList.remove('drag-over');
-      const fromPath = e.dataTransfer.getData('text/plain');
-      const toPath = w.path;
-      if(fromPath === toPath) return; // Same item, no-op
-      // Compute new order
-      const currentPaths = workspaces.map(ws => ws.path);
-      const fromIdx = currentPaths.indexOf(fromPath);
-      const toIdx = currentPaths.indexOf(toPath);
-      if(fromIdx < 0 || toIdx < 0) return;
-      currentPaths.splice(fromIdx, 1);
-      currentPaths.splice(toIdx, 0, fromPath);
-      try {
-        const res = await api('/api/workspaces/reorder', {
-          method: 'POST',
-          body: JSON.stringify({ paths: currentPaths })
-        });
-        if(res && res.ok){
-          renderWorkspacesPanel(res.workspaces);
-          // Also refresh sidebar dropdown
-          loadWorkspaceList().then(() => {});
-        }
-      } catch(err){
-        showToast(t('workspace_reorder_failed'), 'error');
-      }
+      const from = e.dataTransfer.getData('application/x-qubit-workspace-index');
+      if(/^\d+$/.test(from)) moveWorkspace(Number(from), i);
     });
 
     panel.appendChild(row);

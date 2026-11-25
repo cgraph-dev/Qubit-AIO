@@ -30,8 +30,6 @@ WHAT STAYS REFUSED, AND WHY (usually because Qubit already decided)
 ---------------------------------------------------------------------------
 ``workspace/upload``         a file write through a viewer; Qubit writes are
                              brokered + confirmed (``file_patch``) — typed 403.
-``workspaces/reorder``       the registry has no order field; a second ordering
-                             would disagree with the CLI/voice — typed 501.
 ``git/*`` mutations          applied through the ORIGINAL ``/api/git/...``
                              compat rows (same journal, same grant). Re-bound
                              here because the ported page calls THESE paths.

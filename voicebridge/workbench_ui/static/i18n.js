@@ -1700,7 +1700,7 @@ const LOCALES = {
     workspace_add_path_placeholder: 'Add workspace path (e.g. /home/user/my-project)',
     workspace_paths_validated_hint: 'Paths are validated as existing directories before saving.',
 
-    workspace_drag_hint: 'Drag to reorder',
+    workspace_drag_hint: 'Reorder with drag or arrow keys',
     workspace_reorder_failed: 'Reorder failed',
     workspace_added: 'Workspace added',
     workspace_recovered_notice: (path) => `This session's deleted workspace was recovered to ${path}.`,
