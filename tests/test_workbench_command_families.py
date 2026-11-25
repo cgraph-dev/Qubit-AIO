@@ -544,6 +544,9 @@ def test_workspaces_list_reports_registered_folders(env):
     row = payload["workspaces"][0]
     assert row["exists"] is True and row["slug"] == "ws"
     assert payload["terminal_remote_backend"] is False
+    from voicebridge.workbench_ui import gateway_handlers
+
+    assert gateway_handlers.workspaces(cfg, {}, {}, {}) == (status, payload)
 
 
 def test_workspaces_add_needs_confirmation_then_registers(env, tmp_path):
