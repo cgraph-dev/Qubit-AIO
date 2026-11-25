@@ -213,19 +213,23 @@ def test_completion_note_binds_approval_and_survives_restore(tmp_path, monkeypat
     status, refused = QC.h_plugin_kanban_tasks_patch(
         cfg, {}, {**form, "summary": "x" * (KB.MAX_SUMMARY_LEN + 1)}, target)
     assert status == 400 and refused["code"] == KB.BAD_INPUT_CODE
+    status, refused = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {**form, "result": "Conflicting card note"}, target)
+    assert status == 400 and refused["code"] == KB.BAD_INPUT_CODE
     assert not OPS._journal(cfg).pending()
-    status, approval = QC.h_plugin_kanban_tasks_patch(cfg, {}, form, target)
+    status, approval = QC.h_plugin_kanban_tasks_patch(cfg, {}, {**form, "result": note}, target)
     assert status == 409
     cid = approval["confirmation_id"]
     staged = OPS._journal(cfg).get(cid).meta["payload"]
-    assert staged["form_proof"] and "summary" not in staged and note not in repr(staged)
+    assert staged["form_proof"] and "summary" not in staged and "result" not in staged
+    assert note not in repr(staged)
     status, next_approval = QC.h_plugin_kanban_tasks_patch(
         cfg, {}, {**form, "summary": "A different note", "confirmation_id": cid}, target)
     assert status == 409 and next_approval["confirmation_id"] != cid
     assert KB.show(cfg, tid)["task"]["status"] == "open"
 
     status, saved = QC.h_plugin_kanban_tasks_patch(
-        cfg, {}, {**form, "confirmation_id": cid}, target)
+        cfg, {}, {"status": "done", "result": note, "confirmation_id": cid}, target)
     assert status == 200 and saved["task"]["latest_summary"] == note
     assert _tasks_in_board(cfg)["Fixture card"]["latest_summary"] == note
     status, details = QP.h_plugin_kanban_task(cfg, {}, {}, target)
@@ -237,6 +241,35 @@ def test_completion_note_binds_approval_and_survives_restore(tmp_path, monkeypat
     restored = KB.show(cfg, tid)["task"]
     assert restored["status"] == "done" and restored["completion_summary"] == note
     assert sum(event["kind"] == "complete" for event in restored["events"]) == 1
+
+
+def test_bulk_card_completion_preserves_the_exact_selection_and_note(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import kanban as KB
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    first, second, other = [KB.create(cfg, title, confirmed=True)["task"]["id"]
+                            for title in ("First", "Second", "Unselected")]
+    note = "Both checks passed."
+    form = {"ids": [str(first), str(second)], "status": "done", "summary": note, "result": note}
+    status, approval = QC.h_plugin_kanban_tasks_bulk(cfg, {}, form, {})
+    assert status == 409
+    cid = approval["confirmation_id"]
+    staged = OPS._journal(cfg).get(cid).meta["payload"]
+    assert staged["form_proof"] and note not in repr(staged)
+    status, different = QC.h_plugin_kanban_tasks_bulk(
+        cfg, {}, {**form, "ids": [str(first), str(other)], "confirmation_id": cid}, {})
+    assert status == 409 and different["confirmation_id"] != cid
+    assert all(KB.show(cfg, tid)["task"]["status"] == "open" for tid in (first, second, other))
+
+    status, settled = QC.h_plugin_kanban_tasks_bulk(cfg, {}, {**form, "confirmation_id": cid}, {})
+    assert status == 200 and all(result["ok"] for result in settled["results"])
+    for tid in (first, second):
+        task = KB.show(cfg, tid)["task"]
+        assert (task["status"], task["completion_summary"]) == ("done", note)
+        assert sum(event["kind"] == "complete" for event in task["events"]) == 1
+    assert KB.show(cfg, other)["task"]["completion_summary"] == ""
 
 
 def test_voice_completion_note_keeps_exact_words(tmp_path, monkeypatch):
