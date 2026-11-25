@@ -1650,7 +1650,7 @@ export const api = {
     ),
   // ``cron_create`` reads the schedule as ``when`` (or ``schedule.expr``);
   // the editor models it as a display string, so map it and let the shared
-  // confirm round-trip re-issue with ``confirm: true``.
+  // confirm round-trip replay the exact staged request.
   createCronJob: (
     job: CronJobMutation,
     profile = "default",
@@ -1670,6 +1670,7 @@ export const api = {
           },
         ),
       confirm,
+      true,
     ),
   pauseCronJob: (id: string, profile = "default") =>
     runMutationWithConfirm(() =>
@@ -1677,6 +1678,8 @@ export const api = {
         `/api/cron/jobs/${encodeURIComponent(id)}/pause?profile=${encodeURIComponent(profile)}`,
         { method: "POST" },
       ),
+      undefined,
+      true,
     ),
   updateCronJob: (
     id: string,
@@ -1696,6 +1699,7 @@ export const api = {
           },
         ),
       confirm,
+      true,
     ),
   resumeCronJob: (id: string, profile = "default") =>
     runMutationWithConfirm(() =>
@@ -1703,11 +1707,12 @@ export const api = {
         `/api/cron/jobs/${encodeURIComponent(id)}/resume?profile=${encodeURIComponent(profile)}`,
         { method: "POST" },
       ),
+      undefined,
+      true,
     ),
   triggerCronJob: (id: string, profile = "default") =>
     fetchJSON<CronJob>(`/api/cron/jobs/${encodeURIComponent(id)}/trigger?profile=${encodeURIComponent(profile)}`, { method: "POST" }),
-  // ``cron_delete`` is confirm-gated; the helper retries with confirm on both
-  // the body and the query string (the compat body parser covers DELETE).
+  // The DELETE approval ID travels in the query when the request has no body.
   deleteCronJob: (
     id: string,
     profile = "default",
@@ -1720,6 +1725,7 @@ export const api = {
           { method: "DELETE" },
         ),
       confirm,
+      true,
     ),
 
   // Automation Blueprints — parameterized automation blueprints
@@ -1738,6 +1744,8 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
+      undefined,
+      true,
     ),
 
   // Profiles

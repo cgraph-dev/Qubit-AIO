@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Cron, scheduler, and task subpages (2026-11-25).** The Cron row passed at the disposable scope. Production mutations and external delivery remain tracked under live operator verification. The next dashboard row covers System, Gateway, Channels, Webhooks, Pairing, and Devices. [Cron recheck evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Dashboard data controls (2026-11-25).** The Logs, Files, Reports, and Analytics row is complete at the disposable scope. The next dashboard row covers Cron, scheduler, and task subpages. The earlier live service and operator verification remain tracked separately. [Audit evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Live Logs audit (2026-11-25).** Live read-only pagination and search passed. Continue control behavior and export, level and component filters, then the related Files, Reports, and Analytics workflows. The installation health follow-up is resolved on the local deployment. [Live audit evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)

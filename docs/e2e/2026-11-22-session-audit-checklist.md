@@ -195,10 +195,10 @@ the complete scenario is still open.
 | --- | ---: | ---: | ---: |
 | P0 packaged acceptance, reliability, and boundaries | 6 | 0 | 6 |
 | Live chat, Workbench, sessions, models, and PTY | 2 | 4 | 6 |
-| Dashboard routes and actions | 2 | 5 | 7 |
+| Dashboard routes and actions | 3 | 4 | 7 |
 | MCP, skills, plugins, memory, and integrations | 0 | 4 | 4 |
 | CLI and ecosystem compatibility | 0 | 7 | 7 |
-| **Total** | **10** | **20** | **30** |
+| **Total** | **11** | **19** | **30** |
 
 The completed items cover the clean authenticated Linux wheel and the
 installed remote-provider chat lifecycle. The latter includes session IDs and
@@ -218,7 +218,9 @@ provider-aware model pickers on both chat hosts and the Models entry paths in
 a disposable build. The ninth covers the seven repaired dashboard defects on the
 current source build and the bundled Manga presentation. The tenth covers
 Logs, Files, Reports, and Analytics using authenticated disposable dashboard
-and storage fixtures plus the read-only live log snapshot check. The counts describe
+and storage fixtures plus the read-only live log snapshot check. The eleventh covers Cron profile
+ownership, approval and decline, independent scheduler restart, CLI history,
+and one fixture delivery after managed gateway replacement. The counts describe
 whole checkboxes and do not estimate effort.
 [Packaged acceptance evidence](2026-11-24-packaged-acceptance.json) records the
 candidate revision, wheel identity and CI results.

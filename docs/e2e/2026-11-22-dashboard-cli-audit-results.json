@@ -2159,5 +2159,19 @@
       "file_backend": 20,
       "reports_and_route_reads": 2
     }
+  },
+  "current_cron_profile_and_restart_recheck": {
+    "date": "2026-11-25",
+    "revision": "6163edd7beb8e1223acf454b7af6be44575462c4",
+    "environment": "Production Vite build, disposable Chromium and authenticated loopback dashboard, independent CLI ticks, and managed-worker restart fixtures",
+    "approval": "Pause, Resume and blueprint decline canceled their exact IDs. The approval inventory no longer listed them, and a second confirmation returned NO_CONFIRMATION. Profile-scoped replay rejected changes to the target profile or job fields. Approving a fresh blueprint created one job in its owning profile.",
+    "profiles": "Focused contracts covered create, list, update, pause, resume, trigger, runs and delete, including the same job ID in two profiles. Editing a schedule without changing it preserved its slot, and editing a paused job kept it paused.",
+    "restart_and_delivery": "Two separate CLI tick processes produced a single local side effect and a single completed execution. Authenticated HTTP and the owning profile's CLI agreed on the execution ID. The native managed replacement fixture preserved its active worker and sent one delivery to a fixture adapter.",
+    "focused_tests": {
+      "contracts": 21,
+      "native_restart_and_delivery": 8,
+      "chromium": 5
+    },
+    "remaining_live_scope": "Production Cron mutations and delivery to external accounts were outside this disposable rehearsal."
   }
 }
