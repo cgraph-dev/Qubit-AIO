@@ -609,7 +609,7 @@ export default function FilesPage() {
       <PluginSlot name="files:bottom" />
 
       <Dialog
-        open={createDialogOpen}
+        open={createDialogOpen && !brokerConfirm}
         onOpenChange={(open) => {
           if (creating) return;
           setCreateDialogOpen(open);
