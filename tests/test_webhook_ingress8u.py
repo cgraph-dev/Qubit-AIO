@@ -311,3 +311,76 @@ def test_endpoint_oversized_content_length_typed(tmp_path, monkeypatch):
         assert "WEBHOOK_TOO_LARGE" in data
     finally:
         ui.stop()
+
+
+def test_http_signed_channel_envelope_dispatches_once(tmp_path, monkeypatch, capsys):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from voicebridge import channels_inbound as CI
+    from voicebridge.cli import main as cli
+    from voicebridge.communications import ingress as IG
+
+    cfg, ui, port = _started_ui(tmp_path, monkeypatch)
+    try:
+        for channel in ("telegram", "discord"):
+            CI.configure(cfg, channel, secret_ref="env:WH_INGRESS_SECRET",
+                         events=["message"], confirmed=True)
+            command = ["channels", "set-dm-policy", channel, "--allow", "fixture-sender",
+                       "--config", str(tmp_path / "voice.yaml")]
+            assert cli(command) == 3
+            assert json.loads(capsys.readouterr().out)["code"] == IG.CONFIRM_CODE
+            assert cli([*command, "--confirm", "--dry-run"]) == 0
+            assert json.loads(capsys.readouterr().out)["state"] == "preview"
+            assert IG.dm_allowed(cfg, channel, "fixture-sender") == (False, IG.NO_POLICY_CODE)
+            assert cli([*command, "--confirm"]) == 0
+            capsys.readouterr()
+            assert cli(["channels", "dm-policy", channel,
+                        "--config", str(tmp_path / "voice.yaml")]) == 0
+            policy = json.loads(capsys.readouterr().out)["policy"]
+            assert policy["allow"] == ["fixture-sender"] and policy["default_deny"]
+
+        channel_path = "/channels/telegram"
+        envelope = {"schema": IG.CHANNEL_ENVELOPE_SCHEMA, "channel": "telegram",
+                    "sender": "fixture-sender", "event": "message",
+                    "delivery_id": "http-fixture-delivery", "text": "Channel fixture"}
+
+        def request(fields, *, route=channel_path):
+            body = json.dumps(fields).encode()
+            return _post(port, route, body, _headers(SECRET, time.time(), body))
+
+        legacy = b'{"text":"legacy fixture"}'
+        status, verified = _post(port, channel_path, legacy, _headers(SECRET, time.time(), legacy))
+        assert status == 200 and verified["code"] == CI.UNAVAILABLE_CODE
+        assert IG.records(cfg)["count"] == 0
+
+        status, refused = request({**envelope, "sender": "outside-policy"})
+        assert status == 403 and refused["code"] == IG.DM_DENIED_CODE
+        status, refused = request(envelope, route="/channels/discord")
+        assert status == 400 and refused["code"] == IG.BAD_INPUT_CODE
+        assert IG.records(cfg)["count"] == 0
+
+        body = json.dumps(envelope).encode()
+        headers = _headers(SECRET, time.time(), body)
+        headers["X-Qubit-Sender"] = "unsigned-header"
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(lambda _: _post(port, channel_path, body, headers), range(2)))
+        assert sorted(status for status, _ in results) == [200, 409]
+        replies = dict(results)
+        assert replies[200]["state"] == "DELIVERED"
+        assert replies[409]["code"] == CI.REPLAY_CODE
+        rows = IG.records(cfg, channel="telegram")["messages"]
+        assert len(rows) == 1 and rows[0]["sender"] == "fixture-sender"
+        assert rows[0]["message_id"] == "http-fixture-delivery"
+        assert rows[0]["text_preview"] == "Channel fixture"
+
+        status, refused = request({**envelope, "delivery_id": "malformed-fixture",
+                                   "buttons": [None]})
+        assert status == 400 and refused["code"] == IG.BAD_ATTACHMENT_CODE
+
+        broken_receipt = tmp_path / "receipt-is-a-directory"
+        broken_receipt.mkdir()
+        monkeypatch.setattr(IG, "_receipt_path", lambda cfg: broken_receipt)
+        status, refused = request({**envelope, "delivery_id": "unwritable-fixture"})
+        assert status == 503 and refused["code"] == IG.RECEIPT_UNAVAILABLE_CODE
+    finally:
+        ui.stop()

@@ -84,6 +84,25 @@ def test_chat_workspaces_reads_the_real_project_registry(tmp_path, monkeypatch):
                                 "is_primary": True}], proj
 
 
+def test_project_tree_follows_a_changed_primary_folder(tmp_path, monkeypatch):
+    from voicebridge import projects as PJ
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    first = tmp_path / "first"
+    primary = tmp_path / "second"
+    for folder in (first, primary):
+        folder.mkdir()
+    PJ.create(cfg, "Site", [str(first), str(primary)], confirmed=True, use=True)
+    PJ.set_primary(cfg, "site", str(primary), confirmed=True)
+
+    tree_status, tree = HC.dispatch(cfg, "GET", "/api/profiles/projects/tree")
+    workspace_status, workspaces = HC.dispatch(cfg, "GET", "/api/chat/workspaces")
+    assert tree_status == workspace_status == 200
+    assert tree["active_id"] == "site"
+    assert tree["projects"][0]["path"] == workspaces["default_cwd"] == str(primary)
+
+
 def test_chat_workspaces_empty_store_is_honest(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
 

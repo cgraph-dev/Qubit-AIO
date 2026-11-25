@@ -3943,16 +3943,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
         return ""
 
     def _channel_ingress(self, path: str) -> None:
-        """POST /channels/<channel_id>.
-
-        Authenticated by the HMAC signature over the channel's configured
-        ``env:``/``file:`` secret — NOT by the dashboard session token. The
-        raw body is read bounded and handed to
-        ``channels_inbound.receive``; a fully verified delivery still
-        resolves to the typed ``CHANNEL_UNAVAILABLE`` gate (no listener
-        transport exists). Secret values never appear in responses.
-        """
+        """Verify signed channel requests and dispatch Qubit delivery envelopes."""
         from . import channels_inbound as CI
+        from .communications import ingress as IG
 
         prefix = "/channels/"
         channel_id = path[len(prefix):].strip("/")
@@ -3973,17 +3966,23 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         body = self.rfile.read(length) if length else b""
         signature = self._first_header(CI.SIGNATURE_HEADERS)
-        delivery_id = self._first_header(CI.DELIVERY_HEADERS)
         timestamp = self._first_header(CI.TIMESTAMP_HEADERS)
         try:
-            out = CI.receive(
-                self.app.orch.cfg, channel=channel_id, payload=body,
-                signature=signature, timestamp=timestamp or None,
-                delivery_id=delivery_id,
-                sender=self.headers.get("X-Qubit-Sender", "") or "",
-                event=self.headers.get("X-Qubit-Event", "") or "message")
+            cfg = self.app.orch.cfg
+            envelope = IG.channel_http_envelope(body, channel_id)
+            if envelope is None:
+                out = CI.receive(
+                    cfg, channel=channel_id, payload=body,
+                    signature=signature, timestamp=timestamp or None,
+                    delivery_id=self._first_header(CI.DELIVERY_HEADERS),
+                    sender=self.headers.get("X-Qubit-Sender", "") or "",
+                    event=self.headers.get("X-Qubit-Event", "") or "message")
+            else:
+                out = IG.ChannelListener(cfg).deliver(
+                    channel=channel_id, payload=body, signature=signature,
+                    timestamp=timestamp or None, source="channel-http", **envelope)
             self._json(out, 200)
-        except CI.ChannelError as exc:
+        except (CI.ChannelError, IG.IngressError) as exc:
             status = {
                 CI.UNKNOWN_CODE: 404,
                 CI.NOT_FOUND_CODE: 404,
@@ -3997,6 +3996,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 CI.BAD_INPUT_CODE: 400,
                 CI.EVENT_REFUSED_CODE: 400,
                 CI.CORRUPT_CODE: 500,
+                IG.DM_DENIED_CODE: 403,
+                IG.NO_POLICY_CODE: 403,
+                IG.ESTOP_CODE: 409,
+                IG.TOO_LARGE_CODE: 413,
+                IG.RECEIPT_UNAVAILABLE_CODE: 503,
             }.get(exc.code, 400)
             self._json({"state": "failed", "code": exc.code,
                         "detail": redact_obj(exc.detail)[:200]}, status)

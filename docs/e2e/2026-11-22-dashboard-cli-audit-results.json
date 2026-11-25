@@ -2188,7 +2188,7 @@
     "date": "2026-11-25",
     "revision": "237713fe795e2248f993b42ba398e2070f632d58",
     "environment": "Production Vite build and Chromium on an authenticated disposable loopback dashboard",
-    "browser": "At 1440 pixels, an events-only edit kept the existing destination and left the signing reference out of both requests. At 390 pixels, the dialog fit the viewport and saved a new destination and file-backed signing reference. Both saves replayed the exact approval ID. Independent HTTP read-back and the disposable registry confirmed the saved values and isolated the second subscription. Credential references stayed redacted in the HTTP responses.",
+    "browser": "At 1440 pixels, an events-only edit kept the existing destination and left the signing reference out of both requests. At 390 pixels, the dialog fit the viewport and saved a new destination and file-backed signing reference. Both saves replayed the exact approval ID. Independent HTTP read-back and the disposable registry confirmed the saved values and isolated the second subscription. Credential references stayed redacted in the HTTP responses. With the approved mobile request held in flight, Escape left the dialog open and its Close button was disabled until the save finished.",
     "approval_and_storage": "Focused tests rejected a changed field or target on replay, consumed an approved edit once, and rejected a stale form or approval for a subscription deleted and recreated under the same ID. A concurrent toggle made before approval was preserved.",
     "verification": {
       "focused_python_tests": 25,
@@ -2196,5 +2196,84 @@
       "vite_build": "passed"
     },
     "remaining": "Explicit channel send and receive fixtures, pairing lifecycle, physical devices, and deployed mutations remain open for the combined checklist row."
+  },
+  "current_channels_transport_and_approvals": {
+    "date": "2026-11-25",
+    "revision": "d2613e5649269ce6ccbe3d0e956625a993707e2c",
+    "environment": "Disposable Qubit state, loopback HTTP dashboard, loopback Slack-shaped receiver, and synthetic credentials and senders",
+    "outbound": "Without confirmation the broker made zero requests. A confirmed send used the exact fixture recipient and message with its synthetic credential in the authorization header. Replay returned the original provider receipt with no second request. An independent CLI process read the same receipt without exposing the credential or its reference.",
+    "inbound": "The Telegram HTTP route rejected a bad signature and replay. It verified the valid request but returned CHANNEL_UNAVAILABLE and created no dispatch receipt. With an explicit allowed sender, the in-process listener dispatched a separate signed delivery and persisted one receipt with a redacted preview.",
+    "dashboard": "The authenticated platforms inventory omitted synthetic credentials. The Telegram connection probe reported an unconnected channel and sent no message.",
+    "approvals": "Channel settings replay binds the selected platform and submitted settings. Banner settlement uses the recorded settings. For a raw credential the originating form must repeat the same value, which is never stored in the approval journal. Raw approvals outstanding across a listener restart must be staged again.",
+    "pairing": "The focused selection exercised native one-time issuance, expiry, revocation and single-use grant, dashboard scope retention and redacted mint responses, and the disposable device management API.",
+    "focused_tests": {
+      "transport_and_channels": 46,
+      "approvals_pairing_and_devices": 31
+    },
+    "remaining": "Incoming channel dispatch over HTTP, deployed mutation and real provider checks, and physical device enrollment remain open. The in-process receive fixture does not close the public ingress gap."
+  },
+  "current_signed_channel_http_delivery": {
+    "date": "2026-11-25",
+    "revision": "e27eb2c573143321851459e5ac16f5231873ecbc",
+    "environment": "Real VoiceBridge HTTP handler on loopback, disposable channel registry and sender policies, synthetic signing keys",
+    "delivery": "The CLI required confirmation to set the sender policy and then read back the exact allowed sender under default deny. A signed Telegram envelope went through the HTTP route to the communications broker, which persisted one matching receipt. Two parallel requests for the same signed delivery returned 200 DELIVERED and 409 CHANNEL_REPLAY.",
+    "routing_and_compatibility": "The signed body supplies the channel, sender, event, and delivery ID. The route refused a sender outside policy and a body for another channel. An older signed raw-body request returned verification-only CHANNEL_UNAVAILABLE and created no dispatch receipt.",
+    "errors": "Malformed attachment containers are typed refusals. An unavailable receipt store returned HTTP 503 without reporting delivery. Replay checks persist the body and delivery nonces together.",
+    "focused_tests": 68,
+    "remaining": "Provider-native delivery, the deployed mutation checks, and an approved physical device enrollment remain outside the disposable HTTP rehearsal."
+  },
+  "current_native_channel_adapter_rehearsal": {
+    "date": "2026-11-25",
+    "revision": "0cd7d9e97a57c67af40ab3b69737a1f2a102e87a",
+    "environment": "Disposable native gateway processes with separate homes, real Telegram, Slack and Discord SDK adapters, loopback API stand-ins and a loopback model provider",
+    "native_delivery": "Each explicit test recipient got one complete reply. The fake model and a separate SQLite read agreed on one turn and one durable inbound entry. Group messages without a required mention stayed out of prompts and replies. Replaying an original inbound event did not produce another turn, transcript row or reply.",
+    "telegram_restart": "The gateway exited with code 75, the fixture supervisor started its replacement, and the adapter sent one restart notice. Replaying the original restart message produced no second restart and a subsequent DM received a reply.",
+    "verification": {
+      "working_directory": "qubit_runtime",
+      "native_telegram": {
+        "pytest": "tests/e2e/core/platforms/test_telegram_contract.py -k 'dm_one_reply or group_require_mention or redelivery_one_reply or planned_restart_notice'",
+        "passed": 4
+      },
+      "native_slack_discord": {
+        "pytest": "tests/e2e/core/platforms/test_slack_contract.py tests/e2e/core/platforms/test_discord_contract.py -k 'dm_one_reply or group_require_mention or redelivery_one_reply'",
+        "passed": 6
+      },
+      "telegram_admission": {
+        "pytest": "tests/plugins/test_telegram_update_admission.py",
+        "passed": 94
+      },
+      "profile_scope": {
+        "pytest": "tests/gateway/test_telegram_topic_profile_isolation.py tests/gateway/test_platform_authz_scope.py",
+        "passed": 19
+      },
+      "collection_note": "Run the last two selections in separate pytest processes. The gateway conftest replaces the Telegram SDK if imported first. The combined attempt failed the real-SDK admission cases during setup. The isolated runs passed, with an existing unawaited-coroutine warning in the admission selection."
+    },
+    "live_read_only": "Qubit gateway and VoiceBridge services were active. The dashboard served source revision 45c56f4888f0877843208d61bfebd629ee994272. The provider check reported DEGRADED on the local route, the system Ollama unit was inactive, and port 11434 refused a loopback connection.",
+    "remaining": "Real provider accounts, deployed mutations, and physical device enrollment remain open."
+  },
+  "current_local_inference_rehearsal": {
+    "date": "2026-11-25",
+    "source_revision": "735c65b46a14401f5dc9db345872842d130afa31",
+    "deployed_frontend_revision": "45c56f4888f0877843208d61bfebd629ee994272",
+    "environment": "Live dashboard read-only, a time-limited Ollama user unit on loopback, and a separate temporary Qubit CLI home with no inherited credentials",
+    "health": "The system Ollama unit was inactive, and a noninteractive start returned Interactive authentication required. The temporary loopback instance loaded the already-installed model from a disposable store backed by the existing files. The deployed health and authenticated provider checks reached READY while the temporary service answered. Qubit returned to DEGRADED after the temporary unit stopped.",
+    "generation": "Ollama's /api/generate returned READY and two generated tokens for a synthetic prompt. The native Qubit CLI used the local /v1/chat/completions endpoint and returned READY. A separate SQLite read verified one matching user entry and one assistant entry in the disposable home. The original CLI invocation used an invalid toolset name and exited before sending anything. The corrected invocation used the built-in todo toolset.",
+    "deployed_reads": "Chat, Workbench, Channels, Webhooks, Pairing, and Devices documents returned 200. Authenticated System stats, Gateway status, Channels inventory, Webhooks inventory, and Pairing inventory returned JSON with HTTP 200.",
+    "remaining": "Permanent local-provider restoration requires administrator authentication. Deployed dashboard chat, mutation checks, provider-native delivery to approved real accounts, and physical device enrollment remain open."
+  },
+  "current_profile_and_workspace_lifecycle": {
+    "date": "2026-11-25",
+    "profile_revision": "0f927f90be6c5c21980298207624513f17c1034f",
+    "workspace_revision": "477fbe0ec57da545f2f11b4ac7fee4e068a2fd9f",
+    "environment": "Authenticated loopback dashboard and separate CLI processes using disposable Qubit homes and project folders",
+    "profiles": "Confirmed creation persisted the description and honored no_skills. Active selection and rename moved the profile home and sticky pointer together. A separate native CLI listed the renamed profile and its sibling. The reserved default profile refused deletion. Approved cleanup removed the fixture home, reset the active pointer, and left its sibling's marker intact.",
+    "approvals": "Profile creation binds the submitted settings without storing the form values in the journal. Rename and delete bind the selected profile home. Focused regressions checked that a change to the staged settings or target required a fresh approval.",
+    "archive": "The native CLI preserved the fixture marker in the exported archive and omitted the credential file. After dashboard cleanup, a CLI import under a new name restored the description and marker. The restored profile appeared in an independent dashboard read.",
+    "workspace": "The Projects CLI created a two-folder workspace and changed the primary folder. The authenticated project tree and chat workspace API both returned the selected folder. Archive hid the workspace from the chooser, and restore brought it back with the same primary folder.",
+    "focused_tests": {
+      "profiles_identity_workspace_memory": 23,
+      "workspace_routes_and_workbench": 19
+    },
+    "remaining": "Profile-managed gateway ownership in the dashboard flow, nested workspace controls, boards, agents, operations and achievements, browser control verification, and deployed checks remain open."
   }
 }

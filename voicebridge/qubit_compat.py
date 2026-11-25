@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import hmac
 import json
 import math
 from contextlib import closing, contextmanager
@@ -11398,10 +11399,11 @@ def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         if not isinstance(rec, dict):
             continue
         folders = rec.get("folders", []) or []
+        primary = rec.get("primary") or (folders[0] if folders else None)
         projects.append({
             "id": str(rec.get("slug", "")),
             "name": str(rec.get("name", "") or ""),
-            "path": str(folders[0]) if folders else None,
+            "path": str(primary) if primary else None,
             "isAuto": False, "repos": [], "sessionCount": 0,
             "totalTokens": 0, "totalCostUsd": 0.0,
             "lastActive": rec.get("updated_at"), "previewSessions": [],
@@ -11627,6 +11629,30 @@ def h_chat_slash_commands(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(commands=commands, total=len(commands), sources=notes)
 
 
+# Profile builders may include private MCP configuration. Bind it to the
+# originating form without writing the submitted values to the journal.
+_PROFILE_CREATE_APPROVAL_KEY = secrets.token_bytes(32)
+_PROFILE_CREATE_FIELDS = (
+    "name", "clone_from", "clone_from_default", "clone_all", "clone_channels",
+    "no_skills", "description", "provider", "model", "keep_skills", "mcp_servers",
+    "hub_skills",
+)
+
+
+def _confirm_profile_change(cfg: Any, action: str, detail: str,
+                            q: Dict[str, str], b: Dict[str, Any],
+                            payload: Dict[str, Any]) -> Optional[Tuple[int, Dict[str, Any]]]:
+    if q.get("confirmation_id") or b.get("confirmation_id"):
+        q = {key: value for key, value in q.items() if key != "confirm"}
+        b = {key: value for key, value in b.items() if key != "confirm"}
+    return _compat_confirm(cfg, action, detail, q, b, payload=payload, match_payload=True)
+
+
+def _profile_home_identity(path: Path) -> List[int]:
+    facts = path.stat()
+    return [facts.st_dev, facts.st_ino, facts.st_ctime_ns]
+
+
 def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/profiles -> create a real reference profile (one registry).
@@ -11643,16 +11669,26 @@ def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "profile name required",
                      "qubit_counterpart": "CLI `qubit agent profile create`"}
-    guard = _compat_confirm(
-        cfg, "profile_create",
-        f"profile {_redact(name)!r} creation writes a new profile home; "
-        "re-POST with {\"confirm\": true}", q, b)
-    if guard is not None:
-        return guard
     try:
         P = _profiles_module(cfg)
+        canon = P.normalize_profile_name(name)
+        P.validate_profile_name(canon)
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": _redact(str(exc))[:300]}
     except Exception as exc:
         return _fail(exc)
+    if canon == "default":
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": "The default profile is reserved."}
+    fields = {key: b[key] for key in _PROFILE_CREATE_FIELDS if key in b}
+    encoded = json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()
+    proof = hmac.digest(_PROFILE_CREATE_APPROVAL_KEY, encoded, "sha256").hex()
+    guard = _confirm_profile_change(
+        cfg, "profile_create", f"Create profile {_redact(canon)!r} with the submitted settings?",
+        q, b, {"name": canon, "proof": proof})
+    if guard is not None:
+        return guard
     # Clone semantics, exactly like the reference endpoint.
     explicit_source = str(b.get("clone_from") or "").strip()
     clone_all = bool(b.get("clone_all"))
@@ -11682,10 +11718,9 @@ def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "qubit_counterpart": "CLI `qubit agent profile create`"}
     except Exception as exc:
         return _fail(exc)
-    canon = P.normalize_profile_name(name)
     # Fresh (non-clone) profiles get the bundled skills; clones already copied
     # the source's. Best-effort, exactly like the reference.
-    if not clone:
+    if not clone and not no_skills:
         try:
             P.seed_profile_skills(path, quiet=True)
         except Exception:  # noqa: BLE001 - profile already exists
@@ -15491,16 +15526,24 @@ def profile_rename(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not old or not new_raw:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "rename needs the current and new name"}
-    guard = _compat_confirm(
-        cfg, "profile_rename",
-        f"profile rename {_redact(old)!r} -> {_redact(new_raw)!r}; re-POST "
-        "with {\"confirm\": true}", q, b)
-    if guard is not None:
-        return guard
     try:
         P = _profiles_module(cfg)
     except Exception as exc:
         return _fail(exc)
+    home, err = _profile_dir_or_error(P, old)
+    if err is not None:
+        return err
+    old_canon = P.normalize_profile_name(old)
+    try:
+        identity = None if old_canon == "default" else _profile_home_identity(home)
+    except OSError:
+        return 404, {"ok": False, "code": "PROFILE_NOT_FOUND",
+                     "detail": "The profile home is unavailable."}
+    guard = _confirm_profile_change(
+        cfg, "profile_rename", f"Rename profile {_redact(old)!r} to {_redact(new_raw)!r}?",
+        q, b, {"name": old_canon, "new_name": new_raw, "home": identity})
+    if guard is not None:
+        return guard
     try:
         P.rename_profile(old, new_raw)
     except FileNotFoundError as exc:
@@ -15515,7 +15558,6 @@ def profile_rename(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": _redact(str(exc))[:300]}
     except Exception as exc:
         return _fail(exc)
-    old_canon = P.normalize_profile_name(old)
     if old_canon == "default":
         return _ok(ok=True, name="default", display_name=new_raw, path="default",
                    qubit_counterpart="CLI `qubit agent profile rename`")
@@ -15541,16 +15583,27 @@ def profile_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "profile name required"}
-    guard = _compat_confirm(
-        cfg, "profile_delete",
-        f"profile {_redact(name)!r} deletion removes its home; re-POST with "
-        "{\"confirm\": true}", q, b)
-    if guard is not None:
-        return guard
     try:
         P = _profiles_module(cfg)
     except Exception as exc:
         return _fail(exc)
+    if name.strip().lower() == "default":
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": "The default profile cannot be deleted."}
+    home, err = _profile_dir_or_error(P, name)
+    if err is not None:
+        return err
+    canon = P.normalize_profile_name(name)
+    try:
+        identity = _profile_home_identity(home)
+    except OSError:
+        return 404, {"ok": False, "code": "PROFILE_NOT_FOUND",
+                     "detail": "The profile home is unavailable."}
+    guard = _confirm_profile_change(
+        cfg, "profile_delete", f"Delete profile {_redact(canon)!r} and its home?",
+        q, b, {"name": canon, "home": identity})
+    if guard is not None:
+        return guard
     try:
         P.delete_profile(name, yes=True)
     except ValueError as exc:
@@ -15561,7 +15614,6 @@ def profile_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": _redact(str(exc))[:300]}
     except Exception as exc:
         return _fail(exc)
-    canon = P.normalize_profile_name(name)
     _audit("profile.delete", "dashboard:user", {"name": canon})
     return _ok(ok=True, removed=True, name=canon, path=canon,
                qubit_counterpart="CLI `qubit agent profile delete`")
@@ -16607,6 +16659,11 @@ def webhooks_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(ok=True, **res)
 
 
+# Raw credentials stay in the originating form. The process key binds the
+# approval to those values without making the journal a credential store.
+_CHANNEL_APPROVAL_KEY = secrets.token_bytes(32)
+
+
 def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/messaging/platforms/{id} -> confirmed, audited channel update.
@@ -16668,11 +16725,24 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     }
     detail = (f"changing messaging channel {pid!r} requires explicit "
               "confirmation: re-PUT with {\"confirm\": true}")
+    account_label = str(b.get("label", b.get("name", "")) or "") if kind == "account" else ""
+    payload = {
+        "id": pid, "kind": kind, "enabled": enabled,
+        "env": {str(k): str(v) for k, v in store_env.items()},
+        "clear_env": [str(k) for k in clear_in],
+    }
+    if account_label:
+        payload["label"] = account_label
+    if raw_secret_keys:
+        raw_values = {k: str(env_in[k]).strip() for k in raw_secret_keys}
+        encoded = json.dumps(raw_values, sort_keys=True).encode()
+        payload["raw_proof"] = hmac.digest(_CHANNEL_APPROVAL_KEY, encoded, "sha256").hex()
+    if b.get("confirmation_id") or q.get("confirmation_id"):
+        b = {key: value for key, value in b.items() if key != "confirm"}
+        q = {key: value for key, value in q.items() if key != "confirm"}
     guard = _compat_confirm(
         cfg, "messaging.platform_update", detail, q, b,
-        payload={"id": pid, "enabled": enabled,
-                 "env": {str(k): str(v) for k, v in store_env.items()},
-                 "clear_env": [str(k) for k in clear_in]})
+        payload=payload, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -16690,8 +16760,7 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                clear=clear_in)
         if kind == "account":
             M.account_update(cfg, pid,
-                             label=str(b.get("label", b.get("name", "")) or ""),
-                             enabled=enabled,
+                             label=account_label, enabled=enabled,
                              requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__

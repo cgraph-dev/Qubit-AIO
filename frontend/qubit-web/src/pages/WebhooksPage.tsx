@@ -133,9 +133,12 @@ export default function WebhooksPage() {
     setCreated(null);
     setEditing(null);
   }, []);
+  const dismissCreateModal = useCallback(() => {
+    if (!creating) closeCreateModal();
+  }, [closeCreateModal, creating]);
   const createModalRef = useModalBehavior({
     open: createModalOpen,
-    onClose: closeCreateModal,
+    onClose: dismissCreateModal,
   });
 
   const enabled = data?.enabled ?? false;
@@ -518,7 +521,7 @@ export default function WebhooksPage() {
         <div
           ref={createModalRef}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4"
-          onClick={(e) => e.target === e.currentTarget && closeCreateModal()}
+          onClick={(e) => e.target === e.currentTarget && dismissCreateModal()}
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-webhook-title"
@@ -526,7 +529,8 @@ export default function WebhooksPage() {
           <div data-qm-form-panel="" className={cn(themedBody, "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto")}>
             <Button
               variant="secondary"
-              onClick={closeCreateModal}
+              onClick={dismissCreateModal}
+              disabled={creating}
               className="qm-webhook-icon-btn absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
             >

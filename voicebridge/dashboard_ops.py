@@ -938,15 +938,24 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
+            if not staged.get("kind") or staged.get("raw_proof"):
+                return 409, {"ok": False, "code": "MSG_RECONFIRM_IN_FORM",
+                             "detail": "Open the channel form and confirm the update there."}
+            pid = str(staged.get("id", "") or "")
+            kind, _, _ = HC._platform_resolve(cfg, pid)
+            if kind != staged["kind"]:
+                return 409, {"ok": False, "code": "MSG_RECONFIRM_IN_FORM",
+                             "detail": "The channel changed. Open it again to confirm the update."}
             body: Dict[str, Any] = {"confirm": True}
+            if staged.get("label"):
+                body["label"] = staged["label"]
             if isinstance(staged.get("enabled"), bool):
                 body["enabled"] = staged["enabled"]
             if isinstance(staged.get("env"), dict):
                 body["env"] = dict(staged["env"])
             if isinstance(staged.get("clear_env"), list):
                 body["clear_env"] = list(staged["clear_env"])
-            return HC.msg_update(cfg, {}, body,
-                                 {"id": str(staged.get("id", "") or "")})
+            return HC.msg_update(cfg, {}, body, {"id": pid})
         return _run
     if action == "skills_create":
         def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
@@ -1181,7 +1190,7 @@ def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
     payload = dict(meta.get("payload") or meta.get("args") or {})
     if isinstance(supplied, dict) and not (
             action.startswith(("cron.", "mcp_server_", "skills_", "sessions.", "webhook_"))
-            or action in {"config.write", "mcp.catalog_install"}):
+            or action in {"config.write", "mcp.catalog_install", "messaging.platform_update"}):
         payload.update(supplied)
     if _estop(cfg):
         try:

@@ -105,6 +105,24 @@ find voicebridge -name '*.py' -not -path '*/__pycache__/*' | wc -l
 ls config/voice.example.yaml
 ```
 
+## Signed channel delivery
+
+The dashboard listener accepts Qubit delivery envelopes on `POST /channels/<channel>`.
+Each JSON body carries `schema: qubit.channel.delivery.v1`, `channel`, `sender`,
+`event`, and `delivery_id`, along with standard message fields such as `text`
+or `attachments`. Use the configured channel ID in both the path and body.
+Send the Unix timestamp in `X-Qubit-Timestamp` and the hex HMAC-SHA256 in
+`X-Qubit-Signature`. The signing input is the numeric timestamp rendered as
+text, a period, and the exact request bytes.
+
+Use `qubit channels configure` to set the signing reference and event list.
+Set a default-deny sender policy with
+`qubit channels set-dm-policy <channel> --allow <sender> --confirm` and
+inspect it with `qubit channels dm-policy <channel>`. A successful delivery
+persists one communications receipt. The existing raw-body path continues
+to return verification evidence only. Provider-native connection state
+continues to come from the gateway adapters.
+
 ## Home and profile resolution
 
 User state (`config.yaml`, `.env`, logs, sessions) is profile-aware. Both resolvers live in one

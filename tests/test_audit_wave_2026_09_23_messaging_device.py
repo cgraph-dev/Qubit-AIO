@@ -16,6 +16,7 @@ Hermetic: no live service, network, credential, or hardware is touched.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -108,6 +109,60 @@ def test_staged_channel_toggle_carries_reference_payload_only(tmp_path,
     payload = (pending[0].meta or {}).get("payload") or {}
     assert payload.get("id") == "telegram"
     assert payload.get("env") == {"TELEGRAM_BOT_TOKEN": "vault:tg"}
+
+
+def test_channel_form_approval_binds_fields_and_keeps_credentials_out_of_journal(
+        tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import messaging as M
+    from voicebridge import qubit_compat as HC
+    import qubit_cli.config as runtime_config
+
+    entry = {"env_vars": ("TELEGRAM_BOT_TOKEN",)}
+    monkeypatch.setattr(HC, "_platform_resolve",
+                        lambda cfg, pid: ("catalog", entry, {}))
+    applied = []
+    saved = []
+    monkeypatch.setattr(HC, "_platform_store_update",
+                        lambda cfg, pid, **kw: applied.append((pid, kw)))
+    monkeypatch.setattr(M, "bridge_platform_to_gateway", lambda *a, **kw: {})
+    monkeypatch.setattr(runtime_config, "save_env_value", lambda *pair: saved.append(pair))
+    from voicebridge import qubit_runtime
+    monkeypatch.setattr(qubit_runtime, "use_qubit_home", lambda cfg: None)
+
+    path = {"id": "telegram"}
+    reference = {"enabled": True, "env": {"TELEGRAM_BOT_TOKEN": "env:FIXTURE_CHANNEL"}}
+    code, staged = HC.msg_update(cfg, {}, reference, path)
+    assert code == 409
+    cid = staged["confirmation_id"]
+    code, _ = HC.msg_update(cfg, {}, {**reference, "enabled": False, "confirm": True,
+                                      "confirmation_id": cid}, path)
+    assert code == 409 and applied == []
+    approved = OPS.confirm_compat_op(cfg, cid, actor="dashboard:user", session="dashboard",
+                               args={"enabled": False})
+    assert approved["state"] == "executed" and applied[0][1]["enabled"] is True
+
+    credential = "fixture-original-value"
+    raw = {"env": {"TELEGRAM_BOT_TOKEN": credential}}
+    code, staged = HC.msg_update(cfg, {}, raw, path)
+    assert code == 409
+    cid = staged["confirmation_id"]
+    payload = OPS._journal(cfg).get(cid).meta["payload"]
+    assert credential not in json.dumps(payload)
+    assert payload["env"] == {"TELEGRAM_BOT_TOKEN": "env:TELEGRAM_BOT_TOKEN"}
+    changed = {"env": {"TELEGRAM_BOT_TOKEN": "fixture-replacement-value"}}
+    code, _ = HC.msg_update(cfg, {}, {**changed, "confirmation_id": cid}, path)
+    assert code == 409 and saved == []
+    code, _ = HC.msg_update(cfg, {}, {**raw, "confirmation_id": cid}, path)
+    assert code == 200 and saved == [("TELEGRAM_BOT_TOKEN", credential)]
+
+    code, staged = HC.msg_update(cfg, {}, raw, path)
+    assert code == 409
+    blocked = OPS.confirm_op(cfg, staged["confirmation_id"], actor="dashboard:user",
+                              session="dashboard")
+    assert blocked["code"] == "MSG_RECONFIRM_IN_FORM"
+    assert len(saved) == 1 and len(applied) == 2
 
 
 # ---------------------------------------------------------------------------
