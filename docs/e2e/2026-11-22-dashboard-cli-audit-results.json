@@ -2275,5 +2275,22 @@
       "workspace_routes_and_workbench": 19
     },
     "remaining": "Profile-managed gateway ownership in the dashboard flow, nested workspace controls, boards, agents, operations and achievements, browser control verification, and deployed checks remain open."
+  },
+  "current_board_actions_and_gateway_ownership": {
+    "date": "2026-11-25",
+    "backend_revision": "759fff6e8c822d10858c95d5f251d59a4d56572d",
+    "browser_revision": "6604c8b5781d5ca2b1e2ee6fd2dceb05b6e3cc8d",
+    "environment": "Disposable authenticated dashboard, injected gateway status and supervisor, production Vite build, Chromium, and separate CLI and SQLite read-back",
+    "gateway_ownership": "The named profile reported the shared host PID and refused a restart without invoking the supervisor. A dedicated service fixture reported its own PID and the same route passed the named home and its exact service unit to the supervisor. Focused tests also checked that a foreign unit was refused.",
+    "board": "The HTTP flow created a board and task, claimed the task with the submitted assignee, added a comment, completed the task, and archived it. A separate SQLite read verified the board, status, assignee, priority, and comment. The CLI confirmed the restore and read back the previous status.",
+    "approvals": "Board approvals retain the exact submitted fields. Task and comment bodies stay out of the approval journal. The form replays text-bearing approvals. The banner settles supported approvals from recorded fields. An invalid priority caused no status change.",
+    "browser": "Chromium declined an inline Kanban create, cancelled that exact journal entry, and kept the draft. Retry replayed the new confirmation ID, saved one card, and displayed it after reload. An independent HTTP read counted one saved card.",
+    "verification": {
+      "focused_backend_tests": 22,
+      "built_gateway_dashboard_tests": 3,
+      "vite_build": "passed",
+      "typescript": "passed"
+    },
+    "remaining": "Browser coverage of additional board controls, nested workspace and board features, agents, Operations, Achievements, and deployed mutations remain open."
   }
 }
