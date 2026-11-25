@@ -11399,10 +11399,11 @@ def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         if not isinstance(rec, dict):
             continue
         folders = rec.get("folders", []) or []
+        primary = rec.get("primary") or (folders[0] if folders else None)
         projects.append({
             "id": str(rec.get("slug", "")),
             "name": str(rec.get("name", "") or ""),
-            "path": str(folders[0]) if folders else None,
+            "path": str(primary) if primary else None,
             "isAuto": False, "repos": [], "sessionCount": 0,
             "totalTokens": 0, "totalCostUsd": 0.0,
             "lastActive": rec.get("updated_at"), "previewSessions": [],
