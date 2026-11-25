@@ -141,3 +141,38 @@ def test_unmappable_route_stays_typed_refusal(tmp_path, monkeypatch):
     assert code == 403, out
     assert out["code"] == "KANBAN_WRITE_BROKERED"
     assert out["qubit_counterpart"]
+
+
+def test_board_approvals_bind_form_and_replay_banner_fields(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import kanban as KB
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    form = {"title": "Fixture task", "body": "Private fixture notes", "priority": 1}
+    code, pending = QC.h_plugin_kanban_tasks_create(cfg, {}, form, {})
+    assert code == 409
+    cid = pending["confirmation_id"]
+    payload = OPS._journal(cfg).get(cid).meta["payload"]
+    assert "body" not in payload and payload["form_proof"]
+    changed = {**form, "body": "Changed fixture notes", "confirmation_id": cid}
+    code, _ = QC.h_plugin_kanban_tasks_create(cfg, {}, changed, {})
+    assert code == 409 and "Fixture task" not in _tasks_in_board(cfg)
+    code, created = QC.h_plugin_kanban_tasks_create(cfg, {}, {**form, "confirmation_id": cid}, {})
+    assert code == 200
+    task = created["task"]["id"]
+
+    edit = {"status": "running", "title": "Edited fixture", "assignee": "fixture-owner"}
+    code, pending = QC.h_plugin_kanban_tasks_patch(cfg, {}, edit, {"task_id": task})
+    assert code == 409
+    result = OPS.confirm_compat_op(cfg, pending["confirmation_id"], actor="dashboard:user",
+                                   session="dashboard", args={"title": "Replacement"})
+    assert result["state"] == "executed", result
+    native = KB.show(cfg, int(task))["task"]
+    assert native["status"] == "claimed" and native["title"] == "Edited fixture"
+    assert native["assignee"] == "fixture-owner" and native["body"] == form["body"]
+
+    code, _ = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {"status": "done", "priority": 8, "confirm": True}, {"task_id": task})
+    assert code == 400
+    assert KB.show(cfg, int(task))["task"]["status"] == "claimed"

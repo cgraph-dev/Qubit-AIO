@@ -20540,16 +20540,43 @@ def _kanban_vendor_task(cfg: Any, tid: int) -> Dict[str, Any]:
     return _qubit_plugins._native_task_vendor(task, time.time(), len(comments))
 
 
+_KANBAN_APPROVAL_KEY = secrets.token_bytes(32)
+
+
 def _kanban_confirm(cfg: Any, action: str, detail: str, q: Dict[str, str],
                     b: Dict[str, Any], payload: Dict[str, Any]
                     ) -> Optional[Tuple[int, Dict[str, Any]]]:
-    return _compat_confirm(cfg, action, detail, query=q, body=b,
-                           payload=payload)
+    staged = {"version": 1, **payload}
+    text = staged.pop("body", "")
+    if text:
+        staged["form_proof"] = hmac.digest(_KANBAN_APPROVAL_KEY, text.encode(), "sha256").hex()
+    if q.get("confirmation_id") or b.get("confirmation_id"):
+        q = {key: value for key, value in q.items() if key != "confirm"}
+        b = {key: value for key, value in b.items() if key != "confirm"}
+    return _compat_confirm(cfg, action, detail, q, b, payload=staged, match_payload=True)
+
+
+def _kanban_edit_fields(kb: Any, body: Dict[str, Any]) -> Dict[str, Any]:
+    fields = {}
+    if body.get("title") is not None:
+        title = str(body["title"] or "")
+        if title:
+            fields["title"] = kb._check_title(title)
+    if body.get("body") is not None:
+        text = str(body["body"] or "")
+        if text:
+            fields["body"] = kb._check_body(text)
+    if body.get("priority") is not None:
+        priority = _kanban_priority(body["priority"])
+        if priority is None:
+            raise kb.KanbanError(kb.BAD_INPUT_CODE, "priority must be low, normal, or high")
+        fields["priority"] = priority
+    return fields
 
 
 def _kanban_apply_status(cfg: Any, kb: Any, tid: int, status: str) -> None:
     """Apply a vendored column status through the native transition verbs."""
-    if status == "running":
+    if status in ("running", "review"):
         kb.claim(cfg, tid, requested_by="dashboard:user", confirmed=True)
     elif status == "blocked":
         kb.block(cfg, tid, requested_by="dashboard:user", confirmed=True)
@@ -20613,17 +20640,16 @@ def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
         return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
                      "detail": "priority must be low, normal, or high",
                      "qubit_counterpart": "CLI `qubit kanban create`"}
-    gate = _kanban_confirm(
-        cfg, "kanban.create", f"creating kanban task {title!r} on {board!r}",
-        q, b, {"title": title, "board": board})
-    if gate is not None:
-        return gate
     try:
-        out = KB.create(cfg, title, board=board,
-                        body=str(b.get("body") or ""),
-                        assignee=str(b.get("assignee") or ""),
-                        priority=priority, requested_by="dashboard:user",
-                        confirmed=True)
+        fields = {"title": KB._check_title(title), "board": board,
+                  "body": KB._check_body(str(b.get("body") or "")),
+                  "assignee": str(b.get("assignee") or ""), "priority": priority}
+        gate = _kanban_confirm(
+            cfg, "kanban.create", f"creating kanban task {title!r} on {board!r}",
+            q, b, fields)
+        if gate is not None:
+            return gate
+        out = KB.create(cfg, **fields, requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         return _qubit_plugins._kanban_http(exc)
     tid = int(out["task"]["id"])
@@ -20649,38 +20675,26 @@ def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
                      "detail": f"unsupported status {status!r}",
                      "qubit_counterpart": "CLI `qubit kanban`"}
     try:
-        _kanban_native_show(cfg, tid)
-    except Exception as exc:
-        return _qubit_plugins._kanban_http(exc)
-    gate = _kanban_confirm(cfg, "kanban.update",
-                           f"updating kanban task #{tid}", q, b,
-                           {"task_id": tid, "status": status})
-    if gate is not None:
-        return gate
-    try:
-        if b.get("assignee") is not None:
-            assignee = str(b.get("assignee") or "")
-            if assignee.strip():
-                KB.assign(cfg, tid, assignee, requested_by="dashboard:user",
-                          confirmed=True)
-            else:
-                KB.reclaim(cfg, tid, requested_by="dashboard:user",
-                           confirmed=True)
+        current = _kanban_native_show(cfg, tid)
+        fields = _kanban_edit_fields(KB, b)
+        assignment = str(b["assignee"] or "").strip() if b.get("assignee") is not None else None
+        if status == "archived" and (fields or assignment is not None):
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "archive must be a separate action")
+        if assignment == "" and status and _VENDOR_TO_NATIVE_STATUS[status] != "open":
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "clear the assignee in a separate action")
+        gate = _kanban_confirm(cfg, "kanban.update", f"updating kanban task #{tid}", q, b,
+                               {"task_id": tid, "status": status, "assignee": assignment,
+                                "board": current["board"], **fields})
+        if gate is not None:
+            return gate
         if status:
             _kanban_apply_status(cfg, KB, tid, status)
-        if b.get("title") is not None or b.get("body") is not None \
-                or b.get("priority") is not None:
-            priority = (_kanban_priority(b.get("priority"))
-                        if b.get("priority") is not None else "")
-            if priority is None:
-                return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
-                             "detail": "priority must be low, normal, or high",
-                             "qubit_counterpart": "CLI `qubit kanban edit`"}
-            KB.edit(cfg, tid,
-                    title=str(b.get("title") or ""),
-                    body=str(b.get("body") or ""),
-                    priority=priority or "",
-                    requested_by="dashboard:user", confirmed=True)
+        if assignment:
+            KB.assign(cfg, tid, assignment, requested_by="dashboard:user", confirmed=True)
+        elif assignment == "" and not status:
+            KB.reclaim(cfg, tid, requested_by="dashboard:user", confirmed=True)
+        if fields:
+            KB.edit(cfg, tid, **fields, requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         return _qubit_plugins._kanban_http(exc)
     _audit("kanban.update", "dashboard:user", {"task_id": tid})
@@ -20736,38 +20750,34 @@ def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
         return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
                      "detail": f"unsupported status {status!r}",
                      "qubit_counterpart": "CLI `qubit kanban`"}
-    gate = _kanban_confirm(cfg, "kanban.bulk",
-                           f"bulk-updating {len(ids)} kanban tasks", q, b,
-                           {"ids": ",".join(str(i) for i in ids)[:500],
-                            "status": status})
+    try:
+        fields = _kanban_edit_fields(KB, b)
+        archive = bool(b.get("archive"))
+        if (archive or status == "archived") and (fields or b.get("assignee") or (archive and status)):
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "archive must be a separate action")
+    except KB.KanbanError as exc:
+        return _qubit_plugins._kanban_http(exc)
+    assignee = str(b.get("assignee") or "").strip()
+    gate = _kanban_confirm(
+        cfg, "kanban.bulk", f"bulk-updating {len(ids)} kanban tasks", q, b,
+        {"ids": [str(i) for i in ids], "status": status, "archive": archive,
+         "assignee": assignee, **fields})
     if gate is not None:
         return gate
-    priority = _kanban_priority(b.get("priority")) \
-        if b.get("priority") is not None else ""
-    if b.get("priority") is not None and priority is None:
-        return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
-                     "detail": "priority must be low, normal, or high",
-                     "qubit_counterpart": "CLI `qubit kanban`"}
     results = []
     for raw in ids:
         entry: Dict[str, Any] = {"id": str(raw), "ok": True}
         try:
             tid = int(str(raw))
             _kanban_native_show(cfg, tid)
-            if b.get("archive"):
-                KB.archive_task(cfg, tid, requested_by="dashboard:user",
-                                confirmed=True)
+            if archive:
+                KB.archive_task(cfg, tid, requested_by="dashboard:user", confirmed=True)
             if status:
                 _kanban_apply_status(cfg, KB, tid, status)
-            if b.get("assignee") is not None and str(b.get("assignee")).strip():
-                KB.assign(cfg, tid, str(b.get("assignee")),
-                          requested_by="dashboard:user", confirmed=True)
-            if b.get("title") is not None or b.get("body") is not None \
-                    or b.get("priority") is not None:
-                KB.edit(cfg, tid, title=str(b.get("title") or ""),
-                        body=str(b.get("body") or ""),
-                        priority=priority or "",
-                        requested_by="dashboard:user", confirmed=True)
+            if assignee:
+                KB.assign(cfg, tid, assignee, requested_by="dashboard:user", confirmed=True)
+            if fields:
+                KB.edit(cfg, tid, **fields, requested_by="dashboard:user", confirmed=True)
         except Exception as exc:
             entry.update(ok=False, error=_redact(str(exc))[:160])
         results.append(entry)
@@ -20792,15 +20802,14 @@ def h_plugin_kanban_tasks_comment(cfg: Any, q: Dict[str, str],
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "body is required",
                      "qubit_counterpart": "CLI `qubit kanban comment`"}
-    gate = _kanban_confirm(cfg, "kanban.comment",
-                           f"commenting on kanban task #{tid}", q, b,
-                           {"task_id": tid})
-    if gate is not None:
-        return gate
     try:
-        KB.comment(cfg, tid, text,
-                   requested_by=str(b.get("author") or "dashboard:user"),
-                   confirmed=True)
+        _kanban_native_show(cfg, tid)
+        author = str(b.get("author") or "dashboard:user")
+        gate = _kanban_confirm(cfg, "kanban.comment", f"commenting on kanban task #{tid}", q, b,
+                               {"task_id": tid, "author": author, "body": text})
+        if gate is not None:
+            return gate
+        KB.comment(cfg, tid, text, requested_by=author, confirmed=True)
     except Exception as exc:
         return _qubit_plugins._kanban_http(exc)
     _audit("kanban.comment", "dashboard:user", {"task_id": tid})

@@ -1118,20 +1118,25 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                                {"id": sid})
             return None
         return _run
-    if action in ("kanban.create", "kanban.boards_create", "kanban.update"):
+    kanban_handlers = {
+        "kanban.boards_create": "h_plugin_kanban_boards_create",
+        "kanban.create": "h_plugin_kanban_tasks_create",
+        "kanban.update": "h_plugin_kanban_tasks_patch",
+        "kanban.archive": "h_plugin_kanban_tasks_delete",
+        "kanban.bulk": "h_plugin_kanban_tasks_bulk",
+        "kanban.comment": "h_plugin_kanban_tasks_comment",
+    }
+    if action in kanban_handlers:
         def _run(cfg, payload):
             from . import qubit_compat as HC
 
             staged = dict(payload or {})
-            if action == "kanban.boards_create":
-                return HC.h_plugin_kanban_boards_create(
-                    cfg, {}, {**staged, "confirm": True}, {})
-            if action == "kanban.create":
-                return HC.h_plugin_kanban_tasks_create(
-                    cfg, {}, {**staged, "confirm": True}, {})
-            tid = str(staged.get("task_id", "") or "")
-            return HC.h_plugin_kanban_tasks_patch(
-                cfg, {}, {**staged, "confirm": True}, {"task_id": tid})
+            if staged.pop("version", None) != 1 or staged.get("form_proof"):
+                return 409, {"ok": False, "code": "KANBAN_RECONFIRM_IN_FORM",
+                             "detail": "Open the board and confirm this change from the form."}
+            tid = str(staged.pop("task_id", "") or "")
+            handler = getattr(HC, kanban_handlers[action])
+            return handler(cfg, {}, {**staged, "confirm": True}, {"task_id": tid})
         return _run
     if action.startswith("family."):
         # Every ``qubit.family.<fam>.<act>`` capability stages through
@@ -1189,7 +1194,7 @@ def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
                           "cancel it instead."}
     payload = dict(meta.get("payload") or meta.get("args") or {})
     if isinstance(supplied, dict) and not (
-            action.startswith(("cron.", "mcp_server_", "skills_", "sessions.", "webhook_"))
+            action.startswith(("cron.", "mcp_server_", "skills_", "sessions.", "webhook_", "kanban."))
             or action in {"config.write", "mcp.catalog_install", "messaging.platform_update"}):
         payload.update(supplied)
     if _estop(cfg):
