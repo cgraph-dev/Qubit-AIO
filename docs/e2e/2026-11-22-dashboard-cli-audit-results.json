@@ -2250,5 +2250,15 @@
     },
     "live_read_only": "Qubit gateway and VoiceBridge services were active. The dashboard served source revision 45c56f4888f0877843208d61bfebd629ee994272. The provider check reported DEGRADED on the local route, the system Ollama unit was inactive, and port 11434 refused a loopback connection.",
     "remaining": "Real provider accounts, deployed mutations, and physical device enrollment remain open."
+  },
+  "current_local_inference_rehearsal": {
+    "date": "2026-11-25",
+    "source_revision": "735c65b46a14401f5dc9db345872842d130afa31",
+    "deployed_frontend_revision": "45c56f4888f0877843208d61bfebd629ee994272",
+    "environment": "Live dashboard read-only, a time-limited Ollama user unit on loopback, and a separate temporary Qubit CLI home with no inherited credentials",
+    "health": "The system Ollama unit was inactive, and a noninteractive start returned Interactive authentication required. The temporary loopback instance loaded the already-installed model from a disposable store backed by the existing files. The deployed health and authenticated provider checks reached READY while the temporary service answered. Qubit returned to DEGRADED after the temporary unit stopped.",
+    "generation": "Ollama's /api/generate returned READY and two generated tokens for a synthetic prompt. The native Qubit CLI used the local /v1/chat/completions endpoint and returned READY. A separate SQLite read verified one matching user entry and one assistant entry in the disposable home. The original CLI invocation used an invalid toolset name and exited before sending anything. The corrected invocation used the built-in todo toolset.",
+    "deployed_reads": "Chat, Workbench, Channels, Webhooks, Pairing, and Devices documents returned 200. Authenticated System stats, Gateway status, Channels inventory, Webhooks inventory, and Pairing inventory returned JSON with HTTP 200.",
+    "remaining": "Permanent local-provider restoration requires administrator authentication. Deployed dashboard chat, mutation checks, provider-native delivery to approved real accounts, and physical device enrollment remain open."
   }
 }
