@@ -186,3 +186,58 @@ def test_active_selection_round_trips(tmp_path, monkeypatch):
 
     code, out = QC.profiles_active_set(cfg, {}, {"active": "nope"}, {})
     assert code == 404 and out["code"] == "PROFILE_NOT_FOUND", out
+
+
+def test_profile_create_approval_keeps_the_form_and_private_fields_bound(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    profile = {"name": "profile-fixture", "description": "Approved description",
+               "no_skills": True}
+    code, staged = QC.h_profile_create(cfg, {}, profile, {})
+    assert code == 409
+    cid = staged["confirmation_id"]
+    payload = OPS._journal(cfg).get(cid).meta["payload"]
+    assert set(payload) == {"name", "proof"}
+    code, _ = QC.h_profile_create(cfg, {}, {
+        **profile, "description": "Different description", "confirmation_id": cid,
+    }, {})
+    assert code == 409 and "profile-fixture" not in _rows(cfg)
+    code, out = QC.h_profile_create(cfg, {}, {**profile, "confirmation_id": cid}, {})
+    assert code == 200 and out["name"] == "profile-fixture"
+    assert _rows(cfg)["profile-fixture"]["description"] == "Approved description"
+    home = QC._profiles_module(cfg).get_profile_dir("profile-fixture")
+    assert not any((home / "skills").rglob("SKILL.md"))
+
+
+def test_profile_rename_and_delete_approvals_keep_the_original_target(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _create(cfg, "profile-first")
+    _create(cfg, "profile-second")
+    first = {"name": "profile-first"}
+    second = {"name": "profile-second"}
+    update = {"new_name": "profile-renamed"}
+    code, staged = QC.profile_rename(cfg, {}, update, first)
+    assert code == 409
+    cid = staged["confirmation_id"]
+    code, _ = QC.profile_rename(cfg, {}, {**update, "confirmation_id": cid}, second)
+    assert code == 409 and "profile-second" in _rows(cfg)
+    code, out = QC.profile_rename(cfg, {}, {**update, "confirmation_id": cid}, first)
+    assert code == 200 and out["name"] == "profile-renamed"
+
+    renamed = {"name": "profile-renamed"}
+    code, staged = QC.profile_delete(cfg, {}, {}, renamed)
+    assert code == 409
+    cid = staged["confirmation_id"]
+    query = {"confirmation_id": cid, "confirm": "true"}
+    code, _ = QC.profile_delete(cfg, query, {}, second)
+    assert code == 409 and "profile-second" in _rows(cfg)
+    code, _ = QC.profile_delete(cfg, query, {}, renamed)
+    assert code == 200
+    assert "profile-renamed" not in _rows(cfg) and "profile-second" in _rows(cfg)
+
+    code, _ = QC.profile_delete(cfg, {}, {}, {"name": "default"})
+    assert code == 400
