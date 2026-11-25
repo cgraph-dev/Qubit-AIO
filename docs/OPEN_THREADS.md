@@ -1,6 +1,6 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-**Profiles, workspaces, and related controls (2026-11-25).** Disposable HTTP and CLI checks covered profile lifecycle, archive recovery, sibling isolation, and workspace selection and archive. Continue profile gateway ownership, nested workspace controls, boards, agents, Operations, Achievements, browser controls, and deployed verification. [Profile and workspace evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
+**Profiles, workspaces, and related controls (2026-11-25).** Disposable HTTP and CLI checks covered profile lifecycle, archive recovery, sibling isolation, and workspace selection and archive. Profile gateway ownership and the core Kanban lifecycle now have fixture evidence, including Chromium create approval and decline. Continue nested workspace and board controls, agents, Operations, Achievements, and deployed verification. [Profile and workspace evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Deployed local inference (2026-11-25).** The system Ollama service is inactive and requires administrator authentication to start. A temporary loopback instance confirmed real generation and native CLI transcript persistence. Continue the deployed dashboard chat and mutation checks once the service is available and the current build is deployed. [Local inference evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
