@@ -4793,27 +4793,26 @@ def h_webhooks_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
         if fn_name == "add":
             sub_id = str(b.get("id") or b.get("sub_id")
                          or _webhook_slug(b.get("name", "")))
+            sub_id, url, events, secret_ref = W.validate_subscription(
+                sub_id, str(b.get("url") or b.get("deliver_url") or ""),
+                list(b.get("events", []) or []), str(b.get("secret_ref") or b.get("secret") or ""),
+            )
             guard = _compat_confirm(
                 cfg, "webhook_create",
-                f"creating webhook subscription {_redact(sub_id)!r} requires "
-                "explicit confirmation: re-POST with {\"confirm\": true}",
-                q, b,
-                payload={"id": sub_id,
-                         "name": str(b.get("name", "") or ""),
-                         "url": str(b.get("url") or b.get("deliver_url") or ""),
-                         "events": list(b.get("events", []) or []),
-                         "secret_ref": str(b.get("secret_ref")
-                                           or b.get("secret") or "")})
+                f"creating webhook subscription {_redact(sub_id)!r} requires explicit confirmation",
+                q, b, payload={"id": sub_id, "url": url, "events": events, "secret_ref": secret_ref},
+                match_payload=True,
+            )
             if guard is not None:
                 return guard
-            url = str(b.get("url") or b.get("deliver_url") or "")
-            secret_ref = str(b.get("secret_ref") or b.get("secret") or "")
-            res = W.add(cfg, sub_id, url, list(b.get("events", []) or []),
-                        secret_ref, requested_by="dashboard:user",
+            res = W.add(cfg, sub_id, url, events, secret_ref, requested_by="dashboard:user",
                         confirmed=True)
         elif fn_name == "remove":
-            res = W.remove(cfg, str(b.get("id") or p.get("id", "")),
-                           requested_by="dashboard:user", confirmed=True)
+            sub_id = str(p.get("id") or b.get("id") or "")
+            guard = _webhook_delete_confirmation(cfg, q, b, sub_id)
+            if guard is not None:
+                return guard
+            res = W.remove(cfg, sub_id, requested_by="dashboard:user", confirmed=True)
         elif fn_name == "test":
             res = W.test_plan(cfg, str(b.get("id") or p.get("id", "")))
         else:
@@ -16421,14 +16420,16 @@ def webhooks_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/webhooks/enable -> confirmed, audited store-wide toggle."""
     from . import webhooks as W
+    enabled = bool(b.get("enabled", True))
     guard = _compat_confirm(
         cfg, "webhook_enable",
         "toggling webhook delivery requires explicit confirmation: "
-        "re-POST with {\"confirm\": true}", q, b)
+        "re-POST with {\"confirm\": true}", q, b,
+        payload={"enabled": enabled}, match_payload=True)
     if guard is not None:
         return guard
     try:
-        res = W.set_enabled(cfg, bool(b.get("enabled", True)),
+        res = W.set_enabled(cfg, enabled,
                             requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         return _webhook_error(exc)
@@ -16441,21 +16442,29 @@ def webhooks_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """PUT /api/webhooks/{id}/enabled -> confirmed, audited sub toggle."""
     from . import webhooks as W
     sub_id = str(p.get("id", "") or b.get("id", "") or "")
+    enabled = bool(b.get("enabled", True))
     guard = _compat_confirm(
         cfg, "webhook_enabled",
         f"toggling webhook subscription {_redact(sub_id)!r} requires explicit "
         "confirmation: re-send with {\"confirm\": true}", q, b,
-        payload={"id": sub_id})
+        payload={"id": sub_id, "enabled": enabled}, match_payload=True)
     if guard is not None:
         return guard
     try:
-        res = W.set_sub_enabled(cfg, sub_id,
-                                bool(b.get("enabled", True)),
+        res = W.set_sub_enabled(cfg, sub_id, enabled,
                                 requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         return _webhook_error(exc)
     return _ok(ok=True, name=str(res.get("id", "")),
                enabled=bool(res.get("enabled")))
+
+
+def _webhook_delete_confirmation(cfg: Any, q: Dict[str, str], b: Dict[str, Any], sub_id: str):
+    return _compat_confirm(
+        cfg, "webhook_delete",
+        f"deleting webhook subscription {_redact(sub_id)!r} requires explicit confirmation",
+        q, b, payload={"id": sub_id}, match_payload=True,
+    )
 
 
 def webhooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -16470,10 +16479,7 @@ def webhooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """
     from . import webhooks as W
     sub_id = str(p.get("id", "") or b.get("id", "") or "")
-    guard = _compat_confirm(
-        cfg, "webhook_delete",
-        f"deleting webhook subscription {_redact(sub_id)!r} requires explicit "
-        "confirmation: re-DELETE with {\"confirm\": true}", q, b)
+    guard = _webhook_delete_confirmation(cfg, q, b, sub_id)
     if guard is not None:
         return guard
     try:
@@ -16497,7 +16503,7 @@ def webhooks_rotate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "webhook_rotate",
         f"rotating the signing secret for {_redact(sub_id)!r} requires explicit "
         "confirmation: re-POST with {\"confirm\": true}", q, b,
-        payload={"id": sub_id})
+        payload={"id": sub_id}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -16517,7 +16523,7 @@ def webhooks_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "webhook_test",
         f"sending a real signed test delivery to {_redact(sub_id)!r} requires "
         "explicit confirmation: re-POST with {\"confirm\": true}", q, b,
-        payload={"id": sub_id})
+        payload={"id": sub_id}, match_payload=True)
     if guard is not None:
         return guard
     try:
@@ -16553,7 +16559,7 @@ def webhooks_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "webhook_retry",
         f"retrying the last failed delivery for {_redact(sub_id)!r} requires "
         "explicit confirmation: re-POST with {\"confirm\": true}", q, b,
-        payload={"id": sub_id})
+        payload={"id": sub_id}, match_payload=True)
     if guard is not None:
         return guard
     try:
