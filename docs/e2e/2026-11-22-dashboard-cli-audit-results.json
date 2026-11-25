@@ -2097,5 +2097,39 @@
       "Managed gateway restart and deployed acceptance",
       "Cross-process concurrency"
     ]
+  },
+  "live_source_deployment": {
+    "date": "2026-11-25",
+    "source_revision": "45c56f4888f0877843208d61bfebd629ee994272",
+    "main_included": "5923b5ef5",
+    "previous_dashboard_revision": "3d6595549328b150b9dcfc432adcc7119aae40f5",
+    "bundle_index_sha256": "f5a552a9e840392d9a1a9f43b211cb6643650764ba14d1fad158c0255c3fbe0e",
+    "source_dirty": false,
+    "services": {
+      "qubit-voicebridge": {
+        "active": true,
+        "pid": 2244358
+      },
+      "qubit-gateway": {
+        "active": true,
+        "pid": 2244357,
+        "api_process_state": "OK"
+      }
+    },
+    "live_checks": {
+      "build_info": "HTTP 200 reported clean source revision after the restart.",
+      "health": "HTTP 200 and ok true. The installation reported DEGRADED both before and after.",
+      "routes": [
+        "/qubit-chat",
+        "/chat",
+        "/qubit-office",
+        "/qubit-workbench",
+        "/wb"
+      ],
+      "assets": "Twelve shell assets, two WOFF2 responses, and both Manga asset manifests passed.",
+      "authenticated": "Config, Keys and gateway status returned valid JSON. Gateway status reported the replacement systemd PID.",
+      "graft": "Both systemd user services now find Node and Graft through mise shims. Both launched a Graft MCP child. A stdio session with that PATH initialized and listed six tools."
+    },
+    "remaining": "The live read-only smoke check leaves deployed provider calls and per-control mutations open."
   }
 }
