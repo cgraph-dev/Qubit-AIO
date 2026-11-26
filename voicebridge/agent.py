@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from threading import Timer
 from typing import Any, Callable, Dict, Optional
 
 DEFAULT_TIMEOUT_S = 300.0
@@ -564,6 +565,30 @@ def _local_model_runtime(cfg: Any, model: str) -> "Optional[Dict[str, Any]]":
     }
 
 
+def _run_vendored_turn(agent, text: str, deadline: Optional[float]) -> Optional[dict]:
+    """Interrupt the existing runtime turn on expiry and wait for it to unwind."""
+    if deadline is None:
+        return agent.run_conversation(text) or {}
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return None
+    timer = Timer(remaining, lambda: agent.hard_interrupt(tool_reason="worker deadline"))
+    timer.daemon = True
+    timer.start()
+    try:
+        result = agent.run_conversation(text) or {}
+    finally:
+        timer.cancel()
+        timer.join()
+    return result if time.monotonic() < deadline else None
+
+
+def _worker_timeout(sid: str) -> dict:
+    return {"state": "FAILED", "code": "WORKER_TIMEOUT",
+            "detail": "Worker turn exceeded its time limit.", "session": sid,
+            "session_id": sid}
+
+
 def _run_vendored_session(cfg: Any, text: str, sid: str, *,
                           check: Callable[[], bool], store: Any,
                           reasoning: Optional[str],
@@ -571,7 +596,8 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
                           event_sink: Optional[Callable[[str, dict], None]] = None,
                           progress_sink: Optional[Callable[..., None]] = None,
                           stream_delta: Optional[Callable[[Optional[str]], None]] = None,
-                          session_model: Optional[str] = None
+                          session_model: Optional[str] = None,
+                          deadline: Optional[float] = None
                           ) -> "Optional[Dict[str, Any]]":
     """Run one tool-capable agent turn through the vendored ``AIAgent``.
 
@@ -771,10 +797,14 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             # end while claiming to stream. ``None`` keeps the old behavior.
             stream_delta_callback=stream_delta,
         )
-        result = agent.run_conversation(text) or {}
+        result = _run_vendored_turn(agent, text, deadline)
+        if result is None:
+            return _worker_timeout(sid)
     except AgentDenied:
         raise
     except Exception as exc:  # noqa: BLE001 - typed, redacted, no fabrication
+        if deadline is not None and time.monotonic() >= deadline:
+            return _worker_timeout(sid)
         _audit("session_vendored_error", session=sid, error=str(exc)[:160])
         too_long = _is_prompt_too_long(exc)
         if too_long is not None:
@@ -807,6 +837,10 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
     if check():
         raise AgentDenied("EMERGENCY_STOP",
                           "emergency stop latched mid-session")
+    if deadline is not None and (result.get("failed") or result.get("interrupted")):
+        return {"state": "FAILED", "code": "WORKER_ERROR",
+                "detail": "The worker stopped before returning evidence.",
+                "session": sid, "session_id": sid}
     reply = str(result.get("final_response") or "").strip()
     tool_names = _vendor_tool_names(result)
     model_used = str(result.get("model") or model or "")
@@ -1031,6 +1065,7 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     check = estop_engaged or (lambda: False)
     stop = cancelled or (lambda: False)
     budget = timeout_s or DEFAULT_TIMEOUT_S
+    deadline = time.monotonic() + timeout_s if timeout_s is not None else None
     clean = (task_text or "").strip()[:MAX_TEXT_CHARS]
     # Canonical session id: an empty/voice-default alias maps to the one
     # canonical conversation; an explicit id is preserved exactly.
@@ -1086,7 +1121,7 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     vendored = _run_vendored_session(cfg, clean, sid, check=check,
                                      store=store, reasoning=reasoning,
                                      progress_sink=progress_sink,
-                                     session_model=model)
+                                     session_model=model, deadline=deadline)
     if vendored is not None:
         vendored.setdefault("session_id", sid)
         return vendored
@@ -1101,6 +1136,8 @@ def run_session(cfg: Any, task_text: str, *, session: str,
         _audit("session_plan_error", session=sid,
                error=str(exc)[:160])
         proposal = None
+    if deadline is not None and time.monotonic() >= deadline:
+        return _worker_timeout(sid)
     if proposal is not None and execute_tool is not None \
             and not check() and not stop():
         steps += 1
@@ -1132,11 +1169,16 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     try:
         from .providers import gateway as _gateway
 
+        remaining = budget if deadline is None else deadline - time.monotonic()
+        if remaining <= 0:
+            return _worker_timeout(sid)
         res = _gateway.run_role(
             prompt, cfg, role="chat", model=_model(cfg),
-            max_tokens=1024, timeout_s=min(budget, 300.0),
+            max_tokens=1024, timeout_s=min(remaining, 300.0),
             local_mode="chat", should_stop=check, reasoning=reasoning)
     except Exception as exc:  # noqa: BLE001 - typed, redacted
+        if deadline is not None and time.monotonic() >= deadline:
+            return _worker_timeout(sid)
         too_long = _is_prompt_too_long(exc)
         if too_long is not None:
             _RECOGNISED_PROMPT_LIMIT.update(
@@ -1151,6 +1193,8 @@ def run_session(cfg: Any, task_text: str, *, session: str,
         return {"state": "FAILED", "code": "MODEL_ERROR",
                 "detail": _redact(str(exc))[:300], "session": sid,
                 "steps": steps, "tool_used": tool_used}
+    if deadline is not None and time.monotonic() >= deadline:
+        return _worker_timeout(sid)
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if not res.ok:
         if res.code in ("MODEL_UNAVAILABLE", "EMPTY_EMBEDDING") or (

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
+from threading import Event
+from time import monotonic
 from types import SimpleNamespace
 
 import pytest
@@ -36,7 +39,8 @@ def _worker_fixture(monkeypatch, replies, verdicts, on_turn=None):
         def __init__(self, _cfg, *, no_hotkey, headless):
             assert headless and no_hotkey
 
-        def run_worker_task(self, text, *, session):
+        def run_worker_task(self, text, *, session, timeout_s):
+            assert timeout_s == KG.WORKER_TURN_TIMEOUT_S
             calls.append((text, session))
             if on_turn:
                 on_turn()
@@ -89,6 +93,58 @@ def test_goal_cap_blocks_before_an_extra_turn(tmp_path, monkeypatch):
     assert out["goal_status"] == "blocked" and "budget" in out["detail"]
     assert out["task"]["goal_turns_used"] == len(calls) == 1
     assert not out["task"]["goal_running"]
+
+
+def test_goal_worker_deadline_interrupts_and_releases_claim(tmp_path, monkeypatch):
+    from qubit_cli import goals
+    from voicebridge import agent, orchestrator
+
+    cfg = Cfg(tmp_path)
+    task_id = _goal(cfg)
+    interrupted = Event()
+    entered = Event()
+    stopped = Event()
+    reasons = []
+
+    class Runtime:
+        def run_conversation(self, _text):
+            entered.set()
+            assert interrupted.wait(5), "worker was never interrupted"
+            return {"final_response": "Late reply"}
+
+        def hard_interrupt(self, *, tool_reason):
+            reasons.append(tool_reason)
+            interrupted.set()
+
+    class Worker:
+        def __init__(self, _cfg, *, no_hotkey, headless):
+            assert no_hotkey and headless
+
+        def run_worker_task(self, text, *, session, timeout_s):
+            result = agent._run_vendored_turn(Runtime(), text, monotonic() + timeout_s)
+            assert result is None, "a reply after expiry must not reach the judge"
+            return agent._worker_timeout(session)
+
+        def stop(self):
+            stopped.set()
+
+    def judge(*_args):
+        pytest.fail("the judge must not run after the worker deadline")
+
+    monkeypatch.setattr(KG, "WORKER_TURN_TIMEOUT_S", 0.1)
+    monkeypatch.setattr(orchestrator, "VoiceOrchestrator", Worker)
+    monkeypatch.setattr(goals, "judge_goal", judge)
+
+    out = KG.run(cfg, task_id, requested_by="tester", confirmed=True)
+    assert entered.is_set() and stopped.is_set()
+    assert reasons == ["worker deadline"]
+    assert out["detail"] == "Worker turn exceeded its 0.1-second time limit."
+    saved = KB.show(cfg, task_id)
+    assert saved["task"]["status"] == "blocked" and not saved["task"]["goal_running"]
+    assert saved["task"]["goal_turns_used"] == 1 and not saved["task"]["completion_summary"]
+    with closing(KB._connect(cfg)) as db:
+        events = db.execute("SELECT kind FROM events WHERE task_id=? ORDER BY id", (task_id,))
+        assert [row[0] for row in events] == ["create", "goal_started", "block", "goal_finished"]
 
 
 def test_goal_cli_keeps_worker_progress_out_of_json(tmp_path, monkeypatch, capsys):
