@@ -2411,5 +2411,18 @@
     "verification": "89 native, dashboard and voice tests and 14 registry and alias checks passed. The production build and authenticated Chromium rehearsal passed.",
     "deployment": "VoiceBridge restarted from local source 8cc677589. Port 8890 reported READY, the authenticated Operations catalog listed both dependency operations as confirmation-gated, and a self-link returned 400 without staging approval. The gateway stayed active.",
     "remaining": "Goal mode and other advanced settings, broader Agents and Operations controls, physical device checks, and deployed task mutations remain open."
+  },
+  "current_kanban_goal_mode": {
+    "date": "2026-11-26",
+    "revisions": [
+      "57aa0c034",
+      "b0fcdaf67"
+    ],
+    "environment": "Production Vite dashboard, authenticated Chromium, disposable native Kanban store, deterministic worker and judge fixtures",
+    "browser": "A Goal mode card was created with a two-turn limit, which appeared in its drawer. Cancelling the first Operations approval started no worker. An exact fresh approval ran two turns in the same session and stored the evidence. The board showed the completed task and the saved evidence after navigation.",
+    "ownership": "The approval binds the task title, body and budget. Tests refused a stale approval and an overlapping run, stopped a reclaimed run, and released ownership after interruption or emergency stop. The turn budget stopped the worker before an extra turn. The goal remains on the native board throughout, and a hard process exit requires reclaim before a retry.",
+    "read_back": "A separate CLI and SQLite read verified the two spent turns, saved evidence and one completion event. Goal settings and turn count survive snapshots. A snapshot does not revive an executing worker.",
+    "verification": "Ninety-five focused Kanban and voice tests, the production Vite build, and the authenticated browser rehearsal passed.",
+    "remaining": "Real provider worker and judge execution, a card-level launch control, other advanced settings, more Operations and Agents controls, physical device checks, and deployed task mutations remain open."
   }
 }
