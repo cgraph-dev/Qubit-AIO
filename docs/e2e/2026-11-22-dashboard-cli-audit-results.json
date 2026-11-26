@@ -2447,5 +2447,17 @@
     "cli": "A real run exposed worker progress on stdout before the receipt. The fix redirects the worker's progress to stderr. A fresh real run produced JSON on stdout and a separate CLI read returned the same saved evidence. Fifty-two focused tests passed.",
     "interrupt": "The worker returned on the impossible arithmetic card, but the local judge was still generating when the 90-second audit timeout sent SIGINT. The CLI emitted a blocked receipt. Independent SQLite read-back found one spent turn, a cleared ownership marker, and no completion event. This run measured interruption, while the judge verdict for the impossible goal remained open.",
     "remaining": "Deployed Goal mode mutations, verification of tool-backed evidence, and the combined dashboard checklist row remain open."
+  },
+  "current_kanban_browser_real_provider": {
+    "date": "2026-11-26",
+    "revision": "ee7202a6e93198baa4c452d39c27e10676d9e516",
+    "environment": "Chromium against a separate authenticated loopback VoiceBridge listener, disposable Kanban and transcript databases, and the installed qubit-brain model through a separate Ollama listener",
+    "served_bundle": "The Kanban plugin matched the live port 8890 asset byte for byte. It was built from b9dffd4e3 and had SHA-256 e0ea1c36452bf9e3122b4cc532473ed38fdac2ba4f610474defc100b12fbe550. The disposable backend was the main revision above. The bundle reported a source-revision mismatch in the disposable backend.",
+    "approval": "Chromium staged and cancelled one exact ID. The card remained in Todo. Approving a fresh ID showed Goal in progress. An independent replay of the executing ID returned HTTP 400, and SQLite recorded a single goal_started event.",
+    "result": "The real worker returned 91 for 13 times 7. Its transcript contained no canonical tool records to verify its claim of terminal execution. The judge lane timed out on three requests of 80 seconds each and exhausted fallback. The original browser assertion reached its 175-second wait limit before the handler settled. On reload Chromium saw the card in Blocked.",
+    "read_back": "Independent SQLite reads confirmed one spent turn, released ownership, one block and one goal_finished event, no completion summary, and zero completion events. The separate worker transcript contained the arithmetic answer.",
+    "retry": "A fresh card staged and cancelled one approval, then started once. The worker made ten successful provider requests within one goal turn while it tried tools, including unavailable names and an argument validation error. The temporary Ollama listener reached its audit time limit. The worker began provider recovery and did not reach the judge. The audit stopped the disposable dashboard. A separate CLI reclaim restored the card to Todo. SQLite confirmed the cleared claim, one spent turn, no completion summary, and no completion event.",
+    "deployment": "The live board at port 8890 returned HTTP 200 and the authenticated Operations catalog exposed confirmation-gated kanban_run_goal with task_id. Health was DEGRADED while system Ollama was inactive. All test writes went to the disposable board.",
+    "remaining": "Bounded browser-run recovery, successful real judge settlement through the browser, reliable tool-backed evidence, live dashboard mutations, and the combined dashboard checklist row remain open."
   }
 }
