@@ -902,6 +902,9 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
     }
     if tool_evidence is not None:
         receipt["tool_execution"] = tool_evidence.receipt(result)
+        file_mutation_evidence = getattr(agent, "file_mutation_evidence", None)
+        if callable(file_mutation_evidence):
+            receipt["tool_execution"]["file_mutations"] = file_mutation_evidence()
     # THE USAGE BLOCK THE OFFICE LEDGER NEEDS (D15/D16).
     #
     # `office.runner.run_turn` settles a turn's receipt from

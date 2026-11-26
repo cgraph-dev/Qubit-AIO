@@ -119,6 +119,31 @@ def test_goal_requires_a_successful_tool_outcome_after_failed_actions(tmp_path, 
     assert "recorded no successful tool result" in calls[1][0]
 
 
+@pytest.mark.parametrize("retry_target", ["requested-file", "unrelated-file"])
+def test_goal_requires_recovery_of_the_failed_file_target(tmp_path, monkeypatch, retry_target):
+    cfg = Cfg(tmp_path)
+    task_id = _goal(cfg)
+
+    def worker_receipt(*, failed, landed):
+        return {"state": "OK", "reply": "The requested file is updated.",
+                "receipt": {"tool_execution": {"attempted": True, "succeeded": True,
+                            "file_mutations": {"failed": failed, "landed": landed}}}}
+
+    first = worker_receipt(failed=["requested-file"], landed=["another-file"])
+    final = worker_receipt(failed=[], landed=[retry_target])
+    recovered = retry_target == "requested-file"
+    verdicts = [("done", "Accepted", False, None, False)] if recovered else []
+    calls = _worker_fixture(monkeypatch, [first, final], verdicts)
+    out = KG.run(cfg, task_id, requested_by="tester", confirmed=True)
+    assert out["goal_status"] == ("done" if recovered else "blocked")
+    assert out["task"]["goal_turns_used"] == len(calls) == 2
+    assert not out["task"]["goal_running"]
+    assert bool(out["task"]["completion_summary"]) is recovered
+    assert "Retry the authorized change on that target" in calls[1][0]
+    if not recovered:
+        assert out["detail"] == "A file edit failed without a successful retry of the same target."
+
+
 def test_tool_execution_evidence_comes_from_current_runtime_events():
     from voicebridge.agent import _ToolExecutionEvidence
 
