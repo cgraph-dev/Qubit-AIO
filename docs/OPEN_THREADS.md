@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Kanban Goal tool evidence (2026-11-26).** The known false report is blocked when the runtime sees failed attempts without a successful action. A tool outcome alone does not verify the intended effect or its relevance to the goal. False claims without tool attempts, unrelated successes, and deployed task mutations remain open. System Ollama is active again. [Goal tool evidence audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Kanban Goal mode real browser settlement (2026-11-26).** A successful real worker and judge verdict now has disposable Chromium, CLI, and SQLite evidence. The real judge also falsely completed an impossible task after the worker substituted a different equation and claimed nonexistent files. Replaying the original goal and report with stricter judge prompts still returned Done. Resolve the false completion and verify tool-backed evidence before closing Goal mode. Deployed judging and task mutations remain open while system Ollama is unavailable. [Real browser judge evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Kanban Goal worker deadline (2026-11-26).** The worker deadline now interrupts provider requests and recovery waits. In disposable Chromium, both cards released ownership and showed Blocked after reload. Continue with successful browser settlement from a real judge, judge timeout behavior, tool-backed evidence, and deployed mutations once system Ollama is available. [Goal worker deadline evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
