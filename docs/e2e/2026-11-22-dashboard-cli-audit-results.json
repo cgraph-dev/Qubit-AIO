@@ -2484,5 +2484,16 @@
     "reproduction": "Given the concise reply that 6 times 9 is 54, the judge emitted a Blocked verdict with a malformed closing quote. The real parser treated it as malformed. Replaying the full false report under revised prompts, including a structured comparison, still returned Done. The prompt experiments were discarded.",
     "deployment": "The deployed Kanban page at port 8890 returned HTTP 200. Its health was DEGRADED while system Ollama was inactive. Test writes went to the disposable board.",
     "remaining": "False completion against a modified goal, tool-backed evidence, judge latency under the deployed provider configuration, live dashboard mutations, and the combined dashboard checklist row remain open."
+  },
+  "current_kanban_goal_tool_evidence": {
+    "date": "2026-11-26",
+    "revision": "46194eb6016b232a2081cd2c1c844ff241533aea",
+    "environment": "Authenticated Chromium, production Kanban bundle, separate disposable native boards and worker runtime, real local Ollama for the positive run, and a scripted loopback provider for the exact false report replay",
+    "guard": "Goal mode tracks successful runtime tool completion events plus current-turn attempted tools, including attempted calls that never reached execution. Tool discovery and planning do not supply execution evidence. When attempts have no successful result, the runner skips the judge and requires a successful action on an available retry. The worker report stays in the transcript without becoming the card completion summary.",
+    "replay": "The scripted provider first requested an unavailable tool through the real runtime, then returned the full report saved by the earlier false completion. Chromium verified cancellation, fresh approval, the Blocked receipt, and recovery of the card state after reload. The scripted provider saw no judge request. SQLite confirmed one goal_started, one block, one goal_finished, one spent turn, a released claim, and zero completion events.",
+    "real_provider": "The real local worker and judge independently completed the text-only calculation for 48. Chromium and SQLite agreed on the saved answer after reload and one completion event. A new real-model attempt at the impossible goal hit the 120-second worker deadline. SQLite confirmed Blocked with one spent turn and zero completion events. This second real run did not reach evidence settlement.",
+    "verification": "Sixty-five focused tests passed. They cover the failed evidence gate, continuation behavior, successful retry, and exclusion of earlier turns and tool discovery from current execution evidence.",
+    "deployment": "VoiceBridge restarted from local merge 1757ddbf6. Kanban at port 8890 returned HTTP 200 and health reported READY. System Ollama was active and listed qubit-brain. The gateway stayed active with the same process ID.",
+    "remaining": "Verification of requested effects and exact goal satisfaction, false claims without attempts or with unrelated successes, deployed mutations, and the combined dashboard checklist row remain open."
   }
 }
