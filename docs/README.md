@@ -178,3 +178,4 @@ done
 | `QUBIT-OFFICE-UI-CONTRACT.md` | Canonical UI implementation contract — layout, renderer, maps, panels, characters, accessibility, resources |
 | `QUBIT-OFFICE-IMPROVEMENTS-2026.md` | 2026 release/UI/map/scale review — improvements, budgets, problems and technical choices |
 | `QUBIT-OFFICE-BROWSER-REVIEW.md` | Browser comparison — other builders, bad practices, corrections and sources |
+| `QUBIT-OFFICE-VS-HABBLAD.md` | Qubit Office vs Habblaud — how each works, and the differences |
