@@ -851,9 +851,19 @@ def h_wb_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _refusal("WB_SESSION_ID_REQUIRED",
                         "GET /api/session needs ?session_id=",
                         endpoint="session")
+    profile = str(q.get("profile") or "").strip()
+    home = None
+    if profile:
+        from voicebridge.qubit_compat import _settings_profile_error, settings_profile_home
+
+        try:
+            home = settings_profile_home(cfg, q)
+        except Exception as exc:
+            return _settings_profile_error(exc)
     try:
         from voicebridge.qubit_session_store import QubitSessionStore
-        out = QubitSessionStore(cfg).show(sid)
+        store = QubitSessionStore(cfg, runtime_home=home) if home is not None else QubitSessionStore(cfg)
+        out = store.show(sid)
     except Exception as exc:  # noqa: BLE001
         return _refusal("WB_SESSION_STORE_UNAVAILABLE",
                         f"the chat-session authority raised: "
@@ -885,6 +895,8 @@ def h_wb_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # (right) while the rows came from session.messages (absent). Both shapes
     # are emitted so neither old nor new client code loses the transcript.
     payload["session"]["messages"] = msgs
+    if profile and profile not in {"default", "current"}:
+        payload["session"].update(read_only=True, linked_profile=profile, workspace=None)
     return 200, payload
 
 

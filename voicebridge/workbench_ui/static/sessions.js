@@ -3137,6 +3137,21 @@ async function loadSession(sid){
     return loadSession(continuationSid,{...opts,_continuationParentSid:sid,skipLineageResolve:true,skipContinuationResolve:true,force:true,_preloadNotified:true});
   }
   S.session=data.session;
+  if(S.session.linked_profile){
+    // The link carries its own profile. Do not attach to a default-profile
+    // stream or update default-profile visit, draft or saved-session state.
+    S.messages=(S.session.messages||[]).filter(message=>message&&message.role);
+    S.toolCalls=[];
+    S.activeStreamId=null;
+    S.busy=false;
+    _messagesTruncated=false;
+    _oldestIdx=0;
+    _loadingSessionId=null;
+    _setActiveSessionUrl(sid);
+    syncTopbar();
+    renderMessages();
+    return;
+  }
   if(typeof _adoptRegenerationRevision==='function') _adoptRegenerationRevision(data.session);
   if(typeof _clearEmptyComposerModelOverride==='function') _clearEmptyComposerModelOverride();
   // Loading a real existing session abandons any pre-session toolset override
@@ -5889,6 +5904,11 @@ function _profileQueryIntentFromLocation(){
     };
   }catch(_e){return empty;}
 }
+function _namedSessionProfileFromLocation(sid){
+  if(!sid||_sessionIdFromLocation()!==sid) return '';
+  const intent=_profileQueryIntentFromLocation();
+  return intent.valid&&intent.name!=='default'&&intent.name!=='current'?intent.name:'';
+}
 // #7652 review round 4: a sessionless cron notification carries an explicit
 // panel intent so the click lands on the panel the run belongs to instead of
 // the last chat the user had open. Only panels the main view actually renders
@@ -5985,6 +6005,8 @@ function _sessionUrlForSid(sid){
   catch(_e){base=new URL(`/session/${encoded}`, window.location.origin);}
   try{
     const current=new URL(window.location.href);
+    const previousSid=_sessionIdFromLocation();
+    if(previousSid!==sid&&_namedSessionProfileFromLocation(previousSid)) current.searchParams.delete('profile');
     current.searchParams.delete('session');
     current.searchParams.delete('session_id');
     current.searchParams.delete('q');

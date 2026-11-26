@@ -4445,7 +4445,9 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   const _profileSwitchIsDefaultBefore=!!S.activeProfileIsDefault;
   let _profileSwitchCompleted=false;
   let _profileSwitchChangedProfile=false;
-  if(profileIntent&&profileIntent.hasParam){
+  const linkedProfile=(typeof _namedSessionProfileFromLocation==='function')
+    ? _namedSessionProfileFromLocation(_sessionIdFromLocation()) : '';
+  if(profileIntent&&profileIntent.hasParam&&!linkedProfile){
     try{
       if(profileIntent.valid){
         if(typeof switchToProfile==='function'){
@@ -4535,7 +4537,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   window._modelDropdownReady=null;
   window._startBootModelDropdown=_startBootModelDropdown;
   window._ensureModelDropdownReady=_startModelDropdown;
-  setTimeout(()=>{
+  if(!linkedProfile) setTimeout(()=>{
     try{Promise.resolve(_startBootModelDropdown()).catch(()=>{});}catch(_){}
   },0);
   // Start independent boot fetches without holding the conversation list behind
@@ -4668,6 +4670,11 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       // model before S._bootReady lets syncModelChip reveal the composer label.
       // Otherwise the chip can display the static default (e.g. GPT-5.4 Mini)
       // even though S.session already points at the Codex/current model.
+      if(S.session&&S.session.linked_profile){
+        S._bootReady=true;
+        syncTopbar();
+        return;
+      }
       if(S.session) await _startBootModelDropdown();
       // If the restored session has no messages it is an ephemeral scratch pad —
       // treat the page as a fresh start rather than resuming a blank conversation.

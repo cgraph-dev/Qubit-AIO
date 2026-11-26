@@ -5442,7 +5442,7 @@ function _renderInsights(d, box, wikiStatus, skillUsage) {
 }
 
 async function clearConversation() {
-  if(!S.session) return;
+  if(!S.session||S.session.linked_profile) return;
   const _clrMsg=await showConfirmDialog({title:t('clear_conversation_title'),message:t('clear_conversation_message'),confirmLabel:t('clear'),danger:true,focusCancel:true});
   if(!_clrMsg) return;
   try {
@@ -9305,7 +9305,7 @@ function _syncQubitPanelSessionActions(){
   setDisabled('btnExportJSON',!hasSession);
   setDisabled('btnShareSession',!hasSession||visibleMessages===0);
   setDisabled('btnStopSharingSession',!hasShare);
-  setDisabled('btnClearConvModal',!hasSession||visibleMessages===0);
+  setDisabled('btnClearConvModal',!hasSession||!!S.session?.linked_profile||visibleMessages===0);
 }
 
 // Thin wrapper: settings now live in the main content area. External callers

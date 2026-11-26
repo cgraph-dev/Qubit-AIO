@@ -78,6 +78,31 @@ def call(sub: str, cfg, method: str = "GET", q=None, b=None):
                           {"sub": sub, "method": method})
 
 
+def test_named_workbench_history_keeps_duplicate_session_ids_profile_scoped(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as HC
+    from voicebridge.qubit_session_store import QubitSessionStore
+
+    cfg = Cfg(tmp_path / "state")
+    named_home = tmp_path / "named"
+    named_home.mkdir()
+    named = QubitSessionStore(cfg, runtime_home=named_home)
+    default = QubitSessionStore(cfg)
+    sid = "duplicated-id"
+    for store, text in ((named, "Named message"), (default, "Default message")):
+        assert store.create(text, session_id=sid)["state"] == "OK"
+        store.append(sid, "assistant", text)
+    monkeypatch.setattr(HC, "settings_profile_home", lambda cfg, query: named_home)
+
+    named_status, named_body = call("session", cfg, q={"session_id": sid, "profile": "named"})
+    default_status, default_body = call("session", cfg, q={"session_id": sid})
+    assert named_status == default_status == 200
+    assert named_body["session"]["read_only"] is True
+    assert named_body["session"]["linked_profile"] == "named"
+    assert [m["content"] for m in named_body["session"]["messages"]] == ["Named message"]
+    assert [m["content"] for m in default_body["session"]["messages"]] == ["Default message"]
+    assert "linked_profile" not in default_body["session"]
+
+
 @pytest.mark.parametrize("sub,method,body", [
     ("git/status", "GET", {}),
     ("git/branches", "GET", {}),
