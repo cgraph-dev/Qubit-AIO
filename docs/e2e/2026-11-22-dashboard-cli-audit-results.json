@@ -2435,6 +2435,7 @@
     "environment": "Chromium and authenticated disposable dashboard, with fixture worker and judge",
     "browser": "A card waiting on a parent offered a disabled launch control. Declining from the drawer cancelled the exact staged approval. Retrying settled the new ID, showed running feedback, and displayed the completion evidence after reload. Completed cards did not offer launch.",
     "verification": "SQLite and worker records showed one approved two-turn run in one session and zero turns for the dependent card. Thirty-seven focused tests, two plugin syntax checks, the Vite build, and the browser rehearsal passed.",
+    "deployment": "VoiceBridge restarted and port 8890 reported READY. The served Kanban plugin matched the clean local build b9dffd4e3 byte for byte. The gateway stayed active.",
     "remaining": "Real worker and judge provider execution and deployed task mutations remain open."
   }
 }
