@@ -118,6 +118,9 @@ def plugin_root(tmp_path, monkeypatch):
         (app / "style.css").write_text("body{}")
         (app / "server.py").write_bytes(b"SECRET = 1\n")
         (app / "data.bin").write_bytes(b"\x00\x01")
+        # Extensionless MIT-style notice: the vendored app ships exactly this
+        # shape, and MIT requires it to travel with every copy.
+        (app / "LICENSE").write_text("MIT License\n\nCopyright (c) 2026 Test\n")
     real = resources.resource_path
     monkeypatch.setattr(
         resources, "resource_path",
@@ -227,6 +230,24 @@ def test_disallowed_extension_is_refused(plugin_root, name, rel):
 # --------------------------------------------------------------------------
 # 4. The session token is injected for LOOPBACK only
 # --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name", PLUGINS)
+def test_extensionless_licence_is_served_as_a_notice(plugin_root, name):
+    """[handler] An extensionless ``LICENSE`` is a FILE, not a directory.
+
+    Regression pin: the directory-default rule appended ``index.html`` to any
+    basename without a dot, which made the NOTICE_NAMES branch below
+    unreachable and 404'd the vendored MIT notice at
+    ``/plugin-apps/qubit-office/habblaud/LICENSE`` (measured live on
+    2026-11-26). MIT requires the notice to travel with the served copy.
+    """
+    sub = f"{name}/LICENSE"
+    h = _make_handler(path=PREFIX + sub, peer="127.0.0.1",
+                      host="127.0.0.1:8890")
+    h._serve_plugin_app(sub)
+    assert h._captured["code"] == 200, h._captured
+    assert "MIT License" in h._captured["body"].decode("utf-8"), h._captured
+
 
 @pytest.mark.parametrize("name", PLUGINS)
 def test_html_from_loopback_peer_gets_session_token_injected(plugin_root, name):

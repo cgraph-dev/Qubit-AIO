@@ -3069,8 +3069,23 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if not parts or ".." in parts:
             self._send(404, b"not found")
             return
-        # Default document for a directory request.
-        if parts[-1] == "" or "." not in parts[-1]:
+        # Extensionless licence/notice files, allowed BY BASENAME (not by
+        # dropping the allowlist): the vendored MIT app ships `LICENSE` at the
+        # tree root, and MIT requires the copyright + permission notice to be
+        # "included in all copies" — a copy served over HTTP without it is a
+        # notice omission. The file has no suffix, so the suffix map below
+        # would 404 it. Named explicitly so a bare `find`-style path cannot
+        # become servable by accident.
+        NOTICE_NAMES = {
+            "license", "licence", "license.txt", "licence.txt",
+            "notice", "notice.txt", "copying",
+        }
+        # Default document for a directory request. An extensionless NOTICE
+        # basename is a FILE, not a directory: appending index.html here made
+        # the NOTICE_NAMES branch below unreachable and 404'd the vendored
+        # LICENSE (measured live at /plugin-apps/qubit-office/habblaud/LICENSE).
+        if parts[-1] == "" or ("." not in parts[-1]
+                               and parts[-1].lower() not in NOTICE_NAMES):
             parts = parts + ["index.html"]
 
         root = _resources.resource_path("frontend/qubit-app/plugins")
@@ -3090,17 +3105,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
 
         suffix = target.suffix.lower()
-        # Extensionless licence/notice files, allowed BY BASENAME (not by
-        # dropping the allowlist): the vendored MIT app ships `LICENSE` at the
-        # tree root, and MIT requires the copyright + permission notice to be
-        # "included in all copies" — a copy served over HTTP without it is a
-        # notice omission. The file has no suffix, so the suffix map below
-        # would 404 it. Named explicitly so a bare `find`-style path cannot
-        # become servable by accident.
-        NOTICE_NAMES = {
-            "license", "licence", "license.txt", "licence.txt",
-            "notice", "notice.txt", "copying",
-        }
         if target.name.lower() in NOTICE_NAMES:
             self._file(target, "text/plain; charset=utf-8")
             return

@@ -22,7 +22,7 @@ difference is *who serves the page*, *who owns the server*, and *where the data 
 | Form | Standalone local web app | A page inside the Qubit dashboard |
 | URL | `http://localhost:4747` | `http://127.0.0.1:8890/qubit-office` |
 | Process | Its own Node server (or Docker container) | The Qubit dashboard's Python server |
-| Client | Its own Vite build, served at `/` | The same client, vendored and served at `/plugin-apps/qubit-office/habblaud/` inside an iframe |
+| Client | Its own Vite build, served at `/` | Habblaud's built client + local art/FX changes, vendored at `/plugin-apps/qubit-office/habblaud/` and shown in an iframe |
 | Data source | Claude Code / Codex session files on disk | Qubit's office SQLite store (`office.db`) and Business OS |
 | Auth | Loopback by default; optional separate HTTPS port with login | Qubit session token + a loopback/same-origin/Referer/load-nonce gate for the frame |
 | Extras | Claude Code mod/plugins, statusline usage tap, Codex bridge, Docker, phone/HTTPS remote, terminal SSE | Qubit host docks (Agents, HUD, Approvals, War Room, Command Center, Timeline, Studio, Campus), Business OS APIs, seat routing, themes/FX |
@@ -89,14 +89,18 @@ The Qubit shell is not upstream. It adds:
 - docks opened from the office's own Panels icon row: **Agents, HUD, Approvals, War Room, Command
   Center, Timeline, Studio** (Room Builder, Outside World, Panel Inventory), plus **CampusWorld**,
   **TowerNavigator**, **CharacterStudio**, **SeatModelPanel** and **EtsyConnectPanel**;
-- per-seat model routing (`game/entry.ts:90`), the 2Five/theme skin injection, and a persistent
-  `Office art: LimeZu — https://limezu.itch.io` credit.
+- per-seat model routing (`game/entry.ts:90`) and the 2Five/theme skin injection. The shell patches
+  the vendored topbar to say "Qubit Office" and it does **not** paint a persistent credit bar over
+  the game (asserted by `OfficeAppShell.test.ts`). The LimeZu tile credit appears in the Outside
+  World panel. Legal attribution lives in `THIRD_PARTY_NOTICES.md`; the vendored
+  `frontend/qubit-app/plugins/qubit-office/habblaud/LICENSE` travels with the served tree and is
+  served by `_serve_plugin_app` (pinned by `test_extensionless_licence_is_served_as_a_notice`).
 
 ### 3.3 Backend: Python replaces Habblaud's Node server
 
 - The office store is SQLite at `$QUBIT_HOME/voice/state/office/office.db`
   (`voicebridge/office/store.py:250` defines `office_meta`; `:289` `office_agent`; `:603`
-  `office_event`; 20 `office_*` tables in total).
+  `office_event`; 20 `office_*` tables are declared there).
 - `voicebridge/office/tower.py:597` folds the store into the tower report (floors, rooms, desks,
   characters, HUD). `voicebridge/office/runner.py:170` runs a real agent turn and writes events and
   receipts.
@@ -120,11 +124,13 @@ does **not** let those reach the general dashboard API:
   accepted. The write gate also validates a real session token when one is supplied. The read gate
   deliberately refuses a token-bearing request, so a real API caller is never served the office
   client's document instead of the normal route.
-- The host also installs a small `fetch` bridge before the iframe navigates
+- The host also tries a small `fetch` bridge before setting the iframe `src`
   (`frontend/qubit-app/plugins/qubit-office/game/app/api-bridge.ts`,
-  `OfficeAppShell.tsx:612`) to cover the client's startup reads, but the server-side gate above is
-  the authoritative boundary.
-- An unsupported path gets a **typed JSON refusal**, never a bare 404; the catch-all is
+  `OfficeAppShell.tsx:612`), but a same-origin navigation replaces the frame's realm and discards
+  the patch — `_office_client_read_ok`'s own docstring records this. The server-side front door is
+  therefore the effective boundary, not the bridge.
+- A path inside the client's allowlisted dialect that has no compat row gets a **typed JSON
+  refusal**, never a bare 404; the catch-all is
   `h_office_habblaud_refuse` (`voicebridge/qubit_compat.py:7545`), answering
   `403 OFFICE_CLIENT_UNSUPPORTED`.
 
@@ -139,8 +145,14 @@ Real (bound to Qubit data or the shared journals):
   message send (persists an `office_message` and delivers a real claimed office task), room rename,
   queued spawn task, seat model assignment, demo toggle, read-only update check.
 
-Typed refusals (by design): raw PTY and terminal streams, session terminal streams, unknown agent
-sub-actions, dictation writes, spawn attachments, deliveries, remote logout, and the POST catch-all.
+Typed refusals (by design):
+
+- raw PTY / terminal streams, session terminal streams, unknown agent sub-actions, dictation
+  writes, spawn attachments, and the POST catch-all → `403 OFFICE_CLIENT_UNSUPPORTED`;
+- remote logout → `409 NO_REMOTE_SESSION` (there is no remote office session to end);
+- `GET deliveries` is a typed **empty** answer (`200`, `supported:false`, empty list) because Qubit
+  has no deliveries registry — it is not a fabricated list and not a 403.
+
 The snapshot's `meta.terminal` and `meta.messages` gates are `true` because the permission-decision
 and room-rename controls are really bound — it is **not** a claim that Qubit exposes a PTY.
 
@@ -148,8 +160,8 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
 
 - `to_snapshot` returns `accounts: []`. Upstream's account letters and 5-hour/weekly usage counters
   have no Qubit source, so those parts of the topbar are empty rather than fabricated.
-- Upstream's Claude Code mod, Codex bridge, mod inbox, deliveries and remote HTTPS login are not
-  vendored and have no Qubit equivalent in this page.
+- Upstream's Claude Code mod, Codex bridge, mod inbox and remote HTTPS login are not vendored.
+  Deliveries has only a typed empty response (no registry), not a real replacement.
 - Upstream reads Claude Code transcripts directly; Qubit reads its own office store. A Qubit
   character is a Business OS/office seat, not a live `claude` process.
 
@@ -161,8 +173,8 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
   `frontend/qubit-app/plugins/qubit-office/habblaud/PROVENANCE.json`).
 - Only the built **client** is vendored: 41 assets, 33 bundle chunks, 10 Sakuga files,
   `index.html`, `LICENSE` and `manifest.webmanifest` — 87 files / 3,046,780 bytes as recorded by the
-  vendor manifest, plus `frontend/qubit-app/plugins/qubit-office/habblaud/PROVENANCE.json` beside them (88 files on disk). The server, Claude Code
-  mod and Docker setup are not present.
+  vendor manifest, plus `frontend/qubit-app/plugins/qubit-office/habblaud/PROVENANCE.json` beside
+  them (88 files on disk). The server, Claude Code mod and Docker setup are not present.
 - `scripts/vendor_habblaud.py` performs the build copy: it rewrites absolute asset paths to the
   plugin prefix, pins the locale to `en`, renames user-facing document/PWA copy to "Qubit Office",
   and records hashes. `python3 scripts/vendor_habblaud.py --check` must stay green.
@@ -170,9 +182,9 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
   files. They fall into three groups:
   1. **2Five room art** — `client/src/world/layout/twofive.ts`, core/project room surfaces,
      furniture, sakura tree and paper lantern, stable seat ids;
-  2. **Sakuga VFX/UI** — vendored `client/public/sakuga-vfx/*` (10 JS files), `client/src/ui/sakuga.ts`,
-     `client/src/art/sakuga/fx.ts`, converted controls, an FX overlay anchored to real character positions,
-     feed/topbar fixes, and the exposed Sakuga back layer;
+  2. **Sakuga VFX/UI** — vendored `client/public/sakuga-vfx/*` (10 JS files),
+     `client/src/ui/sakuga.ts`, `client/src/art/sakuga/fx.ts`, converted controls, an FX overlay
+     anchored to real character positions, feed/topbar fixes, and the exposed Sakuga back layer;
   3. **Optional theme assets** — `client/src/art/theme-assets.ts`, themed floor tiles with a procedural
      fallback, theme character/furniture/Modern UI slices, and extra host fields in `shared/types.ts` (upstream root).
 
@@ -187,7 +199,7 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
 | Data | Claude Code/Codex session files | Qubit `office.db` + Business OS |
 | Identity of an agent | A live Claude session / subagent | A Business OS / office seat |
 | Server code | TypeScript Node server | Python `voicebridge/office` + `qubit_compat` |
-| Client code | Its own build, served at `/` | Same build, re-pathed, English, re-branded |
+| Client code | Its own build, served at `/` | Habblaud build + documented local art/FX changes, re-pathed, English, re-branded |
 | Account/usage counters | From Claude accounts | Empty (`accounts: []`) |
 | Terminal | Real terminal SSE | Typed refusal |
 | Permissions / messages | Mod + hook queues | Qubit approval journal + office message/task |
@@ -195,10 +207,10 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
 | Remote/phone | Optional HTTPS + login | Not applicable; loopback dashboard |
 | Panels | Habblaud's own UI | Habblaud UI plus Qubit host docks |
 | Business data | None (project rooms only) | Revenue, cost, tasks, artifacts, War Room, departments |
-| Themes/art | Procedural pixel art | Procedural art + optional LimeZu/2Five theme pack |
-| Projected effects | None from Qubit business events | Sakuga VFX from real `office_event` rows |
+| Themes/art | Procedural pixel art | Procedural art + an optional theme pack built locally (2Five/LimeZu slices; not committed) |
+| Projected effects | None from Qubit business events | Sakuga VFX from real `office_event` + recent `bos_event` rows |
 | Update path | `npm`/Docker, upstream releases | Rebuild the vendored client + bump PROVENANCE |
-| Attribution | Its own LICENSE/README | `THIRD_PARTY_NOTICES.md` + persistent in-page credit |
+| Attribution | Its own LICENSE/README | `THIRD_PARTY_NOTICES.md` + vendored LICENSE; LimeZu tile credit in Outside World |
 
 ---
 
@@ -265,11 +277,30 @@ git -C "$HABBLAUD_SRC" ls-tree -r --name-only 4ccce2537472fe5a8d432f06974494d2e7
 .venv/bin/python -m pytest -q tests/test_office_deployment_contract.py -m contract
 ```
 
-## 8. Not verified here
+## 8. Verification status
 
-- No live browser session was run for this document. The claims are from source and the pinned
-  client/provenance files; the deployment contract test is the served-truth instrument.
-- No dashboard rebuild or service restart was performed for this document.
-- `frontend/qubit-dist/plugins/fleet.json` and the served bundle are build artifacts; the source
-  tree is authoritative after a rebuild.
+Run against the current tree while writing this document:
+
+- `python3 scripts/vendor_habblaud.py --check` → `ok: 87 files, 3046780 bytes, commit 4ccce2537472`.
+- `.venv/bin/python -m pytest -q tests/test_office_deployment_contract.py -m contract` against the
+  live dashboard → **5 passed, 2 deselected** (the served-truth HTTP/route checks).
+- `.venv/bin/python scripts/verify_doc_citations.py` → `OK — every citation resolves`.
+- The cited line numbers and the vendored/tree counts were re-derived with the commands in §7.
+- `/qubit-office` and `/api/health` answered HTTP 200 on `127.0.0.1:8890`.
+
+Verification found and fixed one real defect: `GET /plugin-apps/qubit-office/habblaud/LICENSE`
+returned **404** on the running service because `_serve_plugin_app`'s directory-default rule
+appended `index.html` to any extensionless basename, making the intended NOTICE_NAMES branch
+unreachable. The source is fixed and pinned by
+`tests/test_office_pages_security_contract.py::test_extensionless_licence_is_served_as_a_notice`
+(proved red without the fix, green with it). The running service was not restarted, so that live
+URL stays 404 until it is.
+
+Not verified here:
+
+- No headless-browser `-m live` run was made for this document.
+- No dashboard rebuild or service restart was performed, so the served bundle can predate source
+  edits.
+- `frontend/qubit-dist/plugins/fleet.json` and the built bundle are artifacts; the source tree is
+  authoritative after a rebuild.
 - Upstream's own test suite and its mod/Codex/Docker paths were not exercised.
