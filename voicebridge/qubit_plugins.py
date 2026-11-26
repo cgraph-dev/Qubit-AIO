@@ -742,7 +742,7 @@ def _kanban_http(exc: Exception) -> Tuple[int, Any]:
         status = 404
     elif "BAD_INPUT" in code or "BAD_STATE" in code:
         status = 400
-    elif "CONFIRM" in code:
+    elif "CONFIRM" in code or code == "KANBAN_DEPENDENCY_PENDING":
         status = 409
     elif "ESTOP" in code:
         status = 403
@@ -782,6 +782,9 @@ def _native_task_vendor(task: Dict[str, Any], now: float,
                         comment_count: int) -> Dict[str, Any]:
     """Synthesize the vendored task wire shape from a native task."""
     created = float(task.get("created_at") or now)
+    status = _NATIVE_TO_VENDOR.get(str(task.get("status")), "todo")
+    if status == "todo" and task.get("blocked_by"):
+        status = "blocked"
     return {
         "id": str(task.get("id")),
         "board": task.get("board", "main"),
@@ -791,7 +794,7 @@ def _native_task_vendor(task: Dict[str, Any], now: float,
         "latest_summary": task.get("completion_summary") or None,
         "assignee": task.get("assignee") or None,
         "tenant": None,
-        "status": _NATIVE_TO_VENDOR.get(str(task.get("status")), "todo"),
+        "status": status,
         "priority": _NATIVE_PRIORITY_INT.get(str(task.get("priority")), 1),
         "created_at": task.get("created_at"),
         "updated_at": task.get("updated_at"),
@@ -799,7 +802,7 @@ def _native_task_vendor(task: Dict[str, Any], now: float,
                 "started_age_seconds": None,
                 "time_to_complete_seconds": None},
         "comment_count": int(comment_count or 0),
-        "link_counts": {"parents": 0, "children": 0},
+        "link_counts": {side: len(task.get(side, [])) for side in ("parents", "children")},
         "progress": None,
         "workspace_kind": "scratch",
         "workspace_path": None,
@@ -834,15 +837,11 @@ def h_plugin_kanban_board(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         c: [] for c in _SUPPORTED_COLUMNS}
     if _qbool(q, "include_archived"):
         columns["archived"] = []
-    for status, tasks in (out.get("by_column") or {}).items():
-        vendor = _NATIVE_TO_VENDOR.get(status, "todo")
-        if vendor == "archived" and "archived" not in columns:
-            continue
-        if vendor not in columns:
-            vendor = "todo"
+    for tasks in (out.get("by_column") or {}).values():
         for t in tasks:
-            columns[vendor].append(_native_task_vendor(
-                t, now, counts.get(int(t.get("id")), 0)))
+            card = _native_task_vendor(t, now, counts.get(int(t.get("id")), 0))
+            if card["status"] in columns:
+                columns[card["status"]].append(card)
     assignees = sorted({t["assignee"] for col in columns.values()
                         for t in col if t.get("assignee")})
     return 200, {"ok": True,
@@ -875,7 +874,7 @@ def h_plugin_kanban_task(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  "comments": comments, "events": events,
                  "attachments": N.task_attachments(cfg, tid)["attachments"],
                  "attachments_supported": False,
-                 "links": {"parents": [], "children": []},
+                 "links": {side: [str(tid) for tid in task[side]] for side in ("parents", "children")},
                  "child_results": [], "runs": []}
 
 

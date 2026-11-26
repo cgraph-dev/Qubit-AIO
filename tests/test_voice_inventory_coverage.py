@@ -90,18 +90,16 @@ NEW_ALIAS_BINDINGS = {
     "qubit request changes on a kanban task 5": "guard_kanban_request_changes",
     "qubit kanban reopen review 5": "guard_kanban_reopen_review",
     "qubit reopen review of a kanban task 5": "guard_kanban_reopen_review",
-    "qubit kanban link task 5": "guard_kanban_link",
-    "qubit link a kanban task 5": "guard_kanban_link",
-    "qubit kanban unlink task 5": "guard_kanban_unlink",
-    "qubit unlink a kanban task 5": "guard_kanban_unlink",
+    "qubit kanban link task 5 and 6": "kanban_link",
+    "qubit link a kanban task 5": "kanban_link",
+    "qubit kanban unlink task 5 and 6": "kanban_unlink",
+    "qubit unlink a kanban task 5": "kanban_unlink",
 }
 
 GUARD_IDS = {
     "guard_kanban_request_review",
     "guard_kanban_request_changes",
     "guard_kanban_reopen_review",
-    "guard_kanban_link",
-    "guard_kanban_unlink",
 }
 
 
@@ -168,8 +166,6 @@ def test_kanban_guards_are_real_typed_refusals(tmp_path, monkeypatch):
     ctx = VC.make_ctx(cfg, session="w7", source="cli")
     for phrase in ("qubit kanban request review 5",
                    "qubit kanban request changes 5",
-                   "qubit kanban link task 5",
-                   "qubit kanban unlink task 5",
                    "qubit kanban reopen review 5"):
         res = VC.resolve(phrase)
         assert res.kind == VC.MATCH, (phrase, res.kind, res.speech)

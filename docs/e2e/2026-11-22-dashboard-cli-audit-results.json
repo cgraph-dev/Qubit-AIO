@@ -2401,5 +2401,14 @@
     "verification": "Sixty focused Kanban tests, syntax checks of both plugin copies, the production Vite build, and the browser rehearsal passed.",
     "deployment": "VoiceBridge restarted and port 8890 reported READY. Kanban loaded and its served plugin matched build fc83bf206e6e1e57fde2f2b42ab663fd1ea051bf byte for byte. The gateway process stayed active.",
     "remaining": "Parent dependencies, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
+  },
+  "current_kanban_parent_dependencies": {
+    "date": "2026-11-26",
+    "revision": "bb2e03293",
+    "environment": "Chromium, production Vite dashboard, disposable native Kanban database, and independent CLI",
+    "browser": "The child drawer added a parent using its shared confirmation. After reload the child appeared in Blocked. The independent CLI refused its claim with KANBAN_DEPENDENCY_PENDING, then completed the parent and read an empty blocked_by list. Reload put the child in Todo. The drawer removed its approved link and showed the cleared link after reload.",
+    "integrity": "The approval journal bound the exact parent and child for add and removal. SQLite confirmed the link was removed. Unit tests refused cycles, rolled back a cyclic snapshot, preserved links through a valid snapshot, and counted a parent archived after completion as satisfied. Voice fixtures confirmed a link using the shared registry.",
+    "verification": "89 native, dashboard and voice tests and 14 registry and alias checks passed. The production build and authenticated Chromium rehearsal passed.",
+    "remaining": "Goal mode and other advanced settings, broader Agents and Operations controls, physical device checks, and deployed task mutations remain open."
   }
 }

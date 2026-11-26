@@ -1192,7 +1192,15 @@ def build_parser() -> argparse.ArgumentParser:
     kb_create.add_argument("--priority", choices=["low", "normal", "high"],
                            default="normal")
     kb_create.add_argument("--board", default="main")
+    kb_create.add_argument("--parent", action="append", type=int,
+                           help="require this parent task to finish first (repeatable)")
     kb_create.add_argument("--confirm", action="store_true")
+    for action, description in (("link", "add a parent dependency"),
+                                ("unlink", "remove a parent dependency")):
+        dependency = kb_sub.add_parser(action, parents=[common], help=description)
+        dependency.add_argument("parent_id", type=int)
+        dependency.add_argument("child_id", type=int)
+        dependency.add_argument("--confirm", action="store_true")
     kb_list = kb_sub.add_parser("list", parents=[common], help="list tasks")
     kb_list.add_argument("--board", default="")
     kb_list.add_argument("--status", default="",
@@ -1323,7 +1331,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "heartbeat", "runs"):
         kb_sub.add_parser(_kb_del, parents=[common],
                           help="delegates to a Qubit-native path (typed refusal)")
-    for _kb_un in ("set-model", "diagnostics", "diag", "link", "unlink",
+    for _kb_un in ("set-model", "diagnostics", "diag",
                    "attach", "attachments", "attach-rm", "schedule",
                    "request-review", "request-changes", "reopen-review",
                    "promote", "tail", "assignees", "context", "specify",
@@ -7765,7 +7773,7 @@ def _cmd_kanban(cfg, args) -> int:
     cmd = getattr(args, "kanban_command", None) or "list"
     confirm = bool(getattr(args, "confirm", False))
     _MUTATING = {"boards-create", "create", "claim", "assign", "reassign",
-                 "reclaim", "comment", "complete", "edit", "block",
+                 "reclaim", "comment", "complete", "edit", "block", "link", "unlink",
                  "unblock", "archive", "import", "move", "widget-add",
                  "widget-move", "widget-remove", "layout-set",
                  "role-grant", "role-revoke", "snapshot-restore"}
@@ -7800,7 +7808,11 @@ def _cmd_kanban(cfg, args) -> int:
         elif cmd == "create":
             out = KB.create(cfg, args.title, board=args.board, body=args.body,
                             assignee=args.assignee, priority=args.priority,
+                            parents=getattr(args, "parent", None),
                             requested_by="cli:user", confirmed=confirm)
+        elif cmd in ("link", "unlink"):
+            out = KB.change_dependency(cfg, args.parent_id, args.child_id, remove=cmd == "unlink",
+                                       requested_by="cli:user", confirmed=confirm)
         elif cmd in ("list", "ls"):
             out = KB.list_tasks(cfg, board=args.board, status=args.status,
                                 limit=args.limit)

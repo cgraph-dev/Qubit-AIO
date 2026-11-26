@@ -365,8 +365,8 @@ def _board_plan(cfg: Any, q: Dict[str, Any]) -> Dict[str, Any]:
              if not assignee or str(t.get("assignee") or "") == assignee]
     columns: Dict[str, List[Dict[str, Any]]] = {c: [] for c in NATIVE_COLUMNS}
     for task in tasks:
-        columns.setdefault(str(task.get("status") or "open"), []).append(
-            _card(task))
+        card = _card(task)
+        columns.setdefault(card["status"], []).append(card)
     # The picker's value set: the full roster (profiles on disk included, so a
     # fresh profile is filterable before it owns a card), not just this page of
     # tasks. A complete board is one query; a paged one is not, and the page
@@ -390,12 +390,15 @@ def _card(task: Dict[str, Any]) -> Dict[str, Any]:
     coloured without the client doing date math on a missing field.
     """
     created = float(task.get("created_at") or 0)
+    status = str(task.get("status") or "open")
+    if status == "open" and task.get("blocked_by"):
+        status = "blocked"
     return {
         "id": str(task.get("id")),
         "board": task.get("board"),
         "title": task.get("title") or "",
         "body": task.get("body") or "",
-        "status": str(task.get("status") or "open"),
+        "status": status,
         "assignee": task.get("assignee") or None,
         "tenant": None,
         "priority": _priority_int(task.get("priority")),
@@ -406,7 +409,7 @@ def _card(task: Dict[str, Any]) -> Dict[str, Any]:
                 "started_age_seconds": None,
                 "time_to_complete_seconds": None},
         "comment_count": 0,
-        "link_counts": {"parents": 0, "children": 0},
+        "link_counts": {side: len(task.get(side, [])) for side in ("parents", "children")},
         "progress": None,
         "workspace_kind": "scratch",
         "workspace_path": None,
@@ -850,9 +853,10 @@ def dispatch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         out = N.list_tasks(cfg, board=board_slug, limit=N.LIST_MAX)
     except Exception as exc:  # noqa: BLE001
         return _http(exc)
-    queued = [t for t in out.get("tasks") or [] if t.get("status") == "open"]
+    queued = [t for t in out.get("tasks") or [] if t.get("status") == "open" and not t.get("blocked_by")]
     claimed = [t for t in out.get("tasks") or [] if t.get("status") == "claimed"]
-    blocked = [t for t in out.get("tasks") or [] if t.get("status") == "blocked"]
+    blocked = [t for t in out.get("tasks") or [] if t.get("status") == "blocked"
+               or (t.get("status") == "open" and t.get("blocked_by"))]
     limit = max(1, min(_qint(q, "max", 8) or 8, 64))
     spawnable = [t for t in queued if t.get("assignee")][:limit]
     report = {

@@ -1125,6 +1125,8 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
         "kanban.archive": "h_plugin_kanban_tasks_delete",
         "kanban.bulk": "h_plugin_kanban_tasks_bulk",
         "kanban.comment": "h_plugin_kanban_tasks_comment",
+        "kanban.link": "h_plugin_kanban_link",
+        "kanban.unlink": "h_plugin_kanban_unlink",
     }
     if action in kanban_handlers:
         def _run(cfg, payload):

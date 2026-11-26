@@ -13161,6 +13161,8 @@ _r("DELETE", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)",
 _r("POST", r"/api/plugins/kanban/tasks/bulk", "h_plugin_kanban_tasks_bulk")
 _r("POST", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/comments",
    "h_plugin_kanban_tasks_comment")
+_r("POST", r"/api/plugins/kanban/links", "h_plugin_kanban_link")
+_r("DELETE", r"/api/plugins/kanban/links", "h_plugin_kanban_unlink")
 # Installed user dashboard plugin ``obsidian-memory``: its GET reads proxy
 # straight to the vendored plugin router (non-gated, fork-declared), so only the
 # WRITE/explicit-action rows are declared here. PUT drives the plugin's own
@@ -20615,7 +20617,8 @@ def _kanban_apply_status(cfg: Any, kb: Any, tid: int, status: str, *, summary: s
     elif status == "archived":
         kb.archive_task(cfg, tid, requested_by="dashboard:user", confirmed=True)
     else:  # todo/triage/scheduled/ready -> the native "open" column
-        kb.reclaim(cfg, tid, requested_by="dashboard:user", confirmed=True)
+        kb.reclaim(cfg, tid, requested_by="dashboard:user", confirmed=True,
+                   require_parents=status == "ready")
 
 
 def h_plugin_kanban_boards_create(cfg: Any, q: Dict[str, str],
@@ -20663,7 +20666,8 @@ def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
     """POST /api/plugins/kanban/tasks -> create on the native task store."""
     from . import kanban as KB
 
-    unsupported = _kanban_unsupported_options(b, frozenset({"title", "body", "assignee", "priority", "board"}))
+    unsupported = _kanban_unsupported_options(
+        b, frozenset({"title", "body", "assignee", "priority", "board", "parents"}))
     if unsupported is not None:
         return unsupported
 
@@ -20681,7 +20685,8 @@ def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
     try:
         fields = {"title": KB._check_title(title), "board": board,
                   "body": KB._check_body(str(b.get("body") or "")),
-                  "assignee": str(b.get("assignee") or ""), "priority": priority}
+                  "assignee": str(b.get("assignee") or ""), "priority": priority,
+                  "parents": KB.parent_ids(b.get("parents"))}
         gate = _kanban_confirm(
             cfg, "kanban.create", f"creating kanban task {title!r} on {board!r}",
             q, b, fields)
@@ -20865,6 +20870,37 @@ def h_plugin_kanban_tasks_comment(cfg: Any, q: Dict[str, str],
         return _qubit_plugins._kanban_http(exc)
     _audit("kanban.comment", "dashboard:user", {"task_id": tid})
     return 200, {"ok": True}
+
+
+def _kanban_change_dependency(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              *, remove: bool) -> Tuple[int, Dict[str, Any]]:
+    from . import kanban as KB
+
+    action = "unlink" if remove else "link"
+    try:
+        parent = KB.dependency_id(b.get("parent_id", q.get("parent_id")))
+        child = KB.dependency_id(b.get("child_id", q.get("child_id")))
+        if parent == child:
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "a task cannot depend on itself")
+        gate = _kanban_confirm(cfg, f"kanban.{action}", f"{action} parent #{parent} and child #{child}",
+                               q, b, {"parent_id": parent, "child_id": child})
+        if gate is not None:
+            return gate
+        result = KB.change_dependency(cfg, parent, child, remove=remove,
+                                      requested_by="dashboard:user", confirmed=True)
+    except KB.KanbanError as exc:
+        return _qubit_plugins._kanban_http(exc)
+    return 200, {"ok": True, **result}
+
+
+def h_plugin_kanban_link(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _kanban_change_dependency(cfg, q, b, remove=False)
+
+
+def h_plugin_kanban_unlink(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _kanban_change_dependency(cfg, q, b, remove=True)
 
 
 # ---------------------------------------------------------------------------
@@ -21445,6 +21481,8 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_plugin_kanban_tasks_delete": h_plugin_kanban_tasks_delete,
     "h_plugin_kanban_tasks_bulk": h_plugin_kanban_tasks_bulk,
     "h_plugin_kanban_tasks_comment": h_plugin_kanban_tasks_comment,
+    "h_plugin_kanban_link": h_plugin_kanban_link,
+    "h_plugin_kanban_unlink": h_plugin_kanban_unlink,
     "h_plugin_obsidian_note_put": h_plugin_obsidian_note_put,
     "h_plugin_obsidian_note_get": h_plugin_obsidian_note_get,
     "h_plugin_obsidian_refresh": h_plugin_obsidian_refresh,
