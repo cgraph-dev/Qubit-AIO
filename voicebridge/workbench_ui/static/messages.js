@@ -1755,7 +1755,9 @@ async function send(){
     return;
   }
   if(S.session&&(S.session.read_only||S.session.is_read_only)){
-    if(typeof showToast==='function') showToast('Read-only imported sessions cannot be modified.',3000);
+    if(typeof showToast==='function') showToast(S.session.linked_profile
+      ? 'Open this profile in Qubit Chat to continue the conversation.'
+      : 'Read-only imported sessions cannot be modified.',3000);
     return;
   }
   let _slashDisplayTextOverride=null;
@@ -9525,7 +9527,7 @@ function _resumeSessionStreamAfterLiveChat(sid) {
 }
 
 function startSessionStream(sid) {
-  if (!sid) return;
+  if (!sid || (S.session && S.session.session_id===sid && S.session.linked_profile)) return;
   // Already on this session? No-op (loadSession is a no-op when re-selecting
   // the same session; this defends against external re-callers).
   if (_sessionStreamSessionId === sid && _sessionEventSource) return;

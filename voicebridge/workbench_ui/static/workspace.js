@@ -2,6 +2,23 @@ async function api(path,opts={}){
   // Strip leading slash so URL resolves relative to location.href (supports subpath mounts)
   const rel = path.startsWith('/') ? path.slice(1) : path;
   const url=new URL(rel,document.baseURI||location.href);
+  const method=String(opts.method||'GET').toUpperCase();
+  const viewedSession=typeof S!=='undefined'&&S.session;
+  if(method!=='GET'&&viewedSession?.linked_profile){
+    let body=opts.body;
+    if(typeof body==='string'){
+      try{body=JSON.parse(body);}catch(_e){body=null;}
+    }
+    const target=body?.session_id||body?.sid||body?.session
+      ||url.searchParams.get('session_id')||url.searchParams.get('sid');
+    if(target===viewedSession.session_id){
+      throw new Error('Open this profile in Qubit Chat to change the conversation.');
+    }
+  }
+  const linkedProfile=method==='GET'&&url.pathname.endsWith('/api/session')
+    &&typeof _namedSessionProfileFromLocation==='function'
+    ? _namedSessionProfileFromLocation(url.searchParams.get('session_id')) : '';
+  if(linkedProfile) url.searchParams.set('profile',linkedProfile);
   const timeoutMs=Object.prototype.hasOwnProperty.call(opts,'timeoutMs')?opts.timeoutMs:30000;
   const timeoutToast=opts.timeoutToast!==false;
   const redirect401=opts.redirect401!==false;
@@ -20,6 +37,11 @@ async function api(path,opts={}){
     let upstreamAbort=null;
     try{
       const fetchOpts={...opts};
+      if(linkedProfile&&window.__QUBIT_SESSION_TOKEN__){
+        const headers=new Headers(fetchOpts.headers);
+        headers.set('X-Qubit-Session-Token',window.__QUBIT_SESSION_TOKEN__);
+        fetchOpts.headers=headers;
+      }
       delete fetchOpts.timeoutMs;
       delete fetchOpts.timeoutToast;
       delete fetchOpts.redirect401;

@@ -4243,6 +4243,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
             sub = path[len(mount) + len("/api/"):].strip("/")
             query = {k: v[0] for k, v in parse_qs(
                 urlsplit(self.path).query, keep_blank_values=True).items()}
+            if sub == "session" and query.get("profile") and not self._qubit_token_ok():
+                self._json({"ok": False, "code": "AUTH_REQUIRED"}, 401)
+                return True
             body: Dict[str, Any] = {}
             if method != "GET":
                 try:

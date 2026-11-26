@@ -15572,7 +15572,7 @@ function syncTopbar(){
   }
   const _topbarMeta=$('topbarMeta');
   if(_topbarMeta){
-    let sourceLabel=(S.session&&(S.session.source_label||S.session.source_tag||S.session.raw_source))||'';
+    let sourceLabel=(S.session&&(S.session.linked_profile||S.session.source_label||S.session.source_tag||S.session.raw_source))||'';
     // Recovered sidecars stamp source_label 'WebUI' (api/session_recovery.py); don't badge a native session as its own source (#3338).
     if(/^webui$/i.test(sourceLabel)) sourceLabel='';
     const metaText=_topbarMessageMetaText();
@@ -15669,7 +15669,7 @@ function syncTopbar(){
   if(typeof syncToolsetsChip==='function') syncToolsetsChip();
   // Show Clear button only when session has messages
   const clearBtn=$('btnClearConv');
-  if(clearBtn) clearBtn.style.display=(S.messages&&S.messages.filter(msg=>msg.role!=='tool').length>0)?'':'none';
+  if(clearBtn) clearBtn.style.display=(!S.session.linked_profile&&S.messages&&S.messages.some(msg=>msg.role!=='tool'))?'':'none';
   if(typeof _syncQubitPanelSessionActions==='function') _syncQubitPanelSessionActions();
   if(typeof syncWorkspaceDisplays==='function') syncWorkspaceDisplays();
   if(typeof syncTerminalButton==='function') syncTerminalButton();
