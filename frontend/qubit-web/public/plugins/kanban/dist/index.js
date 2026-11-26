@@ -1124,15 +1124,14 @@
     // share the same dispatch path regardless of how confirmation was
     // collected (synchronous window.confirm in the original code, async
     // dialog via useKanbanDialogs now).
-    //   taskId  — required when count <= 1 (single-task PATCH endpoint)
-    //           — ignored when count >  1 (bulk endpoint uses selectedIds)
+    //   taskId  — a card ID for PATCH, or null for the current selection
     //   summary — completion summary string, or null/undefined to skip
-    const performMoveTask = useCallback(function (taskId, newStatus, count, summary) {
+    const performMoveTask = useCallback(function (taskId, newStatus, summary) {
       const patch = { status: newStatus };
       const finalPatch = summary
         ? Object.assign({}, patch, { result: summary, summary: summary })
         : patch;
-      if (count > 1) {
+      if (taskId === null) {
         // Bulk path: optimistic UI prepends all moved tasks to dest column.
         setBoardData(function (b) {
           if (!b) return b;
@@ -1250,12 +1249,12 @@
         .then(function (r1) {
           if (!r1.confirmed) return null;
           if (newStatus !== "done") {
-            performMoveTask(taskId, newStatus, 1, null);
+            performMoveTask(taskId, newStatus, null);
             return null;
           }
           return requestCompletionSummary(1).then(function (r2) {
             if (!r2.confirmed) return null;
-            performMoveTask(taskId, newStatus, 1, r2.summary || null);
+            performMoveTask(taskId, newStatus, r2.summary || null);
           });
         })
         .catch(function () { /* dialog cancelled */ });
@@ -1269,17 +1268,16 @@
     const moveSelected = useCallback(function (newStatus) {
       if (selectedIds.size === 0) return;
       const count = selectedIds.size;
-      const taskId = Array.from(selectedIds)[0]; // representative id for performMoveTask's single-task branch
       requestMoveConfirm(newStatus, count)
         .then(function (r1) {
           if (!r1.confirmed) return null;
           if (newStatus !== "done") {
-            performMoveTask(taskId, newStatus, count, null);
+            performMoveTask(null, newStatus, null);
             return null;
           }
           return requestCompletionSummary(count).then(function (r2) {
             if (!r2.confirmed) return null;
-            performMoveTask(taskId, newStatus, count, r2.summary || null);
+            performMoveTask(null, newStatus, r2.summary || null);
           });
         })
         .catch(function () { /* dialog cancelled */ });
@@ -1611,6 +1609,7 @@
          count: selectedIds.size,
          assignees: (boardData && boardData.assignees) || [],
          onApply: applyBulk,
+         onComplete: function () { moveSelected("done"); },
          onClear: clearSelected,
          onSelectAllVisible: selectAllVisible,
          onDelete: deleteSelected,
@@ -2841,10 +2840,7 @@
         title: "Unblock selected tasks (promote to Ready).",
       }, "Unblock"),
       h(SakugaButton, {
-        onClick: function () {
-          props.onApply({ status: "done" },
-            tx(t, "markDone", "Mark {n} task(s) as done?", { n: props.count }));
-        },
+        onClick: props.onComplete,
         size: "sm",
         title: "Mark selected tasks as done. Releases any claims and unblocks dependent children. You'll be asked for a completion summary.",
       }, tx(t, "complete", "Complete")),

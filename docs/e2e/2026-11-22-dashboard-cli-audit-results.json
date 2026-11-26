@@ -2391,5 +2391,14 @@
     "verification": "Sixty focused native, compatibility, and Workbench Kanban tests passed along with the production Vite build and authenticated browser and CLI rehearsals.",
     "deployment": "VoiceBridge restarted from local source a9d46a1a8. Port 8890 reported READY. The board returned 200 and an authenticated bulk request with conflicting note fields returned 400 without staging approval. The gateway stayed active.",
     "remaining": "Parent dependencies, completion-note entry from the bulk toolbar, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
+  },
+  "current_kanban_bulk_toolbar_completion": {
+    "date": "2026-11-26",
+    "revision": "f358b9121",
+    "environment": "Production Vite dashboard, Chromium, disposable native Kanban store and independent CLI",
+    "browser": "Complete in the bulk toolbar opened the existing note prompt. Dismissing the prompt staged nothing. Declining approval after entry consumed the exact staged ID and left the cards unchanged. Approving a retry completed two selected cards. A separate one-card selection also used bulk approval. Both successful operations cleared selection, and the one-card note remained visible after reload.",
+    "read_back": "The journal recorded the declined ID and two successful distinct IDs bound to the exact card selections. Independent CLI and SQLite checks agreed on the notes and found one completion event per card. The approval journal stored a form proof.",
+    "verification": "Sixty focused Kanban tests, syntax checks of both plugin copies, the production Vite build, and the browser rehearsal passed.",
+    "remaining": "Parent dependencies, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
   }
 }
