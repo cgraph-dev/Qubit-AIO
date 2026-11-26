@@ -187,9 +187,9 @@ def test_extra_board_options_refuse_without_staging_or_writing(tmp_path, monkeyp
     status, staged = QC.h_plugin_kanban_tasks_create(cfg, {}, defaults, {})
     assert status == 409 and staged["confirmation_id"]
     status, refused = QC.h_plugin_kanban_tasks_create(
-        cfg, {}, {**defaults, "goal_mode": True, "parents": ["2"]}, {})
+        cfg, {}, {**defaults, "workspace_kind": "worktree", "parents": ["2"]}, {})
     assert status == 400 and refused["code"] == "UNSUPPORTED_FIELD"
-    assert "goal_mode" in refused["detail"]
+    assert "workspace_kind" in refused["detail"]
     assert "confirmation_id" not in refused and not _tasks_in_board(cfg)
     status, created = QC.h_plugin_kanban_tasks_create(
         cfg, {}, {**defaults, "confirmation_id": staged["confirmation_id"]}, {})

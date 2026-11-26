@@ -1194,7 +1194,12 @@ def build_parser() -> argparse.ArgumentParser:
     kb_create.add_argument("--board", default="main")
     kb_create.add_argument("--parent", action="append", type=int,
                            help="require this parent task to finish first (repeatable)")
+    kb_create.add_argument("--goal", action="store_true", help="enable Goal mode")
+    kb_create.add_argument("--goal-max-turns", type=int, help="set the Goal mode turn budget")
     kb_create.add_argument("--confirm", action="store_true")
+    kb_goal = kb_sub.add_parser("run-goal", parents=[common], help="run a confirmed Goal mode task")
+    kb_goal.add_argument("task_id", type=int)
+    kb_goal.add_argument("--confirm", action="store_true")
     for action, description in (("link", "add a parent dependency"),
                                 ("unlink", "remove a parent dependency")):
         dependency = kb_sub.add_parser(action, parents=[common], help=description)
@@ -4158,6 +4163,9 @@ def _resolve_task_text(cfg, args):
         if cur.get("state") != "OK" or not cur.get("task"):
             return "", cur, 2
         _t = cur["task"]
+        if _t.get("goal_mode"):
+            return "", {"state": "FAILED", "code": _KB.GOAL_RUN_REQUIRED_CODE,
+                        "detail": f"Use qubit kanban run-goal {_t['id']} for this card."}, 2
         text = (str(_t.get("title", "")) + "\n" +
                 str(_t.get("body", ""))).strip()
         return text, None, 0
@@ -7772,7 +7780,7 @@ def _cmd_kanban(cfg, args) -> int:
     from . import kanban as KB
     cmd = getattr(args, "kanban_command", None) or "list"
     confirm = bool(getattr(args, "confirm", False))
-    _MUTATING = {"boards-create", "create", "claim", "assign", "reassign",
+    _MUTATING = {"boards-create", "create", "claim", "assign", "reassign", "run-goal",
                  "reclaim", "comment", "complete", "edit", "block", "link", "unlink",
                  "unblock", "archive", "import", "move", "widget-add",
                  "widget-move", "widget-remove", "layout-set",
@@ -7809,7 +7817,12 @@ def _cmd_kanban(cfg, args) -> int:
             out = KB.create(cfg, args.title, board=args.board, body=args.body,
                             assignee=args.assignee, priority=args.priority,
                             parents=getattr(args, "parent", None),
+                            goal_mode=getattr(args, "goal", False),
+                            goal_max_turns=getattr(args, "goal_max_turns", None),
                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "run-goal":
+            from . import kanban_goal
+            out = kanban_goal.run(cfg, args.task_id, requested_by="cli:user", confirmed=confirm)
         elif cmd in ("link", "unlink"):
             out = KB.change_dependency(cfg, args.parent_id, args.child_id, remove=cmd == "unlink",
                                        requested_by="cli:user", confirmed=confirm)
