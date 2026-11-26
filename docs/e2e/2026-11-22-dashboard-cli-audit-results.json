@@ -2529,5 +2529,15 @@
     "restart_and_adoption": "While the isolated gateway was stopped, the original saved transcript remained readable and the listener created a named GUI draft. After restart the gateway admitted that exact draft ID, streamed a real reply, and saved its transcript. Replay did not add another message. Independent HTTP and SQLite reads also confirmed the original transcript across restart and isolation from the disposable default store.",
     "workbench_defect": "Both Workbench session endpoints returned WB_SESSION_NOT_FOUND for the named gateway session, even with profile=audit-chat in the query. Chromium at 390 pixels showed Failed to load session. Workbench profile/switch returned HTTP 400 MALFORMED. Its adapter sent the name only in the query while the canonical profile switch accepted it from the body. The authenticated Qubit Chat transcript route could retrieve the same ID in the named profile.",
     "remaining": "Request-scoped Workbench profile and transcript wiring, approved deployed inference, actual PTY resize and reattach, long silence keep-alives, and the remaining named gateway checklist cases."
+  },
+  "current_workbench_named_session_links": {
+    "date": "2026-11-26",
+    "revision": "48e174f85825dac0f741437aa0d446ef6b95095b",
+    "environment": "Chromium and authenticated disposable dashboard, real named transcript from the Ollama audit, intentionally duplicated session ID in the default store, and deployed read-only checks at port 8890",
+    "browser": "Both /qubit-workbench and /wb opened the explicit profile and session link at 390 and 1440 CSS pixels and restored the same transcript after reload without horizontal overflow. The profile remained in the URL. The browser issued no sticky profile switch or session-clear request.",
+    "isolation": "Authenticated route reads returned the named transcript for the explicit profile and the different default transcript for an unscoped request with the same ID. Anonymous scoped reads returned 401. An authenticated unknown profile returned 404 without falling back to the default store. SQLite confirmed that both saved transcripts survived and the registry still reported default active.",
+    "verification": "Two hundred and twenty-three focused tests passed. Six modified Workbench scripts passed Node syntax checks. Chromium verified read-only state and the local refusal of a clear request for the loaded named session.",
+    "deployment": "VoiceBridge restarted from local merge df0010bfb. Both mounts served the updated session script and returned HTTP 200. Both deployed aliases rejected an anonymous scoped probe and an authenticated unknown profile. The health endpoint reported READY. The gateway PID stayed the same.",
+    "remaining": "The explicit named links cover read-only history. The separate Workbench profile chooser switch, named Workbench sending, deployed inference with an approved profile, and PTY lifecycle remain open."
   }
 }
