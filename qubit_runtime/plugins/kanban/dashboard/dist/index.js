@@ -5244,7 +5244,7 @@
             type: "button",
             size: "sm",
             onClick: props.onRunGoal,
-            "aria-disabled": props.goalBusy || task.goal_running || !!task.blocked_by?.length,
+            "aria-disabled": props.goalBusy || task.goal_running || task.blocked_by?.length ? "true" : undefined,
             disabled: props.goalBusy || task.goal_running || !!task.blocked_by?.length,
           }, props.goalBusy || task.goal_running
             ? tx(t, "goalRunning", "Goal in progress…")
