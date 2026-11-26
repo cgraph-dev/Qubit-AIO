@@ -2445,6 +2445,7 @@
     "provider": "Provider logs recorded real chat-completions requests for the worker and the separate goal-judge lane. Both used the same local model. The initial warm-up made the first worker request take about 67 seconds.",
     "result": "The first card completed and saved 42. Its response also claimed terminal verification, which the persisted transcript did not substantiate. Two subsequent cards did not supply the answer. They saved 68 for 17 times 4 and 84 for 14 times 6. Independent transcript and board reads verified one spent turn and one completion event per card.",
     "cli": "A real run exposed worker progress on stdout before the receipt. The fix redirects the worker's progress to stderr. A fresh real run produced JSON on stdout and a separate CLI read returned the same saved evidence. Fifty-two focused tests passed.",
+    "interrupt": "The worker returned on the impossible arithmetic card, but the local judge was still generating when the 90-second audit timeout sent SIGINT. The CLI emitted a blocked receipt. Independent SQLite read-back found one spent turn, a cleared ownership marker, and no completion event. This run measured interruption, while the judge verdict for the impossible goal remained open.",
     "remaining": "Deployed Goal mode mutations, verification of tool-backed evidence, and the combined dashboard checklist row remain open."
   }
 }
