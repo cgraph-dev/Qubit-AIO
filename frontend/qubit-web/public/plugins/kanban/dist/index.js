@@ -124,6 +124,7 @@
         title: title,
         role: props.role,
         "aria-label": props["aria-label"],
+        "aria-disabled": props["aria-disabled"],
         "aria-pressed": props["aria-pressed"],
         "aria-expanded": props["aria-expanded"],
         "aria-haspopup": props["aria-haspopup"],
@@ -133,12 +134,13 @@
     return h("sakuga-button", {
       variant: (variant === "secondary" || variant === "outline") ? "secondary" : undefined,
       type: type === "submit" ? "submit" : (type === "reset" ? "reset" : undefined),
-      disabled: disabled ? "" : undefined,
+      disabled: disabled || undefined,
       className: className,
       title: title,
       onClick: onClick,
       role: props.role || "button",
       "aria-label": props["aria-label"],
+      "aria-disabled": props["aria-disabled"],
       "aria-pressed": props["aria-pressed"],
       "aria-expanded": props["aria-expanded"],
       "aria-haspopup": props["aria-haspopup"],
@@ -1640,6 +1642,7 @@
           allTasks: boardData.columns.reduce(function (acc, c) { return acc.concat(c.tasks); }, []),
         }),
         selectedTaskId ? h(TaskDrawer, {
+          key: selectedTaskId,
           taskId: selectedTaskId,
           boardSlug: board,
           onClose: function () { setSelectedTaskId(null); },
@@ -3723,6 +3726,9 @@
     // surface (``err``) is hidden behind the loaded ``data`` and the
     // Ready/Block/Complete buttons feel like no-ops.  See #26744.
     const [patchErr, setPatchErr] = useState(null);
+    const [goalBusy, setGoalBusy] = useState(false);
+    const [goalFeedback, setGoalFeedback] = useState(null);
+    const goalBusyRef = useRef(false);
     const [newComment, setNewComment] = useState("");
     const [uploadBusy, setUploadBusy] = useState(false);
     const [uploadErr, setUploadErr] = useState(null);
@@ -3861,6 +3867,56 @@
           body: JSON.stringify(finalPatch),
         }).then(function () { load(); props.onRefresh(); })
           .catch(function (e) { setPatchErr(parseApiErrorMessage(e)); });
+      }
+    };
+
+    const doRunGoal = async function () {
+      const task = data.task;
+      if (goalBusyRef.current || !props.requestDialog || !task.goal_run_action ||
+          task.goal_running || task.blocked_by?.length || ["done", "archived"].includes(task.status)) return;
+      goalBusyRef.current = true;
+      setGoalBusy(true);
+      setGoalFeedback(null);
+      const post = (action, payload) => SDK.fetchJSON("/api/ops/" + action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      try {
+        let approval;
+        try {
+          await post("run", { id: data.task.goal_run_action, args: { task_id: data.task.id } });
+          throw new Error(tx(t, "goalApprovalMissing", "Qubit did not return a goal approval."));
+        } catch (error) {
+          if (error?.name !== "ConfirmRequiredError" || !error.confirmationId) throw error;
+          approval = error;
+        }
+        const choice = await props.requestDialog({
+          kind: "confirm",
+          title: tx(t, "runGoal", "Run goal"),
+          description: approval.detail,
+          confirmLabel: tx(t, "runGoal", "Run goal"),
+        });
+        const result = await post(choice.confirmed ? "confirm" : "cancel", {
+          confirmation_id: approval.confirmationId,
+        });
+        if (result.state !== "executed") {
+          throw new Error(result.detail || tx(t, "goalApprovalFailed", "Could not settle the goal approval."));
+        }
+        setGoalFeedback({
+          detail: choice.confirmed ? result.detail : tx(t, "goalCancelled", "Goal run cancelled."),
+        });
+        if (choice.confirmed) {
+          await load();
+          props.onRefresh();
+        }
+      } catch (error) {
+        setGoalFeedback({ error: true, detail: parseApiErrorMessage(error) });
+        await load();
+        props.onRefresh();
+      } finally {
+        goalBusyRef.current = false;
+        setGoalBusy(false);
       }
     };
 
@@ -4016,6 +4072,8 @@
           assignees: props.assignees || [],
           boardSlug: boardSlug,
           onPatch: doPatch,
+          onRunGoal: props.requestDialog ? doRunGoal : undefined,
+          goalBusy, goalFeedback,
           onSpecify: doSpecify,
           onDecompose: doDecompose,
           onAddParent: addLink,
@@ -4255,6 +4313,9 @@
       h(StatusActions, {
         task: t,
         onPatch: props.onPatch,
+        onRunGoal: props.onRunGoal,
+        goalBusy: props.goalBusy,
+        goalFeedback: props.goalFeedback,
         onSpecify: props.onSpecify,
         onDecompose: props.onDecompose,
       }),
@@ -5047,6 +5108,19 @@
 
     return h("div", null,
       h("div", { className: "qubit-kanban-actions" },
+        props.onRunGoal && task.goal_run_action && !["done", "archived"].includes(task.status)
+          ? h(SakugaButton, {
+            type: "button",
+            size: "sm",
+            onClick: props.onRunGoal,
+            "aria-disabled": props.goalBusy || task.goal_running || task.blocked_by?.length ? "true" : undefined,
+            disabled: props.goalBusy || task.goal_running || !!task.blocked_by?.length,
+          }, props.goalBusy || task.goal_running
+            ? tx(t, "goalRunning", "Goal in progress…")
+            : task.blocked_by?.length
+              ? tx(t, "goalWaiting", "Waiting for parent tasks")
+              : tx(t, "runGoal", "Run goal"))
+          : null,
         specifyButton,
         decomposeButton,
         b("→ triage",  { status: "triage" },   task.status !== "triage"),
@@ -5065,6 +5139,10 @@
         b(tx(t, "archive", "Archive"),   { status: "archived" }, task.status !== "archived",
           getDestructiveConfirm(t, "archived")),
       ),
+      props.goalFeedback?.detail ? h("div", {
+        role: props.goalFeedback.error ? "alert" : "status",
+        className: props.goalFeedback.error ? "qubit-kanban-msg-err" : "qubit-kanban-msg-ok",
+      }, props.goalFeedback.detail) : null,
       specifyMsg ? h("div", {
         className: specifyMsg.ok
           ? "qubit-kanban-msg-ok"
