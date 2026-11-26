@@ -78,7 +78,7 @@ The gate removes `data-qubit-manga` — and therefore every rule in `manga.css` 
 
 - `/qubit-workbench` (server-served document; untouched)
 - `/qubit-hud`
-- `/qubit-office`, `/qubit-office2`, `/qubit-office3` and every descendant path
+- `/qubit-office` and every descendant path
 
 Verified with the skin preference ON: the marker is absent, the sidebar returns to the active
 theme, and no Manga control is rendered on those routes. The Electron desktop app, Workbench,
@@ -191,7 +191,7 @@ Statuses:
 | | `/open-viking/retrieval`, `/uploads`, `/agent-hub`, `/resources`, `/context-store` | **Smoke** |
 | Media / misc | `/qubit-tv`, `/guide` | **Visual** |
 | | `/sakuga-gallery`, `/achievements`, `/qubit-boards`, `/qubit-runtime`, `/qubit-gateway`, `/qubit-approvals` | **Smoke** |
-| Excluded | `/qubit-workbench`, `/qubit-hud`, `/qubit-office`, `/qubit-office2`, `/qubit-office3` | **Excluded** |
+| Excluded | `/qubit-workbench`, `/qubit-hud`, `/qubit-office` | **Excluded** |
 
 ### Known limitations
 
