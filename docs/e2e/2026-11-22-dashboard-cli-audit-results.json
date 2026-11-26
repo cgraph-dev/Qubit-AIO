@@ -2399,6 +2399,7 @@
     "browser": "Complete in the bulk toolbar opened the existing note prompt. Dismissing the prompt staged nothing. Declining approval after entry consumed the exact staged ID and left the cards unchanged. Approving a retry completed two selected cards. A separate one-card selection also used bulk approval. Both successful operations cleared selection, and the one-card note remained visible after reload.",
     "read_back": "The journal recorded the declined ID and two successful distinct IDs bound to the exact card selections. Independent CLI and SQLite checks agreed on the notes and found one completion event per card. The approval journal stored a form proof.",
     "verification": "Sixty focused Kanban tests, syntax checks of both plugin copies, the production Vite build, and the browser rehearsal passed.",
+    "deployment": "VoiceBridge restarted and port 8890 reported READY. Kanban loaded and its served plugin matched build fc83bf206e6e1e57fde2f2b42ab663fd1ea051bf byte for byte. The gateway process stayed active.",
     "remaining": "Parent dependencies, Goal mode, other advanced settings, physical device checks, and deployed mutation read-back remain open."
   }
 }
