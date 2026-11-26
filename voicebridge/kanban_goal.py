@@ -152,6 +152,8 @@ def _run_owned(cfg, task_id, requested_by, expected):
             prompt = "Continue the same confirmed task. Report the remaining work and the evidence."
     except KB.KanbanError as exc:
         detail = exc.detail
+    except KeyboardInterrupt:
+        detail = "Goal run interrupted."
     except Exception as exc:
         detail = f"Goal run stopped: {type(exc).__name__}"
     finally:

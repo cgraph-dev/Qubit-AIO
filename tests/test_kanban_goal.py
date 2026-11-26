@@ -108,6 +108,26 @@ def test_reclaimed_goal_cannot_settle_or_overlap(tmp_path, monkeypatch):
     assert task["completion_summary"] == "" and len(calls) == 1
 
 
+@pytest.mark.parametrize("interrupt", [False, True])
+def test_stopping_a_goal_preserves_the_spent_turn(tmp_path, monkeypatch, interrupt):
+    cfg = Cfg(tmp_path)
+    task_id = _goal(cfg)
+    stopped = False
+
+    def stop_during_turn():
+        nonlocal stopped
+        stopped = True
+        if interrupt:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(KB, "estop_engaged", lambda _cfg: stopped)
+    calls = _worker_fixture(monkeypatch, ["Reply after stop"], [], stop_during_turn)
+    out = KG.run(cfg, task_id, requested_by="tester", confirmed=True)
+    assert out["goal_status"] == "blocked" and out["task"]["goal_turns_used"] == len(calls) == 1
+    assert not out["task"]["goal_running"]
+    assert out["detail"] == ("Goal run interrupted." if interrupt else "Emergency stop is latched.")
+
+
 def test_voice_approval_binds_goal_text_and_turn_budget(tmp_path, monkeypatch):
     from voicebridge import voice_commands as VC
 
