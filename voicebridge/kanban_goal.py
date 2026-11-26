@@ -123,6 +123,7 @@ def _run_owned(cfg, task_id, requested_by, expected):
     session = f"kanban-goal-{task_id}-{token}"
     prompt = f"Work on this confirmed Kanban task. Report what you did and the evidence.\n\n{goal}"
     detail = "Goal turn budget exhausted."
+    tool_evidence_pending = False
     orch = None
     try:
         orch = VoiceOrchestrator(cfg, no_hotkey=True, headless=True)
@@ -132,7 +133,8 @@ def _run_owned(cfg, task_id, requested_by, expected):
                 break
             if not _reserve_turn(cfg, task_id, token):
                 break
-            result = orch.run_worker_task(prompt, session=session, timeout_s=WORKER_TURN_TIMEOUT_S)
+            result = orch.run_worker_task(
+                prompt, session=session, timeout_s=WORKER_TURN_TIMEOUT_S, capture_tool_evidence=True)
             if not _still_current(cfg, task_id, token):
                 break
             if KB.estop_engaged(cfg):
@@ -144,6 +146,17 @@ def _run_owned(cfg, task_id, requested_by, expected):
             if result.get("state") != "OK":
                 detail = "Worker stopped: " + str(result.get("code", "WORKER_ERROR"))
                 break
+            tool_execution = (result.get("receipt") or {}).get("tool_execution") or {}
+            if tool_execution.get("succeeded") is True:
+                tool_evidence_pending = False
+            elif tool_execution.get("attempted") is True:
+                tool_evidence_pending = True
+            if tool_evidence_pending:
+                detail = "The worker attempted tools without a successful result."
+                prompt = ("Continue the same confirmed task. The runtime recorded no successful "
+                          "tool result. Retry only an authorized operation that can support the "
+                          "original goal, or report the blocker.")
+                continue
             reply = str(result.get("reply", ""))
             verdict, reason, malformed, _, offline = judge_goal(goal, reply)
             if offline:

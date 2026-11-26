@@ -39,12 +39,14 @@ def _worker_fixture(monkeypatch, replies, verdicts, on_turn=None):
         def __init__(self, _cfg, *, no_hotkey, headless):
             assert headless and no_hotkey
 
-        def run_worker_task(self, text, *, session, timeout_s):
+        def run_worker_task(self, text, *, session, timeout_s, capture_tool_evidence):
+            assert capture_tool_evidence
             assert timeout_s == KG.WORKER_TURN_TIMEOUT_S
             calls.append((text, session))
             if on_turn:
                 on_turn()
-            return {"state": "OK", "reply": next(responses)}
+            response = next(responses)
+            return response if isinstance(response, dict) else {"state": "OK", "reply": response}
 
         def stop(self):
             pass
@@ -95,6 +97,50 @@ def test_goal_cap_blocks_before_an_extra_turn(tmp_path, monkeypatch):
     assert not out["task"]["goal_running"]
 
 
+@pytest.mark.parametrize("recovered", [False, True])
+def test_goal_requires_a_successful_tool_outcome_after_failed_actions(tmp_path, monkeypatch, recovered):
+    cfg = Cfg(tmp_path)
+    task_id = _goal(cfg)
+
+    def attempt(succeeded):
+        return {"state": "OK", "reply": "I wrote and verified the deliverable.",
+                "receipt": {"tool_execution": {"attempted": True, "succeeded": succeeded}}}
+
+    final = attempt(True) if recovered else "The deliverable exists."
+    verdicts = [("done", "Accepted", False, None, False)] if recovered else []
+    calls = _worker_fixture(monkeypatch, [attempt(False), final], verdicts)
+    out = KG.run(cfg, task_id, requested_by="tester", confirmed=True)
+    assert out["goal_status"] == ("done" if recovered else "blocked")
+    assert out["task"]["goal_turns_used"] == len(calls) == 2
+    assert not out["task"]["goal_running"]
+    assert bool(out["task"]["completion_summary"]) is recovered
+    if not recovered:
+        assert out["detail"] == "The worker attempted tools without a successful result."
+    assert "recorded no successful tool result" in calls[1][0]
+
+
+def test_tool_execution_evidence_comes_from_current_runtime_events():
+    from voicebridge.agent import _ToolExecutionEvidence
+
+    messages = [
+        {"role": "tool", "name": "terminal"},
+        {"role": "user", "content": "New goal"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "tool_search"}}]},
+    ]
+    result = {"messages": messages, "current_turn_user_idx": 1}
+    evidence = _ToolExecutionEvidence(None)
+    evidence("tool.completed", "tool_search", is_error=False, result="Candidates")
+    assert evidence.receipt(result) == {"attempted": False, "succeeded": False}
+
+    messages.append({"role": "tool", "name": "write_file", "content": "Invalid arguments"})
+    assert evidence.receipt(result) == {"attempted": True, "succeeded": False}
+    evidence("tool.completed", "terminal", is_error=True, result={"error": "Could not run"})
+    evidence("tool.completed", "read_file", is_error=False, result={"guardrail_refusal": True})
+    assert evidence.receipt(result) == {"attempted": True, "succeeded": False}
+    evidence("tool.completed", "write_file", is_error=False, result={"bytes_written": 5})
+    assert evidence.receipt(result) == {"attempted": True, "succeeded": True}
+
+
 def test_goal_worker_deadline_interrupts_and_releases_claim(tmp_path, monkeypatch):
     from qubit_cli import goals
     from voicebridge import agent, orchestrator
@@ -120,7 +166,8 @@ def test_goal_worker_deadline_interrupts_and_releases_claim(tmp_path, monkeypatc
         def __init__(self, _cfg, *, no_hotkey, headless):
             assert no_hotkey and headless
 
-        def run_worker_task(self, text, *, session, timeout_s):
+        def run_worker_task(self, text, *, session, timeout_s, capture_tool_evidence):
+            assert capture_tool_evidence
             result = agent._run_vendored_turn(Runtime(), text, monotonic() + timeout_s)
             assert result is None, "a reply after expiry must not reach the judge"
             return agent._worker_timeout(session)
