@@ -124,6 +124,7 @@ def _run_owned(cfg, task_id, requested_by, expected):
     prompt = f"Work on this confirmed Kanban task. Report what you did and the evidence.\n\n{goal}"
     detail = "Goal turn budget exhausted."
     tool_evidence_pending = False
+    pending_file_targets: set[str] = set()
     orch = None
     try:
         orch = VoiceOrchestrator(cfg, no_hotkey=True, headless=True)
@@ -151,6 +152,15 @@ def _run_owned(cfg, task_id, requested_by, expected):
                 tool_evidence_pending = False
             elif tool_execution.get("attempted") is True:
                 tool_evidence_pending = True
+            file_mutations = tool_execution.get("file_mutations") or {}
+            pending_file_targets.difference_update(file_mutations.get("landed", ()))
+            pending_file_targets.update(file_mutations.get("failed", ()))
+            if pending_file_targets:
+                detail = "A file edit failed without a successful retry of the same target."
+                prompt = ("Continue the same confirmed task. A file operation failed and "
+                          "was not recovered. Retry the authorized change on that target "
+                          "or report the blocker. Do not claim it succeeded.")
+                continue
             if tool_evidence_pending:
                 detail = "The worker attempted tools without a successful result."
                 prompt = ("Continue the same confirmed task. The runtime recorded no successful "

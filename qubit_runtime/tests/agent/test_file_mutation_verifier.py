@@ -98,6 +98,7 @@ def _bare_agent() -> AIAgent:
     agent = object.__new__(AIAgent)
     agent._turn_failed_file_mutations = {}
     agent._turn_file_mutation_paths = set()
+    agent._turn_file_mutation_identities = set()
     return agent
 
 class TestRecordFileMutationResult:
@@ -135,6 +136,29 @@ class TestRecordFileMutationResult:
         )
         assert agent._turn_failed_file_mutations == {}
         assert agent._turn_file_mutation_paths == {"/tmp/a.md"}
+
+    def test_receipt_uses_the_same_identity_for_failed_edit_and_landed_retry(self, tmp_path):
+        target = tmp_path / "notes.md"
+        other = tmp_path / "different.md"
+        agent = _bare_agent()
+        agent._record_file_mutation_result(
+            "patch", {"path": str(target)}, '{"error":"not found"}', is_error=True,
+        )
+        agent._record_file_mutation_result(
+            "write_file", {"path": str(other)}, '{"bytes_written": 8}', is_error=False,
+        )
+        first = agent.file_mutation_evidence()
+        assert len(first["failed"]) == len(first["landed"]) == 1
+        assert first["failed"] != first["landed"]
+        assert str(target) not in str(first)
+
+        retry = _bare_agent()
+        retry._record_file_mutation_result(
+            "write_file", {"path": str(target)},
+            json.dumps({"bytes_written": 8, "resolved_path": str(target)}),
+            is_error=False,
+        )
+        assert retry.file_mutation_evidence() == {"failed": [], "landed": first["failed"]}
 
     def test_landed_paths_prefer_resolved_tool_result(self):
         paths = _extract_landed_file_mutation_paths(

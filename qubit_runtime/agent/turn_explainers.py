@@ -136,6 +136,9 @@ class TurnExplainersMixin:
             changed = getattr(self, "_turn_file_mutation_paths", None)
             if changed is not None:
                 changed.update(landed_paths)
+            identities = getattr(self, "_turn_file_mutation_identities", None)
+            if identities is not None:
+                identities.update(_file_mutation_identity(p, task_id) for p in landed_paths)
             # Feed the checkpoint agent-write ledger so /rollback's safe mode can tell
             # Qubit-authored content from later user hand-edits.
             mgr = getattr(self, "_checkpoint_mgr", None)
@@ -162,6 +165,19 @@ class TurnExplainersMixin:
             for path, info in list(state.items()):
                 if info.get("identity", _file_mutation_identity(path, task_id)) in cleared:
                     state.pop(path, None)
+
+    def file_mutation_evidence(self) -> dict[str, list[str]]:
+        """Return opaque target identities for landed and unresolved file tool outcomes."""
+        from hashlib import sha256
+
+        failed = getattr(self, "_turn_failed_file_mutations", None) or {}
+        landed = getattr(self, "_turn_file_mutation_identities", None) or set()
+
+        def target_ids(paths):
+            return sorted({sha256(os.fsencode(path)).hexdigest() for path in paths})
+
+        return {"failed": target_ids(info["identity"] for info in failed.values()),
+                "landed": target_ids(landed)}
 
     @staticmethod
     def _file_mutations_still_failed(failed: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
