@@ -2507,5 +2507,16 @@
     "verification": "Sixty-seven focused VoiceBridge tests and twenty-four native file mutation verifier tests passed in separate processes. Chromium and independent provider, SQLite and disk checks passed.",
     "deployment": "VoiceBridge restarted from local merge 97fe799b8. Kanban at port 8890 returned HTTP 200 and health reported READY. The gateway process ID was unchanged.",
     "remaining": "Exact requested content and original goal satisfaction, claims without observed attempts, other effect types, deployed task mutations, and the combined dashboard checklist row remain open."
+  },
+  "current_kanban_goal_exact_content": {
+    "date": "2026-11-26",
+    "revision": "b14dbe20d68f51476938d05c80b21e8bafb6ed62",
+    "environment": "Authenticated Chromium with the deployed Kanban bundle on a disposable board, real local write_file tool, scripted worker and judge provider, and independent disk and SQLite reads",
+    "syntax": "Goal card bodies can declare Verify: file-sha256 <64 hex characters> <absolute local path>, one target per line. Verification is opt-in and bounded to eight 8 MiB regular local files. It compares bytes including line endings. An absolute canonical path is required. The runner checks normal file read restrictions and requires prior successful file-tool evidence for the same host target in this run.",
+    "wrong_bytes": "The file tool successfully wrote different bytes at the approved path. Chromium received a SHA-256 mismatch and showed Blocked after reload. No judge request or completion event occurred.",
+    "matching_bytes": "The file tool wrote the expected bytes. The provider received one judge request. Chromium saw Done with the saved summary after reload. Separate disk and SQLite reads confirmed the matching bytes, one turn, one completion event and a released claim.",
+    "verification": "Seventy-two focused VoiceBridge tests and twenty-four native file mutation tests passed. Focused regressions cover pre-existing matches without runtime evidence, malformed criteria before claim, wrong bytes, and a file change between the initial check and judge acceptance.",
+    "deployment": "VoiceBridge restarted from local merge a3c1c80fc. Port 8890 returned HTTP 200 for Kanban and READY for health. The gateway process ID stayed the same. The exact-content writes were exercised on the disposable board.",
+    "remaining": "Natural-language and non-file effects, remote file verification, deployed task mutations, and the combined dashboard checklist row remain open."
   }
 }

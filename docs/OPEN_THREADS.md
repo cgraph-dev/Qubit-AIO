@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Kanban Goal exact-content verification (2026-11-26).** Explicit SHA-256 criteria now verify declared local file contents against runtime evidence. The browser rehearsal covered accepted and rejected bytes, and the focused tests covered a file change during judging. Continue natural-language effect verification, non-file and remote effects, and deployed task mutations. [Goal exact-content audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Kanban Goal file evidence (2026-11-26).** File tools now tie failed edit recovery to the resolved target. Browser and disk evidence covers an unrelated successful retry and a successful retry on the requested file. Exact requested contents, tool claims with no attempted effect, other kinds of effects, and deployed task mutations still need verification. [Goal file evidence audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Kanban Goal tool evidence (2026-11-26).** The known false report is blocked when the runtime sees failed attempts without a successful action. A tool outcome alone does not verify the intended effect or its relevance to the goal. False claims without tool attempts, unrelated successes, and deployed task mutations remain open. System Ollama is active again. [Goal tool evidence audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
