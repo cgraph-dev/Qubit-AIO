@@ -8,6 +8,8 @@ from uuid import uuid4
 
 from . import kanban as KB
 
+WORKER_TURN_TIMEOUT_S = 120.0
+
 
 @contextmanager
 def _write(cfg):
@@ -130,14 +132,17 @@ def _run_owned(cfg, task_id, requested_by, expected):
                 break
             if not _reserve_turn(cfg, task_id, token):
                 break
-            result = orch.run_worker_task(prompt, session=session)
+            result = orch.run_worker_task(prompt, session=session, timeout_s=WORKER_TURN_TIMEOUT_S)
             if not _still_current(cfg, task_id, token):
-                break
-            if result.get("state") != "OK":
-                detail = "Worker stopped: " + str(result.get("code", "WORKER_ERROR"))
                 break
             if KB.estop_engaged(cfg):
                 detail = "Emergency stop is latched."
+                break
+            if result.get("code") == "WORKER_TIMEOUT":
+                detail = f"Worker turn exceeded its {WORKER_TURN_TIMEOUT_S:g}-second time limit."
+                break
+            if result.get("state") != "OK":
+                detail = "Worker stopped: " + str(result.get("code", "WORKER_ERROR"))
                 break
             reply = str(result.get("reply", ""))
             verdict, reason, malformed, _, offline = judge_goal(goal, reply)

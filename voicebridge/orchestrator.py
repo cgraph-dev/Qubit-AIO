@@ -2643,7 +2643,7 @@ class VoiceOrchestrator:
         return
 
     def run_worker_task(self, task_text: str, model: Optional[str] = None,
-                        *, session: str = "") -> Dict[str, Any]:
+                        *, session: str = "", timeout_s: Optional[float] = None) -> Dict[str, Any]:
         """Headless one-shot dispatch through the SAME worker the CLI ``task``
         path runs (``_dispatch_coding``/``_launch_task`` -> ``agent.run_session``
         behind the shared :class:`~voicebridge.dispatch_guard.WorkerGuard`).
@@ -2693,7 +2693,7 @@ class VoiceOrchestrator:
                     self.cfg, text, session=session_key,
                     execute_tool=self._agent_tool,
                     cancelled=lambda: False,
-                    estop_engaged=_estop),
+                    estop_engaged=_estop, timeout_s=timeout_s),
                 source="user", correlation_id=session_key)
         except AgentDenied as exc:
             return {"state": "UNAVAILABLE",
