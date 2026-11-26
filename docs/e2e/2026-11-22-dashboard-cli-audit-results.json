@@ -2409,6 +2409,7 @@
     "browser": "The child drawer added a parent using its shared confirmation. After reload the child appeared in Blocked. The independent CLI refused its claim with KANBAN_DEPENDENCY_PENDING, then completed the parent and read an empty blocked_by list. Reload put the child in Todo. The drawer removed its approved link and showed the cleared link after reload.",
     "integrity": "The approval journal bound the exact parent and child for add and removal. SQLite confirmed the link was removed. Unit tests refused cycles, rolled back a cyclic snapshot, preserved links through a valid snapshot, and counted a parent archived after completion as satisfied. Voice fixtures confirmed a link using the shared registry.",
     "verification": "89 native, dashboard and voice tests and 14 registry and alias checks passed. The production build and authenticated Chromium rehearsal passed.",
+    "deployment": "VoiceBridge restarted from local source 8cc677589. Port 8890 reported READY, the authenticated Operations catalog listed both dependency operations as confirmation-gated, and a self-link returned 400 without staging approval. The gateway stayed active.",
     "remaining": "Goal mode and other advanced settings, broader Agents and Operations controls, physical device checks, and deployed task mutations remain open."
   }
 }
