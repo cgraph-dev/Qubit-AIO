@@ -2518,5 +2518,16 @@
     "verification": "Seventy-two focused VoiceBridge tests and twenty-four native file mutation tests passed. Focused regressions cover pre-existing matches without runtime evidence, malformed criteria before claim, wrong bytes, and a file change between the initial check and judge acceptance.",
     "deployment": "VoiceBridge restarted from local merge a3c1c80fc. Port 8890 returned HTTP 200 for Kanban and READY for health. The gateway process ID stayed the same. The exact-content writes were exercised on the disposable board.",
     "remaining": "Natural-language and non-file effects, remote file verification, deployed task mutations, and the combined dashboard checklist row remain open."
+  },
+  "current_live_routes_and_named_chat": {
+    "date": "2026-11-26",
+    "revision": "a85669a6892c98f3e412f3c98159ed4c33a6786e",
+    "live_mounts": "Chromium mounted /chat, /qubit-chat, /webchat, /qubit-workbench and /wb on port 8890 at 390 and 1440 CSS pixels. All ten loads returned HTTP 200, with zero horizontal document overflow and zero page errors. The deployed frontend reported build b9dffd4e3. The live profile registry contained only default. The deployed checks created no test sessions.",
+    "environment": "Separate authenticated loopback VoiceBridge listener, installed interpreter, disposable named and default Qubit homes, real standalone named gateway, and system Ollama qubit-brain:latest at loopback port 11434",
+    "stream_and_replay": "The selected gateway emitted start, seven text deltas and a successful terminal event in 8.1 seconds. A replay of the same submission ID returned the saved answer immediately, with no new user or assistant record. Separate HTTP and SQLite reads confirmed one user message and the assistant reply in the named store only.",
+    "cancel": "A separate real turn was cancelled after its first streamed delta. The stream settled cancelled. Receipt recovery by exact submission ID returned terminal with outcome interrupted.",
+    "restart_and_adoption": "While the isolated gateway was stopped, the original saved transcript remained readable and the listener created a named GUI draft. After restart the gateway admitted that exact draft ID, streamed a real reply, and saved its transcript. Replay did not add another message. Independent HTTP and SQLite reads also confirmed the original transcript across restart and isolation from the disposable default store.",
+    "workbench_defect": "Both Workbench session endpoints returned WB_SESSION_NOT_FOUND for the named gateway session, even with profile=audit-chat in the query. Chromium at 390 pixels showed Failed to load session. Workbench profile/switch returned HTTP 400 MALFORMED. Its adapter sent the name only in the query while the canonical profile switch accepted it from the body. The authenticated Qubit Chat transcript route could retrieve the same ID in the named profile.",
+    "remaining": "Request-scoped Workbench profile and transcript wiring, approved deployed inference, actual PTY resize and reattach, long silence keep-alives, and the remaining named gateway checklist cases."
   }
 }
