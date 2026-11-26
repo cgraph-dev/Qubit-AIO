@@ -1449,6 +1449,10 @@ def _b_kanban(ctx, args):
             ctx.cfg, _int_arg(args, "parent_id"), _int_arg(args, "child_id"),
             remove=action == "unlink", requested_by=ctx.actor, confirmed=True,
         )
+    if action == "run_goal":
+        from . import kanban_goal
+        return kanban_goal.run(ctx.cfg, _int_arg(args, "task_id"),
+                               requested_by=ctx.actor, confirmed=True, expected=args["goal_signature"])
     if action == "create":
         return KB.create(
             ctx.cfg,
@@ -3543,6 +3547,9 @@ def _b_task_run(ctx, args):
             return {"task": {"state": "UNAVAILABLE", "code": "NO_OPEN_TASKS",
                              "detail": str(current.get("detail", ""))[:200]}}
         task = current["task"]
+        if task.get("goal_mode"):
+            return {"task": {"state": "UNAVAILABLE", "code": _KB.GOAL_RUN_REQUIRED_CODE,
+                             "detail": f"Say run Kanban goal {task['id']} for this card."}}
         text = (str(task.get("title", "")) + "\n" +
                 str(task.get("body", ""))).strip()
     if not text:
@@ -5829,9 +5836,13 @@ def _sum_kanban_task(result):
     if isinstance(result, dict) and result.get("state") == "EMPTY":
         return ("No open tasks. Create one first, for example "
                 "say create task followed by a title.")
+    if isinstance(result, dict) and result.get("goal_status") == "stopped":
+        return str(result["detail"])
     task = result.get("task", {}) if isinstance(result, dict) else {}
     if not task:
         return "No task found."
+    if result.get("goal_status") == "blocked":
+        return f"Task {task['id']} blocked after {task['goal_turns_used']} turns. {result['detail']}"
     return f"Task {task.get('id', '?')}: {task.get('title', '')}, {task.get('status', '')}."
 
 
@@ -6754,6 +6765,11 @@ _E("kanban_unlink", "Remove a Kanban dependency",
    args=(_I("parent_id"), _I("child_id")), fixed=(("action", "unlink"),), confirm=True,
    examples=("qubit, unlink kanban tasks 5 and 6",),
    help="Remove the first task as a parent of the second (confirmed).")
+_E("kanban_run_goal", "Run Kanban goal",
+   ("run kanban goal", "run goal task"), "kanban", ("kanban",),
+   args=(_I("task_id"),), fixed=(("action", "run_goal"),), confirm=True,
+   summary="kanban_task", examples=("qubit, run kanban goal 5",),
+   help="Run one Goal mode card with its saved turn budget (confirmed).")
 _E("kanban_complete", "Complete task",
    ("complete task", "finish task", "done with task", "close task",
     "kanban complete", "complete kanban task", "mark task complete"),
@@ -13379,6 +13395,20 @@ def execute(ctx, resolution: Resolution) -> Outcome:
             except KB.KanbanError as exc:
                 return Outcome(FAILED, entry, _speak(exc.detail), {"code": exc.code})
         wording = ""
+        if entry.id == "kanban_run_goal":
+            from . import kanban as KB, kanban_goal
+
+            try:
+                task = KB.show(ctx.cfg, _int_arg(merged, "task_id"))["task"]
+                if not task["goal_mode"]:
+                    raise KB.KanbanError(KB.BAD_INPUT_CODE, "Goal mode is disabled for this task.")
+                if task["blocked_by"]:
+                    raise KB.KanbanError(KB.DEPENDENCY_CODE, "Finish the parent tasks first.")
+            except KB.KanbanError as exc:
+                return Outcome(FAILED, entry, _speak(exc.detail), {"code": exc.code})
+            merged["goal_signature"] = kanban_goal.signature(task)
+            wording = _speak(f"Run goal for task {task['id']}, {task['title'][:80]}, "
+                             f"with up to {task['goal_max_turns']} turns?")
         if entry.id == "workspaces_move":
             from . import projects as PJ
 

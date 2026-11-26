@@ -742,7 +742,7 @@ def _kanban_http(exc: Exception) -> Tuple[int, Any]:
         status = 404
     elif "BAD_INPUT" in code or "BAD_STATE" in code:
         status = 400
-    elif "CONFIRM" in code or code == "KANBAN_DEPENDENCY_PENDING":
+    elif "CONFIRM" in code or code in ("KANBAN_DEPENDENCY_PENDING", "KANBAN_GOAL_ACTIVE"):
         status = 409
     elif "ESTOP" in code:
         status = 403
@@ -807,8 +807,8 @@ def _native_task_vendor(task: Dict[str, Any], now: float,
         "workspace_kind": "scratch",
         "workspace_path": None,
         "skills": [],
-        "goal_mode": False,
-        "goal_max_turns": None,
+        "goal_mode": bool(task.get("goal_mode")),
+        "goal_max_turns": task.get("goal_max_turns"),
         "created_by": None,
         "model_override": None,
         "provider_override": None,

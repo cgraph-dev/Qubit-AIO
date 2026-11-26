@@ -48,6 +48,8 @@ MAX_TITLE_LEN = 200
 MAX_BODY_LEN = 8000
 MAX_COMMENT_LEN = 2000
 MAX_SUMMARY_LEN = 2000
+DEFAULT_GOAL_TURNS = 20
+MAX_GOAL_TURNS = 100
 MAX_BOARDS = 64
 MAX_OPEN_TASKS_PER_BOARD = 2000
 LIST_DEFAULT = 50
@@ -56,6 +58,8 @@ LIST_MAX = 200
 CONFIRM_CODE = "KANBAN_CONFIRM_REQUIRED"
 ESTOP_CODE = "KANBAN_ESTOP"
 DEPENDENCY_CODE = "KANBAN_DEPENDENCY_PENDING"
+GOAL_ACTIVE_CODE = "KANBAN_GOAL_ACTIVE"
+GOAL_RUN_REQUIRED_CODE = "KANBAN_GOAL_RUN_REQUIRED"
 NOT_FOUND_CODE = "KANBAN_NOT_FOUND"
 EXISTS_CODE = "KANBAN_EXISTS"
 BAD_INPUT_CODE = "KANBAN_BAD_INPUT"
@@ -162,6 +166,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # archive" parity) instead of silently resetting to ``open``.
     _ensure_column(conn, "tasks", "archived_from", "TEXT")
     _ensure_column(conn, "tasks", "completion_summary", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "tasks", "goal_mode", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(conn, "tasks", "goal_max_turns", "INTEGER")
+    _ensure_column(conn, "tasks", "goal_run_token", "TEXT")
+    _ensure_column(conn, "tasks", "goal_turns_used", "INTEGER NOT NULL DEFAULT 0")
 
 
 def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
@@ -206,6 +214,16 @@ def _check_summary(summary: str) -> str:
     return summary.strip()
 
 
+def goal_settings(enabled: Any, max_turns: Any) -> Dict[str, Any]:
+    if not isinstance(enabled, bool):
+        raise KanbanError(BAD_INPUT_CODE, "goal_mode must be a boolean")
+    if max_turns is not None and (type(max_turns) is not int or not 1 <= max_turns <= MAX_GOAL_TURNS):
+        raise KanbanError(BAD_INPUT_CODE, f"goal_max_turns must be 1..{MAX_GOAL_TURNS}")
+    if not enabled and max_turns is not None:
+        raise KanbanError(BAD_INPUT_CODE, "a goal turn limit requires Goal mode")
+    return {"goal_mode": enabled, "goal_max_turns": (max_turns or DEFAULT_GOAL_TURNS) if enabled else None}
+
+
 def _task_dict(row: sqlite3.Row) -> Dict[str, Any]:
     return {"id": row["id"], "board": row["board"],
             "title": redact_spec(row["title"]),
@@ -213,6 +231,8 @@ def _task_dict(row: sqlite3.Row) -> Dict[str, Any]:
             "assignee": redact_spec(row["assignee"] or ""),
             "priority": row["priority"],
             "completion_summary": redact_spec(row["completion_summary"]),
+            "goal_mode": bool(row["goal_mode"]), "goal_max_turns": row["goal_max_turns"],
+            "goal_turns_used": row["goal_turns_used"], "goal_running": bool(row["goal_run_token"]),
             "created_at": row["created_at"], "updated_at": row["updated_at"]}
 
 
@@ -448,6 +468,7 @@ def set_board_project(cfg: Any, slug: str, project_slug: Optional[str],
 def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
            assignee: str = "", priority: str = "normal",
            parents: Optional[List[int]] = None,
+           goal_mode: bool = False, goal_max_turns: Optional[int] = None,
            requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
     """Create a task (status open)."""
@@ -458,6 +479,7 @@ def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
     clean_body = _check_body(body)
     clean_board = _check_board_slug(board)
     dependencies = parent_ids(parents)
+    goal = goal_settings(goal_mode, goal_max_turns)
     if priority not in PRIORITIES:
         raise KanbanError(BAD_INPUT_CODE,
                           f"priority must be one of {PRIORITIES}")
@@ -484,10 +506,10 @@ def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
                               f"board {clean_board!r} is full")
         cur = conn.execute(
             "INSERT INTO tasks(board, title, body, status, assignee,"
-            " priority, created_at, updated_at)"
-            " VALUES(?,?,'', 'open',?,?,?,?)",
+            " priority, created_at, updated_at, goal_mode, goal_max_turns)"
+            " VALUES(?,?,'', 'open',?,?,?,?,?,?)",
             (clean_board, clean_title, (assignee or "").strip()[:80],
-             priority, _now(), _now()))
+             priority, _now(), _now(), goal["goal_mode"], goal["goal_max_turns"]))
         task_id = cur.lastrowid
         if clean_body:
             conn.execute("UPDATE tasks SET body=? WHERE id=?",
@@ -618,6 +640,8 @@ def _transition(cfg: Any, task_id: int, to: str, *,
         try:
             row = _get_task(conn, int(task_id))
             task = _task_dict(row)
+            if task["goal_running"] and op not in ("reclaim", "block", "archive"):
+                raise KanbanError(GOAL_ACTIVE_CODE, f"task #{task_id} has an active goal run")
             if op == "claim" and task["status"] not in ("open", "blocked"):
                 raise KanbanError(STATE_CODE,
                                   f"task #{task_id} is {task['status']}; "
@@ -633,7 +657,7 @@ def _transition(cfg: Any, task_id: int, to: str, *,
                                   f"task #{task_id} is already archived")
             if require_parents or to in ("claimed", "done"):
                 _require_parents_done(conn, task["id"])
-            updates = "status=?, updated_at=?"
+            updates = "status=?, updated_at=?, goal_run_token=NULL"
             params: List[Any] = [to, _now()]
             if op in ("claim", "assign", "reassign"):
                 who = (assignee or requested_by).strip()[:80]
@@ -811,10 +835,13 @@ def edit(cfg: Any, task_id: int, *, title: str = "", body: str = "",
     conn = _connect(cfg)
     try:
         _migrate(conn)
+        conn.execute("BEGIN IMMEDIATE")
         row = _get_task(conn, int(task_id))
         if row["status"] == "archived":
             raise KanbanError(STATE_CODE, f"task #{task_id} is archived")
         sets, params = [], []
+        if row["goal_run_token"]:
+            raise KanbanError(GOAL_ACTIVE_CODE, f"task #{task_id} has an active goal run")
         if title:
             sets.append("title=?")
             params.append(title.strip())
@@ -1040,9 +1067,12 @@ def export(cfg: Any) -> Dict[str, Any]:
     try:
         _migrate(conn)
         conn.execute("BEGIN")
+        tasks = [dict(r) for r in conn.execute("SELECT * FROM tasks")]
+        for task in tasks:
+            task.pop("goal_run_token", None)
         data = {"schema": SCHEMA,
                 "boards": [dict(r) for r in conn.execute("SELECT * FROM boards")],
-                "tasks": [dict(r) for r in conn.execute("SELECT * FROM tasks")],
+                "tasks": tasks,
                 "dependencies": [dict(r) for r in conn.execute(
                     "SELECT * FROM task_dependencies ORDER BY parent_id, child_id")],
                 "comments": [dict(r) for r in
@@ -1114,6 +1144,13 @@ def _validate_snapshot(snapshot: Dict[str, Any]) -> None:
         if len(str(t.get("body", "") or "")) > MAX_BODY_LEN:
             raise KanbanError(BAD_INPUT_CODE, "snapshot task body too long")
         _check_summary(t.get("completion_summary", ""))
+        goal_mode = t.get("goal_mode", False)
+        if type(goal_mode) not in (bool, int) or goal_mode not in (0, 1):
+            raise KanbanError(BAD_INPUT_CODE, "invalid Goal mode value in snapshot")
+        goal_settings(bool(goal_mode), t.get("goal_max_turns"))
+        turns_used = t.get("goal_turns_used", 0)
+        if type(turns_used) is not int or not 0 <= turns_used <= MAX_GOAL_TURNS:
+            raise KanbanError(BAD_INPUT_CODE, "invalid goal turn count in snapshot")
         if t.get("archived_from") not in (None, "", "open", "claimed", "blocked", "done"):
             raise KanbanError(BAD_INPUT_CODE, "invalid archived task status")
         if t.get("id") is not None:
@@ -1172,15 +1209,18 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
                              (b["slug"], b["name"], b.get("project_slug"),
                               b.get("created_at", _now())))
             for t in snapshot.get("tasks", []):
+                goal = goal_settings(bool(t.get("goal_mode", False)), t.get("goal_max_turns"))
                 conn.execute("INSERT INTO tasks(id, board, title, body, status,"
-                             " assignee, priority, created_at, updated_at, completion_summary, archived_from)"
-                             " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                             " assignee, priority, created_at, updated_at, completion_summary, archived_from,"
+                             " goal_mode, goal_max_turns, goal_turns_used)"
+                             " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                              (t.get("id"), t["board"], t["title"],
                               t.get("body", ""), t["status"], t.get("assignee"),
                               t.get("priority", "normal"),
                               t.get("created_at", _now()),
                               t.get("updated_at", _now()),
-                              _check_summary(t.get("completion_summary", "")), t.get("archived_from")))
+                              _check_summary(t.get("completion_summary", "")), t.get("archived_from"),
+                              goal["goal_mode"], goal["goal_max_turns"], t.get("goal_turns_used", 0)))
             for link in snapshot.get("dependencies", []):
                 _add_dependency(conn, dependency_id(link["parent_id"]), dependency_id(link["child_id"]))
             for c in snapshot.get("comments", []):
@@ -1843,6 +1883,8 @@ def move_task(cfg: Any, task_id: int, *, board: str = "",
             if row["status"] == "archived":
                 raise KanbanError(STATE_CODE,
                                   f"task #{task_id} is archived")
+            if row["goal_run_token"]:
+                raise KanbanError(GOAL_ACTIVE_CODE, f"task #{task_id} has an active goal run")
             dest_board = _check_board_slug(board) if board else row["board"]
             _get_board(conn, dest_board)
             dest_status = status or row["status"]
@@ -2574,10 +2616,12 @@ def snapshot_restore(cfg: Any, snapshot_id: int, *,
                           troupe.get("role", "viewer"), _now()))
         moved = 0
         for pos in snap.get("task_positions", []):
-            cur = conn.execute("SELECT id FROM tasks WHERE id=?",
+            cur = conn.execute("SELECT goal_run_token FROM tasks WHERE id=?",
                                (pos.get("id"),)).fetchone()
             if cur is None:
                 continue
+            if cur["goal_run_token"]:
+                raise KanbanError(GOAL_ACTIVE_CODE, f"task #{pos['id']} has an active goal run")
             conn.execute("UPDATE tasks SET board=?, status=?, updated_at=?"
                          " WHERE id=?",
                          (board, pos.get("status", "open"), _now(),

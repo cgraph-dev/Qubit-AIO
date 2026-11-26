@@ -20663,7 +20663,8 @@ def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
     from . import kanban as KB
 
     unsupported = _kanban_unsupported_options(
-        b, frozenset({"title", "body", "assignee", "priority", "board", "parents"}))
+        b, frozenset({"title", "body", "assignee", "priority", "board", "parents",
+                      "goal_mode", "goal_max_turns"}))
     if unsupported is not None:
         return unsupported
 
@@ -20682,7 +20683,8 @@ def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
         fields = {"title": KB._check_title(title), "board": board,
                   "body": KB._check_body(str(b.get("body") or "")),
                   "assignee": str(b.get("assignee") or ""), "priority": priority,
-                  "parents": KB.parent_ids(b.get("parents"))}
+                  "parents": KB.parent_ids(b.get("parents")),
+                  **KB.goal_settings(b.get("goal_mode", False), b.get("goal_max_turns"))}
         gate = _kanban_confirm(
             cfg, "kanban.create", f"creating kanban task {title!r} on {board!r}",
             q, b, fields)
