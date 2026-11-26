@@ -2471,5 +2471,18 @@
     "verification": "Thirty-eight focused tests passed across Goal mode, the native agent, orchestrator session authority, and session continuity. Both Chromium rehearsals and independent database and provider log checks passed.",
     "deployment": "VoiceBridge restarted after the worktree merged the fix at d0fbb0684. The gateway PID stayed the same. Live Kanban returned HTTP 200 and health reported DEGRADED. System Ollama was inactive. The unchanged frontend bundle was built from b9dffd4e3.",
     "remaining": "Successful real judge settlement in Chromium, judge latency and timeouts, tool-backed evidence, live dashboard mutations, and the combined dashboard checklist row remain open."
+  },
+  "current_kanban_browser_judge_settlement": {
+    "date": "2026-11-26",
+    "revision": "621daae67dfbac86f8a8ac6c214b83185b37c12e",
+    "environment": "Authenticated Chromium, the deployed Kanban asset from build b9dffd4e3, a separate local VoiceBridge listener, disposable Kanban and transcript databases, and the installed qubit-brain model in a separate Ollama instance",
+    "provider": "The worker and judge used separate model requests. The disposable judge config put reasoning_effort: none inside auxiliary.goal_judge.extra_body. A loopback relay recorded that exact request field and passed model bytes through unchanged.",
+    "completed": "The browser cancelled one exact approval, confirmed a new ID, and saw the running state. The worker computed 16 times 3 as 48. The separate model judge returned a JSON done verdict. Chromium reopened the card as Done after reload and found the saved answer.",
+    "read_back": "Independent native CLI and SQLite reads agreed on the answer and one spent turn. The saved summary matched the canonical assistant transcript. SQLite had one goal_started, one complete, and one goal_finished event, with no active run token. The completed arithmetic task made no tool calls.",
+    "replay": "After successful settlement, an authenticated replay of the exact approved ID returned HTTP 400 NO_CONFIRMATION. Independent SQLite read-back still showed one completion.",
+    "false_completion": "The second browser card asked for a valid proof that 6 times 9 equals 57, with no change to the task and no tools. The worker instead proved 6 times 9 plus 3 equals 57 and claimed file creation and terminal verification. The judge accepted the substitute and the card reloaded as Done. SQLite recorded one completion. The asserted files were absent, the relevant tool calls failed in the runtime log, and the canonical transcript contained no tool records.",
+    "reproduction": "Given the concise reply that 6 times 9 is 54, the judge emitted a Blocked verdict with a malformed closing quote. The real parser treated it as malformed. Replaying the full false report under revised prompts, including a structured comparison, still returned Done. The prompt experiments were discarded.",
+    "deployment": "The deployed Kanban page at port 8890 returned HTTP 200. Its health was DEGRADED while system Ollama was inactive. Test writes went to the disposable board.",
+    "remaining": "False completion against a modified goal, tool-backed evidence, judge latency under the deployed provider configuration, live dashboard mutations, and the combined dashboard checklist row remain open."
   }
 }
