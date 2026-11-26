@@ -46,10 +46,11 @@ KNOWN_GUARDS = (
     ("qubit tui help", "cli_tui_help"),
     ("qubit console help", "cli_console_help"),
     ("qubit mic help", "cli_mic_help"),
-    ("qubit kanban link task 5", "guard_kanban_link"),
+    ("qubit kanban request review 5", "guard_kanban_request_review"),
 )
 
 KNOWN_REAL = (
+    ("qubit kanban link task 5 and 6", "kanban_link"),
     ("qubit schedules delete 3", "cli_schedules_delete"),
     ("qubit mcp remove demo", "cli_mcp_remove"),
     ("qubit cron list", "schedules_list"),

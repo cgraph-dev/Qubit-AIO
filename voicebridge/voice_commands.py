@@ -1444,6 +1444,11 @@ def _b_kanban(ctx, args):
         )
     if action == "show":
         return KB.show(ctx.cfg, _int_arg(args, "task_id"))
+    if action in ("link", "unlink"):
+        return KB.change_dependency(
+            ctx.cfg, _int_arg(args, "parent_id"), _int_arg(args, "child_id"),
+            remove=action == "unlink", requested_by=ctx.actor, confirmed=True,
+        )
     if action == "create":
         return KB.create(
             ctx.cfg,
@@ -6737,6 +6742,18 @@ _E("kanban_claim", "Claim task",
    fixed=(("action", "claim"),), confirm=True,
    examples=("qubit, claim task 5",),
    help="Claim a task (confirmed).")
+_E("kanban_link", "Add a Kanban dependency",
+   ("link kanban tasks", "add kanban dependency", "kanban link task",
+    "kanban link", "link a kanban task"), "kanban", ("kanban",),
+   args=(_I("parent_id"), _I("child_id")), fixed=(("action", "link"),), confirm=True,
+   examples=("qubit, link kanban tasks 5 and 6",),
+   help="Make the second task wait for the first (confirmed).")
+_E("kanban_unlink", "Remove a Kanban dependency",
+   ("unlink kanban tasks", "remove kanban dependency", "kanban unlink task",
+    "kanban unlink", "unlink a kanban task"), "kanban", ("kanban",),
+   args=(_I("parent_id"), _I("child_id")), fixed=(("action", "unlink"),), confirm=True,
+   examples=("qubit, unlink kanban tasks 5 and 6",),
+   help="Remove the first task as a parent of the second (confirmed).")
 _E("kanban_complete", "Complete task",
    ("complete task", "finish task", "done with task", "close task",
     "kanban complete", "complete kanban task", "mark task complete"),
@@ -10676,10 +10693,6 @@ KANBAN_NO_CONSTRUCT = {
                       "kanban reopen-review",
                       "reopen review of a kanban task",
                       "reopen-review a kanban task"),
-    "link": ("kanban link task", "kanban link", "link a kanban task",
-             "link kanban tasks"),
-    "unlink": ("kanban unlink task", "kanban unlink", "unlink a kanban task",
-               "unlink kanban tasks"),
 }
 for _kb_sub, _kb_aliases in KANBAN_NO_CONSTRUCT.items():
     _kb_flag = _kb_sub.replace("_", "-")

@@ -189,12 +189,51 @@ def test_extra_board_options_refuse_without_staging_or_writing(tmp_path, monkeyp
     status, refused = QC.h_plugin_kanban_tasks_create(
         cfg, {}, {**defaults, "goal_mode": True, "parents": ["2"]}, {})
     assert status == 400 and refused["code"] == "UNSUPPORTED_FIELD"
-    assert "goal_mode" in refused["detail"] and "parents" in refused["detail"]
+    assert "goal_mode" in refused["detail"]
     assert "confirmation_id" not in refused and not _tasks_in_board(cfg)
     status, created = QC.h_plugin_kanban_tasks_create(
         cfg, {}, {**defaults, "confirmation_id": staged["confirmation_id"]}, {})
     assert status == 200
     assert _tasks_in_board(cfg)["Fixture card"]["status"] == "todo"
+
+
+def test_dashboard_dependency_binds_approval_and_reads_both_links(tmp_path, monkeypatch):
+    from voicebridge import dashboard_ops as OPS
+    from voicebridge import kanban as KB
+    from voicebridge import qubit_compat as QC
+    from voicebridge import qubit_plugins as QP
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    parent = KB.create(cfg, "Parent", confirmed=True)["task"]["id"]
+    sibling = KB.create(cfg, "Different", confirmed=True)["task"]["id"]
+    status, staged = QC.h_plugin_kanban_tasks_create(cfg, {}, {"title": "Child", "parents": [str(parent)]}, {})
+    assert status == 409
+    status, created = QC.h_plugin_kanban_tasks_create(
+        cfg, {}, {"title": "Child", "parents": [parent], "confirmation_id": staged["confirmation_id"]}, {})
+    assert status == 200 and created["task"]["status"] == "blocked"
+    child = int(created["task"]["id"])
+    target = {"task_id": str(child)}
+    status, detail = QP.h_plugin_kanban_task(cfg, {}, {}, target)
+    assert status == 200 and detail["links"]["parents"] == [str(parent)]
+    assert _tasks_in_board(cfg)["Parent"]["link_counts"]["children"] == 1
+    status, refused = QC.h_plugin_kanban_tasks_patch(
+        cfg, {}, {"status": "ready", "confirm": True}, target)
+    assert status == 409 and refused["code"] == KB.DEPENDENCY_CODE
+
+    params = {"parent_id": str(parent), "child_id": str(child)}
+    status, staged = QC.h_plugin_kanban_unlink(cfg, params, {}, {})
+    assert status == 409
+    cid = staged["confirmation_id"]
+    settled = OPS.confirm_compat_op(cfg, cid, args={"parent_id": sibling})
+    assert settled["state"] == "executed"
+    assert KB.show(cfg, child)["task"]["parents"] == []
+    assert _tasks_in_board(cfg)["Child"]["status"] == "todo"
+
+    voice = VC.voice_say(cfg, f"qubit, link kanban tasks {sibling} and {child}")
+    assert voice["state"] == VC.NEEDS_CONFIRM
+    assert VC.confirm_pending(VC.make_ctx(cfg), voice["confirmation_id"]).kind == VC.EXECUTED
+    assert KB.show(cfg, child)["task"]["parents"] == [sibling]
 
 
 def test_completion_note_binds_approval_and_survives_restore(tmp_path, monkeypatch):

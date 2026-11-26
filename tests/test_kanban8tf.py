@@ -147,6 +147,44 @@ def test_confirm_required_and_dry_run(tmp_path, monkeypatch):
     assert _run(cfg, _Args("list"))[1]["tasks"] == []
 
 
+def test_dependency_blocks_claim_and_survives_snapshot(tmp_path, monkeypatch):
+    from voicebridge import kanban as KB
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    parent = KB.create(cfg, "Parent", confirmed=True)["task"]["id"]
+    child = KB.create(cfg, "Child", parents=[parent], confirmed=True)["task"]["id"]
+    tail = KB.create(cfg, "Grandchild", parents=[child], confirmed=True)["task"]["id"]
+    assert KB.show(cfg, parent)["task"]["children"] == [child]
+    assert KB.show(cfg, child)["task"]["blocked_by"] == [parent]
+    assert KB.current_task(cfg)["task"]["id"] == parent
+    for action in (KB.claim, KB.complete):
+        with pytest.raises(KB.KanbanError) as refusal:
+            action(cfg, child, confirmed=True)
+        assert refusal.value.code == KB.DEPENDENCY_CODE
+    with pytest.raises(KB.KanbanError) as cycle:
+        KB.change_dependency(cfg, tail, parent, confirmed=True)
+    assert cycle.value.code == KB.BAD_INPUT_CODE
+    assert KB.show(cfg, parent)["task"]["parents"] == []
+
+    before = KB.export(cfg)["snapshot"]
+    invalid = {**before, "dependencies": [
+        *before["dependencies"], {"parent_id": tail, "child_id": parent},
+    ]}
+    with pytest.raises(KB.KanbanError):
+        KB.import_snapshot(cfg, invalid, confirmed=True)
+    assert KB.export(cfg)["snapshot"] == before
+    assert KB.change_dependency(cfg, parent, child, remove=True, confirmed=True)["changed"]
+    assert not KB.change_dependency(cfg, parent, child, remove=True, confirmed=True)["changed"]
+    KB.import_snapshot(cfg, before, confirmed=True)
+    assert KB.show(cfg, child)["task"]["blocked_by"] == [parent]
+
+    KB.complete(cfg, parent, confirmed=True)
+    KB.archive_task(cfg, parent, confirmed=True)
+    assert KB.show(cfg, child)["task"]["blocked_by"] == []
+    KB.import_snapshot(cfg, KB.export(cfg)["snapshot"], confirmed=True)
+    assert KB.claim(cfg, child, confirmed=True)["task"]["status"] == "claimed"
+
+
 def test_export_import_roundtrip_is_rollback(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     _board(cfg)

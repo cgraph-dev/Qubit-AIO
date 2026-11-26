@@ -92,7 +92,7 @@ WAVE12_ENTRY_IDS = {v for v in WAVE12_BINDINGS.values()}
 W7_BRIDGE_IDS = {
     "plugins_capabilities", "skills_install",
     "guard_kanban_request_review", "guard_kanban_request_changes",
-    "guard_kanban_reopen_review", "guard_kanban_link", "guard_kanban_unlink",
+    "guard_kanban_reopen_review",
 }
 
 

@@ -55,6 +55,7 @@ LIST_MAX = 200
 
 CONFIRM_CODE = "KANBAN_CONFIRM_REQUIRED"
 ESTOP_CODE = "KANBAN_ESTOP"
+DEPENDENCY_CODE = "KANBAN_DEPENDENCY_PENDING"
 NOT_FOUND_CODE = "KANBAN_NOT_FOUND"
 EXISTS_CODE = "KANBAN_EXISTS"
 BAD_INPUT_CODE = "KANBAN_BAD_INPUT"
@@ -150,7 +151,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
         " id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,"
         " kind TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '',"
         " created_at REAL NOT NULL);"
-        "CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);")
+        "CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);"
+        "CREATE TABLE IF NOT EXISTS task_dependencies("
+        " parent_id INTEGER NOT NULL REFERENCES tasks(id),"
+        " child_id INTEGER NOT NULL REFERENCES tasks(id),"
+        " PRIMARY KEY(parent_id, child_id));"
+        "CREATE INDEX IF NOT EXISTS idx_dependency_child ON task_dependencies(child_id);")
     # Additive-only: remembers the status a task held before it was archived so
     # a later restore returns it there (Qubit workboard "Restore from
     # archive" parity) instead of silently resetting to ``open``.
@@ -230,6 +236,103 @@ def _get_board(conn: sqlite3.Connection, slug: str) -> sqlite3.Row:
     if row is None:
         raise KanbanError(NOT_FOUND_CODE, f"no board {slug!r}")
     return row
+
+
+def dependency_id(value: Any) -> int:
+    if not re.fullmatch(r"[0-9]{1,19}", str(value)):
+        raise KanbanError(BAD_INPUT_CODE, "dependency task IDs must be positive integers")
+    task_id = int(value)
+    if not 0 < task_id <= 2**63 - 1:
+        raise KanbanError(BAD_INPUT_CODE, "dependency task ID is out of range")
+    return task_id
+
+
+def parent_ids(values: Any) -> List[int]:
+    if values is None:
+        return []
+    if not isinstance(values, (list, tuple)):
+        raise KanbanError(BAD_INPUT_CODE, "parents must be a list of task IDs")
+    return sorted({dependency_id(value) for value in values})
+
+
+def _add_dependency(conn: sqlite3.Connection, parent: int, child: int) -> bool:
+    _get_task(conn, parent)
+    _get_task(conn, child)
+    if parent == child or conn.execute(
+        "WITH RECURSIVE descendants(id) AS (SELECT child_id FROM task_dependencies WHERE parent_id=?"
+        " UNION SELECT link.child_id FROM task_dependencies link JOIN descendants d ON link.parent_id=d.id)"
+        " SELECT 1 FROM descendants WHERE id=?",
+        (child, parent),
+    ).fetchone():
+        raise KanbanError(BAD_INPUT_CODE, "that dependency would create a cycle")
+    return bool(conn.execute(
+        "INSERT OR IGNORE INTO task_dependencies(parent_id, child_id) VALUES(?,?)",
+        (parent, child),
+    ).rowcount)
+
+
+_PARENT_UNFINISHED = "(p.status != 'done' AND (p.status != 'archived' OR coalesce(p.archived_from,'') != 'done'))"
+
+
+def _require_parents_done(conn: sqlite3.Connection, task_id: int) -> None:
+    pending = [str(row["parent_id"]) for row in conn.execute(
+        "SELECT d.parent_id FROM task_dependencies d JOIN tasks p ON p.id=d.parent_id"
+        f" WHERE d.child_id=? AND {_PARENT_UNFINISHED} ORDER BY d.parent_id", (task_id,)
+    )]
+    if pending:
+        raise KanbanError(DEPENDENCY_CODE,
+                          f"task #{task_id} is waiting for parent task(s) " + ", ".join(pending))
+
+
+def _with_dependencies(conn: sqlite3.Connection, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_id = {task["id"]: task for task in tasks}
+    if not by_id:
+        return tasks
+    for task in tasks:
+        task.update(parents=[], children=[], blocked_by=[])
+    ids = ",".join("(?)" for _ in by_id)
+    for row in conn.execute(
+        f"WITH visible(id) AS (VALUES {ids})"
+        f" SELECT d.parent_id, d.child_id, {_PARENT_UNFINISHED} AS unfinished"
+        " FROM task_dependencies d JOIN tasks p ON p.id=d.parent_id"
+        " WHERE d.parent_id IN (SELECT id FROM visible) OR d.child_id IN (SELECT id FROM visible)"
+        " ORDER BY d.parent_id, d.child_id", list(by_id),
+    ):
+        parent, child = row["parent_id"], row["child_id"]
+        if parent in by_id:
+            by_id[parent]["children"].append(child)
+        if child in by_id:
+            by_id[child]["parents"].append(parent)
+            if row["unfinished"]:
+                by_id[child]["blocked_by"].append(parent)
+    return tasks
+
+
+def change_dependency(cfg: Any, parent: Any, child: Any, *, remove: bool = False,
+                      requested_by: str = "cli:user", confirmed: bool = False) -> Dict[str, Any]:
+    action = "unlink" if remove else "link"
+    _canvas_guard(cfg, action, confirmed)
+    parent, child = dependency_id(parent), dependency_id(child)
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        if remove:
+            _get_task(conn, parent)
+            _get_task(conn, child)
+            changed = bool(conn.execute(
+                "DELETE FROM task_dependencies WHERE parent_id=? AND child_id=?", (parent, child)
+            ).rowcount)
+        else:
+            changed = _add_dependency(conn, parent, child)
+        if changed:
+            _event(conn, child, action, f"parent_id={parent}")
+        conn.commit()
+    finally:
+        conn.close()
+    if changed:
+        _audit(action, requested_by, {"parent_id": parent, "child_id": child})
+    return {"state": "OK", "parent_id": parent, "child_id": child, "changed": changed}
 
 
 # ------------------------------------------------------------------- boards
@@ -344,6 +447,7 @@ def set_board_project(cfg: Any, slug: str, project_slug: Optional[str],
 # -------------------------------------------------------------------- tasks
 def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
            assignee: str = "", priority: str = "normal",
+           parents: Optional[List[int]] = None,
            requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
     """Create a task (status open)."""
@@ -353,12 +457,16 @@ def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
     clean_title = _check_title(title)
     clean_body = _check_body(body)
     clean_board = _check_board_slug(board)
+    dependencies = parent_ids(parents)
     if priority not in PRIORITIES:
         raise KanbanError(BAD_INPUT_CODE,
                           f"priority must be one of {PRIORITIES}")
     conn = _connect(cfg)
     try:
         _migrate(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        for parent in dependencies:
+            _get_task(conn, parent)
         brow = conn.execute("SELECT 1 FROM boards WHERE slug=?",
                             (clean_board,)).fetchone()
         if brow is None:
@@ -385,11 +493,14 @@ def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
             conn.execute("UPDATE tasks SET body=? WHERE id=?",
                          (clean_body, task_id))
         _event(conn, task_id, "create", f"board={clean_board}")
+        for parent in dependencies:
+            _add_dependency(conn, parent, task_id)
+            _event(conn, task_id, "link", f"parent_id={parent}")
         conn.commit()
         _audit("create", requested_by,
                {"board": clean_board, "task_id": task_id})
         return {"state": "OK",
-                "task": _task_dict(_get_task(conn, task_id))}
+                "task": _with_dependencies(conn, [_task_dict(_get_task(conn, task_id))])[0]}
     finally:
         conn.close()
 
@@ -429,7 +540,7 @@ def list_tasks(cfg: Any, *, board: str = "", status: str = "",
                  "LIMIT ? OFFSET ?")
         rows = conn.execute(query, [*params, limit, offset]).fetchall()
         return {"state": "OK",
-                "tasks": [_task_dict(r) for r in rows], "limit": limit,
+                "tasks": _with_dependencies(conn, [_task_dict(r) for r in rows]), "limit": limit,
                 "offset": offset, "total": int(total),
                 "has_more": offset + len(rows) < int(total)}
     finally:
@@ -441,7 +552,7 @@ def show(cfg: Any, task_id: int) -> Dict[str, Any]:
     conn = _connect(cfg)
     try:
         _migrate(conn)
-        task = _task_dict(_get_task(conn, int(task_id)))
+        task = _with_dependencies(conn, [_task_dict(_get_task(conn, int(task_id)))])[0]
         comments = [
             {"id": r["id"], "author": redact_spec(r["author"]),
              "body": redact_spec(r["body"]), "created_at": r["created_at"]}
@@ -473,8 +584,10 @@ def current_task(cfg: Any) -> Dict[str, Any]:
     try:
         _migrate(conn)
         row = conn.execute(
-            "SELECT id FROM tasks WHERE status IN ('open','claimed','blocked')"
-            " ORDER BY id DESC LIMIT 1").fetchone()
+            "SELECT t.id FROM tasks t WHERE t.status IN ('open','claimed','blocked')"
+            " AND NOT EXISTS (SELECT 1 FROM task_dependencies d JOIN tasks p ON p.id=d.parent_id"
+            f" WHERE d.child_id=t.id AND {_PARENT_UNFINISHED})"
+            " ORDER BY t.id DESC LIMIT 1").fetchone()
         if row is None:
             return {"state": "EMPTY", "code": "NO_OPEN_TASKS",
                     "detail": "no open, claimed, or blocked tasks; "
@@ -492,7 +605,7 @@ def current_task(cfg: Any) -> Dict[str, Any]:
 def _transition(cfg: Any, task_id: int, to: str, *,
                 requested_by: str, confirmed: bool, op: str,
                 assignee: str = "", event_detail: str = "",
-                completion_summary: str = "") -> Dict[str, Any]:
+                completion_summary: str = "", require_parents: bool = False) -> Dict[str, Any]:
     if not confirmed:
         raise KanbanError(CONFIRM_CODE,
                           f"kanban {op} requires explicit --confirm")
@@ -518,6 +631,8 @@ def _transition(cfg: Any, task_id: int, to: str, *,
             if op == "archive" and task["status"] == "archived":
                 raise KanbanError(STATE_CODE,
                                   f"task #{task_id} is already archived")
+            if require_parents or to in ("claimed", "done"):
+                _require_parents_done(conn, task["id"])
             updates = "status=?, updated_at=?"
             params: List[Any] = [to, _now()]
             if op in ("claim", "assign", "reassign"):
@@ -594,10 +709,10 @@ def reassign(cfg: Any, task_id: int, assignee: str, *,
 
 
 def reclaim(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
-            confirmed: bool = False) -> Dict[str, Any]:
+            confirmed: bool = False, require_parents: bool = False) -> Dict[str, Any]:
     """Release a claim back to open (unassigns)."""
     return _transition(cfg, task_id, "open", requested_by=requested_by,
-                       confirmed=confirmed, op="reclaim")
+                       confirmed=confirmed, op="reclaim", require_parents=require_parents)
 
 
 def complete(cfg: Any, task_id: int, *, summary: str = "", requested_by: str = "cli:user",
@@ -655,6 +770,8 @@ def restore_task(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
                 if "archived_from" in keys else ""
             target = prior if prior in STATUSES \
                 and prior != "archived" else "open"
+            if target == "claimed":
+                _require_parents_done(conn, row["id"])
             conn.execute(
                 "UPDATE tasks SET status=?, archived_from=NULL, updated_at=?"
                 " WHERE id=?", (target, _now(), row["id"]))
@@ -918,13 +1035,16 @@ def diagnostics(cfg: Any, *, board: str = "main",
 
 
 def export(cfg: Any) -> Dict[str, Any]:
-    """Dump boards+tasks+comments+events as JSON (rollback snapshots)."""
+    """Dump boards, tasks, dependencies, comments and events as JSON."""
     conn = _connect(cfg)
     try:
         _migrate(conn)
+        conn.execute("BEGIN")
         data = {"schema": SCHEMA,
                 "boards": [dict(r) for r in conn.execute("SELECT * FROM boards")],
                 "tasks": [dict(r) for r in conn.execute("SELECT * FROM tasks")],
+                "dependencies": [dict(r) for r in conn.execute(
+                    "SELECT * FROM task_dependencies ORDER BY parent_id, child_id")],
                 "comments": [dict(r) for r in
                              conn.execute("SELECT * FROM comments")],
                 "events": [dict(r) for r in conn.execute(
@@ -994,6 +1114,8 @@ def _validate_snapshot(snapshot: Dict[str, Any]) -> None:
         if len(str(t.get("body", "") or "")) > MAX_BODY_LEN:
             raise KanbanError(BAD_INPUT_CODE, "snapshot task body too long")
         _check_summary(t.get("completion_summary", ""))
+        if t.get("archived_from") not in (None, "", "open", "claimed", "blocked", "done"):
+            raise KanbanError(BAD_INPUT_CODE, "invalid archived task status")
         if t.get("id") is not None:
             task_ids.add(t.get("id"))
     for c in comments:
@@ -1005,6 +1127,13 @@ def _validate_snapshot(snapshot: Dict[str, Any]) -> None:
     for e in events:
         if not isinstance(e, dict) or not str(e.get("kind", "") or ""):
             raise KanbanError(BAD_INPUT_CODE, "snapshot event needs a kind")
+    dependencies = snapshot.get("dependencies", [])
+    if not isinstance(dependencies, list):
+        raise KanbanError(BAD_INPUT_CODE, "snapshot dependencies must be a list")
+    for link in dependencies:
+        if not isinstance(link, dict) or any(dependency_id(link.get(key)) not in task_ids
+                                             for key in ("parent_id", "child_id")):
+            raise KanbanError(BAD_INPUT_CODE, "snapshot dependency references an unknown task")
 
 
 def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
@@ -1034,6 +1163,7 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
         try:
             conn.execute("DELETE FROM events")
             conn.execute("DELETE FROM comments")
+            conn.execute("DELETE FROM task_dependencies")
             conn.execute("DELETE FROM tasks")
             conn.execute("DELETE FROM boards")
             for b in snapshot.get("boards", []):
@@ -1043,14 +1173,16 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
                               b.get("created_at", _now())))
             for t in snapshot.get("tasks", []):
                 conn.execute("INSERT INTO tasks(id, board, title, body, status,"
-                             " assignee, priority, created_at, updated_at, completion_summary)"
-                             " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                             " assignee, priority, created_at, updated_at, completion_summary, archived_from)"
+                             " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                              (t.get("id"), t["board"], t["title"],
                               t.get("body", ""), t["status"], t.get("assignee"),
                               t.get("priority", "normal"),
                               t.get("created_at", _now()),
                               t.get("updated_at", _now()),
-                              _check_summary(t.get("completion_summary", ""))))
+                              _check_summary(t.get("completion_summary", "")), t.get("archived_from")))
+            for link in snapshot.get("dependencies", []):
+                _add_dependency(conn, dependency_id(link["parent_id"]), dependency_id(link["child_id"]))
             for c in snapshot.get("comments", []):
                 conn.execute("INSERT INTO comments(id, task_id, author, body,"
                              " created_at) VALUES(?,?,?,?,?)",
@@ -1667,9 +1799,8 @@ def board_open(cfg: Any, board: str = "main") -> Dict[str, Any]:
         columns = (json.loads(layout_row["columns"])
                    if layout_row else list(_DEFAULT_COLUMNS))
         by_column: Dict[str, List[Dict[str, Any]]] = {c: [] for c in columns}
-        for trow in conn.execute("SELECT * FROM tasks WHERE board=?"
-                                 " ORDER BY id DESC LIMIT 500", (slug,)):
-            task = _task_dict(trow)
+        rows = conn.execute("SELECT * FROM tasks WHERE board=? ORDER BY id DESC LIMIT 500", (slug,))
+        for task in _with_dependencies(conn, [_task_dict(row) for row in rows]):
             by_column.setdefault(task["status"], []).append(task)
         widgets = [_widget_dict(r) for r in conn.execute(
             "SELECT * FROM canvas_widgets WHERE board=? ORDER BY y, x, id",
@@ -1716,6 +1847,8 @@ def move_task(cfg: Any, task_id: int, *, board: str = "",
             _get_board(conn, dest_board)
             dest_status = status or row["status"]
             task = _task_dict(row)
+            if dest_status in ("claimed", "done") and dest_status != row["status"]:
+                _require_parents_done(conn, task["id"])
             if task.get("assignee"):
                 _require_canvas_role(conn, dest_board,
                                      task["assignee"], "editor")
