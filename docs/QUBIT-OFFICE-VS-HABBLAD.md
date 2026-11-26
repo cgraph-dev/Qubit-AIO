@@ -1,33 +1,44 @@
-# Qubit Office vs Habblaud — how each works, and the differences
+# Qubit Office vs Habblaud vs StarNet — three agent-workspace designs
 
 **Status:** comparison and code inventory. **Not a verdict.** Nothing here is `VERIFIED`,
 `COMPLETE`, or a parity claim. It describes what exists in the tree today.
 
-This document explains two different things that share one renderer:
+*(The filename keeps its original two-project name so existing links and the STATUS log do not
+break; the document now covers three projects.)*
+
+This document explains three different products that put agents in a pixel-art workspace:
 
 1. **Habblaud** — the upstream project (`marmottajr/habblaud`, MIT), a standalone local web
    application for watching Claude Code / Codex agents.
 2. **Qubit Office** — the `/qubit-office` page in the Qubit dashboard, which embeds a vendored
    build of Habblaud's **client** and feeds it from Qubit's own office backend.
+3. **StarNet** — the upstream project (`androoAGI/starnet`, MIT code), a local-first **desktop
+   harness** that creates and runs its own AI-agent teams and renders their live state as a
+   pixel-art space station.
 
-Habblaud is **not** a desktop app. Both surfaces are browser UIs served over HTTP. The real
-difference is *who serves the page*, *who owns the server*, and *where the data comes from*.
+The form difference is real but often mis-stated: **Habblaud and Qubit Office are browser UIs;
+StarNet is a desktop app (Tauri).** The deeper difference is *who owns the agent runtime*:
+Habblaud observes Claude Code, Qubit Office projects Qubit's own office/Business OS, and StarNet
+runs its own harness.
 
 ---
 
 ## 1. At a glance
 
-| | Upstream Habblaud | Qubit Office (`/qubit-office`) |
-|---|---|---|
-| Form | Standalone local web app | A page inside the Qubit dashboard |
-| URL | `http://localhost:4747` | `http://127.0.0.1:8890/qubit-office` |
-| Process | Its own Node server (or Docker container) | The Qubit dashboard's Python server |
-| Client | Its own Vite build, served at `/` | Habblaud's built client + local art/FX changes, vendored at `/plugin-apps/qubit-office/habblaud/` and shown in an iframe |
-| Data source | Claude Code / Codex session files on disk | Qubit's office SQLite store (`office.db`) and Business OS |
-| Auth | Loopback by default; optional separate HTTPS port with login | Qubit session token + a loopback/same-origin/Referer/load-nonce gate for the frame |
-| Extras | Claude Code mod/plugins, statusline usage tap, Codex bridge, Docker, phone/HTTPS remote, terminal SSE | Qubit host docks (Agents, HUD, Approvals, War Room, Command Center, Timeline, Studio, Campus), Business OS APIs, seat routing, themes/FX |
-| Always on | Yes, independent of any dashboard | Only while the Qubit dashboard runs |
-| License | MIT (upstream) | Same MIT client, vendored; attribution in `THIRD_PARTY_NOTICES.md` |
+| | Upstream Habblaud | Qubit Office (`/qubit-office`) | StarNet |
+|---|---|---|---|
+| Form | Standalone local web app | A page inside the Qubit dashboard | Local-first desktop app (Tauri) |
+| Launch | `http://localhost:4747` | `http://127.0.0.1:8890/qubit-office` | installers; `node sidecar/index.js` → `:8787`; `starnet` terminal client |
+| Process | Its own Node server (or Docker) | The Qubit dashboard's Python server | Rust/Tauri shell + embedded Node sidecar |
+| Client | Its own Vite build, served at `/` | Habblaud's built client + local art/FX, in an iframe | Vanilla JS station UI (no frontend build step) |
+| Data source | Claude Code / Codex session files | Qubit's office SQLite store + Business OS | StarNet's own local workspace, transcripts and ledgers |
+| Who runs agents | Claude Code (external) | Qubit runtime (Hermes-derived) | StarNet's own sidecar harness |
+| Visual | Office rooms | Office + Qubit host docks | Pixel-art space station |
+| Auth | Loopback; optional HTTPS + login | Qubit token + loopback/same-origin/nonce gate | Local app; keys in OS keychain; local API auth |
+| Extras | Claude Code mod/plugins, statusline usage, Codex bridge, Docker, remote, terminal SSE | Host docks, Business OS APIs, seat routing, themes/FX | Models, tools/MCP, channels, cron, spend, permissions/E-STOP, voice |
+| Platforms | macOS / Linux (Node or Docker) | Wherever the Qubit dashboard runs | Windows / macOS public; Linux internal |
+| Always on | Yes | Only while the dashboard runs | Yes (tray/background) |
+| License | MIT | MIT client, vendored; attribution in `THIRD_PARTY_NOTICES.md` | MIT code; name/logo/art not licensed |
 
 ---
 
@@ -65,9 +76,95 @@ pin, verified below).
 
 ---
 
-## 3. How Qubit Office works
+## 3. How StarNet works
 
-### 3.1 Page, plugin, iframe
+> **Path scope:** every path in §3 (for example `frontend/app/…`, `sidecar/…`,
+> `docs/VOICE_CHAT_PLAN.md`) is inside the **StarNet repository**, not this Qubit tree.
+> StarNet is not vendored here.
+
+StarNet (`https://github.com/androoAGI/starnet`, MIT code, © 2026 Andrew Sims) is a
+**local-first desktop harness** — not a viewer. Its own description: "A local-first, gamified
+desktop harness for building and running real AI-agent teams." You create agents, give them
+workspaces, tools and bounded permissions, and watch them work; the station is the projection
+of that runtime state.
+
+Verified with a shallow clone on 2026-11-26 (commands in §8):
+
+- default branch `feat/harness-backend`, HEAD `e316231d70610aac7b181c4efd1a10b3fc833cdc`
+  (2026-11-07), version `0.15.0` (`package.json` and `src-tauri/tauri.conf.json`);
+- `LICENSE` is MIT, Copyright (c) 2026 Andrew Sims; `NOTICE.md` records third-party skill
+  credits. The README states the MIT licence covers the **code only** — the StarNet name,
+  logo, station art and sprites are **not** licensed with it;
+- no `habblaud` or `qubit` references were found in the tree; the harness is partly ported
+  from Hermes (see §3.5).
+
+### 3.1 Process model
+
+ONE Node process: `node sidecar/index.js` → HTTP + SSE on `:8787` (`sidecar/index.js`), serving
+the frontend and running the agent loop in-process. The Rust/Tauri desktop app embeds that same
+sidecar and compiles the frontend into the executable (`src-tauri/`). The README also documents
+a `starnet` terminal client that reads the same station state and can start the app in the
+background. Public installers are Windows and macOS; Linux is an internal build target only.
+
+### 3.2 The station is a projection, not a simulation
+
+The pixel-art station is rendered from live harness state. The README's product contract: a room
+is a capability-scoped team, a hallway is an authorized handoff lane, and a placed object is a
+real capability grant — "the layout you draw *is* the workflow the agents run." It states that
+StarNet does not simulate revenue, completed work, model activity or spend, and that the
+interface must never assert state the harness cannot prove.
+
+### 3.3 What the harness owns
+
+From `CODE_MAP.md` and the tree:
+
+- **Agent loop + providers** (`sidecar/loop.js`, `sidecar/providers/`): Anthropic, OpenRouter,
+  OpenAI-compatible, Gemini, Codex, Claude CLI and local Ollama.
+- **Tools and capability gates** (`sidecar/tools/`, `sidecar/capability/`): a registry plus
+  web/browser/computer/desktop/fs/notebook/recall/skills/image/shell tools, with a
+  station-layout → tool-allowlist gate before tools run.
+- **Consent + permissions** (`permissions.js`, `permgrants.js`, `halt.js`): an explicit consent
+  broker, grants and an E-STOP.
+- **Channels** (`sidecar/channels/`): Telegram, Discord, Slack, Signal and Matrix, with pairing,
+  a delivery ledger and admission.
+- **MCP** (`sidecar/mcp/`): stdio/HTTP transports and an OAuth client.
+- **Cron / routines / loops**: schedules, locks, stores and channel notifications.
+- **Spend and ledgers** (`cost.js`, `spend.js`, `credits.js`, `ledger.js`): real USD
+  reconciliation, budgets and run history.
+- **Persistence and memory**: atomic stores for checkpoints, transcripts, skills and workshop
+  state; Cortex recall/redaction and context compaction.
+- **Frontend** (`frontend/`, vanilla JS modules; no frontend build step): the canvas station,
+  COMMS chat/voice, quests/goals/recipes/workstreams and the station editor.
+
+### 3.4 Voice
+
+`docs/VOICE_CHAT_PLAN.md` (91 lines) specifies two-way voice for COMMS: push-to-talk STT into
+the same chat send path, agent replies spoken once per finished reply, and a deterministic
+per-agent voice. It leaves an explicit seam for neural voices. The current frontend includes
+`app/voice.js` and `app/voice-state.js`.
+
+Qubit already keeps a read-only map of StarNet's voice pipeline in
+`docs/STARNET_VOICE_STUDY.md` (2026-10-17), read from a local `starnet-live` checkout. That
+checkout's current HEAD is `54899e5ff3f2b002b457757916b3977818db6fc1` (2026-10-09) — older than
+the `e316231d…` pin used here — and the study did not record a commit. Read that study for the
+exact STT/TTS ladder rather than re-deriving it here.
+
+### 3.5 Relationship to Qubit and Habblaud
+
+- **No direct code relationship with Qubit Office or Habblaud**; the repo has no references to either.
+- **Lineage via Hermes:** `NOTICE.md` says the harness was "in part ported from" the Hermes
+  agent project (© 2025 Nous Research, MIT). Qubit's runtime is also Hermes-derived, so the two
+  share an upstream ancestor but are independent products. StarNet can import an existing
+  OpenClaw or Hermes home as a new StarNet agent.
+- **The deleted `/qubit-office3`** (Voice Chat) was a Qubit-authored reimplementation of
+  `docs/VOICE_CHAT_PLAN.md`, not vendored StarNet code, and was removed on 2026-11-26. StarNet
+  itself remains the reference design.
+
+---
+
+## 4. How Qubit Office works
+
+### 4.1 Page, plugin, iframe
 
 - The dashboard route is `frontend/qubit-web/src/App.tsx:418`:
   `"/qubit-office": () => <PluginPage name="qubit-office" />`.
@@ -79,7 +176,7 @@ pin, verified below).
   `OfficeAppShell.tsx:796` renders that document in a sandboxed `<iframe>`. `?theme=` and
   `?floor=live:<n>` are appended to the iframe URL; `?shell`/`?app` choose the renderer.
 
-### 3.2 Host shell around the iframe
+### 4.2 Host shell around the iframe
 
 The Qubit shell is not upstream. It adds:
 
@@ -96,7 +193,7 @@ The Qubit shell is not upstream. It adds:
   `frontend/qubit-app/plugins/qubit-office/habblaud/LICENSE` travels with the served tree and is
   served by `_serve_plugin_app` (pinned by `test_extensionless_licence_is_served_as_a_notice`).
 
-### 3.3 Backend: Python replaces Habblaud's Node server
+### 4.3 Backend: Python replaces Habblaud's Node server
 
 - The office store is SQLite at `$QUBIT_HOME/voice/state/office/office.db`
   (`voicebridge/office/store.py:250` defines `office_meta`; `:289` `office_agent`; `:603`
@@ -110,7 +207,7 @@ The Qubit shell is not upstream. It adds:
 - The dashboard serves the frame's live feed at `GET /api/stream` via
   `voicebridge/webui.py:2832` (`_serve_office_stream`), and the one-shot JSON at `/api/snapshot`.
 
-### 3.4 How the vendored client's `/api/*` calls are answered
+### 4.4 How the vendored client's `/api/*` calls are answered
 
 The client was written against Habblaud's own server and issues literal `/api/...` requests. Qubit
 does **not** let those reach the general dashboard API:
@@ -134,7 +231,7 @@ does **not** let those reach the general dashboard API:
   `h_office_habblaud_refuse` (`voicebridge/qubit_compat.py:7545`), answering
   `403 OFFICE_CLIENT_UNSUPPORTED`.
 
-### 3.5 What is real vs. refused in the embedded client
+### 4.5 What is real vs. refused in the embedded client
 
 Real (bound to Qubit data or the shared journals):
 
@@ -156,7 +253,7 @@ Typed refusals (by design):
 The snapshot's `meta.terminal` and `meta.messages` gates are `true` because the permission-decision
 and room-rename controls are really bound — it is **not** a claim that Qubit exposes a PTY.
 
-### 3.6 What the embedded client does not get from Qubit
+### 4.6 What the embedded client does not get from Qubit
 
 - `to_snapshot` returns `accounts: []`. Upstream's account letters and 5-hour/weekly usage counters
   have no Qubit source, so those parts of the topbar are empty rather than fabricated.
@@ -165,7 +262,7 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
 - Upstream reads Claude Code transcripts directly; Qubit reads its own office store. A Qubit
   character is a Business OS/office seat, not a live `claude` process.
 
-### 3.7 Vendored client provenance and local changes
+### 4.7 Vendored client provenance and local changes
 
 - Source: `https://github.com/marmottajr/habblaud`, upstream commit
   `4ccce2537472fe5a8d432f06974494d2e778ff15`; local source commit
@@ -190,48 +287,66 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
 
 ---
 
-## 4. Differences that matter
+## 5. Differences that matter
 
-| Area | Upstream Habblaud | Qubit Office |
-|---|---|---|
-| Deployment | Own Node/Docker process on :4747 | Served by the Qubit Python dashboard on :8890 |
-| Independence | Runs with or without a dashboard | Requires the Qubit dashboard |
-| Data | Claude Code/Codex session files | Qubit `office.db` + Business OS |
-| Identity of an agent | A live Claude session / subagent | A Business OS / office seat |
-| Server code | TypeScript Node server | Python `voicebridge/office` + `qubit_compat` |
-| Client code | Its own build, served at `/` | Habblaud build + documented local art/FX changes, re-pathed, English, re-branded |
-| Account/usage counters | From Claude accounts | Empty (`accounts: []`) |
-| Terminal | Real terminal SSE | Typed refusal |
-| Permissions / messages | Mod + hook queues | Qubit approval journal + office message/task |
-| Codex support | Codex bridge | Not vendored |
-| Remote/phone | Optional HTTPS + login | Not applicable; loopback dashboard |
-| Panels | Habblaud's own UI | Habblaud UI plus Qubit host docks |
-| Business data | None (project rooms only) | Revenue, cost, tasks, artifacts, War Room, departments |
-| Themes/art | Procedural pixel art | Procedural art + an optional theme pack built locally (2Five/LimeZu slices; not committed) |
-| Projected effects | None from Qubit business events | Sakuga VFX from real `office_event` + recent `bos_event` rows |
-| Update path | `npm`/Docker, upstream releases | Rebuild the vendored client + bump PROVENANCE |
-| Attribution | Its own LICENSE/README | `THIRD_PARTY_NOTICES.md` + vendored LICENSE; LimeZu tile credit in Outside World |
+| Area | Upstream Habblaud | Qubit Office | StarNet |
+|---|---|---|---|
+| Deployment | Own Node/Docker process on `:4747` | Served by the Qubit Python dashboard on `:8890` | Tauri desktop app; sidecar on `:8787` in source/browser mode |
+| Independence | Runs with or without a dashboard | Requires the Qubit dashboard | Standalone desktop app; can run in the tray |
+| Agent runtime owner | Claude Code / Codex (external) | Qubit's runtime / Business OS seats | StarNet's own Node sidecar harness |
+| Data / state | Claude session files on disk | Qubit `office.db` + Business OS | StarNet workspace, saves, transcripts, ledgers |
+| Identity of an agent | A live Claude session / subagent | A Business OS / office seat | A created StarNet agent with class, workspace and permissions |
+| Server / engine code | TypeScript Node server | Python `voicebridge/office` + `qubit_compat` | Node sidecar (`sidecar/`, agent loop, providers, tools) |
+| Client code | Its own Vite build, served at `/` | Habblaud build + local art/FX, re-pathed, English, re-branded | Vanilla JS station UI, no frontend build step |
+| Visual metaphor | Office rooms | Office + Qubit host docks | Pixel-art space station |
+| Multi-agent | One room per open session | Office floors / rooms / desks (seats) | Several concurrent agents, each a separate bounded run |
+| Models / providers | Not applicable (observes Claude) | The Qubit profile's models | Anthropic, OpenRouter, OpenAI-compatible, Gemini, Codex, Claude CLI, Ollama |
+| Tools / MCP | Mod hooks only | Qubit tools/approvals; MCP is Qubit's own | Tools + MCP client, gated by the station layout |
+| Channels | Mod permission/message plugins | Qubit channels (its own) | Telegram, Discord, Slack, Signal, Matrix |
+| Cron / routines | None | Qubit cron (its own) | Routines, loops and schedules in the harness |
+| Permissions / consent | Mod + hook queues | Qubit approval journal + office message/task | Consent broker, grants, E-STOP |
+| Spend / budget | Reads Claude account usage | Not a Qubit Office feature | Real USD reconciliation, budgets and ledgers |
+| Memory | Reads Claude session transcripts | Qubit memory (its own) | Cortex recall/redaction + context compaction |
+| Voice | Dictation in (Whisper); no agent voice | Dictation status via the compat route (writes refused); no agent voice | Push-to-talk STT + spoken replies (one locked station voice; per-agent override) |
+| Business / office concept | Project rooms only | Revenue, cost, tasks, artifacts, War Room, departments | Station rooms/bays are capability teams; work lands in OUTBOX |
+| Account / usage counters | From Claude accounts | Empty (`accounts: []`) | Spend/budget shown from StarNet's own ledger |
+| Terminal | Real terminal SSE | Typed refusal | `starnet` CLI client; desktop tools through the harness |
+| Remote / phone | Optional HTTPS + login | Not applicable; loopback dashboard | Channel messaging (Telegram/Discord/Slack/Signal/Matrix) |
+| Themes / art | Procedural pixel art | Procedural art + optional locally built theme pack (2Five/LimeZu slices) | StarNet's own station art and sprites |
+| Projected effects | None from Qubit business events | Sakuga VFX from real `office_event` + recent `bos_event` rows | World animation from live harness events |
+| Update path | `npm`/Docker, upstream releases | Rebuild the vendored client + bump PROVENANCE | Upstream installers/updater |
+| Attribution | Its own LICENSE/README | `THIRD_PARTY_NOTICES.md` + vendored LICENSE; LimeZu tile credit in Outside World | MIT code; `NOTICE.md`; brand/art reserved |
+| Hermes lineage | None | Runtime is Hermes-derived | Harness is partly ported from Hermes (per `NOTICE.md`) |
 
 ---
 
-## 5. Practical consequences
+## 6. Practical consequences
 
+- **They answer three different questions.** Habblaud: "what are my Claude Code agents doing right
+  now?" Qubit Office: "what is my Qubit office/Business OS doing?" StarNet: "run my own agent team
+  in a station." They are not three skins of one product.
+- **Only StarNet is a desktop app.** Habblaud and Qubit Office are browser UIs served over HTTP.
 - **You cannot use `/qubit-office` as a drop-in Habblaud replacement.** It shows Qubit's office,
   not your Claude Code processes. A project room appears because the office store has a
   floor/room, not because a terminal is open.
-- **Upstream-only capabilities are absent or refused**, by design: raw terminal, deliveries, the
-  Codex bridge, account usage, remote phone login, and the Claude Code mod.
+- **Upstream-Habblaud-only capabilities are absent or refused**, by design: raw terminal,
+  deliveries, the Codex bridge, account usage, remote phone login, and the Claude Code mod.
 - **Qubit-only capabilities are additive**: the host docks, Business OS APIs
   (`/api/office/business/*`, `/api/office/world/*`, `/api/office/tower`), seat model routing, the
   character store, and the theme/FX layer.
-- **Shared**: the canvas renderer, the SSE protocol (`snapshot` + `feed`), the room/agent model,
-  character editing, timeline/stats views (adapted to Qubit data), and the demo toggle.
+- **StarNet adds what neither other product owns**: its own agent loop, providers, tools/MCP,
+  channels, routines, spend ledgers, consent/E-STOP and a desktop shell. Its visual station is a
+  projection of that harness, not a view of someone else's sessions.
+- **Shared between Habblaud and Qubit Office**: the canvas renderer, the SSE protocol
+  (`snapshot` + `feed`), the room/agent model, character editing, timeline/stats views (adapted to
+  Qubit data), and the demo toggle. StarNet has **no direct code relationship** with either; its only lineage link is that both its
+  harness and Qubit's runtime are partly derived from Hermes.
 - **`?shell=1`** still mounts the older Qubit vector shell. It is a comparison/fallback surface, not
   a second product.
 
 ---
 
-## 6. Where the code lives
+## 7. Where the code lives
 
 | Concern | Path |
 |---|---|
@@ -250,7 +365,18 @@ and room-rename controls are really bound — it is **not** a claim that Qubit e
 | Compat handlers / refusals | `voicebridge/qubit_compat.py` (`h_office_habblaud_refuse:7545`) |
 | Business OS | `voicebridge/business/` |
 
-## 7. How to check this document
+StarNet is **not vendored** in this repository. Its paths below are inside the external repo:
+
+| StarNet concern | Path (in `androoAGI/starnet`) |
+|---|---|
+| Agent runtime / server | `sidecar/loop.js`, `sidecar/index.js` |
+| Providers / tools / MCP | `sidecar/providers/`, `sidecar/tools/`, `sidecar/mcp/` |
+| Channels / cron / spend | `sidecar/channels/`, `sidecar/cron*.js`, `sidecar/cost.js` |
+| Station UI / COMMS / voice | `frontend/app/world.js`, `frontend/app/chat.js`, `frontend/app/voice.js` |
+| Desktop shell | `src-tauri/` |
+| Voice design | `docs/VOICE_CHAT_PLAN.md` |
+
+## 8. How to check this document
 
 ```bash
 # Vendored client identity and hash manifest (should print ok + pin)
@@ -273,11 +399,19 @@ git -C "$HABBLAUD_SRC" log --oneline 4ccce2537472fe5a8d432f06974494d2e778ff15..d
 # Upstream client source size at the pin
 git -C "$HABBLAUD_SRC" ls-tree -r --name-only 4ccce2537472fe5a8d432f06974494d2e778ff15 -- client/src | wc -l
 
+# StarNet (external, not vendored): pin, version, licence and voice plan
+git clone --depth 1 https://github.com/androoAGI/starnet "$STARNET_SRC"
+git -C "$STARNET_SRC" ls-remote --symref origin HEAD | head -1
+git -C "$STARNET_SRC" log -1 --format='%H %cI %s'
+sha256sum "$STARNET_SRC/LICENSE" "$STARNET_SRC/NOTICE.md"
+python3 -c "import json;print(json.load(open('$STARNET_SRC/package.json'))['version'])"
+wc -l "$STARNET_SRC/docs/VOICE_CHAT_PLAN.md"
+
 # The deployment contract (served truth, not the filesystem)
 .venv/bin/python -m pytest -q tests/test_office_deployment_contract.py -m contract
 ```
 
-## 8. Verification status
+## 9. Verification status
 
 Run against the current tree while writing this document:
 
@@ -285,8 +419,22 @@ Run against the current tree while writing this document:
 - `.venv/bin/python -m pytest -q tests/test_office_deployment_contract.py -m contract` against the
   live dashboard → **5 passed, 2 deselected** (the served-truth HTTP/route checks).
 - `.venv/bin/python scripts/verify_doc_citations.py` → `OK — every citation resolves`.
-- The cited line numbers and the vendored/tree counts were re-derived with the commands in §7.
+- The cited line numbers and the vendored/tree counts were re-derived with the commands in §8.
 - `/qubit-office` and `/api/health` answered HTTP 200 on `127.0.0.1:8890`.
+
+StarNet (external repository, shallow clone on 2026-11-26):
+
+- `git ls-remote --symref origin HEAD` → default branch `feat/harness-backend`, commit
+  `e316231d70610aac7b181c4efd1a10b3fc833cdc` (2026-11-07), version `0.15.0`.
+- `LICENSE` is MIT (Copyright (c) 2026 Andrew Sims), sha256
+  `576bf9e6651870a13ef8b0067ccbd85e4781999b6da32c767891997cf65d46b7`;
+  `NOTICE.md` sha256 `347ffb1ccd1489a4bed8659c6cc62b629ea0f3fc275162baba0538e6a3359c6c`.
+- `docs/VOICE_CHAT_PLAN.md` is 91 lines; a repo-wide search found no `habblaud` or `qubit`
+  references.
+- Qubit's earlier read-only study, `docs/STARNET_VOICE_STUDY.md` (2026-10-17), read a local
+  `starnet-live` checkout whose HEAD is `54899e5ff3f2b002b457757916b3977818db6fc1` (2026-10-09);
+  the upstream HEAD verified here is newer (`e316231d…`). That study did not record a commit, and
+  its voice details were not re-run.
 
 Verification found and fixed one real defect: `GET /plugin-apps/qubit-office/habblaud/LICENSE`
 returned **404** on the running service because `_serve_plugin_app`'s directory-default rule
@@ -303,4 +451,6 @@ Not verified here:
   edits.
 - `frontend/qubit-dist/plugins/fleet.json` and the built bundle are artifacts; the source tree is
   authoritative after a rebuild.
-- Upstream's own test suite and its mod/Codex/Docker paths were not exercised.
+- Habblaud's own test suite and its mod/Codex/Docker paths were not exercised.
+- StarNet's own test suite, desktop builds, Tauri shell and live harness were not run; only its
+  repository facts (pin, licence, version, tree shape) were verified.
