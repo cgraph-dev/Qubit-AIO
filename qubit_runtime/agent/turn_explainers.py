@@ -138,7 +138,14 @@ class TurnExplainersMixin:
                 changed.update(landed_paths)
             identities = getattr(self, "_turn_file_mutation_identities", None)
             if identities is not None:
-                identities.update(_file_mutation_identity(p, task_id) for p in landed_paths)
+                resolved = {_file_mutation_identity(p, task_id) for p in landed_paths}
+                identities.update(resolved)
+                host_identities = getattr(self, "_turn_host_file_mutation_identities", None)
+                if host_identities is not None:
+                    from tools.file_tools import file_ops_used_host_filesystem
+
+                    if file_ops_used_host_filesystem(task_id or "default"):
+                        host_identities.update(resolved)
             # Feed the checkpoint agent-write ledger so /rollback's safe mode can tell
             # Qubit-authored content from later user hand-edits.
             mgr = getattr(self, "_checkpoint_mgr", None)
@@ -166,7 +173,7 @@ class TurnExplainersMixin:
                 if info.get("identity", _file_mutation_identity(path, task_id)) in cleared:
                     state.pop(path, None)
 
-    def file_mutation_evidence(self) -> dict[str, list[str]]:
+    def file_mutation_evidence(self, *, include_host_targets: bool = False) -> dict[str, list[str]]:
         """Return opaque target identities for landed and unresolved file tool outcomes."""
         from hashlib import sha256
 
@@ -176,8 +183,11 @@ class TurnExplainersMixin:
         def target_ids(paths):
             return sorted({sha256(os.fsencode(path)).hexdigest() for path in paths})
 
-        return {"failed": target_ids(info["identity"] for info in failed.values()),
-                "landed": target_ids(landed)}
+        evidence = {"failed": target_ids(info["identity"] for info in failed.values()),
+                    "landed": target_ids(landed)}
+        if include_host_targets:
+            evidence["host_landed"] = target_ids(getattr(self, "_turn_host_file_mutation_identities", ()))
+        return evidence
 
     @staticmethod
     def _file_mutations_still_failed(failed: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:

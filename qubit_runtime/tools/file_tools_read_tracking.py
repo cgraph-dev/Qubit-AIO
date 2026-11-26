@@ -254,18 +254,29 @@ def _file_metadata(resolved: str) -> tuple | None:
         return None
 
 
-def _file_version(resolved: str) -> tuple | None:
-    """A byte snapshot, not just mtime (editors/copy tools can preserve that)."""
+def _file_version(resolved: str, *, max_bytes: int | None = None) -> tuple | None:
+    """A byte snapshot, with an optional bounded read of a direct regular file."""
+    follow_links = max_bytes is None
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+    if not follow_links:
+        flags |= getattr(os, "O_NOFOLLOW", 0)
     try:
-        if not stat.S_ISREG(os.stat(resolved).st_mode):
+        initial = os.stat(resolved, follow_symlinks=follow_links)
+        if not stat.S_ISREG(initial.st_mode) or (max_bytes is not None and initial.st_size > max_bytes):
             return None
-        fd = os.open(resolved, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+        fd = os.open(resolved, flags)
         with os.fdopen(fd, "rb") as stream:
             before = os.fstat(stream.fileno())
             if not stat.S_ISREG(before.st_mode):
                 return None
-            digest = hashlib.file_digest(stream, "sha256").digest()
-            after = os.stat(resolved)
+            if max_bytes is None:
+                digest = hashlib.file_digest(stream, "sha256").digest()
+            else:
+                contents = stream.read(max_bytes + 1)
+                if len(contents) > max_bytes:
+                    return None
+                digest = hashlib.sha256(contents).digest()
+            after = os.stat(resolved, follow_symlinks=follow_links)
         fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
         version = tuple(getattr(before, name) for name in fields)
         if version == tuple(getattr(after, name) for name in fields):

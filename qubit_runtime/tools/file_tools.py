@@ -374,6 +374,16 @@ def _get_file_ops(task_id: str = "default") -> ShellFileOperations:
     return file_ops
 
 
+def file_ops_used_host_filesystem(task_id: str) -> bool:
+    """Check the backend already used by a file operation without creating one."""
+    from tools.terminal_tool import _resolve_container_task_id
+
+    key = _resolve_container_task_id(task_id)
+    with _file_ops_lock:
+        ops = _file_ops_cache.get(key)
+    return ops is not None and _file_ops_uses_host_paths(ops)
+
+
 def clear_file_ops_cache(task_id: str | None = None):
     """Clear file-operation state for a finished task, or all tasks."""
     with _file_ops_lock:

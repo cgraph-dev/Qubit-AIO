@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from hashlib import sha256
 from contextlib import closing
 from threading import Event
 from time import monotonic
@@ -142,6 +144,52 @@ def test_goal_requires_recovery_of_the_failed_file_target(tmp_path, monkeypatch,
     assert "Retry the authorized change on that target" in calls[1][0]
     if not recovered:
         assert out["detail"] == "A file edit failed without a successful retry of the same target."
+
+
+@pytest.mark.parametrize("case", ["match", "wrong_bytes", "no_landing", "changes_during_judge"])
+def test_exact_file_verification_controls_goal_completion(tmp_path, monkeypatch, case):
+    from qubit_cli import goals
+
+    cfg = Cfg(tmp_path)
+    file = tmp_path / "requested file.md"
+    expected = b"approved\n"
+    digest = sha256(expected).hexdigest()
+    target = os.path.normcase(str(file.resolve()))
+    file.write_bytes(b"wrong\n" if case == "wrong_bytes" else expected)
+    card = KB.create(cfg, "Verify the target",
+                     body=f"Check the fixture evidence.\nVerify: file-sha256 {digest} {target}",
+                     goal_mode=True, goal_max_turns=1, confirmed=True)["task"]
+    landed = [] if case == "no_landing" else [sha256(os.fsencode(target)).hexdigest()]
+    result = {"state": "OK", "reply": "I verified the requested file.",
+              "receipt": {"tool_execution": {"file_mutations": {"host_landed": landed}}}}
+    _worker_fixture(monkeypatch, [result], [])
+    calls = []
+
+    def judge(goal, reply):
+        calls.append(goal)
+        assert digest in goal
+        if case == "changes_during_judge":
+            file.write_bytes(b"changed while judging\n")
+        return "done", "Accepted", False, None, False
+
+    monkeypatch.setattr(goals, "judge_goal", judge)
+    out = KG.run(cfg, card["id"], requested_by="tester", confirmed=True)
+    done = case == "match"
+    assert out["goal_status"] == ("done" if done else "blocked")
+    assert bool(out["task"]["completion_summary"]) is done
+    assert bool(calls) is (case in ("match", "changes_during_judge"))
+    assert not out["task"]["goal_running"] and out["task"]["goal_turns_used"] == 1
+
+
+def test_malformed_exact_file_requirement_refuses_before_claim(tmp_path):
+    cfg = Cfg(tmp_path)
+    card = KB.create(cfg, "Verify the target", body="Verify: file-sha256 bogus /tmp/file",
+                     goal_mode=True, goal_max_turns=1, confirmed=True)["task"]
+    with pytest.raises(KB.KanbanError) as exc:
+        KG.run(cfg, card["id"], requested_by="tester", confirmed=True)
+    assert exc.value.code == KB.BAD_INPUT_CODE
+    saved = KB.show(cfg, card["id"])["task"]
+    assert saved["status"] == "open" and saved["goal_turns_used"] == 0
 
 
 def test_tool_execution_evidence_comes_from_current_runtime_events():
