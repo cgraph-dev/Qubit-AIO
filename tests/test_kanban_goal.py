@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
 import pytest
 
 from voicebridge import kanban as KB, kanban_goal as KG
@@ -86,6 +89,22 @@ def test_goal_cap_blocks_before_an_extra_turn(tmp_path, monkeypatch):
     assert out["goal_status"] == "blocked" and "budget" in out["detail"]
     assert out["task"]["goal_turns_used"] == len(calls) == 1
     assert not out["task"]["goal_running"]
+
+
+def test_goal_cli_keeps_worker_progress_out_of_json(tmp_path, monkeypatch, capsys):
+    from voicebridge.cli import _cmd_kanban
+
+    cfg = Cfg(tmp_path)
+    task_id = _goal(cfg, turns=1)
+    _worker_fixture(monkeypatch, ["Fixture passed."], [
+        ("done", "Verified", False, None, False),
+    ], lambda: print("Worker progress"))
+    args = SimpleNamespace(kanban_command="run-goal", task_id=task_id, confirm=True)
+
+    assert _cmd_kanban(cfg, args) == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["goal_status"] == "done"
+    assert "Worker progress" in captured.err
 
 
 def test_reclaimed_goal_cannot_settle_or_overlap(tmp_path, monkeypatch):

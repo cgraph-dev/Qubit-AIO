@@ -7821,8 +7821,13 @@ def _cmd_kanban(cfg, args) -> int:
                             goal_max_turns=getattr(args, "goal_max_turns", None),
                             requested_by="cli:user", confirmed=confirm)
         elif cmd == "run-goal":
+            from contextlib import redirect_stdout
+
             from . import kanban_goal
-            out = kanban_goal.run(cfg, args.task_id, requested_by="cli:user", confirmed=confirm)
+
+            # Worker progress belongs on stderr. Keep stdout machine-readable.
+            with redirect_stdout(sys.stderr):
+                out = kanban_goal.run(cfg, args.task_id, requested_by="cli:user", confirmed=confirm)
         elif cmd in ("link", "unlink"):
             out = KB.change_dependency(cfg, args.parent_id, args.child_id, remove=cmd == "unlink",
                                        requested_by="cli:user", confirmed=confirm)
