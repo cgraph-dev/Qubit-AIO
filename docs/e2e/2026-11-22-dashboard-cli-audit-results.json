@@ -2437,5 +2437,14 @@
     "verification": "SQLite and worker records showed one approved two-turn run in one session and zero turns for the dependent card. Thirty-seven focused tests, two plugin syntax checks, the Vite build, and the browser rehearsal passed.",
     "deployment": "VoiceBridge restarted and port 8890 reported READY. The served Kanban plugin matched the clean local build b9dffd4e3 byte for byte. The gateway stayed active.",
     "remaining": "Real worker and judge provider execution and deployed task mutations remain open."
+  },
+  "current_kanban_real_provider": {
+    "date": "2026-11-26",
+    "revision": "ca54db63c",
+    "environment": "Native CLI and worker, real auxiliary judge, installed qubit-brain model in a temporary loopback Ollama instance, disposable Qubit home and SQLite databases",
+    "provider": "Provider logs recorded real chat-completions requests for the worker and the separate goal-judge lane. Both used the same local model. The initial warm-up made the first worker request take about 67 seconds.",
+    "result": "The first card completed and saved 42. Its response also claimed terminal verification, which the persisted transcript did not substantiate. Two subsequent cards did not supply the answer. They saved 68 for 17 times 4 and 84 for 14 times 6. Independent transcript and board reads verified one spent turn and one completion event per card.",
+    "cli": "A real run exposed worker progress on stdout before the receipt. The fix redirects the worker's progress to stderr. A fresh real run produced JSON on stdout and a separate CLI read returned the same saved evidence. Fifty-two focused tests passed.",
+    "remaining": "Deployed Goal mode mutations, verification of tool-backed evidence, and the combined dashboard checklist row remain open."
   }
 }
