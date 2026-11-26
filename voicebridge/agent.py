@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, Optional
 
 DEFAULT_TIMEOUT_S = 300.0
 MAX_TEXT_CHARS = 8000
+_NON_EVIDENCE_TOOLS = frozenset({"tool_search", "tool_describe", "todo"})
 
 
 class AgentDenied(Exception):
@@ -514,6 +515,38 @@ def _vendor_tool_names(result: Any) -> "list[str]":
     return out
 
 
+class _ToolExecutionEvidence:
+    """Track this turn's runtime outcomes without retaining tool input or output."""
+
+    def __init__(self, progress_sink):
+        self.progress_sink = progress_sink
+        self.attempted = False
+        self.succeeded = False
+
+    def __call__(self, event, tool_name=None, *args, **kwargs):
+        if tool_name and tool_name not in _NON_EVIDENCE_TOOLS:
+            if event in ("tool.started", "tool.completed"):
+                self.attempted = True
+            if event == "tool.completed" and kwargs.get("is_error") is False:
+                from agent.tool_result_classification import is_guardrail_refusal
+
+                result = kwargs.get("result")
+                if result is not None and not is_guardrail_refusal(result):
+                    self.succeeded = True
+        if self.progress_sink is not None:
+            self.progress_sink(event, tool_name, *args, **kwargs)
+
+    def receipt(self, result: dict) -> dict:
+        # Argument validation and declined calls can appear in the live turn
+        # without a tool.started event. Never use older turns as this turn's evidence.
+        messages = result.get("messages")
+        idx = result.get("current_turn_user_idx")
+        if isinstance(messages, list) and type(idx) is int and 0 <= idx < len(messages):
+            requests = _vendor_tool_names({"messages": messages[idx + 1:]})
+            self.attempted |= bool(set(requests) - _NON_EVIDENCE_TOOLS)
+        return {"attempted": self.attempted, "succeeded": self.succeeded}
+
+
 def _local_model_runtime(cfg: Any, model: str) -> "Optional[Dict[str, Any]]":
     """Runtime kwargs for a LOCAL pinned model, or ``None`` when it is not local.
 
@@ -597,7 +630,8 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
                           progress_sink: Optional[Callable[..., None]] = None,
                           stream_delta: Optional[Callable[[Optional[str]], None]] = None,
                           session_model: Optional[str] = None,
-                          deadline: Optional[float] = None
+                          deadline: Optional[float] = None,
+                          capture_tool_evidence: bool = False
                           ) -> "Optional[Dict[str, Any]]":
     """Run one tool-capable agent turn through the vendored ``AIAgent``.
 
@@ -769,6 +803,7 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
         _fb_chain = get_fallback_chain(vcfg) or None
     except Exception:  # noqa: BLE001 - chain is advisory, never fatal
         _fb_chain = None
+    tool_evidence = _ToolExecutionEvidence(progress_sink) if capture_tool_evidence else None
     try:
         agent = AIAgent(
             api_key=runtime.get("api_key"),
@@ -788,7 +823,7 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             reasoning_config=_vendor_reasoning_config(reasoning),
             clarify_callback=_vendor_clarify_callback,
             event_callback=event_sink,
-            tool_progress_callback=progress_sink,
+            tool_progress_callback=tool_evidence or progress_sink,
             # Real per-token streaming seam. The vendored agent fires this with
             # each increment as the model produces it, and with ``None`` at a
             # segment boundary (before tool lines). Without it a general turn
@@ -865,6 +900,8 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
         "provider": provider_used, "model": model_used,
         "tools": tool_names, "session_id": sid,
     }
+    if tool_evidence is not None:
+        receipt["tool_execution"] = tool_evidence.receipt(result)
     # THE USAGE BLOCK THE OFFICE LEDGER NEEDS (D15/D16).
     #
     # `office.runner.run_turn` settles a turn's receipt from
@@ -1040,7 +1077,8 @@ def run_session(cfg: Any, task_text: str, *, session: str,
                 estop_engaged: Optional[Callable[[], bool]] = None,
                 cancelled: Optional[Callable[[], bool]] = None,
                 progress_sink: Optional[Callable[..., None]] = None,
-                model: Optional[str] = None
+                model: Optional[str] = None,
+                capture_tool_evidence: bool = False
                 ) -> Dict[str, Any]:
     """Run a bounded multi-step worker session natively.
 
@@ -1121,7 +1159,8 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     vendored = _run_vendored_session(cfg, clean, sid, check=check,
                                      store=store, reasoning=reasoning,
                                      progress_sink=progress_sink,
-                                     session_model=model, deadline=deadline)
+                                     session_model=model, deadline=deadline,
+                                     capture_tool_evidence=capture_tool_evidence)
     if vendored is not None:
         vendored.setdefault("session_id", sid)
         return vendored
