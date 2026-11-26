@@ -2459,5 +2459,17 @@
     "retry": "A fresh card staged and cancelled one approval, then started once. The worker made ten successful provider requests within one goal turn while it tried tools, including unavailable names and an argument validation error. The temporary Ollama listener reached its audit time limit. The worker began provider recovery and did not reach the judge. The audit stopped the disposable dashboard. A separate CLI reclaim restored the card to Todo. SQLite confirmed the cleared claim, one spent turn, no completion summary, and no completion event.",
     "deployment": "The live board at port 8890 returned HTTP 200 and the authenticated Operations catalog exposed confirmation-gated kanban_run_goal with task_id. Health was DEGRADED while system Ollama was inactive. All test writes went to the disposable board.",
     "remaining": "Bounded browser-run recovery, successful real judge settlement through the browser, reliable tool-backed evidence, live dashboard mutations, and the combined dashboard checklist row remain open."
+  },
+  "current_kanban_goal_worker_deadline": {
+    "date": "2026-11-26",
+    "revision": "7aa9d18d3949c7d79fac92d3040089ed4e590601",
+    "environment": "Authenticated Chromium, production Kanban bundle, separate loopback VoiceBridge listener, disposable board, real worker runtime, and a disposable provider HTTP fixture",
+    "worker": "Each Kanban Goal worker turn requests a 120-second deadline. At expiry the shared native worker calls the runtime hard-interrupt path and waits for it to unwind. A timed-out reply cannot reach the judge. A separate deadline for judge transport is outside this change.",
+    "stalled_stream": "With the timeout set to eight seconds in the disposable listener, Chromium cancelled an exact approval, then approved a fresh ID. The real worker started a streaming HTTP request. The provider held it open without a reply. The deadline closed the socket, and the browser received a Blocked receipt.",
+    "recovery": "A second card used a provider returning HTTP 503 and Retry-After: 45. A single ordinary worker attempt caused the automatic recovery ladder to start a 45-second wait. The same audit deadline interrupted recovery before another model request and before goal judging. The card reloaded as Blocked.",
+    "read_back": "SQLite showed one goal_started, one block, one goal_finished, one spent turn, a cleared run token, and no completion event or summary for each card. Chromium verified the exact cancellations and approvals and checked each card after reload.",
+    "verification": "Thirty-eight focused tests passed across Goal mode, the native agent, orchestrator session authority, and session continuity. Both Chromium rehearsals and independent database and provider log checks passed.",
+    "deployment": "VoiceBridge restarted after the worktree merged the fix at d0fbb0684. The gateway PID stayed the same. Live Kanban returned HTTP 200 and health reported DEGRADED. System Ollama was inactive. The unchanged frontend bundle was built from b9dffd4e3.",
+    "remaining": "Successful real judge settlement in Chromium, judge latency and timeouts, tool-backed evidence, live dashboard mutations, and the combined dashboard checklist row remain open."
   }
 }
