@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from contextlib import contextmanager
 from hashlib import sha256
 from uuid import uuid4
@@ -9,6 +11,8 @@ from uuid import uuid4
 from . import kanban as KB
 
 WORKER_TURN_TIMEOUT_S = 120.0
+MAX_VERIFIED_FILE_BYTES = 8 * 1024 * 1024
+MAX_VERIFIED_FILES = 8
 
 
 @contextmanager
@@ -28,6 +32,49 @@ def signature(task):
     return sha256(json.dumps(fields, ensure_ascii=False).encode()).hexdigest()
 
 
+def _exact_file_requirements(body: str) -> dict[str, str]:
+    """Read optional Verify: file-sha256 <digest> <absolute path> criteria."""
+    requirements: dict[str, str] = {}
+    for line in body.splitlines():
+        label, _, value = line.partition(":")
+        if label.strip().lower() not in {"verify", "verification"}:
+            continue
+        value = value.strip()
+        if re.match(r"file-sha256(?:\s|$)", value, re.IGNORECASE) is None:
+            continue
+        match = re.fullmatch(r"file-sha256\s+([a-f0-9]{64})\s+(.+)", value, re.IGNORECASE)
+        if match is None:
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "Use Verify: file-sha256 <digest> <absolute path>.")
+        digest, path = match.groups()
+        if not os.path.isabs(path) or path.startswith(("//", "\\")) or "\x00" in path:
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "File verification requires an absolute local path.")
+        path = os.path.normcase(os.path.normpath(path))
+        if requirements.setdefault(path, digest.lower()) != digest.lower():
+            raise KB.KanbanError(KB.BAD_INPUT_CODE, "Conflicting digests for one verification target.")
+    if len(requirements) > MAX_VERIFIED_FILES:
+        raise KB.KanbanError(KB.BAD_INPUT_CODE, f"Verify at most {MAX_VERIFIED_FILES} files per goal.")
+    return requirements
+
+
+def _verify_exact_files(requirements: dict[str, str], host_landed: set[str]) -> str:
+    if not requirements:
+        return ""
+    from agent.file_safety import get_read_block_error
+    from tools.file_tools import _is_blocked_device
+    from tools.file_tools_read_tracking import _file_version
+
+    for path, digest in requirements.items():
+        if sha256(os.fsencode(path)).hexdigest() not in host_landed:
+            return "The requested file has no successful local file-tool edit in this run."
+        if (_is_blocked_device(path) or os.path.normcase(os.path.realpath(path)) != path
+                or get_read_block_error(path)):
+            return "The requested file is unavailable for safe local verification."
+        version = _file_version(path, max_bytes=MAX_VERIFIED_FILE_BYTES)
+        if version is None or version[-1].hex() != digest:
+            return "The requested file did not match its exact SHA-256 verification."
+    return ""
+
+
 def _start(cfg, task_id, token, actor, expected):
     with _write(cfg) as conn:
         row = KB._get_task(conn, task_id)
@@ -41,13 +88,14 @@ def _start(cfg, task_id, token, actor, expected):
         if row["status"] not in ("open", "blocked", "claimed"):
             raise KB.KanbanError(KB.STATE_CODE, f"task #{task_id} is {row['status']}")
         KB._require_parents_done(conn, task_id)
+        exact_files = _exact_file_requirements(task["body"])
         conn.execute(
             "UPDATE tasks SET status='claimed', goal_run_token=?, goal_turns_used=0,"
             " assignee=coalesce(nullif(assignee,''),?), updated_at=? WHERE id=?",
             (token, actor, KB._now(), task_id),
         )
         KB._event(conn, task_id, "goal_started")
-        return task
+        return task, exact_files
 
 
 def _reserve_turn(cfg, task_id, token):
@@ -118,13 +166,14 @@ def _run_owned(cfg, task_id, requested_by, expected):
     from .orchestrator import VoiceOrchestrator
 
     token = uuid4().hex
-    task = _start(cfg, task_id, token, requested_by, expected)
+    task, exact_files = _start(cfg, task_id, token, requested_by, expected)
     goal = "\n\n".join(part for part in (task["title"], task["body"]) if part)
     session = f"kanban-goal-{task_id}-{token}"
     prompt = f"Work on this confirmed Kanban task. Report what you did and the evidence.\n\n{goal}"
     detail = "Goal turn budget exhausted."
     tool_evidence_pending = False
     pending_file_targets: set[str] = set()
+    host_landed: set[str] = set()
     orch = None
     try:
         orch = VoiceOrchestrator(cfg, no_hotkey=True, headless=True)
@@ -153,6 +202,7 @@ def _run_owned(cfg, task_id, requested_by, expected):
             elif tool_execution.get("attempted") is True:
                 tool_evidence_pending = True
             file_mutations = tool_execution.get("file_mutations") or {}
+            host_landed.update(file_mutations.get("host_landed", ()))
             pending_file_targets.difference_update(file_mutations.get("landed", ()))
             pending_file_targets.update(file_mutations.get("failed", ()))
             if pending_file_targets:
@@ -167,12 +217,22 @@ def _run_owned(cfg, task_id, requested_by, expected):
                           "tool result. Retry only an authorized operation that can support the "
                           "original goal, or report the blocker.")
                 continue
+            mismatch = _verify_exact_files(exact_files, host_landed)
+            if mismatch:
+                detail = mismatch
+                prompt = ("Continue the same confirmed task. Exact file verification did not pass. "
+                          "Check the original verification criteria and correct the authorized target.")
+                continue
             reply = str(result.get("reply", ""))
             verdict, reason, malformed, _, offline = judge_goal(goal, reply)
             if offline:
                 detail = "Goal judge unavailable."
                 break
             if verdict == "done" and not malformed and reply.strip():
+                mismatch = _verify_exact_files(exact_files, host_landed)
+                if mismatch:
+                    detail = mismatch
+                    break
                 return _finish(cfg, task_id, token, "done", "Goal judge accepted the evidence.", reply)
             if verdict == "blocked" and not malformed:
                 detail = "Goal judge blocked the task: " + str(reason)
