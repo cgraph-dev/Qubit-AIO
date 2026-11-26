@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Kanban Goal file evidence (2026-11-26).** File tools now tie failed edit recovery to the resolved target. Browser and disk evidence covers an unrelated successful retry and a successful retry on the requested file. Exact requested contents, tool claims with no attempted effect, other kinds of effects, and deployed task mutations still need verification. [Goal file evidence audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Kanban Goal tool evidence (2026-11-26).** The known false report is blocked when the runtime sees failed attempts without a successful action. A tool outcome alone does not verify the intended effect or its relevance to the goal. False claims without tool attempts, unrelated successes, and deployed task mutations remain open. System Ollama is active again. [Goal tool evidence audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Kanban Goal mode real browser settlement (2026-11-26).** A successful real worker and judge verdict now has disposable Chromium, CLI, and SQLite evidence. The real judge also falsely completed an impossible task after the worker substituted a different equation and claimed nonexistent files. Replaying the original goal and report with stricter judge prompts still returned Done. Resolve the false completion and verify tool-backed evidence before closing Goal mode. Deployed judging and task mutations remain open while system Ollama is unavailable. [Real browser judge evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)

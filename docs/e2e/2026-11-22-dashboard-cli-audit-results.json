@@ -2495,5 +2495,17 @@
     "verification": "Sixty-five focused tests passed. They cover the failed evidence gate, continuation behavior, successful retry, and exclusion of earlier turns and tool discovery from current execution evidence.",
     "deployment": "VoiceBridge restarted from local merge 1757ddbf6. Kanban at port 8890 returned HTTP 200 and health reported READY. System Ollama was active and listed qubit-brain. The gateway stayed active with the same process ID.",
     "remaining": "Verification of requested effects and exact goal satisfaction, false claims without attempts or with unrelated successes, deployed mutations, and the combined dashboard checklist row remain open."
+  },
+  "current_kanban_goal_file_evidence": {
+    "date": "2026-11-26",
+    "revision": "9824ebbde01838666551948312c987333a4e7e40",
+    "environment": "Authenticated Chromium, production Kanban bundle, disposable loopback listener, native Kanban database and real native file tools, scripted local worker and judge provider",
+    "guard": "The runtime projects opaque identities for unresolved file edit targets and verified file-tool landings. Goal mode retains pending target identities across worker turns and clears them when a file tool records a successful operation for the same resolved target. A settled failure from the same turn retains priority. The report and successful outcomes for different paths cannot clear that pending target.",
+    "unrelated_write": "The scripted worker patched the requested file using a missing old_string, then wrote unrelated files successfully on both turns while reporting success. Chromium confirmed the exact approvals and reopened the card as Blocked. Direct disk read-back found the two unrelated outputs and the original requested contents. The provider saw no judge request.",
+    "recovery": "The second card encountered an initial patch failure and a verified unrelated write. Retrying the requested patch substituted verified for original on disk. The judge ran once, and Chromium reloaded the card as Done with its saved report.",
+    "read_back": "SQLite confirmed two spent turns and cleared ownership for each card. The blocked cases recorded no completion event or summary. The recovered card recorded one completion event. Independent disk reads matched each requested target and each unrelated effect.",
+    "verification": "Sixty-seven focused VoiceBridge tests and twenty-four native file mutation verifier tests passed in separate processes. Chromium and independent provider, SQLite and disk checks passed.",
+    "deployment": "VoiceBridge restarted from local merge 97fe799b8. Kanban at port 8890 returned HTTP 200 and health reported READY. The gateway process ID was unchanged.",
+    "remaining": "Exact requested content and original goal satisfaction, claims without observed attempts, other effect types, deployed task mutations, and the combined dashboard checklist row remain open."
   }
 }
