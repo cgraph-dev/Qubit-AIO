@@ -2550,5 +2550,14 @@
     "verification": "Sixty-three focused PTY tests passed with the vendored gateway.config_loader imported before pytest collection and the installed Chromium cache available. The initial test launch resolved a shadowed gateway package. A separate fresh-turn setup in the copied home returned HTTP 409, so the lifecycle proof used the existing saved transcript.",
     "deployment": "The deployed health endpoint on port 8890 returned READY. The named-profile lifecycle was exercised on the disposable listener.",
     "remaining": "Deployed named terminal inference, on-prompt model and credential handoff, provider switching and failover, and packaged installation coverage. The combined checklist remains at eleven of thirty complete."
+  },
+  "current_workbench_profile_scoped_history_list": {
+    "date": "2026-11-28",
+    "revision": "254319897d78a9488dc2b31636d3cb1ba57cc186",
+    "reproduction": "The Workbench switch to a known named profile returned HTTP 400 MALFORMED. The bare session list returned the default store's row for both a valid named profile and an unknown profile while echoing the name as active.",
+    "verification": "Both Workbench mounts returned the named canonical session list, filtered the actual saved Ollama message by its text, and returned the corresponding read-only transcript. The unscoped list returned the separate default row with the same session ID. Authentication was required for explicit profile list, search, and transcript. An authenticated unknown name returned 404. Independent canonical read-back of the sticky profile still reported default.",
+    "tests": "The Workbench selection passed 151 tests. The duplicate-ID regression also passed after the final change that marks reads of a sibling default store read-only.",
+    "deployment": "Port 8890 reported READY. The HTTP checks used a disposable listener. Restarting the local service from the active checkout would also load other local changes.",
+    "remaining": "The profile chooser and named Workbench conversation writes remain open. A successful switch must align the list, session creation, and subsequent actions with the same profile. Eleven of thirty checklist rows are complete."
   }
 }
