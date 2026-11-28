@@ -2625,5 +2625,25 @@
     "verification": "Fifteen targeted Sessions page tests passed. TypeScript and the production Vite build passed.",
     "deployment": "The clean local build fc42d7fab30e508130e41ed88c0466cef9dfbf31 is served on port 8890 after a VoiceBridge restart. Sessions, Qubit Chat and Workbench returned HTTP 200 and the service reported READY. The previous build was retained. All destructive browser actions used disposable stores.",
     "remaining": "The single-delete dialog still says permanent while the canonical operation archives the transcript. The remaining session UI interactions and combined continuation rows stay open."
+  },
+  "current_session_history_archive_recovery_and_checklist": {
+    "date": "2026-11-28",
+    "revision": "07896799d63ca752fe697ec516b61b15c5913693",
+    "browser": "Chromium used the corrected confirmation text and profile-scoped archive filter, restored the same session, renamed it, and downloaded its JSON. Chromium at 390 CSS pixels imported the download into a sibling with a duplicate ID and searched for the copied message without horizontal overflow.",
+    "read_back": "Independent SQLite reads verified that restore preserved the original messages, rename affected only the selected profile, and import retained the sibling's original session while adding a separately identified copy. Authenticated HTTP matched full and archived counts to SQLite, found only the copy by message content in the sibling, and resolved the same parent ID to different latest-descendant results as appropriate.",
+    "verification": "Fifteen focused frontend tests, ten focused backend tests, TypeScript and the production bundle passed.",
+    "deployment": "VoiceBridge restarted and port 8890 served clean build c90d4383876f320f41aa1b5eacb9258aa6d16e08, which includes other committed work in the active checkout. Sessions returned HTTP 200 and health reported READY. The previous bundle was retained. Mutations ran in disposable profiles.",
+    "continuation_checklist": {
+      "row": "Verify Session history list, search, count, messages, activity, drafts, comments, export/import, latest descendant, rename, archive/restore, prune, empty cleanup, and bulk deletion.",
+      "state": "pass",
+      "prior_evidence": [
+        "current_session_portability_and_archive_validation",
+        "current_session_artifacts_profile_archive",
+        "current_session_destructive_confirmations",
+        "current_sessions_browser_confirmation_flows"
+      ],
+      "completed_rows": 12,
+      "total_rows": 30
+    }
   }
 }
