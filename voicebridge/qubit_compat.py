@@ -1160,7 +1160,11 @@ def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; session change refused"}
-    if "name" not in b and b.get("archived") is None:
+    archived = b.get("archived")
+    if archived is not None and not isinstance(archived, bool):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "archived must be a boolean"}
+    if "name" not in b and archived is None:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "patch needs name or archived"}
     # Chat transcripts rename/archive in the single session authority the
@@ -1177,7 +1181,7 @@ def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             if "name" in b:
                 res = cs.rename(rid, str(b.get("name", "")))
             else:
-                res = cs.archive(rid, bool(b.get("archived")))
+                res = cs.archive(rid, archived)
         except Exception as exc:
             return _fail(exc)
         if str(res.get("state")) != "MISSING":
@@ -1195,9 +1199,8 @@ def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     try:
         if "name" in b:
             res = store.rename(rid, str(b.get("name", "")))
-        elif b.get("archived") is not None:
-            res = (store.archive(rid) if b.get("archived")
-                   else store.resume(rid))
+        elif archived is not None:
+            res = store.archive(rid) if archived else store.resume(rid)
         else:
             return 400, {"ok": False, "code": "MALFORMED",
                          "detail": "patch needs name or archived"}
@@ -9106,11 +9109,15 @@ def _patch_chat_session(cfg: Any, b: Dict[str, Any], p: Dict[str, str],
         return 403, {"ok": False, "state": "UNAVAILABLE",
                      "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; session change refused"}
+    archived = b.get("archived")
+    if archived is not None and not isinstance(archived, bool):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "archived must be a boolean"}
     st = store if store is not None else CT.store(cfg)
     if "name" in b:
         res = st.rename(p.get("id", ""), str(b.get("name", "")))
-    elif b.get("archived") is not None:
-        res = st.archive(p.get("id", ""), bool(b.get("archived")))
+    elif archived is not None:
+        res = st.archive(p.get("id", ""), archived)
     elif "reasoning" in b:
         from .local_llm import normalize_reasoning_level
 

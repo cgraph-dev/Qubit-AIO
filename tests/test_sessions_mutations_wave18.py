@@ -30,6 +30,27 @@ def _dispatch(cfg, method, path, body):
     return HC.dispatch(cfg, method, path, {}, body)
 
 
+def test_session_archive_rejects_non_boolean_values_without_mutation(tmp_path, monkeypatch):
+    from voicebridge.qubit_session_store import QubitSessionStore
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    store = QubitSessionStore(cfg)
+    sid = "archive-boolean-fixture"
+    assert store.create("Archive regression", session_id=sid)["state"] == "OK"
+
+    for prefix in ("/api/sessions", "/api/qubit/chat/sessions"):
+        path = f"{prefix}/{sid}"
+        for invalid in ("false", "true", 0, 1, [], {}):
+            code, out = _dispatch(cfg, "PATCH", path, {"archived": invalid})
+            assert (code, out.get("code")) == (400, "MALFORMED")
+            assert not store._session(sid)["archived"]
+
+        assert _dispatch(cfg, "PATCH", path, {"archived": True})[0] == 200
+        assert store._session(sid)["archived"]
+        assert _dispatch(cfg, "PATCH", path, {"archived": False})[0] == 200
+        assert not store._session(sid)["archived"]
+
+
 def test_prune_dry_run_is_non_destructive(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = _dispatch(cfg, "POST", "/api/sessions/prune", {"dry_run": True})
