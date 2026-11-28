@@ -595,6 +595,10 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   const [transcriptState, setTranscriptState] = useState<
     "loading" | "ready" | "error"
   >("loading");
+  const readOnlyHistory = routed && legacySession === session;
+  const canCompose = !readOnlyHistory && (
+    !routed || !resumeParam || (transcriptSession === session && transcriptState === "ready")
+  );
   // A ?resume= id that is NOT a Qubit-chat session (e.g. a canonical /chat
   // worker id): don't hijack this page's conversation — offer to open it in
   // the /chat terminal instead. Null when the current session is ours.
@@ -886,7 +890,8 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
           // operator does not have to retype `continue`. Guarded to once per
           // session per page load, so a crash loop cannot spin here.
           const interrupted = info.interrupted_turn;
-          if (interrupted?.prompt && !resumedRef.current.has(session)) {
+          if ((!routed || info.session?.source !== "dashboard")
+              && interrupted?.prompt && !resumedRef.current.has(session)) {
             resumedRef.current.add(session);
             sendRef.current?.(interrupted.prompt, "thinking");
           }
@@ -944,7 +949,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       setError(reason instanceof Error ? reason.message : String(reason ?? "load failed"));
     });
     return () => { loadReqRef.current += 1; };
-  }, [readMessages, scopedProfile, session, transcriptKey]);
+  }, [readMessages, routed, scopedProfile, session, transcriptKey]);
 
   // Live voice follow: while the open session is a `voice-*` session (and
   // following has not been turned off), re-read the persisted transcript on a
@@ -1179,6 +1184,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   const send = useCallback(
     (raw: string, activity: "thinking" | "summarizing" = "thinking", retryId?: string,
       imageDataUrl?: string, failedId?: string) => {
+      if (readOnlyHistory || (routed && resumeParam && !transcriptReadyRef.current)) return;
       const text = (raw || "").trim();
       const previous = pendingTurnRef.current;
       if (!text || busy || (routed && previous?.key === recoveryKey && previous.turn.id !== retryId)) return;
@@ -1449,7 +1455,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         });
     },
     [busy, session, reasoning, nextModel, nextReasoning, followLiveVoice, routed, scopedProfile, recoveryKey,
-      rememberTurn, readMessages, transcriptKey],
+      rememberTurn, readMessages, transcriptKey, readOnlyHistory, resumeParam],
   );
 
   async function checkProfileTurn(cancel: boolean) {
@@ -2268,13 +2274,13 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
   }, [busy, controller, send, voice.committedText, voice.engine, voice.state]);
 
   const startVoice = useCallback(() => {
-    if (busy || controller.active) return;
+    if (!canCompose || busy || controller.active) return;
     setVoiceNotice(null);
     lastCommittedRef.current = "";
     browserSentRef.current = "";
     controller.setCommittedText("");
     void controller.start(inputEngine);
-  }, [busy, controller, inputEngine]);
+  }, [busy, canCompose, controller, inputEngine]);
 
   const stopVoice = useCallback(() => {
     void controller.stop();
@@ -2312,7 +2318,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
         if (controller.active) cancelVoice();
         return;
       }
-      if (event.code !== "ControlRight" || event.repeat) return;
+      if (!canCompose || event.code !== "ControlRight" || event.repeat) return;
       if (rightCtrlHeldRef.current) return;
       rightCtrlHeldRef.current = true;
       setRightCtrlHeld(true);
@@ -2331,7 +2337,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("keyup", onKeyUp, true);
     };
-  }, [cancelVoice, controller, desktopHelperLive, isActive, startVoice, stopVoice]);
+  }, [canCompose, cancelVoice, controller, desktopHelperLive, isActive, startVoice, stopVoice]);
 
   const voiceState: "idle" | "listening" | "unsupported" | "error" =
     voice.state === "starting" || voice.state === "listening"
@@ -3186,7 +3192,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             </div>
           ) : null}
 
-          {routed && legacySession === session && transcriptState === "ready" ? (
+          {readOnlyHistory && transcriptState === "ready" ? (
             <div className="mt-2 flex flex-col items-start gap-2 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center">
               <p className="min-w-0 flex-1 text-sm text-text-secondary">
                 Copy this read-only history into a new chat.
@@ -3207,7 +3213,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             <ProfileChatApprovalBanner key={transcriptKey} session={session} profile={scopedProfile} />
           ) : null}
 
-          {pendingConfirm ? (
+          {canCompose && pendingConfirm ? (
             <div
               role="status"
               data-testid="pending-confirmation"
@@ -3241,7 +3247,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             </div>
           ) : null}
 
-          {routed && nextPickerOpen ? (
+          {canCompose && routed && nextPickerOpen ? (
             <Suspense>
               <NextTurnModelPicker
                 title="Model for next turn"
@@ -3258,7 +3264,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             </Suspense>
           ) : null}
 
-          <form
+          {canCompose && <form
             onSubmit={onSubmit}
             className="qchat__composer mt-2 flex shrink-0 flex-wrap items-end gap-2 border-t border-current/10 pt-2"
           >
@@ -3485,7 +3491,7 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
               Send
             </Button>
             )}
-          </form>
+          </form>}
 
           <div className="qchat__session-actions mt-2 flex items-center justify-between gap-2">
             <Button
@@ -3508,20 +3514,20 @@ function ProfileChatPage({ isActive, scopedProfile, routed }: {
             <Button
               variant="secondary"
               onClick={summarizeSession}
-              disabled={busy || messages.length === 0}
+              disabled={!canCompose || busy || messages.length === 0}
               aria-label="Ask the local brain to report on this session"
             >
               <FileText className="h-3.5 w-3.5" />
               summarize
             </Button>
-            <a
+            {!readOnlyHistory && <a
               href={sessionResumeHref(session, scopedProfile)}
               aria-label="Continue this session in the /chat terminal"
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-midground hover:bg-midground/10"
             >
               <Terminal className="h-3.5 w-3.5" />
               open in /chat
-            </a>
+            </a>}
           </div>
         </section>
 

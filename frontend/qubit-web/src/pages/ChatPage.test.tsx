@@ -1262,13 +1262,17 @@ it("continues a named legacy history and reuses the request after a lost respons
     (button) => button.textContent === "Continue in new chat",
   );
   await vi.waitFor(() => expect(copy()).toBeDefined());
+  expect(container.querySelector('[aria-label="Message Qubit"]')).toBeNull();
+  expect(container.querySelector('[aria-label="Continue this session in the /chat terminal"]')).toBeNull();
   await act(async () => copy()?.click());
   expect(container.textContent).toContain("Response lost");
+  expect(container.querySelector('[aria-label="Message Qubit"]')).toBeNull();
   await act(async () => copy()?.click());
   expect(apiMocks.continueChatHistory).toHaveBeenCalledTimes(2);
   expect(apiMocks.continueChatHistory).toHaveBeenCalledWith("dashboard-legacy", "work", expect.any(String));
   expect(apiMocks.continueChatHistory.mock.calls[0]).toEqual(apiMocks.continueChatHistory.mock.calls[1]);
   expect(container.querySelector('[data-testid="location"]')?.textContent).toContain("resume=active-copy");
+  await vi.waitFor(() => expect(container.querySelector('[aria-label="Message Qubit"]')).not.toBeNull());
 });
 
 describe("ChatPage New chat mint reliability", () => {
