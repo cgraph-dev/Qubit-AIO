@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Session artifact ownership (2026-11-28).** Disposable HTTP and sidecar reads verified draft content and metadata, comment targeting, activity, concurrent profile isolation, and archive recovery. Continue with the UI flows and exact confirmations for destructive session maintenance. [Session artifacts audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Session portability (2026-11-28).** Authenticated export, additive import, duplicate IDs, lineage, archive and restore passed in sibling profiles. Continue against comment and draft ownership, exact destructive confirmations, and the remaining history actions. The existing route-wiring profile 404 assertion and retry TOOLSET_CONFIG_ERROR were reproduced on the previous checkout. [Session portability and archive audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Read-only named legacy history (2026-11-28).** Browser verification covered the pending named read, the saved history view, and the new conversation after copying. The source remained unchanged. Continue named sending inside Workbench and deployed named-profile inference. [Read-only legacy history audit](e2e/2026-11-22-dashboard-cli-audit-results.json)

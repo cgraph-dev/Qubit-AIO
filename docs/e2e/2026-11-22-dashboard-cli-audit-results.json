@@ -2596,5 +2596,14 @@
     "tests": "Six focused mutation tests passed. The wider selection passed 35 and failed two. Both failures reproduced on the previous active checkout: the typed PROFILE_NOT_FOUND response in route wiring, and a retry fixture blocked by TOOLSET_CONFIG_ERROR. Test collection used the vendored gateway package to avoid a test namespace collision.",
     "deployment": "VoiceBridge restarted from local merge b98be35b7. On port 8890 both authenticated malformed requests for a generated absent ID returned 400 MALFORMED. Live health returned READY and the gateway retained its PID. Valid mutations were confined to the fixture stores.",
     "remaining": "Full session UI interactions, comments, drafts, latest descendant, destructive operations and exact approval replay. Eleven of thirty continuation rows are complete."
+  },
+  "current_session_artifacts_profile_archive": {
+    "date": "2026-11-28",
+    "revision": "8a26bd1d424b9acc39d35142900abc1a23773bcc",
+    "profile_isolation": "Three disposable profiles shared a session ID and a draft path. Nine concurrent read groups returned the selected draft bytes and hash, metadata-only pagination, targeted comments and one scoped activity event. Direct reads of the JSON sidecars confirmed the distinct contents. Unknown-profile, unauthenticated and sibling-only draft requests were refused.",
+    "archive_recovery": "The original default-profile endpoints served sidecars from an archived conversation, while the named profile returned 404. Both now suppress artifacts when their canonical conversation is archived. Restoring the conversation reopened its original artifacts and left the sibling profile readable throughout.",
+    "verification": "Twenty-two focused projection, profile lifecycle and gateway session tests passed.",
+    "deployment": "VoiceBridge restarted from local merge fb24d875a. Port 8890 reported READY. Authenticated read-only probes returned an empty list for a generated absent default ID and 404 for a generated unknown profile. Archive mutations ran only on fixture data. The gateway PID stayed unchanged.",
+    "remaining": "Session UI interactions, remaining history endpoints and destructive confirmations. Eleven of thirty continuation rows are complete."
   }
 }
