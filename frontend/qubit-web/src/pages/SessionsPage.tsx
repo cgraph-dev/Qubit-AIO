@@ -631,7 +631,7 @@ function SessionRow({
   isExpanded,
   isSelected,
   onToggle,
-  onSelectClick,
+  onSelectionChange,
   onDelete,
   onRename,
   onExport,
@@ -792,18 +792,9 @@ function SessionRow({
       ? "border-success/30 bg-success/[0.03]"
       : "border-border";
 
-  // Clicking the checkbox must NOT toggle row expansion; selection and
-  // expansion are independent gestures. We bind ``onClick`` directly on
-  // the Checkbox (which Radix forwards to its underlying ``<button
-  // role=checkbox>``) so the event carries the real ``shiftKey`` state
-  // for range-select AND so keyboard activation (Space on the focused
-  // checkbox) toggles selection via the same code path — the browser
-  // synthesises a click on <button> for Space, so one handler covers
-  // mouse + keyboard cleanly.
-  const handleSelectClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelectClick(e);
-  };
+  // A native label activation can emit two clicks. Commit selection from the
+  // checkbox's change event and capture the modifier before it changes.
+  const rangeSelection = useRef(false);
 
   return (
     <div
@@ -814,10 +805,20 @@ function SessionRow({
         className="flex cursor-pointer items-start gap-3 p-3 transition-colors hover:bg-secondary/30"
         onClick={onToggle}
       >
-        <span className="flex shrink-0 items-center pt-0.5">
+        <span
+          className="flex shrink-0 items-center pt-0.5"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => { rangeSelection.current = event.shiftKey; }}
+          onKeyDown={(event) => {
+            if (event.key === " ") rangeSelection.current = event.shiftKey;
+          }}
+        >
           <Checkbox
             checked={isSelected}
-            onClick={handleSelectClick}
+            onChange={(selected) => {
+              onSelectionChange(selected, rangeSelection.current);
+              rangeSelection.current = false;
+            }}
             aria-label={t.sessions.selectSession}
           />
         </span>
@@ -1553,21 +1554,19 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
    *  be the currently rendered list (post-search), since indices are
    *  resolved against what the user is actually looking at.
    */
-  const handleSelectClick = useCallback(
-    (event: React.MouseEvent, index: number, visibleList: SessionInfo[]) => {
+  const handleSelectionChange = useCallback(
+    (willSelect: boolean, extendRange: boolean, index: number, visibleList: SessionInfo[]) => {
       const id = visibleList[index]?.id;
       if (!id) return;
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        const wasSelected = next.has(id);
-        const willSelect = !wasSelected;
 
         const anchor = lastClickedIndexRef.current;
         // Shift-click extends the selection from the anchor to here.
         // Skip if there's no anchor or the anchor is outside the
         // visible list — in those cases fall through to a plain toggle
         // (the click also resets the anchor below).
-        if (event.shiftKey && anchor !== null && anchor < visibleList.length) {
+        if (extendRange && anchor !== null && anchor < visibleList.length) {
           const [lo, hi] =
             anchor <= index ? [anchor, index] : [index, anchor];
           for (let i = lo; i <= hi; i++) {
@@ -2358,8 +2357,8 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
                   onToggle={() =>
                     setExpandedId((prev) => (prev === s.id ? null : s.id))
                   }
-                  onSelectClick={(event) =>
-                    handleSelectClick(event, index, filtered)
+                  onSelectionChange={(selected, extendRange) =>
+                    handleSelectionChange(selected, extendRange, index, filtered)
                   }
                   onDelete={() => sessionDelete.requestDelete(s)}
                   onRename={handleRename}
@@ -2431,7 +2430,7 @@ interface SessionRowProps {
   onExport: (id: string) => void;
   onRename: (id: string, title: string) => Promise<boolean>;
   onRestore: (id: string) => void;
-  onSelectClick: (event: React.MouseEvent) => void;
+  onSelectionChange: (selected: boolean, extendRange: boolean) => void;
   onToggle: () => void;
   resumeInChatEnabled: boolean;
   searchQuery?: string;
