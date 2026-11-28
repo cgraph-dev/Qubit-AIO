@@ -2559,5 +2559,14 @@
     "tests": "The Workbench selection passed 151 tests. The duplicate-ID regression also passed after the final change that marks reads of a sibling default store read-only.",
     "deployment": "Port 8890 reported READY. The HTTP checks used a disposable listener. Restarting the local service from the active checkout would also load other local changes.",
     "remaining": "The profile chooser and named Workbench conversation writes remain open. A successful switch must align the list, session creation, and subsequent actions with the same profile. Eleven of thirty checklist rows are complete."
+  },
+  "current_workbench_named_profile_chooser": {
+    "date": "2026-11-28",
+    "revision": "9e80dcb8a3a9ff091a30f3817a49a500b652e1d9",
+    "browser": "Chromium tested /wb at 1440 pixels and /qubit-workbench at 390 pixels. Keyboard activation opened the dialog. Escape closed it and restored focus to the chooser. Both views fit horizontally, kept the selected profile and exact session in the link, and showed the real saved Ollama transcript after reload. A one-time fixture 503 exercised the retry state before the live empty-list response.",
+    "write_ownership": "The dialog did not send a profile-switch or Workbench session-create POST. Open Qubit Chat navigated to the selected profile. The native New chat action posted to the selected profile and exposed the returned session ID in the URL. A read-only SQLite check found exactly one new draft in the selected fixture store and no matching ID in the default store.",
+    "verification": "Seventy-three focused Workbench checks and JavaScript syntax validation passed. The native handoff used a disposable profile with no running gateway to exercise the draft path.",
+    "deployment": "VoiceBridge restarted from local merge 64e0b5b14, which also includes the active branch's other committed source changes. Both port-8890 aliases served the new dialog and script, and scoped history required authentication. Health returned READY and the gateway kept its process ID.",
+    "remaining": "Named sending from Workbench itself, managed profile activation, and real deployed inference for an approved named profile. The continuation checklist remains at eleven of thirty complete."
   }
 }

@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Workbench named conversations (2026-11-28).** The chooser provides named history and a handoff to Qubit Chat without a shared profile switch. Chromium followed the handoff and created one profile-scoped draft. Continue with named conversation writes inside Workbench, managed profile activation, and approved deployed inference. [Workbench profile chooser audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Workbench profile ownership (2026-11-28).** Both aliases passed authenticated named list and search with a duplicate ID in the default store. The chooser still sends its target to the canonical registry in the query while the registry reads the body. The chooser can open or create a session after a successful switch. Wire the selected owner into those operations before enabling the switch. [Workbench history list audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Named terminal lifecycle (2026-11-28).** The disposable native PTY passed exact resume, resize, reconnect by attach key and by fresh ticket, transcript replay, and orphan cleanup. Continue with a deployed named profile and approved provider for next-prompt credential scope, inference, and failover. [Named terminal audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
