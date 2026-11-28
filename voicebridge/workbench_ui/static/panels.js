@@ -7587,9 +7587,7 @@ function openProfileHistory(profile, trigger) {
   const status = $('profileHistoryStatus');
   const list = $('profileHistoryList');
   const retry = $('profileHistoryRetry');
-  const chat = new URL('../qubit-chat', document.baseURI);
-  chat.searchParams.set('profile', profile);
-  $('profileHistoryChat').href = chat.href;
+  $('profileHistoryChat').href = namedProfileChatUrl(profile);
   $('profileHistoryTitle').textContent = t('profile_history_title', profile);
 
   const request = new AbortController();

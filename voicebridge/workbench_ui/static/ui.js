@@ -15542,6 +15542,15 @@ function _topbarMessageMetaText(){
   return t('n_messages',loadedCount);
 }
 function syncTopbar(){
+  const continuation = $('linkedProfileChat');
+  if (continuation) {
+    const { linked_profile: profile, session_id: sessionId } = S.session || {};
+    continuation.hidden = !profile || !sessionId;
+    $('composerWrap').hidden = !continuation.hidden;
+    const link = $('linkedProfileChatLink');
+    if (continuation.hidden) link.removeAttribute('href');
+    else link.href = namedProfileChatUrl(profile, sessionId);
+  }
   if(!S.session){
     document.title=assistantDisplayName();
     if(typeof syncWorkspaceDisplays==='function') syncWorkspaceDisplays();

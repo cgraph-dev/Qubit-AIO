@@ -1734,6 +1734,7 @@ const LOCALES = {
     profile_history_title: 'Conversations in {0}',
     profile_history_help: 'Recent conversations in this profile. Open a saved conversation in Workbench or use Qubit Chat to send messages.',
     profile_history_chat: 'Open Qubit Chat',
+    profile_history_continue: 'Continue in Qubit Chat',
     profile_history_loading: 'Loading conversations…',
     profile_history_empty: 'No saved conversations in this profile.',
     profile_history_failed: 'Could not load conversations. Try again.',

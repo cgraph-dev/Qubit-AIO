@@ -1,3 +1,10 @@
+function namedProfileChatUrl(profile, sessionId) {
+  const url = new URL('../qubit-chat', document.baseURI);
+  url.searchParams.set('profile', profile);
+  if (sessionId) url.searchParams.set('resume', sessionId);
+  return url.href;
+}
+
 async function api(path,opts={}){
   // Strip leading slash so URL resolves relative to location.href (supports subpath mounts)
   const rel = path.startsWith('/') ? path.slice(1) : path;

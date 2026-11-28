@@ -1575,6 +1575,7 @@ function _setComposerAfterCliOnlyExplainer(value,owner){
 }
 
 async function send(){
+  if (S.session?.linked_profile) return;
   // Static guards expect _defaultMessageMode to stay near send() while the actual
   // read remains in the S.busy branch below.
   // _defaultMessageMode
