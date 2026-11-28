@@ -2568,5 +2568,15 @@
     "verification": "Seventy-three focused Workbench checks and JavaScript syntax validation passed. The native handoff used a disposable profile with no running gateway to exercise the draft path.",
     "deployment": "VoiceBridge restarted from local merge 64e0b5b14, which also includes the active branch's other committed source changes. Both port-8890 aliases served the new dialog and script, and scoped history required authentication. Health returned READY and the gateway kept its process ID.",
     "remaining": "Named sending from Workbench itself, managed profile activation, and real deployed inference for an approved named profile. The continuation checklist remains at eleven of thirty complete."
+  },
+  "current_workbench_exact_named_conversation_handoff": {
+    "date": "2026-11-28",
+    "revision": "011eddc143e8e082fc791d614d449628dfc79bb1",
+    "browser": "Chromium checked the exact conversation link and hidden Workbench composer on desktop /qubit-workbench and mobile /wb. Native Qubit Chat loaded the selected saved transcript, posted one turn with the exact original profile and session, displayed a real system Ollama reply, and retained the new reply after reload.",
+    "isolation": "Independent authenticated transcript and SQLite checks found one new user and one new assistant message on the original named ID. The intentionally duplicated default-store ID still contained only its seeded message.",
+    "older_history": "Chromium saw the saved legacy transcript and the Continue in new chat action. The native composer was visible alongside it. Independent HTTP exercised the copy and retried the same request ID. It returned the same named child, preserved the parent transcript, and created no default-store session.",
+    "verification": "Seventy-three focused Workbench tests passed, along with syntax checks for five modified JavaScript files.",
+    "deployment": "Port 8890 served the updated Workbench action and script on both aliases. The existing VoiceBridge process stayed active and reported READY. The named gateway and model turn ran in a disposable profile.",
+    "remaining": "Named conversation sends within Workbench itself, the native legacy composer behavior, and deployed named-profile inference. The checklist remains at eleven of thirty."
   }
 }

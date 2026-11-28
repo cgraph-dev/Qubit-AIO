@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Exact Workbench conversation handoff (2026-11-28).** A real Ollama turn proved the handoff retains the exact named session. Legacy history offers its native copy action and the authenticated copy API preserves the source. The native Chat page still shows a composer beside that legacy copy action. Continue named sending inside Workbench, legacy composer behavior, and approved deployed inference. [Exact named conversation audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Workbench named conversations (2026-11-28).** The chooser provides named history and a handoff to Qubit Chat without a shared profile switch. Chromium followed the handoff and created one profile-scoped draft. Continue with named conversation writes inside Workbench, managed profile activation, and approved deployed inference. [Workbench profile chooser audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Workbench profile ownership (2026-11-28).** Both aliases passed authenticated named list and search with a duplicate ID in the default store. The chooser still sends its target to the canonical registry in the query while the registry reads the body. The chooser can open or create a session after a successful switch. Wire the selected owner into those operations before enabling the switch. [Workbench history list audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
