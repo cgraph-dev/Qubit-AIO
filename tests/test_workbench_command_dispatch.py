@@ -102,6 +102,18 @@ def test_named_workbench_history_keeps_duplicate_session_ids_profile_scoped(tmp_
     assert [m["content"] for m in default_body["session"]["messages"]] == ["Default message"]
     assert "linked_profile" not in default_body["session"]
 
+    named_status, named_page = call("sessions", cfg, q={"profile": "named", "q": "Named"})
+    default_status, default_page = call("sessions", cfg, q={"q": "Default"})
+    assert named_status == default_status == 200
+    assert named_page["active_profile"] == "named"
+    assert [(row["id"], row["title"], row["read_only"]) for row in named_page["sessions"]] == [
+        (sid, "Named message", True),
+    ]
+    assert [(row["id"], row["title"]) for row in default_page["sessions"]] == [
+        (sid, "Default message"),
+    ]
+    assert call("sessions", cfg, q={"profile": "named", "q": "Default"})[1]["sessions"] == []
+
 
 @pytest.mark.parametrize("sub,method,body", [
     ("git/status", "GET", {}),

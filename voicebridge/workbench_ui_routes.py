@@ -809,14 +809,33 @@ def _session_row(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _resolve_history_profile(
+    cfg: Any, q: Dict[str, str],
+) -> Tuple[Optional[Path], Optional[Tuple[int, Any]]]:
+    if not str(q.get("profile") or "").strip():
+        return None, None
+
+    from .qubit_compat import _settings_profile_error, settings_profile_home
+
+    try:
+        return settings_profile_home(cfg, q), None
+    except Exception as exc:
+        return None, _settings_profile_error(exc)
+
+
 def h_wb_sessions(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Any]:
     """GET /api/wb/api/sessions — the rail's list, from the session authority."""
+    profile = str(q.get("profile") or "").strip()
+    home, err = _resolve_history_profile(cfg, q)
+    if err:
+        return err
     limit = str(q.get("limit") or "50")
     out, err = _call_adapter(
         "adapters_sessions", "list_sessions", cfg,
         limit=int(limit) if limit.isdigit() else 50,
         offset=0,
+        runtime_home=home,
         query=str(q.get("q") or q.get("search") or ""),
         include_archived=str(q.get("archived") or "") in ("1", "true", "include"))
     if err:
@@ -825,11 +844,14 @@ def h_wb_sessions(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _status(out, 502), out
     rows = [_session_row(r) for r in (out.get("sessions") or [])
             if isinstance(r, dict)]
+    if home is not None or (profile and profile.lower() not in {"default", "current"}):
+        for row in rows:
+            row.update(profile=profile, linked_profile=profile, read_only=True)
     return 200, {
         "ok": True,
         "sessions": rows,
         "total": int(out.get("total") or len(rows)),
-        "active_profile": str(q.get("profile") or "default"),
+        "active_profile": profile or "default",
         "projects": [],
         "archived_webui_count": 0,
         "archived_cli_count": 0,
@@ -852,14 +874,9 @@ def h_wb_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         "GET /api/session needs ?session_id=",
                         endpoint="session")
     profile = str(q.get("profile") or "").strip()
-    home = None
-    if profile:
-        from voicebridge.qubit_compat import _settings_profile_error, settings_profile_home
-
-        try:
-            home = settings_profile_home(cfg, q)
-        except Exception as exc:
-            return _settings_profile_error(exc)
+    home, err = _resolve_history_profile(cfg, q)
+    if err:
+        return err
     try:
         from voicebridge.qubit_session_store import QubitSessionStore
         store = QubitSessionStore(cfg, runtime_home=home) if home is not None else QubitSessionStore(cfg)
@@ -895,7 +912,7 @@ def h_wb_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # (right) while the rows came from session.messages (absent). Both shapes
     # are emitted so neither old nor new client code loses the transcript.
     payload["session"]["messages"] = msgs
-    if profile and profile not in {"default", "current"}:
+    if home is not None or (profile and profile.lower() not in {"default", "current"}):
         payload["session"].update(read_only=True, linked_profile=profile, workspace=None)
     return 200, payload
 

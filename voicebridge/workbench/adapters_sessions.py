@@ -36,6 +36,7 @@ that names what is missing.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import SESSION_AUTHORITY, UPSTREAM_PIN
@@ -61,7 +62,7 @@ def _unavailable(code: str, detail: str, **extra: Any) -> Dict[str, Any]:
     return out
 
 
-def _store(cfg: Any) -> Any:
+def _store(cfg: Any, *, runtime_home: Optional[Path] = None) -> Any:
     """Open the ONE session authority.
 
     Deliberately raises on failure: the callers below turn that into a typed
@@ -70,7 +71,7 @@ def _store(cfg: Any) -> Any:
     """
     from ..qubit_session_store import QubitSessionStore
 
-    return QubitSessionStore(cfg)
+    return QubitSessionStore(cfg, runtime_home=runtime_home)
 
 
 def _int(value: Any, default: int, low: int, high: int) -> int:
@@ -102,7 +103,8 @@ def _session_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 # ------------------------------------------------------------- read: list
 def list_sessions(cfg: Any = None, *, limit: int = PAGE, offset: int = 0,
-                  query: str = "", include_archived: bool = False
+                  query: str = "", include_archived: bool = False,
+                  runtime_home: Optional[Path] = None
                   ) -> Dict[str, Any]:
     """A page of chat sessions from the canonical store.
 
@@ -114,7 +116,7 @@ def list_sessions(cfg: Any = None, *, limit: int = PAGE, offset: int = 0,
     page = _int(limit, PAGE, 1, MAX_PAGE)
     start = _int(offset, 0, 0, 10 ** 9)
     try:
-        store = _store(cfg)
+        store = _store(cfg, runtime_home=runtime_home)
     except Exception as exc:  # noqa: BLE001 - absence is a typed answer
         return _unavailable(
             "WORKBENCH_SESSION_STORE_UNAVAILABLE",
