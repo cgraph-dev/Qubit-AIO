@@ -1036,6 +1036,87 @@ def test_profile_chat_cancel_targets_only_the_admitted_turn(tmp_path, monkeypatc
     assert control.active_runs() == []
 
 
+def test_profile_chat_heartbeats_during_pending_admission_and_receipt(tmp_path, monkeypatch):
+    import asyncio
+    from contextlib import asynccontextmanager
+
+    from voicebridge import profile_chat, qubit_runtime
+
+    qubit_runtime.ensure_path()
+    from tui_gateway import owner_forward
+
+    calls = []
+
+    class Client:
+        async def rpc(self, method, **params):
+            calls.append((method, params))
+            if method == "session.resume":
+                return {"session_id": "chat", "stored_session_id": "chat"}
+            if method == "prompt.submit":
+                await asyncio.sleep(0.06)
+                return {"status": "terminal", "admission_id": "turn"}
+            assert method == "prompt.receipt"
+            await asyncio.sleep(0.06)
+            return {"status": "terminal", "outcome": "complete",
+                    "result": {"final_response": "saved answer"}}
+
+    @asynccontextmanager
+    async def connect(_home, _endpoint):
+        yield Client()
+
+    monkeypatch.setattr(owner_forward, "connect_owner", connect)
+    monkeypatch.setattr(profile_chat, "_HEARTBEAT_INTERVAL", 0.02)
+    messages = list(profile_chat.events(
+        tmp_path, "owner", "chat", "question", submission_id="quiet-test",
+    ))
+    names = [message["event"] for message in messages]
+    assert "heartbeat" in names[:names.index("start")]
+    assert "heartbeat" in names[names.index("start") + 1:-1]
+    assert names[-1] == "done" and messages[-1]["reply"] == "saved answer"
+    assert [method for method, _ in calls] == ["session.resume", "prompt.submit", "prompt.receipt"]
+    assert calls[1][1]["submission_id"] == "quiet-test"
+
+
+def test_profile_chat_closes_pending_gateway_read_on_stream_disconnect(tmp_path, monkeypatch):
+    import asyncio
+    from contextlib import asynccontextmanager
+
+    from voicebridge import profile_chat, qubit_runtime
+
+    qubit_runtime.ensure_path()
+    from tui_gateway import owner_forward
+
+    calls = []
+    disconnected = []
+
+    class Client:
+        async def rpc(self, method, **_params):
+            calls.append(method)
+            if method == "session.resume":
+                return {"session_id": "chat", "stored_session_id": "chat"}
+            assert method == "prompt.submit"
+            await asyncio.sleep(0.1)
+            return {"status": "queued", "admission_id": "turn"}
+
+    @asynccontextmanager
+    async def connect(_home, _endpoint):
+        try:
+            yield Client()
+        finally:
+            disconnected.append(True)
+
+    monkeypatch.setattr(owner_forward, "connect_owner", connect)
+    monkeypatch.setattr(profile_chat, "_HEARTBEAT_INTERVAL", 0.02)
+    stream = profile_chat.events(tmp_path, "owner", "chat", "question")
+    try:
+        assert next(stream)["event"] == "heartbeat"
+    finally:
+        stream.close()
+    assert calls == ["session.resume", "prompt.submit"]
+    assert disconnected == [True]
+    assert profile_chat.cancel(tmp_path, "chat")[0] == 404
+
+
 def test_profile_chat_disconnect_does_not_resubmit(tmp_path, monkeypatch):
     from contextlib import asynccontextmanager
 

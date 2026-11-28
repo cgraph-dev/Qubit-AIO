@@ -6,6 +6,7 @@ import asyncio
 import threading
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,9 +97,7 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
             if stop_pending or stopped():
                 await client.rpc("prompt.cancel", session_id=target, admission_id=admission)
             yield {"event": "start", "session_id": session, "route": "gateway"}
-            started_at = time.monotonic()
-            deadline = started_at + _WAIT_SECONDS
-            next_heartbeat = started_at + _HEARTBEAT_INTERVAL
+            deadline = time.monotonic() + _WAIT_SECONDS
             status = admitted.get("status")
             while time.monotonic() < deadline:
                 frame = None
@@ -119,10 +118,6 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                         return
                     if status == "unknown":
                         break
-                    now = time.monotonic()
-                    if now >= next_heartbeat:
-                        yield {"event": "heartbeat"}
-                        next_heartbeat = now + _HEARTBEAT_INTERVAL
                     continue
                 params = frame.get("params") or {}
                 if params.get("admission_id") != admission:
@@ -163,6 +158,33 @@ async def _events(home: Path, endpoint, session: str, text: str, turn: _Turn, st
                 staged.unlink(missing_ok=True)
 
 
+async def _with_heartbeats(source: AsyncGenerator[dict, None]) -> AsyncGenerator[dict, None]:
+    """Keep the HTTP stream alive without interrupting an in-flight gateway read."""
+    pending = None
+    try:
+        while True:
+            if pending is None:
+                pending = asyncio.create_task(anext(source))
+            ready, _ = await asyncio.wait({pending}, timeout=_HEARTBEAT_INTERVAL)
+            if not ready:
+                yield {"event": "heartbeat"}
+                continue
+            finished, pending = pending, None
+            try:
+                frame = finished.result()
+            except StopAsyncIteration:
+                return
+            yield frame
+    finally:
+        try:
+            if pending is not None:
+                pending.cancel()
+                with suppress(asyncio.CancelledError, StopAsyncIteration):
+                    await pending
+        finally:
+            await source.aclose()
+
+
 def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submission_id=None, image=None, options=None, retry_of=None):
     """Run the gateway relay on the calling HTTP thread and close its socket on exit."""
     from .plugins import estop_engaged
@@ -194,7 +216,10 @@ def events(home: Path, endpoint, session: str, text: str, *, cfg=None, submissio
         if control is not None:
             control.track(correlation, stop_turn)
         with asyncio.Runner() as runner:
-            stream = _events(home, endpoint, session, text, turn, stopped, submission_id or uuid.uuid4().hex, image, options, retry_of)
+            stream = _with_heartbeats(_events(
+                home, endpoint, session, text, turn, stopped,
+                submission_id or uuid.uuid4().hex, image, options, retry_of,
+            ))
             try:
                 while True:
                     yield runner.run(anext(stream))
