@@ -2669,5 +2669,16 @@
     "model_and_reasoning": "A separate session sent the exact untagged qubit-brain alias with reasoning_effort none. Its next turn omitted the overrides and sent the configured qubit-brain:latest with reasoning_effort medium. Both completed in the same named session and a direct read of SQLite matched the two prompts in order. The two names resolve to the same locally installed model.",
     "tests": "Eight focused named-stream and profile-chat tests passed.",
     "remaining": "Failed image retry and receipt reconciliation, a distinct model and provider, and error recovery under heavier concurrent load. Twelve of thirty continuation rows are complete."
+  },
+  "current_named_chat_failed_image_retry_and_concurrent_recovery": {
+    "date": "2026-11-28",
+    "revision": "e5edff78ebdcafaea419c09196ab79e1a7267263",
+    "environment": "Authenticated loopback VoiceBridge HTTP, a disposable standalone named gateway, and a loopback proxy to local Ollama. The proxy returned HTTP 400 on the targeted original requests and forwarded the retries to Ollama.",
+    "exact_retry": "The original SSE ended with CHAT_GATEWAY_TURN_FAILED and its submission recovered as terminal failed. A retry carrying only the original and new IDs completed in the same conversation. The provider received the original PNG bytes and low reasoning. Recovering both submissions returned their own terminal outcomes. Repeating the retry ID replayed the saved answer. A new retry ID against the already retried failure received CHAT_RETRY_UNAVAILABLE. Neither replay nor refusal made another provider request.",
+    "image_sha256": "f34bf5ea67b98ac79c6ef271edb1f286b5af9af098781e50160e9e54b43838af",
+    "read_back": "Read-only SQLite showed two admissions with identical payloads, the two inactive original message rows, and one active user/assistant exchange. The durable attachment file matched the provider digest.",
+    "concurrency": "Four separate conversations submitted concurrently and independently recovered terminal failures. Their four concurrent retries recovered as completed and identified the image as blue. SQLite showed each exact pair of submission IDs and matching payloads, retained each conversation's own prompt, and exposed one active exchange per conversation. The proxy saw four rejections and four successful image-bearing requests.",
+    "tests": "Eight focused relay tests, four gateway retry tests, and two dashboard retry and reconciliation tests passed.",
+    "remaining": "Switching to a distinct model and provider with real inference. Twelve of thirty continuation rows are complete."
   }
 }

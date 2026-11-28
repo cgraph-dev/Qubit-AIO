@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Named chat retry and load follow-up (2026-11-28).** The exact failed receipt, saved attachment and reasoning setting, retry replay, and transcript replacement passed through the named gateway. Four concurrent conversations recovered independently. Finish the distinct model and provider switch against an approved second provider and model. [Named chat retry audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Named chat image and model follow-up (2026-11-28).** The disposable named gateway now has provider-level evidence for direct and delegated PNG turns, malformed image rejection, and per-turn model alias and reasoning scope. Continue with failed image retry through the original transcript and receipt, switching to a distinct model and provider, and error recovery under heavier concurrent load. [Named chat image and model audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Named chat quiet turns (2026-11-28).** The relay’s keep-alive now covers pending admission and receipt calls. Two concurrent requests through the real local provider exercised completion and disconnect recovery. Continue the broader named-chat row with image turns, per-turn model and reasoning, and heavier-load verification. [Named chat quiet-stream audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
