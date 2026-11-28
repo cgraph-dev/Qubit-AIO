@@ -2539,5 +2539,16 @@
     "verification": "Two hundred and twenty-three focused tests passed. Six modified Workbench scripts passed Node syntax checks. Chromium verified read-only state and the local refusal of a clear request for the loaded named session.",
     "deployment": "VoiceBridge restarted from local merge df0010bfb. Both mounts served the updated session script and returned HTTP 200. Both deployed aliases rejected an anonymous scoped probe and an authenticated unknown profile. The health endpoint reported READY. The gateway PID stayed the same.",
     "remaining": "The explicit named links cover read-only history. The separate Workbench profile chooser switch, named Workbench sending, deployed inference with an approved profile, and PTY lifecycle remain open."
+  },
+  "current_native_named_pty_lifecycle": {
+    "date": "2026-11-28",
+    "revision": "880e29dae938c7b18d7359f860ea0cd8bcd2b934",
+    "environment": "Disposable named and default homes, authenticated loopback VoiceBridge, installed interpreter, prebuilt Qubit Ink TUI, and the actual named transcript from the preceding system Ollama rehearsal copied into the disposable store.",
+    "profile_and_geometry": "An unknown management profile received 404 CHAT_PROFILE_INVALID. A valid profile ticket opened the exact session in the named home. Linux TIOCGWINSZ recorded 96 columns and 31 rows at spawn and 123 columns and 44 rows after a WebSocket resize.",
+    "reattach_and_replay": "The initial socket displayed the saved transcript marker. Closing it detached the TUI. Reconnect with the same attach key replayed the marker. A new authenticated ticket for the same session also reattached without the key. Both reconnects kept the original Linux process.",
+    "orphan_and_readback": "The native orphan sweep ran with the timeout shortened for the fixture, retired one detached TUI and removed its Linux process. Independent SQLite reads still found the saved user and assistant messages in the named store only.",
+    "verification": "Sixty-three focused PTY tests passed with the vendored gateway.config_loader imported before pytest collection and the installed Chromium cache available. The initial test launch resolved a shadowed gateway package. A separate fresh-turn setup in the copied home returned HTTP 409, so the lifecycle proof used the existing saved transcript.",
+    "deployment": "The deployed health endpoint on port 8890 returned READY. The named-profile lifecycle was exercised on the disposable listener.",
+    "remaining": "Deployed named terminal inference, on-prompt model and credential handoff, provider switching and failover, and packaged installation coverage. The combined checklist remains at eleven of thirty complete."
   }
 }
