@@ -144,7 +144,7 @@ export const zhHant: Translations = {
     deleteSession: "刪除工作階段",
     confirmDeleteTitle: "刪除工作階段？",
     confirmDeleteMessage:
-      "此操作將永久移除對話及其所有訊息，無法復原。",
+      "此對話將從使用中的記錄隱藏。您可以稍後還原。",
     sessionDeleted: "工作階段已刪除",
     failedToDelete: "刪除工作階段失敗",
     deleteEmpty: "刪除空工作階段",

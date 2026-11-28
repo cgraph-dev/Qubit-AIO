@@ -144,7 +144,7 @@ export const hu: Translations = {
     deleteSession: "Munkamenet törlése",
     confirmDeleteTitle: "Törli a munkamenetet?",
     confirmDeleteMessage:
-      "Ez véglegesen eltávolítja a beszélgetést és minden üzenetét. A művelet nem vonható vissza.",
+      "A beszélgetés eltűnik az aktív előzményekből. Később visszaállíthatod.",
     sessionDeleted: "Munkamenet törölve",
     failedToDelete: "Nem sikerült törölni a munkamenetet",
     deleteEmpty: "Üresek törlése",

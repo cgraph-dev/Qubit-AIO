@@ -144,7 +144,7 @@ export const af: Translations = {
     deleteSession: "Skrap sessie",
     confirmDeleteTitle: "Skrap sessie?",
     confirmDeleteMessage:
-      "Dit verwyder die gesprek en al sy boodskappe permanent. Dit kan nie ongedaan gemaak word nie.",
+      "Die gesprek word uit die aktiewe geskiedenis versteek. Jy kan dit later herstel.",
     sessionDeleted: "Sessie geskrap",
     failedToDelete: "Kon nie sessie skrap nie",
     deleteEmpty: "Skrap leë",

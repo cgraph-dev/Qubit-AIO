@@ -191,7 +191,7 @@ export const ar = defineLocale({
     deleteSession: "حذف الجلسة",
     confirmDeleteTitle: "حذف الجلسة؟",
     confirmDeleteMessage:
-      "سيزيل هذا نهائيًا المحادثة وجميع رسائلها. لا يمكن التراجع عن هذا الإجراء.",
+      "ستُخفى المحادثة من السجل النشط. يمكنك استعادتها لاحقًا.",
     sessionDeleted: "تم حذف الجلسة",
     failedToDelete: "فشل حذف الجلسة",
     resumeInChat: "استئناف في المحادثة",

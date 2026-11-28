@@ -144,7 +144,7 @@ export const ga: Translations = {
     deleteSession: "Scrios an seisiún",
     confirmDeleteTitle: "Scrios an seisiún?",
     confirmDeleteMessage:
-      "Baineann sé seo an comhrá agus a chuid teachtaireachtaí ar fad go buan. Ní féidir é seo a chealú.",
+      "Cuirfear an comhrá i bhfolach ón stair ghníomhach. Is féidir leat é a athchóiriú níos déanaí.",
     sessionDeleted: "Seisiún scriosta",
     failedToDelete: "Theip ar scriosadh an tseisiúin",
     deleteEmpty: "Scrios folamh",

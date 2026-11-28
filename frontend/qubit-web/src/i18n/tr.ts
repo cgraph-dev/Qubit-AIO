@@ -144,7 +144,7 @@ export const tr: Translations = {
     deleteSession: "Oturumu sil",
     confirmDeleteTitle: "Oturum silinsin mi?",
     confirmDeleteMessage:
-      "Bu, konuşmayı ve tüm mesajlarını kalıcı olarak siler. Bu işlem geri alınamaz.",
+      "Konuşma etkin geçmişten gizlenir. Daha sonra geri yükleyebilirsiniz.",
     sessionDeleted: "Oturum silindi",
     failedToDelete: "Oturum silinemedi",
     deleteEmpty: "Boşları sil",

@@ -223,7 +223,7 @@ export const en: Translations = {
     deleteSession: "Delete session",
     confirmDeleteTitle: "Delete session?",
     confirmDeleteMessage:
-      "This permanently removes the conversation and all of its messages. This cannot be undone.",
+      "This hides the conversation from active history. You can restore it later.",
     sessionDeleted: "Session deleted",
     failedToDelete: "Failed to delete session",
     deleteEmpty: "Delete empty",

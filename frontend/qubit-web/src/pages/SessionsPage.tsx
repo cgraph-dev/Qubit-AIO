@@ -1021,6 +1021,7 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
       all: null,
     });
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
+  const [archivedOnly, setArchivedOnly] = useState(false);
   const sourceMenuRef = useRef<HTMLDivElement | null>(null);
   const sessionsRequestRef = useRef(0);
   // Count of empty (no-message, ended, non-archived) sessions across the
@@ -1096,7 +1097,7 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
   );
 
   const sessionQueryOptions = useMemo(() => {
-    const scope = { profile };
+    const scope = archivedOnly ? { profile, archived: "only" as const } : { profile };
     if (selectedSources !== null) {
       if (selectedSources.length === 0) {
         return allSourceNames.length > 0
@@ -1124,7 +1125,7 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
         : { ...scope, sources: AUTOMATION_SESSION_SOURCES };
     }
     return scope;
-  }, [selectedSources, sessionCategory, allSourceNames, profile]);
+  }, [archivedOnly, selectedSources, sessionCategory, allSourceNames, profile]);
 
   const categoryDefaultSources = useMemo(() => {
     return allSourceNames.filter((source) =>
@@ -1725,12 +1726,8 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
 
   const handleRestore = useCallback(
     async (id: string) => {
-      // "Delete" on the compat route archives a chat session; the archived row
-      // is un-archived in the SAME canonical chat-session store via its native
-      // PATCH route (`PATCH /api/qubit/chat/sessions/{id} {archived:false}`).
-      // The compat `/api/sessions/{id}` patch cannot see an archived row.
       try {
-        await api.patchChatSession(id, { archived: false }, rowProfile(id));
+        await api.restoreSession(id, rowProfile(id));
         showToast("Session restored", "success");
         loadSessions(page, true);
         loadStats();
@@ -2191,6 +2188,20 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
               />
             )}
 
+            <Button
+              variant="secondary"
+              aria-label={t.kanban.showArchived}
+              aria-pressed={archivedOnly}
+              onClick={() => {
+                setArchivedOnly((only) => !only);
+                switchView("list");
+                setPage(0);
+                setExpandedId(null);
+              }}
+            >
+              {t.kanban.showArchived}
+            </Button>
+
             {showList && (
               <div className="relative min-w-0 w-full sm:w-auto sm:min-w-[12rem] sm:max-w-md sm:flex-1">
                 {searching ? (
@@ -2219,7 +2230,7 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
               </div>
             )}
 
-            {showList && emptyCount > 0 && !isSearching && (
+            {showList && emptyCount > 0 && !isSearching && !archivedOnly && (
               <Button
                 variant="primary"
                 className="shrink-0"

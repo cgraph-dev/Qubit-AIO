@@ -144,7 +144,7 @@ export const ru: Translations = {
     deleteSession: "Удалить сессию",
     confirmDeleteTitle: "Удалить сессию?",
     confirmDeleteMessage:
-      "Это безвозвратно удалит разговор и все его сообщения. Действие нельзя отменить.",
+      "Разговор будет скрыт из активной истории. Его можно восстановить позже.",
     sessionDeleted: "Сессия удалена",
     failedToDelete: "Не удалось удалить сессию",
     deleteEmpty: "Удалить пустые",

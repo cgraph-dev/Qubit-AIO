@@ -705,6 +705,7 @@ function appendQueryParam(url: string, key: string, value?: string): string {
 export interface SessionQueryOptions {
   profile?: string;
   order?: "created" | "recent";
+  archived?: "only";
   source?: string | null;
   sources?: string[];
   excludeSources?: string[];
@@ -733,6 +734,7 @@ function appendSessionFilters(url: string, options: SessionQueryOptions): string
   if (options.excludeSources && options.excludeSources.length > 0) {
     next = appendQueryParam(next, "exclude_sources", options.excludeSources.join(","));
   }
+  next = appendQueryParam(next, "archived", options.archived);
   return appendProfileParam(next, options.profile);
 }
 
@@ -1093,6 +1095,11 @@ export const api = {
     fetchJSON<{ ok: boolean }>(
       appendProfileParam(`/api/sessions/${encodeURIComponent(id)}`, profile),
       { method: "DELETE" },
+    ),
+  restoreSession: (id: string, profile = getManagementProfile()) =>
+    fetchJSON<{ ok: boolean }>(
+      appendProfileParam(`/api/sessions/${encodeURIComponent(id)}/resume`, profile),
+      { method: "POST" },
     ),
   getEmptySessionsCount: (profile = getManagementProfile()) =>
     fetchJSON<{ count: number }>(

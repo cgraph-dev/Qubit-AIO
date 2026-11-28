@@ -144,7 +144,7 @@ export const ko: Translations = {
     deleteSession: "세션 삭제",
     confirmDeleteTitle: "세션을 삭제하시겠습니까?",
     confirmDeleteMessage:
-      "이 작업은 대화와 모든 메시지를 영구적으로 제거합니다. 되돌릴 수 없습니다.",
+      "대화가 현재 기록에서 숨겨집니다. 나중에 복원할 수 있습니다.",
     sessionDeleted: "세션이 삭제되었습니다",
     failedToDelete: "세션 삭제에 실패했습니다",
     deleteEmpty: "빈 세션 삭제",

@@ -142,7 +142,7 @@ export const zh: Translations = {
     untitledSession: "无标题会话",
     deleteSession: "删除会话",
     confirmDeleteTitle: "删除会话？",
-    confirmDeleteMessage: "此操作将永久删除对话及其所有消息，无法恢复。",
+    confirmDeleteMessage: "此对话将从活动历史记录中隐藏。您可以稍后恢复它。",
     sessionDeleted: "会话已删除",
     failedToDelete: "删除会话失败",
     deleteEmpty: "删除空会话",

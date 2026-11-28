@@ -17,7 +17,7 @@ const apiMocks = vi.hoisted(() => ({
   deleteSession: vi.fn(),
   deleteEmptySessions: vi.fn(),
   bulkDeleteSessions: vi.fn(),
-  patchChatSession: vi.fn(),
+  restoreSession: vi.fn(),
   getProfiles: vi.fn(),
   getActiveProfile: vi.fn(),
   getSessionStats: vi.fn(),
@@ -142,7 +142,7 @@ beforeEach(() => {
   apiMocks.getSessionMessages.mockResolvedValue({ messages: [] });
   apiMocks.deleteSession.mockResolvedValue({ ok: true });
   apiMocks.renameSession.mockResolvedValue({ ok: true, title: "Renamed" });
-  apiMocks.patchChatSession.mockResolvedValue({ ok: true });
+  apiMocks.restoreSession.mockResolvedValue({ ok: true });
   apiMocks.exportSessionUrl.mockReturnValue("/api/sessions/x/export");
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500 })));
   vi.stubGlobal("ResizeObserver", class { disconnect() {} observe() {} unobserve() {} });
@@ -216,15 +216,17 @@ describe("SessionsPage archived rows", () => {
       },
     ]);
 
+    await act(async () => click(button("Show archived")));
+    await waitFor(() => apiMocks.getSessions.mock.calls.some(
+      ([, , options]) => options?.archived === "only",
+    ));
     const restore = button("Restore session");
     expect(restore).not.toBeNull();
     // An archived row offers Restore, not Delete/Rename.
     expect(button("Delete session")).toBeNull();
 
     await act(async () => click(restore));
-    expect(apiMocks.patchChatSession).toHaveBeenCalledWith("sid-archived", {
-      archived: false,
-    }, "current");
+    expect(apiMocks.restoreSession).toHaveBeenCalledWith("sid-archived", "current");
   });
 });
 

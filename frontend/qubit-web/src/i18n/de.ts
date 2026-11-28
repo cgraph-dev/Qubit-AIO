@@ -144,7 +144,7 @@ export const de: Translations = {
     deleteSession: "Sitzung löschen",
     confirmDeleteTitle: "Sitzung löschen?",
     confirmDeleteMessage:
-      "Dies entfernt die Unterhaltung und alle Nachrichten dauerhaft. Dies kann nicht rückgängig gemacht werden.",
+      "Die Unterhaltung wird im aktiven Verlauf ausgeblendet. Du kannst sie später wiederherstellen.",
     sessionDeleted: "Sitzung gelöscht",
     failedToDelete: "Sitzung konnte nicht gelöscht werden",
     deleteEmpty: "Leere löschen",

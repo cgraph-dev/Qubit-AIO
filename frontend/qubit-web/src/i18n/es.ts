@@ -144,7 +144,7 @@ export const es: Translations = {
     deleteSession: "Eliminar sesión",
     confirmDeleteTitle: "¿Eliminar sesión?",
     confirmDeleteMessage:
-      "Esto elimina permanentemente la conversación y todos sus mensajes. No se puede deshacer.",
+      "La conversación se ocultará del historial activo. Puedes restaurarla más adelante.",
     sessionDeleted: "Sesión eliminada",
     failedToDelete: "No se pudo eliminar la sesión",
     deleteEmpty: "Eliminar vacías",

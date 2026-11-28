@@ -144,7 +144,7 @@ export const fr: Translations = {
     deleteSession: "Supprimer la session",
     confirmDeleteTitle: "Supprimer la session ?",
     confirmDeleteMessage:
-      "Cela supprime définitivement la conversation et tous ses messages. Cette action est irréversible.",
+      "La conversation sera masquée dans l’historique actif. Vous pourrez la restaurer plus tard.",
     sessionDeleted: "Session supprimée",
     failedToDelete: "Échec de la suppression de la session",
     deleteEmpty: "Supprimer les vides",

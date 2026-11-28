@@ -144,7 +144,7 @@ export const uk: Translations = {
     deleteSession: "Видалити сесію",
     confirmDeleteTitle: "Видалити сесію?",
     confirmDeleteMessage:
-      "Це назавжди видалить розмову та всі її повідомлення. Цю дію не можна скасувати.",
+      "Розмову буде приховано з активної історії. Її можна відновити пізніше.",
     sessionDeleted: "Сесію видалено",
     failedToDelete: "Не вдалося видалити сесію",
     deleteEmpty: "Видалити порожні",

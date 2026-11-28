@@ -144,7 +144,7 @@ export const ja: Translations = {
     deleteSession: "セッションを削除",
     confirmDeleteTitle: "セッションを削除しますか？",
     confirmDeleteMessage:
-      "会話とそのすべてのメッセージが完全に削除されます。この操作は取り消せません。",
+      "会話はアクティブな履歴から非表示になります。後で復元できます。",
     sessionDeleted: "セッションを削除しました",
     failedToDelete: "セッションの削除に失敗しました",
     deleteEmpty: "空を削除",

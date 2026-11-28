@@ -144,7 +144,7 @@ export const pt: Translations = {
     deleteSession: "Eliminar sessão",
     confirmDeleteTitle: "Eliminar sessão?",
     confirmDeleteMessage:
-      "Esta ação remove permanentemente a conversa e todas as suas mensagens. Não é possível anular.",
+      "A conversa ficará oculta no histórico ativo. Pode restaurá-la mais tarde.",
     sessionDeleted: "Sessão eliminada",
     failedToDelete: "Falha ao eliminar a sessão",
     deleteEmpty: "Eliminar vazias",
