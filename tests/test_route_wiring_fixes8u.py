@@ -515,15 +515,29 @@ def test_sessions_history_and_confirmations_follow_the_owning_profile(tmp_path, 
         assert request("GET", "sessions/empty/count?profile=work")[1]["count"] == 0
         assert request("GET", "sessions/empty/count?profile=current")[1]["count"] == 1
 
-        assert request("DELETE", "sessions/same-id?profile=work&confirm=false")[0] == 409
-        assert request("DELETE", "sessions/same-id?profile=work&confirm=true")[0] == 200
+        code, pending = request("DELETE", "sessions/same-id?profile=work")
+        assert code == 409 and pending["confirmation_id"]
+        cid = pending["confirmation_id"]
+        assert request("DELETE", f"sessions/same-id?profile=current&confirmation_id={cid}&confirm=true")[0] == 409
+        assert request("DELETE", f"sessions/bulk-id?profile=work&confirmation_id={cid}&confirm=true")[0] == 409
+        code, result = request("POST", "ops/confirm", {
+            "confirmation_id": cid, "sensitive": {"profile": "current", "id": "bulk-id"},
+        })
+        assert code == 200 and result["state"] == "executed", result
         assert request("GET", "sessions/same-id?profile=work")[0] == 404
         assert request("GET", "sessions/same-id?profile=current")[0] == 200
         assert request("PATCH", "qubit/chat/sessions/same-id?profile=work", {"archived": False})[0] == 200
         assert request("GET", "sessions/same-id?profile=work")[0] == 200
+        assert request("DELETE", f"sessions/same-id?profile=work&confirmation_id={cid}&confirm=true")[0] == 409
+        assert request("GET", "sessions/same-id?profile=work")[0] == 200
 
         code, pending = request("POST", "sessions/bulk-delete", {"profile": "work", "ids": ["bulk-id"]})
         assert code == 409 and pending["confirmation_id"]
+        code, out = request("POST", "sessions/bulk-delete?profile=current", {
+            "ids": ["same-id"], "confirmation_id": pending["confirmation_id"], "confirm": True,
+        })
+        assert code == 409, out
+        assert request("GET", "sessions/same-id?profile=current")[0] == 200
         code, result = request("POST", "ops/confirm", {
             "confirmation_id": pending["confirmation_id"],
             "sensitive": {"profile": "current", "ids": ["same-id"]},

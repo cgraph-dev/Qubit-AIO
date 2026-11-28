@@ -197,7 +197,8 @@ def _compat_confirm(cfg: Any, action: str, detail: str,
     Returns ``None`` when the request may proceed: either an explicit
     ``confirm`` (body or query) is truthy, or a ``confirmation_id`` staged by a
     prior call for the SAME action is present and still pending (it is consumed
-    here, exactly once). Otherwise stages a fresh single-use approval — with
+    here, exactly once). For exact payloads, a supplied ID takes precedence over
+    the flag. Otherwise stages a fresh single-use approval — with
     ``payload`` (the validated scalar set) recorded on it — and returns a typed
     409 whose ``confirmation_id`` is real and usable by both the re-issue path
     and the id-only ``POST /api/ops/confirm`` path.
@@ -214,10 +215,9 @@ def _compat_confirm(cfg: Any, action: str, detail: str,
                      "detail": "emergency stop latched; mutation refused",
                      "owner": "qubit-policy",
                      "rollback": "nothing changed; nothing to roll back"}
-    if _truthy(b.get("confirm")) or _truthy(q.get("confirm")):
+    cid = str(b.get("confirmation_id") or q.get("confirmation_id") or "").strip()
+    if (not match_payload or not cid) and (_truthy(b.get("confirm")) or _truthy(q.get("confirm"))):
         return None
-    cid = str(b.get("confirmation_id", "")
-              or q.get("confirmation_id", "") or "").strip()
     if cid:
         try:
             from .dashboard_ops import _journal
@@ -1223,11 +1223,11 @@ def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Delete a session (canonical chat store, then receipt tombstone)."""
     rid = p.get("id", "")
-    confirm = _truthy(b.get("confirm", q.get("confirm")))
-    if _estop(cfg):
-        return 403, {"ok": False, "state": "UNAVAILABLE",
-                     "code": "EMERGENCY_STOP",
-                     "detail": "emergency stop latched; session delete refused"}
+    guard = _compat_confirm(
+        cfg, "sessions.delete", f"Deleting session {rid!r} requires confirmation.",
+        q, b, payload={"id": rid, "profile": q["profile"]}, match_payload=True)
+    if guard is not None:
+        return guard
     # The canonical chat store deletes the real transcript (recoverable from a
     # backup); a receipt row deletes its lifecycle tombstone. ``delete`` does
     # not gate on ``show``, so an already-archived chat row is still handled
@@ -1238,16 +1238,10 @@ def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cs = None
     if cs is not None:
         try:
-            res = cs.delete(rid, confirm=confirm)
+            res = cs.delete(rid, confirm=True)
         except Exception as exc:
             return _fail(exc)
         if str(res.get("state")) != "MISSING":
-            if not confirm:
-                return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
-                             "code": res.get("code", "CONFIRM_REQUIRED"),
-                             "detail": res.get("detail", ""),
-                             "qubit_counterpart": "re-DELETE with "
-                                                  "{\"confirm\": true}"}
             ok = str(res.get("state")) == "OK"
             if ok:
                 _audit("session.delete", "dashboard:user", {"id": str(rid)})
@@ -1257,15 +1251,9 @@ def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                               res.get("detail", ""))[:200],
                                           "session": res.get("session")}
     try:
-        res = _receipt_session_store(cfg).delete(rid, confirm=confirm)
+        res = _receipt_session_store(cfg).delete(rid, confirm=True)
     except Exception as exc:
         return _fail(exc)
-    if not confirm:
-        return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
-                     "code": res.get("code", "CONFIRM_REQUIRED"),
-                     "detail": res.get("detail", ""),
-                     "qubit_counterpart": "re-DELETE with {\"confirm\": true}; "
-                                          "recover with POST resume"}
     ok = str(res.get("state")) == "OK"
     if ok:
         _audit("session.delete", "dashboard:user", {"id": str(rid)})

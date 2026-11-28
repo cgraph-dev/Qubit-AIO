@@ -892,7 +892,7 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                 body["config"] = dict(payload)
             return HC.config_save(cfg, query, body, {})
         return _run
-    if action in ("sessions.prune", "sessions.bulk_delete", "sessions.delete_empty"):
+    if action in ("sessions.prune", "sessions.bulk_delete", "sessions.delete_empty", "sessions.delete"):
         def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
             from . import qubit_compat as HC
 
@@ -900,9 +900,11 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                 "sessions.prune": HC.h_sessions_prune,
                 "sessions.bulk_delete": HC.h_sessions_bulk_delete,
                 "sessions.delete_empty": HC.h_sessions_empty_delete,
+                "sessions.delete": HC.h_session_delete,
             }
             body = {**payload, "confirm": True}
-            return handlers[action](cfg, {"profile": str(payload.get("profile") or "")}, body, {})
+            params = {"id": str(payload.get("id") or "")} if action == "sessions.delete" else {}
+            return handlers[action](cfg, {"profile": str(payload.get("profile") or "")}, body, params)
         return _run
     if action == "memory.reset":
         def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
