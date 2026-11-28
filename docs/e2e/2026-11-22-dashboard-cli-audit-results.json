@@ -2578,5 +2578,14 @@
     "verification": "Seventy-three focused Workbench tests passed, along with syntax checks for five modified JavaScript files.",
     "deployment": "Port 8890 served the updated Workbench action and script on both aliases. The existing VoiceBridge process stayed active and reported READY. The named gateway and model turn ran in a disposable profile.",
     "remaining": "Named conversation sends within Workbench itself, the native legacy composer behavior, and deployed named-profile inference. The checklist remains at eleven of thirty."
+  },
+  "current_qubit_chat_read_only_legacy_history": {
+    "date": "2026-11-28",
+    "revision": "02c24bcbecd0fa64659b7ac08d7a636f784669b4",
+    "browser": "Chromium at 390 CSS pixels held the exact named session metadata request and saw no composer while waiting. The legacy transcript loaded with the copy action, without a composer or terminal handoff. Summarize was disabled. The browser copied the conversation through the disposable named gateway, opened the child composer, and restored the transcript and composer after reload. No chat stream POST was issued.",
+    "isolation": "Independent SQLite reads confirmed exact parent linkage, unchanged source messages, matching copied messages, and no source or child in the default database.",
+    "verification": "All 35 focused ChatPage tests passed. TypeScript and the Vite production build passed, including the retry case after a lost copy response.",
+    "deployment": "The production bundle was built from clean local merge fe7ef5903c8d175863ebb103281b06c92fc381c2, including other committed work in that checkout. The previous bundle was retained. After the VoiceBridge restart, port 8890 served that build with READY health. Both chat and Workbench routes, Qubit Office and its licence route returned 200. The gateway kept its process ID.",
+    "remaining": "Sending from inside Workbench, named inference on the deployed dashboard, and the remaining combined checklist requirements. Eleven of thirty are complete."
   }
 }
