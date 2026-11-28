@@ -7582,6 +7582,60 @@ async function deleteCurrentProfile(){
   } catch (e) { showToast(t('delete_failed') + e.message); }
 }
 
+function openProfileHistory(profile, trigger) {
+  const dialog = $('profileHistoryDialog');
+  const status = $('profileHistoryStatus');
+  const list = $('profileHistoryList');
+  const retry = $('profileHistoryRetry');
+  const chat = new URL('../qubit-chat', document.baseURI);
+  chat.searchParams.set('profile', profile);
+  $('profileHistoryChat').href = chat.href;
+  $('profileHistoryTitle').textContent = t('profile_history_title', profile);
+
+  const request = new AbortController();
+  dialog.addEventListener('close', () => {
+    request.abort();
+    (trigger && trigger.isConnected ? trigger : $('profileChip'))?.focus();
+  }, { once: true });
+
+  async function loadConversations() {
+    list.replaceChildren();
+    retry.hidden = true;
+    status.textContent = t('profile_history_loading');
+    try {
+      const params = new URLSearchParams({ profile });
+      const token = window.__QUBIT_SESSION_TOKEN__;
+      const headers = token ? { 'X-Qubit-Session-Token': token } : {};
+      const data = await api('/api/sessions?' + params, {
+        headers, signal: request.signal, timeoutToast: false, redirect401: false,
+      });
+      if (request.signal.aborted) return;
+      if (data?.active_profile !== profile || !Array.isArray(data.sessions)
+          || data.sessions.some(row => !row?.id || row.linked_profile !== profile || row.read_only !== true)) {
+        throw new Error('Unexpected session owner');
+      }
+      for (const row of data.sessions) {
+        const link = document.createElement('a');
+        const url = new URL(document.baseURI);
+        url.search = new URLSearchParams({ profile, session: row.id });
+        link.href = url.href;
+        link.textContent = row.title || row.id;
+        const item = document.createElement('li');
+        item.append(link);
+        list.append(item);
+      }
+      status.textContent = data.sessions.length ? '' : t('profile_history_empty');
+    } catch (_) {
+      if (request.signal.aborted) return;
+      status.textContent = t('profile_history_failed');
+      retry.hidden = false;
+    }
+  }
+  retry.onclick = loadConversations;
+  dialog.showModal();
+  void loadConversations();
+}
+
 function renderProfileDropdown(data) {
   data = data || {};
   const dd = $('profileDropdown');
@@ -7593,8 +7647,9 @@ function renderProfileDropdown(data) {
     : (data.active || 'default');
   const profiles = allProfiles.filter(p => p && (p.visible !== false || p.name === active));
   for (const p of profiles) {
-    const opt = document.createElement('div');
-    opt.className = 'profile-opt' + (p.name === active ? ' active' : '');
+    const opt = document.createElement('button');
+    opt.type = 'button';
+    opt.className = 'profile-opt profile-choice' + (p.name === active ? ' active' : '');
     const meta = [];
     if (typeof p.model === 'string' && p.model) meta.push(p.model.split('/').pop());
     if (p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
@@ -7604,9 +7659,13 @@ function renderProfileDropdown(data) {
     opt.innerHTML = `<div class="profile-opt-name">${gwDot}${esc(p.name)}${defaultBadge}${checkmark}</div>` +
       (meta.length ? `<div class="profile-opt-meta">${esc(meta.join(' \u00b7 '))}</div>` : '');
     opt.onclick = async () => {
+      const trigger = _profileDropdownTrigger;
       closeProfileDropdown();
-      if (p.name === active) return;
-      await switchToProfile(p.name);
+      if (!p.is_default && p.name !== 'default') {
+        openProfileHistory(p.name, trigger);
+        return;
+      }
+      if (p.name !== active) await switchToProfile(p.name);
     };
     dd.appendChild(opt);
   }

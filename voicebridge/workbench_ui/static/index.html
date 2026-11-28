@@ -1865,6 +1865,19 @@
     </div>
   </div>
 </div>
+<dialog class="app-dialog profile-history-dialog" id="profileHistoryDialog" aria-labelledby="profileHistoryTitle">
+  <div class="app-dialog-header">
+    <h2 class="app-dialog-title" id="profileHistoryTitle"></h2>
+  </div>
+  <p class="app-dialog-desc" data-i18n="profile_history_help">Recent conversations in this profile. Open a saved conversation in Workbench or use Qubit Chat to send messages.</p>
+  <p class="app-dialog-desc" id="profileHistoryStatus" role="status"></p>
+  <ul class="profile-history-list" id="profileHistoryList"></ul>
+  <div class="app-dialog-actions">
+    <button class="app-dialog-btn" id="profileHistoryRetry" type="button" data-i18n="profile_history_retry" hidden>Retry</button>
+    <form method="dialog"><button class="app-dialog-btn" type="submit" data-i18n="terminal_close" autofocus>Close</button></form>
+    <a class="app-dialog-btn confirm" id="profileHistoryChat" data-i18n="profile_history_chat">Open Qubit Chat</a>
+  </div>
+</dialog>
 <div class="toast" id="toast"></div>
 <script src="static/i18n.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/icons.js?v=__WEBUI_VERSION__" defer></script>
