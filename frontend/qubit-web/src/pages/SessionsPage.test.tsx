@@ -55,6 +55,7 @@ vi.mock("@/sakuga/ui", async (importOriginal) => {
 
 vi.mock("@/lib/api", () => ({
   api: apiMocks,
+  runMutationWithConfirm: <T,>(call: () => Promise<T>) => call(),
   // ProfileProvider mirrors its selection into the api module.
   setManagementProfile: vi.fn(),
   getManagementProfile: vi.fn(() => ""),

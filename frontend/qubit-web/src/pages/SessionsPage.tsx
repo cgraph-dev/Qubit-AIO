@@ -1506,7 +1506,10 @@ function ProfileSessionsPage({ profile }: { profile: string }) {
       async (session: SessionInfo) => {
         const { id } = session;
         try {
-          await api.deleteSession(id, session.profile || profile);
+          await runMutationWithConfirm(
+            () => api.deleteSession(id, session.profile || profile),
+            () => true,
+          );
           setSessions((prev) => prev.filter((s) => s.id !== id));
           setSearchResults((prev) => prev?.filter((s) => s.id !== id) ?? null);
           setOverviewSessions((prev) => prev.filter((s) => s.id !== id));

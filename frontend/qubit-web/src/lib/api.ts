@@ -1092,13 +1092,7 @@ export const api = {
   deleteSession: (id: string, profile = getManagementProfile()) =>
     fetchJSON<{ ok: boolean }>(
       appendProfileParam(`/api/sessions/${encodeURIComponent(id)}`, profile),
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        // The confirm dialog is the human confirmation; the backend requires
-        // an explicit confirm flag on the delete request.
-        body: JSON.stringify({ confirm: true }),
-      },
+      { method: "DELETE" },
     ),
   getEmptySessionsCount: (profile = getManagementProfile()) =>
     fetchJSON<{ count: number }>(
