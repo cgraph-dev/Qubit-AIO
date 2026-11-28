@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Named chat row closed (2026-11-28).** Two live local provider endpoints returned responses from distinct models in the same named conversation. This covers per-turn routing and reasoning. The separate model picker and terminal model handoff rows remain open. [Named chat provider switch audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Named chat retry and load follow-up (2026-11-28).** The exact failed receipt, saved attachment and reasoning setting, retry replay, and transcript replacement passed through the named gateway. Four concurrent conversations recovered independently. Finish the distinct model and provider switch against an approved second provider and model. [Named chat retry audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Named chat image and model follow-up (2026-11-28).** The disposable named gateway now has provider-level evidence for direct and delegated PNG turns, malformed image rejection, and per-turn model alias and reasoning scope. Continue with failed image retry through the original transcript and receipt, switching to a distinct model and provider, and error recovery under heavier concurrent load. [Named chat image and model audit](e2e/2026-11-22-dashboard-cli-audit-results.json)

@@ -2680,5 +2680,47 @@
     "concurrency": "Four separate conversations submitted concurrently and independently recovered terminal failures. Their four concurrent retries recovered as completed and identified the image as blue. SQLite showed each exact pair of submission IDs and matching payloads, retained each conversation's own prompt, and exposed one active exchange per conversation. The proxy saw four rejections and four successful image-bearing requests.",
     "tests": "Eight focused relay tests, four gateway retry tests, and two dashboard retry and reconciliation tests passed.",
     "remaining": "Switching to a distinct model and provider with real inference. Twelve of thirty continuation rows are complete."
+  },
+  "current_named_chat_provider_switch_and_checklist": {
+    "date": "2026-11-28",
+    "revision": "d0fde3259903a60473ba9dbe683e168bb683fe4e",
+    "environment": "Authenticated disposable dashboard and named gateway, two named custom provider entries, and separate loopback Ollama services. The secondary service used a temporary model store and a 65,536-token runtime window. The original secondary test model had a 32,768-token window and hit the gateway's existing 64,000-token tool-use guard.",
+    "provider_capture": [
+      {
+        "provider": "audit-secondary",
+        "model": "qwen3.5:0.8b-q8_0",
+        "digest": "7c00f78aed0fd757e9ba2f2720896768fd22da24b7fb6fe17096bb1e85bb2d25",
+        "reasoning_effort": "none",
+        "reply": "violet"
+      },
+      {
+        "provider": "audit-primary",
+        "model": "qubit-brain:latest",
+        "digest": "f73056de9af01695b3b87e7a5a111ef8306e0a082777d92645090ba9cabb3394",
+        "reasoning_effort": "low",
+        "reply": "amber"
+      },
+      {
+        "provider": "audit-primary",
+        "model": "qubit-brain:latest",
+        "reasoning_effort": "medium",
+        "reply": "green",
+        "selection": "profile default"
+      }
+    ],
+    "read_back": "The provider traces attributed each marked request only to its expected endpoint. The provider model lists showed different model artifacts. Each SSE stream completed in the original session and the authenticated receipt read returned terminal completed for the exact submission. Read-only SQLite confirmed the ordered prompts, replies, and receipt IDs.",
+    "tests": "Twenty-six focused gateway tests passed after allowing the test harness to create its own isolated home.",
+    "deployment": "This was an evidence update. Port 8890 returned READY and served Qubit Chat. The provider switch ran on the disposable named gateway.",
+    "continuation_checklist": {
+      "row": "Close the named-chat gaps for supported image turns, retry, per-turn model and reasoning overrides, and cancellation recovery after relay disconnect. On uncertain admission or an interrupted reply, reconcile the transcript or receipt before permitting an immediate resubmission. Verify quiet-turn keep-alives and error recovery under load.",
+      "state": "pass",
+      "prior_evidence": [
+        "current_named_chat_quiet_stream_and_recovery",
+        "current_named_chat_image_and_per_turn_options",
+        "current_named_chat_failed_image_retry_and_concurrent_recovery"
+      ],
+      "completed_rows": 13,
+      "total_rows": 30
+    }
   }
 }
