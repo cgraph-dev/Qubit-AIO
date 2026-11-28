@@ -2655,5 +2655,19 @@
     "tests": "Thirteen targeted stream, approval, relay and recovery tests passed. The new regressions cover pending admission, pending receipt, and release of the owner connection when the stream is closed while waiting.",
     "deployment": "VoiceBridge restarted from local merge 95dbb05c6. Port 8890 returned READY and served Qubit Chat. The live gateway retained its PID. Named inference tested the disposable gateway only.",
     "remaining": "The broader named-chat checklist row still needs the other image, model, reasoning, retry and load evidence. Twelve of thirty continuation rows are complete."
+  },
+  "current_named_chat_image_and_per_turn_options": {
+    "date": "2026-11-28",
+    "revision": "572c0f136b0bf0a85d31c10a24209d0b3ccd9640",
+    "environment": "Authenticated loopback VoiceBridge chat API, a standalone disposable named gateway, and a capture proxy forwarding to local system Ollama with qubit-brain:latest. Production configuration and transcripts were outside the fixture.",
+    "image": {
+      "sha256": "f34bf5ea67b98ac79c6ef271edb1f286b5af9af098781e50160e9e54b43838af",
+      "input": "Synthetic PNG showing a blue square. Declaring those bytes as JPEG returned HTTP 400 BAD_IMAGE.",
+      "with_explicit_vision_support": "With agent.image_input_mode native and model.supports_vision true, the primary request carried the original PNG bytes and reasoning_effort low. A subsequent provider call in the same turn used none. The terminal SSE and named SQLite transcript contained blue and the transcript contained one persisted user message.",
+      "without_explicit_vision_support": "With native mode and the model capability override absent, the vision helper received the same original PNG bytes. The primary call received text and the terminal SSE and named SQLite transcript again contained blue and one persisted user message."
+    },
+    "model_and_reasoning": "A separate session sent the exact untagged qubit-brain alias with reasoning_effort none. Its next turn omitted the overrides and sent the configured qubit-brain:latest with reasoning_effort medium. Both completed in the same named session and a direct read of SQLite matched the two prompts in order. The two names resolve to the same locally installed model.",
+    "tests": "Eight focused named-stream and profile-chat tests passed.",
+    "remaining": "Failed image retry and receipt reconciliation, a distinct model and provider, and error recovery under heavier concurrent load. Twelve of thirty continuation rows are complete."
   }
 }

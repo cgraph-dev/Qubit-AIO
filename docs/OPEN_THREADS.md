@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Named chat image and model follow-up (2026-11-28).** The disposable named gateway now has provider-level evidence for direct and delegated PNG turns, malformed image rejection, and per-turn model alias and reasoning scope. Continue with failed image retry through the original transcript and receipt, switching to a distinct model and provider, and error recovery under heavier concurrent load. [Named chat image and model audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Named chat quiet turns (2026-11-28).** The relay’s keep-alive now covers pending admission and receipt calls. Two concurrent requests through the real local provider exercised completion and disconnect recovery. Continue the broader named-chat row with image turns, per-turn model and reasoning, and heavier-load verification. [Named chat quiet-stream audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Session history row closed (2026-11-28).** The final browser and store checks cover the archive recovery, rename, export and import sequence. The audit links together the earlier draft, comment, activity, destructive confirmation and isolation evidence. Continue with the other eighteen continuation rows. [Session history completion evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
