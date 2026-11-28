@@ -2615,5 +2615,15 @@
     "tests": "Eight focused tests passed. Independent SQLite reads checked the effects of every destructive HTTP probe.",
     "deployment": "VoiceBridge restarted from local merge de646df59. Sessions returned HTTP 200 and health returned READY. The gateway retained its PID. Destructive tests ran only in disposable stores.",
     "remaining": "Sessions browser flows, remaining history endpoints, and any requirement to pin a prune or empty-sweep candidate snapshot. Eleven of thirty continuation rows are complete."
+  },
+  "current_sessions_browser_confirmation_flows": {
+    "date": "2026-11-28",
+    "revision": "90537c65288202f4fd1d4c29969e225db15ec25e",
+    "reproduction": "The single-delete browser request sent confirm=true directly. A pointer click on the bulk-selection checkbox did not leave a row selected because the native label and input both emitted clicks.",
+    "browser": "Chromium at 1440 and 390 CSS pixels exercised Cancel and Confirm for single delete, bulk delete, prune, and empty cleanup. Cancel sent no mutation. Each approval produced a 409 stage and a 200 settlement using that same server-issued confirmation ID in the intended profile. Keyboard Space, pointer Shift range selection, and touch selection worked without horizontal overflow.",
+    "isolation": "Read-only SQLite inspection confirmed single delete archived only its selected row. Bulk delete, prune and empty cleanup removed one intended row apiece. Active and archived rows remained and a sibling with the same IDs retained every fixture.",
+    "verification": "Fifteen targeted Sessions page tests passed. TypeScript and the production Vite build passed.",
+    "deployment": "The clean local build fc42d7fab30e508130e41ed88c0466cef9dfbf31 is served on port 8890 after a VoiceBridge restart. Sessions, Qubit Chat and Workbench returned HTTP 200 and the service reported READY. The previous build was retained. All destructive browser actions used disposable stores.",
+    "remaining": "The single-delete dialog still says permanent while the canonical operation archives the transcript. The remaining session UI interactions and combined continuation rows stay open."
   }
 }

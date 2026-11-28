@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Sessions page browser checks (2026-11-28).** Four destructive dialogs passed cancellation and exact settlement on disposable profiles. The single-delete dialog still describes permanent deletion even though the canonical row is archived. Continue the remaining Sessions UI actions and adjust that copy to match recovery. [Sessions browser confirmation audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Session confirmation ownership (2026-11-28).** Confirmed actions rejected changes to the operation, target, profile and prune filters. Browser interaction and the remaining session-history actions still need coverage. Prune and empty cleanup retain their existing operation and filter semantics. [Session confirmation audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Session artifact ownership (2026-11-28).** Disposable HTTP and sidecar reads verified draft content and metadata, comment targeting, activity, concurrent profile isolation, and archive recovery. Continue with the UI flows and exact confirmations for destructive session maintenance. [Session artifacts audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
