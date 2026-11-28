@@ -2587,5 +2587,14 @@
     "verification": "All 35 focused ChatPage tests passed. TypeScript and the Vite production build passed, including the retry case after a lost copy response.",
     "deployment": "The production bundle was built from clean local merge fe7ef5903c8d175863ebb103281b06c92fc381c2, including other committed work in that checkout. The previous bundle was retained. After the VoiceBridge restart, port 8890 served that build with READY health. Both chat and Workbench routes, Qubit Office and its licence route returned 200. The gateway kept its process ID.",
     "remaining": "Sending from inside Workbench, named inference on the deployed dashboard, and the remaining combined checklist requirements. Eleven of thirty are complete."
+  },
+  "current_session_portability_and_archive_validation": {
+    "date": "2026-11-28",
+    "revision": "167b35ff3a97ccf8c7fe486eac0eeed38e1ff35d",
+    "export_import": "An authenticated loopback listener read from sibling test profiles with a shared ID and different transcripts. Both exports selected the owning store. Missing authentication and an unknown profile were refused. Import skipped the existing target ID, restored the new parent and child in reverse input order, and skipped all three IDs on replay. A conflicting body and query profile and an invalid record in a batch left the target unchanged.",
+    "archive_restore": "The original code archived a conversation when it received the string false. Both patched session routes returned HTTP 400 MALFORMED for that input. SQLite confirmed valid booleans toggled only the selected profile. The canonical Sessions list hid the archived row by default, found it with the archive filter, and exported its original transcript. Resume restored that transcript.",
+    "tests": "Six focused mutation tests passed. The wider selection passed 35 and failed two. Both failures reproduced on the previous active checkout: the typed PROFILE_NOT_FOUND response in route wiring, and a retry fixture blocked by TOOLSET_CONFIG_ERROR. Test collection used the vendored gateway package to avoid a test namespace collision.",
+    "deployment": "VoiceBridge restarted from local merge b98be35b7. On port 8890 both authenticated malformed requests for a generated absent ID returned 400 MALFORMED. Live health returned READY and the gateway retained its PID. Valid mutations were confined to the fixture stores.",
+    "remaining": "Full session UI interactions, comments, drafts, latest descendant, destructive operations and exact approval replay. Eleven of thirty continuation rows are complete."
   }
 }
