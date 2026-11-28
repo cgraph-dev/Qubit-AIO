@@ -2605,5 +2605,15 @@
     "verification": "Twenty-two focused projection, profile lifecycle and gateway session tests passed.",
     "deployment": "VoiceBridge restarted from local merge fb24d875a. Port 8890 reported READY. Authenticated read-only probes returned an empty list for a generated absent default ID and 404 for a generated unknown profile. Archive mutations ran only on fixture data. The gateway PID stayed unchanged.",
     "remaining": "Session UI interactions, remaining history endpoints and destructive confirmations. Eleven of thirty continuation rows are complete."
+  },
+  "current_session_destructive_confirmations": {
+    "date": "2026-11-28",
+    "revision": "9534e50068c995efb4ee63b02a5a5dec8cfbbf9c",
+    "reproduction": "In disposable profiles, the original bulk-delete endpoint executed a different target and profile when the request supplied a staged ID plus confirm=true. The patch makes the supplied ID authoritative for exact-payload confirmation contracts.",
+    "verification": "Authenticated HTTP with duplicate IDs across disposable profiles refused changed actions, IDs, profiles and prune filters. One exact bulk settlement deleted its intended row and kept the sibling. The single-delete approval used the recorded target despite conflicting values at settlement. Restore reopened that row. Replaying the settled approval or presenting a cancelled approval left the session untouched.",
+    "maintenance": "A prune preview reported exactly the one old ended fixture. Approved prune and empty cleanup removed the intended test rows and left active and archived rows, and the sibling store, intact. Their staged payloads specify the operation, profile and prune filters where applicable. They evaluate eligible rows at execution time.",
+    "tests": "Eight focused tests passed. Independent SQLite reads checked the effects of every destructive HTTP probe.",
+    "deployment": "VoiceBridge restarted from local merge de646df59. Sessions returned HTTP 200 and health returned READY. The gateway retained its PID. Destructive tests ran only in disposable stores.",
+    "remaining": "Sessions browser flows, remaining history endpoints, and any requirement to pin a prune or empty-sweep candidate snapshot. Eleven of thirty continuation rows are complete."
   }
 }
