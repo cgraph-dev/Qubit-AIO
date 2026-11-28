@@ -2645,5 +2645,15 @@
       "completed_rows": 12,
       "total_rows": 30
     }
+  },
+  "current_named_chat_quiet_stream_and_recovery": {
+    "date": "2026-11-28",
+    "revision": "ca2b412d7490158369f74c964845285f64a8cc94",
+    "reproduction": "A delayed admission RPC and a delayed receipt RPC both produced no keep-alives on the original relay. The relay could only emit a heartbeat after its normal frame-read timeout and returned receipt.",
+    "verification": "Two concurrent authenticated requests used a disposable VoiceBridge listener, the standalone named gateway and system Ollama. A loopback proxy delayed provider output for 15 seconds. The streams emitted keep-alive comments after 10.09 and 10.06 seconds. One finished with its exact session and expected reply. The other lost its TCP connection before receiving a delta and reached terminal cancellation after recovery with the original submission ID.",
+    "read_back": "Per-request proxy counts and independent read-only SQLite verification showed exactly one provider request and one persisted user row per submission. The completed reply was present in the original named transcript.",
+    "tests": "Thirteen targeted stream, approval, relay and recovery tests passed. The new regressions cover pending admission, pending receipt, and release of the owner connection when the stream is closed while waiting.",
+    "deployment": "VoiceBridge restarted from local merge 95dbb05c6. Port 8890 returned READY and served Qubit Chat. The live gateway retained its PID. Named inference tested the disposable gateway only.",
+    "remaining": "The broader named-chat checklist row still needs the other image, model, reasoning, retry and load evidence. Twelve of thirty continuation rows are complete."
   }
 }

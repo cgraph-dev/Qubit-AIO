@@ -1,5 +1,7 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Named chat quiet turns (2026-11-28).** The relay’s keep-alive now covers pending admission and receipt calls. Two concurrent requests through the real local provider exercised completion and disconnect recovery. Continue the broader named-chat row with image turns, per-turn model and reasoning, and heavier-load verification. [Named chat quiet-stream audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
+
 **Session history row closed (2026-11-28).** The final browser and store checks cover the archive recovery, rename, export and import sequence. The audit links together the earlier draft, comment, activity, destructive confirmation and isolation evidence. Continue with the other eighteen continuation rows. [Session history completion evidence](e2e/2026-11-22-dashboard-cli-audit-results.json)
 
 **Sessions page browser checks (2026-11-28).** Four destructive dialogs passed cancellation and exact settlement on disposable profiles. The single-delete dialog still describes permanent deletion even though the canonical row is archived. Continue the remaining Sessions UI actions and adjust that copy to match recovery. [Sessions browser confirmation audit](e2e/2026-11-22-dashboard-cli-audit-results.json)
