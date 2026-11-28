@@ -235,6 +235,17 @@ def test_chat_projection_reads_are_real(tmp_path, monkeypatch):
     assert out["state"] == "OK" and out["counts"]["note"] == 1, out
     assert sid == "s1"
 
+    assert CT.store(cfg).archive(sid, True)["state"] == "OK"
+    for section in ("activity", "drafts", "draft", "comments", "ci"):
+        code, out = _dispatch(
+            cfg, "GET", f"/api/qubit/chat/sessions/{sid}/{section}", {"path": "src/app.py"},
+        )
+        assert (code, out.get("code")) == (404, "SESSION_NOT_FOUND"), (section, out)
+
+    assert CT.store(cfg).restore(sid)["state"] == "OK"
+    code, out = _dispatch(cfg, "GET", "/api/qubit/chat/sessions/s1/comments")
+    assert code == 200 and [row["body"] for row in out["comments"]] == ["please review"]
+
 
 # --------------------------------------------------------------------- S8
 CATALOG_OPS = {

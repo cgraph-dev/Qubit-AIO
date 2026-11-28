@@ -8746,14 +8746,18 @@ def _chat_store_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
 
 
 def _session_artifacts_profiled(handler):
-    """A scoped sidecar is visible only while its owning conversation is visible."""
+    """Hide sidecars for archived conversations and for unknown named sessions."""
     @_session_history_profiled
     @wraps(handler)
     def scoped(cfg, q, b, p):
-        if _session_history_home() is not None:
-            record = _chat_session_store(cfg)._session(p["id"])
-            if record is None or record.get("archived"):
+        home = _session_history_home()
+        record = _chat_session_store(cfg)._session(p["id"])
+        if record is None:
+            # Allow the listener's legacy sidecars that lack a canonical row.
+            if home is not None:
                 return 404, {"ok": False, "code": "SESSION_NOT_FOUND"}
+        elif record.get("archived"):
+            return 404, {"ok": False, "code": "SESSION_NOT_FOUND"}
         return handler(cfg, q, b, p)
     return scoped
 
